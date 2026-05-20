@@ -1,14 +1,28 @@
 <script setup>
 import { Terminal } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
-import MarkdownIt from 'markdown-it'
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
-
-const markdown = new MarkdownIt({
-  html: false,
-  linkify: true,
-  breaks: false,
-})
+import { fuzzyScore, highlightedText as highlightFuzzyText } from './lib/fuzzy'
+import {
+  eventTime,
+  formatDate,
+  formatMode,
+  modeChip,
+  modelChip,
+  projectName,
+  sessionTime,
+  toolLabel,
+  toolTarget,
+} from './lib/format'
+import {
+  entryClass,
+  messageBlocks,
+  messageBlocksFor,
+  renderedBlock,
+  renderedMessage,
+  textFromBlocks,
+  textFromContent,
+} from './lib/transcript'
 
 const sessions = ref([])
 const sessionsError = ref('')
@@ -304,14 +318,6 @@ function eventSummary(item) {
   return item.activeSessionId ? item.activeSessionId.slice(0, 8) : 'runtime'
 }
 
-function eventTime(item) {
-  return new Intl.DateTimeFormat(undefined, {
-    hour: 'numeric',
-    minute: '2-digit',
-    second: '2-digit',
-  }).format(new Date(item.loggedAt))
-}
-
 function activityText(event) {
   const type = event?.type || ''
   if (type === 'agent_start' || type === 'turn_start') return 'Thinking…'
@@ -354,47 +360,6 @@ function shouldClearLiveAssistant(event) {
   return event?.type === 'agent_end'
 }
 
-function textFromContent(content) {
-  if (!content) return ''
-  if (typeof content === 'string') return content
-  if (!Array.isArray(content)) return String(content)
-  return textFromBlocks(messageBlocks(content))
-}
-
-function messageBlocks(content) {
-  if (!Array.isArray(content)) return []
-
-  return content
-    .map((block) => {
-      if (block.type === 'text') return { type: 'text', text: block.text }
-      if (block.type === 'thinking') {
-        return { type: 'thinking', text: block.thinking }
-      }
-      return undefined
-    })
-    .filter((block) => block?.text)
-}
-
-function textFromBlocks(blocks) {
-  return blocks
-    .filter((block) => block.type === 'text')
-    .map((block) => block.text)
-    .join('\n')
-}
-
-function toolLabel(toolName) {
-  if (!toolName) return 'tool'
-  if (toolName === 'bash') return 'bash'
-  return toolName
-}
-
-function toolTarget(args) {
-  if (!args) return ''
-  const value = args.command || args.path
-  if (!value) return ''
-  return ` · ${String(value).slice(0, 80)}`
-}
-
 async function activateSession(session) {
   const response = await fetch('/api/pi/active-session', {
     method: 'POST',
@@ -406,45 +371,6 @@ async function activateSession(session) {
   activeRuntimeSession.value = data.active
 }
 
-function modelChip(model) {
-  if (!model) return 'No model'
-  const provider = model.provider ? `${formatProvider(model.provider)} · ` : ''
-  return `${provider}${formatModelId(model.id)}`
-}
-
-function formatProvider(value) {
-  return String(value)
-    .split(/[-_]/g)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ')
-}
-
-function formatModelId(value) {
-  return String(value || 'Unknown model')
-    .replace(/^(anthropic\.|claude-|openai\/)/, '')
-    .replace(/[-_]/g, ' ')
-    .replace(/\b\d{8}\b/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/\b\w/g, (letter) => letter.toUpperCase())
-}
-
-function modeChip(steeringMode, followUpMode) {
-  if (!steeringMode && !followUpMode) return ''
-  if (steeringMode === followUpMode) return `Mode · ${steeringMode}`
-  return [
-    steeringMode ? `Steer · ${steeringMode}` : '',
-    followUpMode ? `Follow-up · ${followUpMode}` : '',
-  ].filter(Boolean).join(' / ')
-}
-
-function formatMode(value) {
-  return String(value)
-    .replace(/[-_]/g, ' ')
-    .replace(/\b\w/g, (letter) => letter.toUpperCase())
-}
-
 function sessionTitle(session) {
   return session?.name || session?.firstMessage || 'Untitled session'
 }
@@ -453,88 +379,8 @@ function sessionScore(session, query) {
   return fuzzyScore(sessionTitle(session), query)
 }
 
-function fuzzyScore(value, query) {
-  const text = value.toLowerCase()
-  const terms = query.split(/\s+/).filter(Boolean)
-  let total = 0
-
-  for (const term of terms) {
-    const score = fuzzyTermScore(text, term)
-    if (score === 0) return 0
-    total += score
-  }
-
-  return total
-}
-
-function fuzzyTermScore(text, term) {
-  let position = -1
-  let score = 0
-  let streak = 0
-
-  for (const char of term) {
-    const next = text.indexOf(char, position + 1)
-    if (next === -1) return 0
-
-    streak = next === position + 1 ? streak + 1 : 1
-    score += 1 + streak * 2
-    if (next === 0 || /[\/\-_\s]/.test(text[next - 1])) score += 4
-    position = next
-  }
-
-  if (text.includes(term)) score += 20
-  if (text.startsWith(term)) score += 30
-  return score
-}
-
 function highlightedText(value) {
-  const query = sessionQuery.value.trim().toLowerCase()
-  if (!query) return escapeHtml(value)
-
-  const indexes = fuzzyMatchIndexes(value, query)
-  if (!indexes.size) return escapeHtml(value)
-
-  return Array.from(value)
-    .map((char, index) => ({ char, matched: indexes.has(index) }))
-    .reduce((html, item, index, items) => {
-      const previous = items[index - 1]
-      const next = items[index + 1]
-      const open = item.matched && !previous?.matched
-      const close = item.matched && !next?.matched
-      return `${html}${open ? '<mark>' : ''}${escapeHtml(item.char)}${close ? '</mark>' : ''}`
-    }, '')
-}
-
-function fuzzyMatchIndexes(value, query) {
-  const text = value.toLowerCase()
-  const indexes = new Set()
-  let start = 0
-
-  for (const term of query.split(/\s+/).filter(Boolean)) {
-    let position = start - 1
-    const termIndexes = []
-
-    for (const char of term) {
-      const next = text.indexOf(char, position + 1)
-      if (next === -1) return new Set()
-      termIndexes.push(next)
-      position = next
-    }
-
-    for (const index of termIndexes) indexes.add(index)
-    start = position + 1
-  }
-
-  return indexes
-}
-
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;')
+  return highlightFuzzyText(value, sessionQuery.value)
 }
 
 function isProjectExpanded(project) {
@@ -551,59 +397,6 @@ function toggleProject(project) {
   if (next.has(project.cwd)) next.delete(project.cwd)
   else next.add(project.cwd)
   expandedProjects.value = next
-}
-
-function projectName(cwd) {
-  if (!cwd) return 'unknown'
-  return cwd.split('/').filter(Boolean).at(-1) || cwd
-}
-
-function formatDate(value) {
-  if (!value) return ''
-  return new Intl.DateTimeFormat(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(new Date(value))
-}
-
-function sessionTime(session) {
-  if (!session.timestamp) return ''
-
-  const then = new Date(session.timestamp).getTime()
-  const diff = Date.now() - then
-  const minute = 60 * 1000
-  const hour = 60 * minute
-  const day = 24 * hour
-
-  if (diff < hour) return `${Math.max(1, Math.round(diff / minute))}m`
-  if (diff < day) return `${Math.round(diff / hour)}h`
-  return `${Math.round(diff / day)}d`
-}
-
-function entryClass(entry) {
-  return {
-    'user-message': entry.role === 'user',
-    'assistant-message': entry.role === 'assistant',
-    'summary-message': entry.type === 'summary',
-  }
-}
-
-function messageText(entry) {
-  return entry.text || ''
-}
-
-function renderedMessage(entry) {
-  return markdown.render(messageText(entry))
-}
-
-function renderedBlock(block) {
-  return markdown.render(block.text || '')
-}
-
-function messageBlocksFor(entry) {
-  return entry.blocks?.length ? entry.blocks : [{ type: 'text', text: entry.text }]
 }
 
 function isToolExpanded(entry) {
