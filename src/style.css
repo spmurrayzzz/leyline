@@ -843,7 +843,11 @@ h1 {
   border: 1px solid #35323f;
   border-radius: 22px;
   background: #17161d;
-  box-shadow: 0 18px 60px rgb(0 0 0 / 42%);
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 3%) inset,
+    0 2px 6px -3px rgb(0 0 0 / 45%),
+    0 14px 34px -18px rgb(0 0 0 / 32%),
+    0 28px 70px -42px rgb(20 16 32 / 34%);
 }
 
 .start-composer:focus-within {
