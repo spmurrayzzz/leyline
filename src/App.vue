@@ -1,4 +1,6 @@
 <script setup>
+import { Terminal } from '@xterm/xterm'
+import '@xterm/xterm/css/xterm.css'
 import MarkdownIt from 'markdown-it'
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 
@@ -36,9 +38,17 @@ const liveAssistantText = ref('')
 const liveAssistantBlocks = ref([])
 const stickToBottom = ref(true)
 const hasNewOutput = ref(false)
+const terminalOpen = ref(false)
+const terminalEl = ref(null)
+const terminalStatus = ref('closed')
+const terminalCwd = ref('')
 let eventSource
 let refreshTimer
 let scrollFrame
+let terminalInstance
+let terminalSocket
+let terminalInputDisposable
+let terminalRunId = 0
 
 const visibleProjects = computed(() => {
   const projects = new Map()
@@ -90,6 +100,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   eventSource?.close()
+  closeTerminalPanel()
   clearTimeout(refreshTimer)
   cancelAnimationFrame(scrollFrame)
 })
@@ -184,6 +195,7 @@ async function createSession(project) {
     stickToBottom.value = true
     hasNewOutput.value = false
     await scrollToLatest()
+    if (terminalOpen.value) await connectTerminal()
   } catch (error) {
     sessionError.value = error.message
   } finally {
@@ -214,6 +226,7 @@ async function selectSession(session) {
   } finally {
     sessionLoading.value = false
     await scrollToLatest()
+    if (terminalOpen.value && !sessionError.value) await connectTerminal()
   }
 }
 
@@ -674,6 +687,112 @@ function updateSelectedSessionSummary(session) {
   })
 }
 
+async function toggleTerminal() {
+  if (terminalOpen.value) {
+    closeTerminalPanel()
+    return
+  }
+
+  terminalOpen.value = true
+  await connectTerminal()
+}
+
+function closeTerminalPanel() {
+  terminalRunId += 1
+  terminalOpen.value = false
+  terminalStatus.value = 'closed'
+  terminalInputDisposable?.dispose()
+  terminalInputDisposable = undefined
+  terminalSocket?.close()
+  terminalSocket = undefined
+  terminalInstance?.dispose()
+  terminalInstance = undefined
+  window.removeEventListener('resize', resizeTerminal)
+}
+
+async function connectTerminal() {
+  terminalStatus.value = 'connecting'
+  await nextTick()
+  if (!terminalEl.value) return
+
+  const runId = terminalRunId + 1
+  terminalRunId = runId
+  terminalInputDisposable?.dispose()
+  terminalSocket?.close()
+  terminalInstance?.dispose()
+  window.removeEventListener('resize', resizeTerminal)
+
+  terminalInstance = new Terminal({
+    cursorBlink: true,
+    fontFamily: 'SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+    fontSize: 12,
+    lineHeight: 1.25,
+    theme: {
+      background: '#0b0c0f',
+      foreground: '#d8dbe3',
+      cursor: '#cfc5ff',
+      selectionBackground: '#3d3650',
+    },
+  })
+  const term = terminalInstance
+  term.open(terminalEl.value)
+  resizeTerminal()
+
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  const socket = new WebSocket(
+    `${protocol}//${window.location.host}/api/pi/terminal`,
+  )
+  terminalSocket = socket
+
+  terminalInputDisposable = term.onData((data) => {
+    if (socket.readyState !== WebSocket.OPEN) return
+    socket.send(JSON.stringify({ type: 'input', data }))
+  })
+
+  socket.addEventListener('open', () => {
+    if (runId !== terminalRunId) return
+    terminalStatus.value = 'connected'
+    resizeTerminal()
+  })
+
+  socket.addEventListener('message', (event) => {
+    if (runId !== terminalRunId) return
+    let payload
+    try {
+      payload = JSON.parse(event.data)
+    } catch {
+      return
+    }
+    if (payload.type === 'ready') {
+      terminalCwd.value = payload.cwd
+      terminalStatus.value = 'connected'
+    }
+    if (payload.type === 'data') term.write(payload.data)
+    if (payload.type === 'error') {
+      terminalStatus.value = 'error'
+      term.write(`\r\n${payload.message}\r\n`)
+    }
+    if (payload.type === 'exit') terminalStatus.value = 'exited'
+  })
+
+  socket.addEventListener('close', () => {
+    if (runId !== terminalRunId) return
+    if (terminalStatus.value === 'connected') terminalStatus.value = 'closed'
+  })
+
+  window.addEventListener('resize', resizeTerminal)
+}
+
+function resizeTerminal() {
+  if (!terminalInstance || !terminalEl.value) return
+  const cols = Math.max(40, Math.floor(terminalEl.value.clientWidth / 7.4))
+  const rows = Math.max(8, Math.floor(terminalEl.value.clientHeight / 15))
+  terminalInstance.resize(cols, rows)
+  if (terminalSocket?.readyState === WebSocket.OPEN) {
+    terminalSocket.send(JSON.stringify({ type: 'resize', cols, rows }))
+  }
+}
+
 function handleComposerKeydown(event) {
   if (event.key !== 'Enter' || event.shiftKey) return
   event.preventDefault()
@@ -775,6 +894,13 @@ function handleComposerKeydown(event) {
         </div>
         <div v-if="selectedSession" class="topbar-meta">
           <span v-if="agentRunning" class="running-pill">running</span>
+          <button
+            class="event-log-button"
+            type="button"
+            @click="toggleTerminal"
+          >
+            Terminal {{ terminalStatus }}
+          </button>
           <button
             class="event-log-button"
             type="button"
@@ -929,6 +1055,16 @@ function handleComposerKeydown(event) {
       >
         Jump to latest
       </button>
+
+      <section v-if="terminalOpen" class="terminal-panel">
+        <div class="terminal-header">
+          <strong>Terminal</strong>
+          <code>{{ terminalCwd || selectedSession?.cwd }}</code>
+          <span>{{ terminalStatus }}</span>
+          <button type="button" @click="closeTerminalPanel">×</button>
+        </div>
+        <div ref="terminalEl" class="terminal-frame"></div>
+      </section>
 
       <div v-if="!initializing" class="composer-fade"></div>
 

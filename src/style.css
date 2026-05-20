@@ -1012,6 +1012,70 @@ h1 {
   box-shadow: 0 10px 30px rgb(0 0 0 / 38%);
 }
 
+.terminal-panel {
+  position: absolute;
+  right: 44px;
+  bottom: 176px;
+  left: 44px;
+  z-index: 3;
+  height: 290px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: #0b0c0f;
+  box-shadow: 0 18px 60px rgb(0 0 0 / 48%);
+}
+
+.terminal-header {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  height: 34px;
+  border-bottom: 1px solid var(--border-soft);
+  background: #111217;
+  padding: 0 10px 0 12px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.terminal-header strong {
+  color: #e2e3e8;
+  font-size: 12px;
+}
+
+.terminal-header code {
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.terminal-header span {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 7px;
+  color: var(--muted-strong);
+  font-weight: 800;
+}
+
+.terminal-header button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.terminal-frame {
+  height: calc(100% - 34px);
+  padding: 8px 10px;
+}
+
+.terminal-frame .xterm {
+  height: 100%;
+}
+
 .composer {
   position: absolute;
   bottom: 22px;

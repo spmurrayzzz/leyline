@@ -12,9 +12,12 @@
   "dependencies": {
     "@earendil-works/pi-coding-agent": "0.75.3",
     "@vitejs/plugin-vue": "latest",
+    "@xterm/xterm": "6.0.0",
     "markdown-it": "14.1.1",
+    "node-pty": "1.1.0",
     "vite": "latest",
-    "vue": "latest"
+    "vue": "latest",
+    "ws": "8.20.1"
   },
   "devDependencies": {
     "playwright": "1.60.0"
