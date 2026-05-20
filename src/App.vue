@@ -44,6 +44,7 @@ const newSessionFormOpen = ref(false)
 const sessionQuery = ref('')
 const selectedSessionId = ref('')
 const expandedProjects = ref(new Set())
+const sidebarOpen = ref(false)
 const sessionDetail = ref(null)
 const sessionLoading = ref(false)
 const sessionError = ref('')
@@ -239,6 +240,7 @@ async function createSessionForCwd(cwd) {
     stickToBottom.value = true
     hasNewOutput.value = false
     await scrollToLatest()
+    sidebarOpen.value = false
     if (terminalOpen.value) await connectTerminal()
   } catch (error) {
     sessionError.value = error.message
@@ -270,6 +272,7 @@ async function selectSession(session) {
   } finally {
     sessionLoading.value = false
     await scrollToLatest()
+    sidebarOpen.value = false
     if (terminalOpen.value && !sessionError.value) await connectTerminal()
   }
 }
@@ -608,7 +611,15 @@ function handleComposerKeydown(event) {
 </script>
 
 <template>
-  <main class="leyline-app">
+  <main class="leyline-app" :class="{ 'sidebar-open': sidebarOpen }">
+    <button
+      v-if="sidebarOpen"
+      class="sidebar-scrim"
+      type="button"
+      aria-label="Close sessions"
+      @click="sidebarOpen = false"
+    ></button>
+
     <aside class="sidebar">
       <div class="brand-row">
         <div class="brand-mark">⌁</div>
@@ -712,6 +723,12 @@ function handleComposerKeydown(event) {
 
     <section class="main-pane">
       <header class="topbar">
+        <button
+          class="mobile-sidebar-button"
+          type="button"
+          aria-label="Open sessions"
+          @click="sidebarOpen = true"
+        >☰</button>
         <div class="topbar-project">
           <strong>
             {{ initializing ? 'Loading workspace' : projectName(selectedSession?.cwd) }}
