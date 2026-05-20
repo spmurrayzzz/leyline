@@ -90,6 +90,7 @@ async function selectSession(session) {
     const response = await fetch(`/api/pi/sessions/${session.id}`)
     const data = await response.json()
     if (!response.ok) throw new Error(data.error || 'Failed to load session')
+    await activateSession(session)
     sessionDetail.value = data
     expandedTools.value = new Set()
     localEntries.value = []
@@ -100,6 +101,16 @@ async function selectSession(session) {
     sessionLoading.value = false
     await scrollToLatest()
   }
+}
+
+async function activateSession(session) {
+  const response = await fetch('/api/pi/active-session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: session.id }),
+  })
+  const data = await response.json()
+  if (!response.ok) throw new Error(data.error || 'Failed to activate session')
 }
 
 function sessionTitle(session) {

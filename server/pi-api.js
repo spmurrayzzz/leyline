@@ -1,4 +1,29 @@
-import { SessionManager } from '@earendil-works/pi-coding-agent'
+import {
+  createAgentSessionFromServices,
+  createAgentSessionRuntime,
+  createAgentSessionServices,
+  getAgentDir,
+  SessionManager,
+} from '@earendil-works/pi-coding-agent'
+
+let activeRuntime
+let activeSessionId
+let unsubscribeActiveSession
+
+const sseClients = new Set()
+
+const createRuntime = async ({ cwd, sessionManager, sessionStartEvent }) => {
+  const services = await createAgentSessionServices({ cwd })
+  return {
+    ...(await createAgentSessionFromServices({
+      services,
+      sessionManager,
+      sessionStartEvent,
+    })),
+    services,
+    diagnostics: services.diagnostics,
+  }
+}
 
 export function piApi() {
   return {
@@ -11,6 +36,27 @@ export function piApi() {
           if (url.pathname === '/sessions') {
             const sessions = await SessionManager.listAll()
             return json(res, { sessions: sessions.map(toSessionDto) })
+          }
+
+          if (url.pathname === '/active-session') {
+            if (req.method !== 'POST') {
+              return json(res, { error: 'Method not allowed' }, 405)
+            }
+
+            const body = await readJson(req)
+            const session = await findSession(body.id)
+            if (!session) return json(res, { error: 'Session not found' }, 404)
+
+            const active = await switchActiveSession(session)
+            return json(res, { active })
+          }
+
+          if (url.pathname === '/events') {
+            if (req.method !== 'GET') {
+              return json(res, { error: 'Method not allowed' }, 405)
+            }
+
+            return openEventStream(req, res)
           }
 
           const match = url.pathname.match(/^\/sessions\/([^/]+)$/)
@@ -32,6 +78,89 @@ export function piApi() {
 async function findSession(id) {
   const sessions = await SessionManager.listAll()
   return sessions.find((session) => session.id === id)
+}
+
+async function switchActiveSession(session) {
+  if (!activeRuntime) {
+    activeRuntime = await createAgentSessionRuntime(createRuntime, {
+      cwd: session.cwd,
+      agentDir: getAgentDir(),
+      sessionManager: SessionManager.open(session.path),
+    })
+  } else if (activeRuntime.session.sessionFile !== session.path) {
+    await activeRuntime.switchSession(session.path)
+  }
+
+  activeSessionId = session.id
+  await bindActiveSession()
+
+  return {
+    id: activeSessionId,
+    path: activeRuntime.session.sessionFile,
+    cwd: activeRuntime.cwd,
+    diagnostics: activeRuntime.diagnostics,
+  }
+}
+
+async function bindActiveSession() {
+  unsubscribeActiveSession?.()
+  await activeRuntime.session.bindExtensions({})
+  unsubscribeActiveSession = activeRuntime.session.subscribe((event) => {
+    broadcastEvent('runtime_event', {
+      activeSessionId,
+      event,
+    })
+  })
+  broadcastEvent('active_session', {
+    id: activeSessionId,
+    path: activeRuntime.session.sessionFile,
+    cwd: activeRuntime.cwd,
+  })
+}
+
+function openEventStream(req, res) {
+  res.statusCode = 200
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache, no-transform')
+  res.setHeader('Connection', 'keep-alive')
+  res.write(': connected\n\n')
+
+  sseClients.add(res)
+
+  if (activeRuntime) {
+    sendEvent(res, 'active_session', {
+      id: activeSessionId,
+      path: activeRuntime.session.sessionFile,
+      cwd: activeRuntime.cwd,
+    })
+  }
+
+  req.on('close', () => {
+    sseClients.delete(res)
+  })
+}
+
+function broadcastEvent(type, data) {
+  for (const client of sseClients) sendEvent(client, type, data)
+}
+
+function sendEvent(res, type, data) {
+  res.write(`event: ${type}\n`)
+  res.write(`data: ${stringifyEvent(data)}\n\n`)
+}
+
+function stringifyEvent(data) {
+  try {
+    return JSON.stringify(data)
+  } catch (error) {
+    return JSON.stringify({
+      activeSessionId,
+      event: {
+        type: 'unserializable',
+        error: error.message,
+      },
+    })
+  }
 }
 
 function toSessionDetailDto(session) {
@@ -240,6 +369,25 @@ function timestampFromPath(path) {
   const match = path?.match(/(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z)_/)
   if (!match) return undefined
   return match[1].replace(/T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z/, 'T$1:$2:$3.$4Z')
+}
+
+function readJson(req) {
+  return new Promise((resolve, reject) => {
+    let data = ''
+    req.on('data', (chunk) => {
+      data += chunk
+    })
+    req.on('end', () => {
+      if (!data) return resolve({})
+
+      try {
+        resolve(JSON.parse(data))
+      } catch (error) {
+        reject(error)
+      }
+    })
+    req.on('error', reject)
+  })
 }
 
 function json(res, data, status = 200) {
