@@ -34,7 +34,7 @@
 
 ## Memory maintenance
 
-- Read `MEMORY.md` at the start of future sessions before making changes.
+- Read `MEMORY.md` at the start of future sessions before making changes if it exists.
 - Keep `MEMORY.md` up to date when project direction, architecture, pi SDK
   learnings, workflows, or important UI decisions change.
 - Update `MEMORY.md` at natural checkpoints or when the user asks for a memory
