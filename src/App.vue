@@ -1,5 +1,6 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { useRuntimeEvents } from './composables/useRuntimeEvents'
 import { useTerminal } from './composables/useTerminal'
 import { fuzzyScore, highlightedText as highlightFuzzyText } from './lib/fuzzy'
 import {
@@ -46,13 +47,10 @@ const localEntries = ref([])
 const draft = ref('')
 const workbench = ref(null)
 const activeRuntimeSession = ref(null)
-const runtimeEvents = ref([])
 const eventLogOpen = ref(false)
 const promptSubmitting = ref(false)
 const interrupting = ref(false)
 const promptError = ref('')
-const eventStreamError = ref('')
-const eventStreamConnected = ref(false)
 const agentRunning = ref(false)
 const liveActivity = ref('')
 const liveAssistantText = ref('')
@@ -68,7 +66,6 @@ const {
   terminalStatus,
   toggleTerminal,
 } = useTerminal()
-let eventSource
 let refreshTimer
 let scrollFrame
 
@@ -113,7 +110,35 @@ const entries = computed(() => [
   ...(sessionDetail.value?.entries || []),
   ...localEntries.value,
 ])
-const eventLog = computed(() => runtimeEvents.value.slice(-20).reverse())
+const {
+  appendRuntimeEvent,
+  closeEventStream,
+  eventLog,
+  eventStreamConnected,
+  eventStreamError,
+  openEventStream,
+  runtimeEvents,
+} = useRuntimeEvents({
+  onActiveSession(activeSession) {
+    activeRuntimeSession.value = activeSession
+    appendRuntimeEvent({
+      type: 'active_session',
+      summary: projectName(activeSession.cwd),
+    })
+  },
+  onRuntimeEvent(data) {
+    scheduleSessionRefresh(data.activeSessionId, data.event)
+    console.log('pi runtime event', data)
+
+    if (data.activeSessionId !== selectedSessionId.value) return
+
+    agentRunning.value = isRunningEvent(data.event)
+    liveActivity.value = activityText(data.event)
+    updateLiveAssistant(data.event)
+    surfaceRuntimeError(data.event)
+    scheduleLiveScroll(data.activeSessionId)
+  },
+})
 const composerChips = computed(() => {
   const state = activeRuntimeSession.value?.state || {}
   const steeringMode = state.steeringMode && formatMode(state.steeringMode)
@@ -135,59 +160,11 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  eventSource?.close()
+  closeEventStream()
   closeTerminalPanel()
   clearTimeout(refreshTimer)
   cancelAnimationFrame(scrollFrame)
 })
-
-function openEventStream() {
-  eventSource?.close()
-  eventSource = new EventSource('/api/pi/events')
-
-  eventSource.addEventListener('active_session', (event) => {
-    activeRuntimeSession.value = JSON.parse(event.data)
-    appendRuntimeEvent({
-      type: 'active_session',
-      summary: projectName(activeRuntimeSession.value.cwd),
-    })
-  })
-
-  eventSource.addEventListener('runtime_event', (event) => {
-    const data = JSON.parse(event.data)
-    appendRuntimeEvent(data)
-    scheduleSessionRefresh(data.activeSessionId, data.event)
-    console.log('pi runtime event', data)
-
-    if (data.activeSessionId !== selectedSessionId.value) return
-
-    agentRunning.value = isRunningEvent(data.event)
-    liveActivity.value = activityText(data.event)
-    updateLiveAssistant(data.event)
-    surfaceRuntimeError(data.event)
-    scheduleLiveScroll(data.activeSessionId)
-  })
-
-  eventSource.onopen = () => {
-    eventStreamConnected.value = true
-    eventStreamError.value = ''
-    appendRuntimeEvent({ type: 'connected' })
-  }
-
-  eventSource.onerror = () => {
-    eventStreamConnected.value = false
-    eventStreamError.value = 'Runtime event stream disconnected'
-    appendRuntimeEvent({ type: 'disconnected' })
-    console.warn('pi event stream disconnected')
-  }
-}
-
-function appendRuntimeEvent(event) {
-  runtimeEvents.value = [
-    ...runtimeEvents.value.slice(-99),
-    { ...event, loggedAt: new Date().toISOString() },
-  ]
-}
 
 async function loadSessions({ selectFirst = true } = {}) {
   sessionsLoading.value = true
