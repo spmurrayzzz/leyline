@@ -391,6 +391,12 @@ function clearSelectedSession() {
   liveAssistantBlocks.value = []
 }
 
+function navigateHome() {
+  clearSelectedSession()
+  updateSessionRoute('')
+  sidebarOpen.value = false
+}
+
 function scheduleSessionRefresh(activeSessionId, event) {
   if (activeSessionId !== selectedSessionId.value) return
   if (event?.type === 'message_update') return
@@ -782,10 +788,17 @@ function closeSettingsOnEscape(event) {
 
     <aside class="sidebar">
       <div class="brand-row">
-        <div class="brand-mark">⌁</div>
-        <div>
-          <strong>Leyline</strong>
-        </div>
+        <button
+          class="brand-home"
+          type="button"
+          aria-label="Go to home"
+          @click="navigateHome"
+        >
+          <span class="brand-mark">⌁</span>
+          <span class="brand-name">
+            <strong>Leyline</strong>
+          </span>
+        </button>
         <button
           class="sidebar-collapse-button"
           type="button"

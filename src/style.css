@@ -142,6 +142,22 @@ button {
   margin-left: auto;
 }
 
+.brand-home {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.brand-home:hover .brand-mark {
+  border-color: var(--accent-border);
+  color: #d6d0ea;
+}
+
 .brand-mark {
   display: grid;
   place-items: center;
@@ -155,21 +171,16 @@ button {
   line-height: 1;
 }
 
+.brand-name {
+  display: block;
+  min-width: 0;
+}
+
 .brand-row strong {
   display: block;
   color: var(--text);
   font-size: 17px;
   letter-spacing: 0.01em;
-}
-
-.brand-row span {
-  display: block;
-  margin-top: 2px;
-  color: var(--muted);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
 }
 
 .settings-button,
