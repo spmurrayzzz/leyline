@@ -93,6 +93,16 @@ export function piApi() {
             return json(res, { ok: true, active: activeSessionDto() })
           }
 
+          if (url.pathname === '/model') {
+            if (req.method !== 'POST') {
+              return json(res, { error: 'Method not allowed' }, 405)
+            }
+
+            const body = await readJson(req)
+            await setActiveModel(body.provider, body.id)
+            return json(res, { ok: true, active: activeSessionDto() })
+          }
+
           if (url.pathname === '/interrupt') {
             if (req.method !== 'POST') {
               return json(res, { error: 'Method not allowed' }, 405)
@@ -192,6 +202,15 @@ async function interruptActiveSession() {
   await activeRuntime.session.abort()
 }
 
+async function setActiveModel(provider, id) {
+  if (!activeRuntime) throw new Error('No active session')
+  if (!provider || !id) throw new Error('provider and id are required')
+
+  const model = activeRuntime.services.modelRegistry.find(provider, id)
+  if (!model) throw new Error('Model not found')
+  await activeRuntime.session.setModel(model)
+}
+
 async function createNewSession(cwd) {
   if (!cwd) throw new Error('cwd is required')
 
@@ -225,11 +244,23 @@ function activeSessionDto() {
 
 function activeSessionStateDto() {
   return {
-    model: activeRuntime.session.model,
+    model: modelDto(activeRuntime.session.model),
+    availableModels: activeRuntime.services.modelRegistry
+      .getAvailable()
+      .map(modelDto),
     thinkingLevel: activeRuntime.session.thinkingLevel,
     steeringMode: activeRuntime.session.steeringMode,
     followUpMode: activeRuntime.session.followUpMode,
     activeToolCount: activeRuntime.session.getActiveToolNames().length,
+  }
+}
+
+function modelDto(model) {
+  if (!model) return undefined
+  return {
+    id: model.id,
+    name: model.name,
+    provider: model.provider,
   }
 }
 

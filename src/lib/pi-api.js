@@ -35,6 +35,14 @@ export function interruptPiSession() {
   })
 }
 
+export async function switchPiModel(provider, id) {
+  const data = await apiRequest('/api/pi/model', 'Failed to switch model', {
+    method: 'POST',
+    body: { provider, id },
+  })
+  return data.active
+}
+
 async function apiRequest(url, fallbackError, options = {}) {
   if (typeof fallbackError !== 'string') {
     options = fallbackError

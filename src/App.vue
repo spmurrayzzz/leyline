@@ -21,6 +21,7 @@ import {
   fetchSessions,
   interruptPiSession,
   submitPrompt,
+  switchPiModel,
 } from './lib/pi-api'
 import {
   entryClass,
@@ -50,6 +51,8 @@ const activeRuntimeSession = ref(null)
 const eventLogOpen = ref(false)
 const promptSubmitting = ref(false)
 const interrupting = ref(false)
+const switchingModel = ref(false)
+const modelPickerOpen = ref(false)
 const promptError = ref('')
 const agentRunning = ref(false)
 const liveActivity = ref('')
@@ -139,13 +142,23 @@ const {
     scheduleLiveScroll(data.activeSessionId)
   },
 })
+const availableModels = computed(() => {
+  return activeRuntimeSession.value?.state?.availableModels || []
+})
+const selectedModelKey = computed(() => {
+  const model = activeRuntimeSession.value?.state?.model
+  if (!model) return ''
+  return modelKey(model)
+})
+const currentModelLabel = computed(() => {
+  return modelChip(activeRuntimeSession.value?.state?.model)
+})
 const composerChips = computed(() => {
   const state = activeRuntimeSession.value?.state || {}
   const steeringMode = state.steeringMode && formatMode(state.steeringMode)
   const followUpMode = state.followUpMode && formatMode(state.followUpMode)
 
   return [
-    modelChip(state.model),
     state.thinkingLevel ? `Thinking · ${formatMode(state.thinkingLevel)}` : '',
     modeChip(steeringMode, followUpMode),
     typeof state.activeToolCount === 'number'
@@ -492,6 +505,29 @@ function updateSelectedSessionSummary(session) {
   })
 }
 
+async function selectModel(model) {
+  if (!model || modelKey(model) === selectedModelKey.value) {
+    modelPickerOpen.value = false
+    return
+  }
+
+  switchingModel.value = true
+  modelPickerOpen.value = false
+  promptError.value = ''
+
+  try {
+    activeRuntimeSession.value = await switchPiModel(model.provider, model.id)
+  } catch (error) {
+    promptError.value = error.message
+  } finally {
+    switchingModel.value = false
+  }
+}
+
+function modelKey(model) {
+  return JSON.stringify([model.provider, model.id])
+}
+
 function handleComposerKeydown(event) {
   if (event.key !== 'Enter' || event.shiftKey) return
   event.preventDefault()
@@ -778,6 +814,29 @@ function handleComposerKeydown(event) {
           {{ promptError || eventStreamError }}
         </div>
         <div class="composer-bar">
+          <div class="model-picker">
+            <button
+              class="composer-chip model-picker-button"
+              type="button"
+              :disabled="agentRunning || promptSubmitting || switchingModel"
+              @click="modelPickerOpen = !modelPickerOpen"
+            >
+              <span class="model-label">{{ currentModelLabel }}</span>
+              <span class="model-caret">▾</span>
+            </button>
+            <div v-if="modelPickerOpen" class="model-menu">
+              <button
+                v-for="model in availableModels"
+                :key="modelKey(model)"
+                type="button"
+                :class="{ active: modelKey(model) === selectedModelKey }"
+                @click="selectModel(model)"
+              >
+                <span>{{ modelChip(model) }}</span>
+                <span v-if="modelKey(model) === selectedModelKey">✓</span>
+              </button>
+            </div>
+          </div>
           <span
             v-for="chip in composerChips"
             :key="chip"
