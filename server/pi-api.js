@@ -396,7 +396,7 @@ function toMessageEntryDto(entry, toolCalls) {
     type: 'message',
     role: message.role,
     label: labelForRole(message.role),
-    text: truncate(text, 1600),
+    text,
     timestamp: entry.timestamp,
   }
 }

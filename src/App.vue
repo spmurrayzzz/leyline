@@ -102,7 +102,7 @@ function openEventStream() {
     liveActivity.value = activityText(data.event)
     updateLiveAssistant(data.event)
     scheduleLiveScroll(data.activeSessionId)
-    scheduleSessionRefresh(data.activeSessionId)
+    scheduleSessionRefresh(data.activeSessionId, data.event)
     console.log('pi runtime event', data)
   })
 
@@ -188,15 +188,19 @@ async function loadSessionDetail(id) {
   return data
 }
 
-function scheduleSessionRefresh(activeSessionId) {
+function scheduleSessionRefresh(activeSessionId, event) {
   if (activeSessionId !== selectedSessionId.value) return
+  if (event?.type === 'message_update') return
 
   clearTimeout(refreshTimer)
   refreshTimer = setTimeout(async () => {
+    const wasStuck = stickToBottom.value
+
     try {
       sessionDetail.value = await loadSessionDetail(selectedSessionId.value)
       await loadSessions({ selectFirst: false })
-      if (stickToBottom.value) await scrollToLatest()
+      if (shouldClearLiveAssistant(event)) liveAssistantText.value = ''
+      if (wasStuck) await scrollToLatest()
       else hasNewOutput.value = true
     } catch (error) {
       sessionError.value = error.message
@@ -234,13 +238,17 @@ function updateLiveAssistant(event) {
     return
   }
 
-  if (event?.type === 'message_end' && event.message?.role === 'assistant') {
+  if (['error', 'aborted'].includes(event?.type)) {
     liveAssistantText.value = ''
+  }
+}
+
+function shouldClearLiveAssistant(event) {
+  if (event?.type === 'message_end' && event.message?.role === 'assistant') {
+    return true
   }
 
-  if (['agent_end', 'error', 'aborted'].includes(event?.type)) {
-    liveAssistantText.value = ''
-  }
+  return event?.type === 'agent_end'
 }
 
 function textFromContent(content) {
@@ -426,9 +434,7 @@ function entryClass(entry) {
 }
 
 function messageText(entry) {
-  if (!entry.text) return ''
-  if (entry.text.length <= 1200) return entry.text
-  return `${entry.text.slice(0, 1199)}…`
+  return entry.text || ''
 }
 
 function renderedMessage(entry) {
