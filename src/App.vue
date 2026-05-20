@@ -252,12 +252,17 @@ onUnmounted(() => {
   cancelAnimationFrame(scrollFrame)
 })
 
-async function loadSessions({ routeSessionId = '', selectFirst = false } = {}) {
-  sessionsLoading.value = true
+async function loadSessions({
+  routeSessionId = '',
+  selectFirst = false,
+  showLoading = true,
+} = {}) {
+  if (showLoading) sessionsLoading.value = true
   sessionsError.value = ''
 
   try {
-    sessions.value = await fetchSessions()
+    const nextSessions = await fetchSessions()
+    sessions.value = nextSessions
     if (!newSessionCwd.value && sessions.value[0]?.cwd) {
       newSessionCwd.value = sessions.value[0].cwd
     }
@@ -267,11 +272,15 @@ async function loadSessions({ routeSessionId = '', selectFirst = false } = {}) {
 
     if (routedSession) await selectSession(routedSession, { replaceRoute: true })
     else if (routeSessionId) sessionError.value = 'Session not found'
-    else if (selectFirst && sessions.value[0]) await selectSession(sessions.value[0])
+    else if (selectFirst && sessions.value[0]) {
+      await selectSession(sessions.value[0])
+    }
   } catch (error) {
-    sessionsError.value = error.message
+    if (showLoading || sessions.value.length === 0) {
+      sessionsError.value = error.message
+    }
   } finally {
-    sessionsLoading.value = false
+    if (showLoading) sessionsLoading.value = false
   }
 }
 
@@ -289,7 +298,7 @@ async function createSessionForCwd(cwd) {
   try {
     const data = await createPiSession(targetCwd)
 
-    await loadSessions({ selectFirst: false })
+    await loadSessions({ selectFirst: false, showLoading: false })
     activeRuntimeSession.value = data.active
     sessionDetail.value = data.detail
     selectedSessionId.value = data.detail.session.id
