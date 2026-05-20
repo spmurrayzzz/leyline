@@ -16,6 +16,7 @@
   --accent-soft: rgb(124 92 255 / 13%);
   --accent-border: rgb(124 92 255 / 34%);
   --blue-accent: #9b8cff;
+  --content-max: 1080px;
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
@@ -370,7 +371,7 @@ kbd {
   min-width: 0;
   border-bottom: 1px solid var(--border-soft);
   background: #0f1014;
-  padding: 0 22px;
+  padding: 0 max(44px, calc((100% - var(--content-max)) / 2));
 }
 
 .composer-bar {
@@ -547,7 +548,9 @@ h1 {
 }
 
 .message {
-  max-width: 1080px;
+  width: min(var(--content-max), 100%);
+  margin-right: auto;
+  margin-left: auto;
   color: #e2e3ea;
   font-size: 14px;
   line-height: 1.45;
@@ -575,7 +578,7 @@ h1 {
 }
 
 .assistant-message {
-  margin-left: 16px;
+  padding-left: 16px;
   color: #d8dbe3;
 }
 
@@ -721,8 +724,8 @@ h1 {
   display: flex;
   align-items: center;
   gap: 9px;
-  max-width: 1080px;
-  margin-top: 8px;
+  width: min(var(--content-max), 100%);
+  margin: 8px auto 0;
   color: #707070;
   font-size: 12px;
 }
@@ -752,7 +755,9 @@ h1 {
 }
 
 .empty-workbench {
-  max-width: 1080px;
+  width: min(var(--content-max), 100%);
+  margin-right: auto;
+  margin-left: auto;
   color: #777;
   font-size: 14px;
 }
@@ -827,8 +832,8 @@ h1 {
 }
 
 .tool-card {
-  max-width: 1080px;
-  margin-top: 12px;
+  width: min(var(--content-max), 100%);
+  margin: 12px auto 0;
   border: 1px solid #292b34;
   border-radius: 12px;
   background: #14151a;
@@ -936,8 +941,8 @@ h1 {
 }
 
 .changed-files {
-  max-width: 1080px;
-  margin-top: 18px;
+  width: min(var(--content-max), 100%);
+  margin: 18px auto 0;
   border: 1px solid var(--border-soft);
   border-radius: 15px;
   background: #131419;
@@ -999,7 +1004,7 @@ h1 {
 
 .jump-latest-button {
   position: absolute;
-  right: 52px;
+  right: max(52px, calc((100% - var(--content-max)) / 2 + 8px));
   bottom: 152px;
   z-index: 2;
   border: 1px solid var(--accent-border);
@@ -1014,9 +1019,9 @@ h1 {
 
 .terminal-panel {
   position: absolute;
-  right: 44px;
+  right: max(44px, calc((100% - var(--content-max)) / 2));
   bottom: 176px;
-  left: 44px;
+  left: max(44px, calc((100% - var(--content-max)) / 2));
   z-index: 3;
   height: 290px;
   overflow: hidden;
@@ -1079,8 +1084,9 @@ h1 {
 .composer {
   position: absolute;
   bottom: 22px;
-  left: 44px;
-  width: min(1080px, calc(100% - 88px));
+  left: 50%;
+  width: min(var(--content-max), calc(100% - 88px));
+  transform: translateX(-50%);
   border: 1px solid #3d3650;
   border-radius: 22px;
   background: #15121d;
