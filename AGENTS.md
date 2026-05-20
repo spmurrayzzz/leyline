@@ -2,8 +2,9 @@
 
 - Work iteratively: discuss the next change, set expectations, implement only
   after approval, then let the user validate in the browser.
-- For visual UI work, the user will keep the Vite dev server running and validate with
-  screenshots/browser before moving on. You may need to tell them to restart on config changes.
+- For visual UI work, the user will keep the Vite dev server running for you,
+  so that you can validate with screenshots/browser before moving on. You may
+  need to tell them to restart on config changes.
 - Use Vue 3, Vite, Node.js, and JavaScript. Do not introduce TypeScript.
 - Prefer simple CSS and small focused changes. No component library unless the
   user asks.
