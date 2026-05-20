@@ -688,7 +688,6 @@ function handleComposerKeydown(event) {
         <div class="brand-mark">⌁</div>
         <div>
           <strong>Leyline</strong>
-          <span>pi runtime</span>
         </div>
       </div>
 
