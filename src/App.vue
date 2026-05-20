@@ -92,6 +92,20 @@ const entries = computed(() => [
   ...localEntries.value,
 ])
 const eventLog = computed(() => runtimeEvents.value.slice(-20).reverse())
+const composerChips = computed(() => {
+  const state = activeRuntimeSession.value?.state || {}
+  const steeringMode = state.steeringMode && formatMode(state.steeringMode)
+  const followUpMode = state.followUpMode && formatMode(state.followUpMode)
+
+  return [
+    modelChip(state.model),
+    state.thinkingLevel ? `Thinking · ${formatMode(state.thinkingLevel)}` : '',
+    modeChip(steeringMode, followUpMode),
+    typeof state.activeToolCount === 'number'
+      ? `${state.activeToolCount} tools`
+      : '',
+  ].filter(Boolean)
+})
 
 onMounted(async () => {
   openEventStream()
@@ -389,6 +403,46 @@ async function activateSession(session) {
   })
   const data = await response.json()
   if (!response.ok) throw new Error(data.error || 'Failed to activate session')
+  activeRuntimeSession.value = data.active
+}
+
+function modelChip(model) {
+  if (!model) return 'No model'
+  const provider = model.provider ? `${formatProvider(model.provider)} · ` : ''
+  return `${provider}${formatModelId(model.id)}`
+}
+
+function formatProvider(value) {
+  return String(value)
+    .split(/[-_]/g)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
+function formatModelId(value) {
+  return String(value || 'Unknown model')
+    .replace(/^(anthropic\.|claude-|openai\/)/, '')
+    .replace(/[-_]/g, ' ')
+    .replace(/\b\d{8}\b/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase())
+}
+
+function modeChip(steeringMode, followUpMode) {
+  if (!steeringMode && !followUpMode) return ''
+  if (steeringMode === followUpMode) return `Mode · ${steeringMode}`
+  return [
+    steeringMode ? `Steer · ${steeringMode}` : '',
+    followUpMode ? `Follow-up · ${followUpMode}` : '',
+  ].filter(Boolean).join(' / ')
+}
+
+function formatMode(value) {
+  return String(value)
+    .replace(/[-_]/g, ' ')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase())
 }
 
 function sessionTitle(session) {
@@ -1079,10 +1133,13 @@ function handleComposerKeydown(event) {
           {{ promptError || eventStreamError }}
         </div>
         <div class="composer-bar">
-          <button type="button">✳ Claude Opus 4.5</button>
-          <button type="button">High · Normal</button>
-          <button type="button">⚒ Build</button>
-          <button type="button">▢ Full access</button>
+          <span
+            v-for="chip in composerChips"
+            :key="chip"
+            class="composer-chip"
+          >
+            {{ chip }}
+          </span>
           <button
             class="send-button"
             :class="{ 'stop-button': agentRunning }"

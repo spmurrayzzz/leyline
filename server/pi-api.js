@@ -219,6 +219,17 @@ function activeSessionDto() {
     path: activeRuntime.session.sessionFile,
     cwd: activeRuntime.cwd,
     diagnostics: activeRuntime.diagnostics,
+    state: activeSessionStateDto(),
+  }
+}
+
+function activeSessionStateDto() {
+  return {
+    model: activeRuntime.session.model,
+    thinkingLevel: activeRuntime.session.thinkingLevel,
+    steeringMode: activeRuntime.session.steeringMode,
+    followUpMode: activeRuntime.session.followUpMode,
+    activeToolCount: activeRuntime.session.getActiveToolNames().length,
   }
 }
 
@@ -351,11 +362,7 @@ async function bindActiveSession() {
       event,
     })
   })
-  broadcastEvent('active_session', {
-    id: activeSessionId,
-    path: activeRuntime.session.sessionFile,
-    cwd: activeRuntime.cwd,
-  })
+  broadcastEvent('active_session', activeSessionDto())
 }
 
 function openEventStream(req, res) {
@@ -368,11 +375,7 @@ function openEventStream(req, res) {
   sseClients.add(res)
 
   if (activeRuntime) {
-    sendEvent(res, 'active_session', {
-      id: activeSessionId,
-      path: activeRuntime.session.sessionFile,
-      cwd: activeRuntime.cwd,
-    })
+    sendEvent(res, 'active_session', activeSessionDto())
   }
 
   req.on('close', () => {

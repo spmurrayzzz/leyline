@@ -1120,6 +1120,21 @@ textarea::placeholder {
   padding: 0 12px 12px;
 }
 
+.composer-chip {
+  overflow: hidden;
+  max-width: 220px;
+  border: 1px solid #312d3d;
+  border-radius: 999px;
+  background: #1a1722;
+  padding: 6px 10px;
+  color: var(--muted-strong);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .composer-bar button {
   color: var(--muted-strong);
 }
