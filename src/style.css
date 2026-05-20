@@ -816,6 +816,7 @@ h1 {
 }
 
 .init-workbench,
+.session-loading-workbench,
 .start-workbench-shell {
   display: grid;
   place-items: center;
@@ -1274,6 +1275,49 @@ h1 {
   margin-left: auto;
   color: #777;
   font-size: 14px;
+}
+
+.session-loading-panel {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: min(360px, 100%);
+  border: 1px solid var(--border-soft);
+  border-radius: 16px;
+  background: #15161b;
+  padding: 16px 18px;
+  box-shadow: 0 16px 48px rgb(0 0 0 / 28%);
+}
+
+.session-loading-mark {
+  width: 22px;
+  height: 22px;
+  border: 2px solid #343540;
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: session-loading-spin 800ms linear infinite;
+}
+
+.session-loading-panel strong,
+.session-loading-panel span {
+  display: block;
+}
+
+.session-loading-panel strong {
+  color: #ececf3;
+  font-size: 14px;
+}
+
+.session-loading-panel span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+@keyframes session-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .init-panel {
@@ -1885,7 +1929,8 @@ textarea::placeholder {
     padding: 14px 12px 218px;
   }
 
-  .init-workbench {
+  .init-workbench,
+  .session-loading-workbench {
     padding: 0 12px;
   }
 

@@ -968,6 +968,7 @@ function closeSettingsOnEscape(event) {
         class="workbench"
         :class="{
           'init-workbench': initializing,
+          'session-loading-workbench': sessionLoading,
           'start-workbench-shell': !initializing && !selectedSession,
         }"
         @scroll="handleWorkbenchScroll"
@@ -990,8 +991,12 @@ function closeSettingsOnEscape(event) {
             </div>
           </div>
         </div>
-        <div v-else-if="sessionLoading" class="empty-workbench">
-          Loading session…
+        <div v-else-if="sessionLoading" class="session-loading-panel">
+          <div class="session-loading-mark" aria-hidden="true"></div>
+          <div>
+            <strong>Opening session</strong>
+            <span>Reading transcript and activating pi runtime…</span>
+          </div>
         </div>
         <div v-else-if="sessionError" class="empty-workbench error-note">
           {{ sessionError }}
