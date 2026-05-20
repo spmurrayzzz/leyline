@@ -237,14 +237,16 @@ const startProjectLabel = computed(() => {
 })
 
 onMounted(async () => {
-  window.addEventListener('keydown', closeSettingsOnEscape)
+  window.addEventListener('keydown', closeMenusOnEscape)
+  window.addEventListener('click', closeMenusOnOutsideClick)
   window.addEventListener('popstate', handleRouteChange)
   openEventStream()
   await loadSessions({ routeSessionId: sessionIdFromRoute() })
 })
 
 onUnmounted(() => {
-  window.removeEventListener('keydown', closeSettingsOnEscape)
+  window.removeEventListener('keydown', closeMenusOnEscape)
+  window.removeEventListener('click', closeMenusOnOutsideClick)
   window.removeEventListener('popstate', handleRouteChange)
   closeEventStream()
   closeTerminalPanel()
@@ -765,8 +767,23 @@ async function submitStartDraft() {
   if (text) await submitDraft()
 }
 
-function closeSettingsOnEscape(event) {
-  if (event.key === 'Escape') settingsOpen.value = false
+function closeMenusOnEscape(event) {
+  if (event.key !== 'Escape') return
+  settingsOpen.value = false
+  closePickerMenus()
+}
+
+function closeMenusOnOutsideClick(event) {
+  if (event.target.closest('.model-picker')) return
+  if (event.target.closest('.start-project-button, .start-project-menu')) return
+  closePickerMenus()
+}
+
+function closePickerMenus() {
+  modelPickerOpen.value = false
+  thinkingPickerOpen.value = false
+  modePickerOpen.value = false
+  startProjectPickerOpen.value = false
 }
 
 </script>
