@@ -15,6 +15,14 @@ import {
   toolTarget,
 } from './lib/format'
 import {
+  activatePiSession,
+  createPiSession,
+  fetchSessionDetail,
+  fetchSessions,
+  interruptPiSession,
+  submitPrompt,
+} from './lib/pi-api'
+import {
   entryClass,
   messageBlocks,
   messageBlocksFor,
@@ -186,10 +194,7 @@ async function loadSessions({ selectFirst = true } = {}) {
   sessionsError.value = ''
 
   try {
-    const response = await fetch('/api/pi/sessions')
-    const data = await response.json()
-    if (!response.ok) throw new Error(data.error || 'Failed to load sessions')
-    sessions.value = data.sessions || []
+    sessions.value = await fetchSessions()
     if (selectFirst && sessions.value[0]) await selectSession(sessions.value[0])
   } catch (error) {
     sessionsError.value = error.message
@@ -203,13 +208,7 @@ async function createSession(project) {
   sessionError.value = ''
 
   try {
-    const response = await fetch('/api/pi/sessions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cwd: project.cwd }),
-    })
-    const data = await response.json()
-    if (!response.ok) throw new Error(data.error || 'Failed to create session')
+    const data = await createPiSession(project.cwd)
 
     await loadSessions({ selectFirst: false })
     sessionDetail.value = data.detail
@@ -259,10 +258,7 @@ async function selectSession(session) {
 }
 
 async function loadSessionDetail(id) {
-  const response = await fetch(`/api/pi/sessions/${id}`)
-  const data = await response.json()
-  if (!response.ok) throw new Error(data.error || 'Failed to load session')
-  return data
+  return fetchSessionDetail(id)
 }
 
 function scheduleSessionRefresh(activeSessionId, event) {
@@ -361,14 +357,7 @@ function shouldClearLiveAssistant(event) {
 }
 
 async function activateSession(session) {
-  const response = await fetch('/api/pi/active-session', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id: session.id }),
-  })
-  const data = await response.json()
-  if (!response.ok) throw new Error(data.error || 'Failed to activate session')
-  activeRuntimeSession.value = data.active
+  activeRuntimeSession.value = await activatePiSession(session.id)
 }
 
 function sessionTitle(session) {
@@ -458,13 +447,7 @@ async function submitDraft() {
   else hasNewOutput.value = true
 
   try {
-    const response = await fetch('/api/pi/prompt', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text }),
-    })
-    const data = await response.json()
-    if (!response.ok) throw new Error(data.error || 'Failed to submit prompt')
+    await submitPrompt(text)
     draft.value = ''
     agentRunning.value = true
     liveActivity.value = 'Thinking…'
@@ -489,9 +472,7 @@ async function interruptAgent() {
   liveActivity.value = 'Stopping…'
 
   try {
-    const response = await fetch('/api/pi/interrupt', { method: 'POST' })
-    const data = await response.json()
-    if (!response.ok) throw new Error(data.error || 'Failed to stop run')
+    await interruptPiSession()
     agentRunning.value = false
     liveActivity.value = ''
   } catch (error) {
