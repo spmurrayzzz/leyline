@@ -28,6 +28,9 @@
 - Build check:
   - `npm run build`
 - Do not add tests, docs, or broad refactors unless explicitly requested.
+- If the user asks what to work on next, and you haven't ready any of the code,
+  you need to research the codebase to ground your recommendation. Do not guess
+  or assume based on the last notes or MEMORY.md file.
 
 ## Memory maintenance
 
