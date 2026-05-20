@@ -233,8 +233,10 @@ function scheduleSessionRefresh(activeSessionId, event) {
     const wasStuck = stickToBottom.value
 
     try {
-      sessionDetail.value = await loadSessionDetail(selectedSessionId.value)
-      await loadSessions({ selectFirst: false })
+      const detail = await loadSessionDetail(selectedSessionId.value)
+      sessionDetail.value = detail
+      reconcileLocalEntries(detail)
+      updateSelectedSessionSummary(detail.session)
       if (shouldClearLiveAssistant(event)) {
         liveAssistantText.value = ''
         liveAssistantBlocks.value = []
@@ -588,8 +590,12 @@ async function submitDraft() {
   const text = draft.value.trim()
   if (!text || promptSubmitting.value || agentRunning.value) return
 
+  const localEntry = pendingUserEntry(text)
+  localEntries.value = [...localEntries.value, localEntry]
   promptSubmitting.value = true
   promptError.value = ''
+  if (stickToBottom.value) await scrollToLatest()
+  else hasNewOutput.value = true
 
   try {
     const response = await fetch('/api/pi/prompt', {
@@ -603,6 +609,9 @@ async function submitDraft() {
     agentRunning.value = true
     liveActivity.value = 'Thinking…'
   } catch (error) {
+    localEntries.value = localEntries.value.filter((entry) => {
+      return entry.id !== localEntry.id
+    })
     promptError.value = error.message
     liveActivity.value = ''
     liveAssistantText.value = ''
@@ -631,6 +640,38 @@ async function interruptAgent() {
   } finally {
     interrupting.value = false
   }
+}
+
+function pendingUserEntry(text) {
+  return {
+    id: `local-${Date.now()}`,
+    type: 'message',
+    role: 'user',
+    label: 'You',
+    text,
+  }
+}
+
+function reconcileLocalEntries(detail) {
+  localEntries.value = localEntries.value.filter((localEntry) => {
+    return !detail.entries.some((entry) => {
+      return entry.type === 'message'
+        && entry.role === localEntry.role
+        && entry.text === localEntry.text
+    })
+  })
+}
+
+function updateSelectedSessionSummary(session) {
+  sessions.value = sessions.value.map((item) => {
+    if (item.id !== session.id) return item
+    return {
+      ...item,
+      messageCount: session.messageCount,
+      modified: session.modified,
+      timestamp: session.modified || item.timestamp,
+    }
+  })
 }
 
 function handleComposerKeydown(event) {
