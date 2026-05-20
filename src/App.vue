@@ -21,7 +21,9 @@ import {
   fetchSessions,
   interruptPiSession,
   submitPrompt,
+  switchPiMode,
   switchPiModel,
+  switchPiThinkingLevel,
 } from './lib/pi-api'
 import {
   entryClass,
@@ -52,7 +54,11 @@ const eventLogOpen = ref(false)
 const promptSubmitting = ref(false)
 const interrupting = ref(false)
 const switchingModel = ref(false)
+const switchingThinking = ref(false)
+const switchingMode = ref(false)
 const modelPickerOpen = ref(false)
+const thinkingPickerOpen = ref(false)
+const modePickerOpen = ref(false)
 const promptError = ref('')
 const agentRunning = ref(false)
 const liveActivity = ref('')
@@ -153,14 +159,24 @@ const selectedModelKey = computed(() => {
 const currentModelLabel = computed(() => {
   return modelChip(activeRuntimeSession.value?.state?.model)
 })
+const availableThinkingLevels = computed(() => {
+  return activeRuntimeSession.value?.state?.availableThinkingLevels || []
+})
+const currentThinkingLabel = computed(() => {
+  const level = activeRuntimeSession.value?.state?.thinkingLevel
+  return level ? `Thinking · ${formatMode(level)}` : 'Thinking'
+})
+const currentModeLabel = computed(() => {
+  const state = activeRuntimeSession.value?.state || {}
+  return modeChip(
+    state.steeringMode && formatMode(state.steeringMode),
+    state.followUpMode && formatMode(state.followUpMode),
+  ) || 'Mode'
+})
 const composerChips = computed(() => {
   const state = activeRuntimeSession.value?.state || {}
-  const steeringMode = state.steeringMode && formatMode(state.steeringMode)
-  const followUpMode = state.followUpMode && formatMode(state.followUpMode)
 
   return [
-    state.thinkingLevel ? `Thinking · ${formatMode(state.thinkingLevel)}` : '',
-    modeChip(steeringMode, followUpMode),
     typeof state.activeToolCount === 'number'
       ? `${state.activeToolCount} tools`
       : '',
@@ -524,6 +540,51 @@ async function selectModel(model) {
   }
 }
 
+async function selectThinkingLevel(level) {
+  if (!level || level === activeRuntimeSession.value?.state?.thinkingLevel) {
+    thinkingPickerOpen.value = false
+    return
+  }
+
+  switchingThinking.value = true
+  thinkingPickerOpen.value = false
+  promptError.value = ''
+
+  try {
+    activeRuntimeSession.value = await switchPiThinkingLevel(level)
+  } catch (error) {
+    promptError.value = error.message
+  } finally {
+    switchingThinking.value = false
+  }
+}
+
+async function selectMode(key, value) {
+  const state = activeRuntimeSession.value?.state || {}
+  if (!key || !value || state[key] === value) {
+    modePickerOpen.value = false
+    return
+  }
+
+  switchingMode.value = true
+  modePickerOpen.value = false
+  promptError.value = ''
+
+  try {
+    activeRuntimeSession.value = await switchPiMode({ [key]: value })
+  } catch (error) {
+    promptError.value = error.message
+  } finally {
+    switchingMode.value = false
+  }
+}
+
+function togglePicker(name) {
+  modelPickerOpen.value = name === 'model' && !modelPickerOpen.value
+  thinkingPickerOpen.value = name === 'thinking' && !thinkingPickerOpen.value
+  modePickerOpen.value = name === 'mode' && !modePickerOpen.value
+}
+
 function modelKey(model) {
   return JSON.stringify([model.provider, model.id])
 }
@@ -819,7 +880,7 @@ function handleComposerKeydown(event) {
               class="composer-chip model-picker-button"
               type="button"
               :disabled="agentRunning || promptSubmitting || switchingModel"
-              @click="modelPickerOpen = !modelPickerOpen"
+              @click="togglePicker('model')"
             >
               <span class="model-label">{{ currentModelLabel }}</span>
               <span class="model-caret">▾</span>
@@ -834,6 +895,82 @@ function handleComposerKeydown(event) {
               >
                 <span>{{ modelChip(model) }}</span>
                 <span v-if="modelKey(model) === selectedModelKey">✓</span>
+              </button>
+            </div>
+          </div>
+          <div class="model-picker small-picker">
+            <button
+              class="composer-chip model-picker-button"
+              type="button"
+              :disabled="agentRunning || promptSubmitting || switchingThinking"
+              @click="togglePicker('thinking')"
+            >
+              <span class="model-label">{{ currentThinkingLabel }}</span>
+              <span class="model-caret">▾</span>
+            </button>
+            <div v-if="thinkingPickerOpen" class="model-menu small-menu">
+              <button
+                v-for="level in availableThinkingLevels"
+                :key="level"
+                type="button"
+                :class="{
+                  active: level === activeRuntimeSession?.state?.thinkingLevel,
+                }"
+                @click="selectThinkingLevel(level)"
+              >
+                <span>{{ formatMode(level) }}</span>
+                <span
+                  v-if="level === activeRuntimeSession?.state?.thinkingLevel"
+                >
+                  ✓
+                </span>
+              </button>
+            </div>
+          </div>
+          <div class="model-picker small-picker">
+            <button
+              class="composer-chip model-picker-button"
+              type="button"
+              :disabled="agentRunning || promptSubmitting || switchingMode"
+              @click="togglePicker('mode')"
+            >
+              <span class="model-label">{{ currentModeLabel }}</span>
+              <span class="model-caret">▾</span>
+            </button>
+            <div v-if="modePickerOpen" class="model-menu mode-menu">
+              <div class="mode-menu-label">Steering</div>
+              <button
+                v-for="value in ['one-at-a-time', 'all']"
+                :key="`steering-${value}`"
+                type="button"
+                :class="{
+                  active: value === activeRuntimeSession?.state?.steeringMode,
+                }"
+                @click="selectMode('steeringMode', value)"
+              >
+                <span>{{ formatMode(value) }}</span>
+                <span
+                  v-if="value === activeRuntimeSession?.state?.steeringMode"
+                >
+                  ✓
+                </span>
+              </button>
+              <div class="mode-menu-label">Follow-up</div>
+              <button
+                v-for="value in ['one-at-a-time', 'all']"
+                :key="`follow-up-${value}`"
+                type="button"
+                :class="{
+                  active: value === activeRuntimeSession?.state?.followUpMode,
+                }"
+                @click="selectMode('followUpMode', value)"
+              >
+                <span>{{ formatMode(value) }}</span>
+                <span
+                  v-if="value === activeRuntimeSession?.state?.followUpMode"
+                >
+                  ✓
+                </span>
               </button>
             </div>
           </div>

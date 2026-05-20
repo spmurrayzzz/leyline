@@ -1145,6 +1145,10 @@ textarea::placeholder {
   max-width: 280px;
 }
 
+.small-picker {
+  max-width: 190px;
+}
+
 .model-picker-button {
   display: inline-flex;
   align-items: center;
@@ -1182,6 +1186,23 @@ textarea::placeholder {
   border-radius: 14px;
   background: #111018;
   box-shadow: 0 18px 60px rgb(0 0 0 / 45%);
+}
+
+.small-menu {
+  width: 190px;
+}
+
+.mode-menu {
+  width: 230px;
+}
+
+.mode-menu-label {
+  padding: 10px 12px 5px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .model-menu button {

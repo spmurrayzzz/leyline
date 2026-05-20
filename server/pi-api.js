@@ -103,6 +103,26 @@ export function piApi() {
             return json(res, { ok: true, active: activeSessionDto() })
           }
 
+          if (url.pathname === '/thinking') {
+            if (req.method !== 'POST') {
+              return json(res, { error: 'Method not allowed' }, 405)
+            }
+
+            const body = await readJson(req)
+            setActiveThinkingLevel(body.level)
+            return json(res, { ok: true, active: activeSessionDto() })
+          }
+
+          if (url.pathname === '/mode') {
+            if (req.method !== 'POST') {
+              return json(res, { error: 'Method not allowed' }, 405)
+            }
+
+            const body = await readJson(req)
+            setActiveMode(body)
+            return json(res, { ok: true, active: activeSessionDto() })
+          }
+
           if (url.pathname === '/interrupt') {
             if (req.method !== 'POST') {
               return json(res, { error: 'Method not allowed' }, 405)
@@ -211,6 +231,30 @@ async function setActiveModel(provider, id) {
   await activeRuntime.session.setModel(model)
 }
 
+function setActiveThinkingLevel(level) {
+  if (!activeRuntime) throw new Error('No active session')
+  if (!level) throw new Error('level is required')
+
+  const levels = activeRuntime.session.getAvailableThinkingLevels()
+  if (!levels.includes(level)) throw new Error('Thinking level not available')
+  activeRuntime.session.setThinkingLevel(level)
+}
+
+function setActiveMode({ steeringMode, followUpMode }) {
+  if (!activeRuntime) throw new Error('No active session')
+  if (steeringMode) {
+    activeRuntime.session.setSteeringMode(validMode(steeringMode))
+  }
+  if (followUpMode) {
+    activeRuntime.session.setFollowUpMode(validMode(followUpMode))
+  }
+}
+
+function validMode(mode) {
+  if (mode === 'all' || mode === 'one-at-a-time') return mode
+  throw new Error('Mode must be all or one-at-a-time')
+}
+
 async function createNewSession(cwd) {
   if (!cwd) throw new Error('cwd is required')
 
@@ -249,6 +293,7 @@ function activeSessionStateDto() {
       .getAvailable()
       .map(modelDto),
     thinkingLevel: activeRuntime.session.thinkingLevel,
+    availableThinkingLevels: activeRuntime.session.getAvailableThinkingLevels(),
     steeringMode: activeRuntime.session.steeringMode,
     followUpMode: activeRuntime.session.followUpMode,
     activeToolCount: activeRuntime.session.getActiveToolNames().length,
