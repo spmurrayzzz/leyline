@@ -1485,7 +1485,9 @@ textarea::placeholder {
   .composer-bar {
     gap: 7px;
     overflow-x: auto;
-    padding: 0 10px 10px;
+    min-height: 46px;
+    margin-right: 46px;
+    padding: 0 0 10px 10px;
     scrollbar-width: none;
   }
 
@@ -1509,11 +1511,13 @@ textarea::placeholder {
   }
 
   .send-button {
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
     flex: 0 0 auto;
     width: 36px;
     height: 36px;
-    position: sticky;
-    right: 0;
+    box-shadow: -12px 0 18px #15121d;
   }
 
   .jump-latest-button {
