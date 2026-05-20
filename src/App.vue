@@ -28,6 +28,7 @@ const promptSubmitting = ref(false)
 const interrupting = ref(false)
 const promptError = ref('')
 const eventStreamError = ref('')
+const eventStreamConnected = ref(false)
 const agentRunning = ref(false)
 const liveActivity = ref('')
 const liveAssistantText = ref('')
@@ -74,6 +75,7 @@ const visibleProjects = computed(() => {
     .slice(0, 8)
 })
 const selectedSession = computed(() => sessionDetail.value?.session)
+const initializing = computed(() => sessionsLoading.value && !selectedSession.value)
 const entries = computed(() => [
   ...(sessionDetail.value?.entries || []),
   ...localEntries.value,
@@ -114,16 +116,21 @@ function openEventStream() {
   })
 
   eventSource.onopen = () => {
+    eventStreamConnected.value = true
     eventStreamError.value = ''
   }
 
   eventSource.onerror = () => {
+    eventStreamConnected.value = false
     eventStreamError.value = 'Runtime event stream disconnected'
     console.warn('pi event stream disconnected')
   }
 }
 
 async function loadSessions({ selectFirst = true } = {}) {
+  sessionsLoading.value = true
+  sessionsError.value = ''
+
   try {
     const response = await fetch('/api/pi/sessions')
     const data = await response.json()
@@ -610,9 +617,16 @@ function handleComposerKeydown(event) {
           <span>↕ ＋</span>
         </div>
 
-        <div v-if="sessionsLoading" class="sidebar-note">Loading…</div>
+        <div v-if="sessionsLoading" class="sidebar-skeleton">
+          <div v-for="index in 3" :key="index" class="skeleton-project">
+            <div class="skeleton-line skeleton-title"></div>
+            <div class="skeleton-line"></div>
+            <div class="skeleton-line short"></div>
+          </div>
+        </div>
         <div v-else-if="sessionsError" class="sidebar-note error-note">
           {{ sessionsError }}
+          <button type="button" @click="loadSessions()">Retry</button>
         </div>
         <div v-else-if="visibleProjects.length === 0" class="sidebar-note">
           No sessions found
@@ -666,8 +680,12 @@ function handleComposerKeydown(event) {
     <section class="main-pane">
       <header class="topbar">
         <div class="topbar-project">
-          <strong>{{ projectName(selectedSession?.cwd) }}</strong>
-          <span>{{ selectedSession?.cwd }}</span>
+          <strong>
+            {{ initializing ? 'Loading workspace' : projectName(selectedSession?.cwd) }}
+          </strong>
+          <span>
+            {{ initializing ? 'Reading local pi state' : selectedSession?.cwd }}
+          </span>
         </div>
         <div v-if="selectedSession" class="topbar-meta">
           <span v-if="agentRunning" class="running-pill">running</span>
@@ -676,8 +694,35 @@ function handleComposerKeydown(event) {
         </div>
       </header>
 
-      <div ref="workbench" class="workbench" @scroll="handleWorkbenchScroll">
-        <div v-if="sessionLoading" class="empty-workbench">Loading session…</div>
+      <div
+        ref="workbench"
+        class="workbench"
+        :class="{ 'init-workbench': initializing }"
+        @scroll="handleWorkbenchScroll"
+      >
+        <div v-if="initializing" class="init-panel">
+          <div class="init-kicker">Starting Agent</div>
+          <h2>Loading workspace…</h2>
+          <div class="init-steps">
+            <div class="init-step active">
+              <span></span>
+              <strong>Loading sessions</strong>
+            </div>
+            <div class="init-step" :class="{ done: eventStreamConnected }">
+              <span></span>
+              <strong>
+                {{ eventStreamConnected ? 'Runtime events connected' : 'Connecting runtime events' }}
+              </strong>
+            </div>
+            <div class="init-step">
+              <span></span>
+              <strong>Preparing transcript view</strong>
+            </div>
+          </div>
+        </div>
+        <div v-else-if="sessionLoading" class="empty-workbench">
+          Loading session…
+        </div>
         <div v-else-if="sessionError" class="empty-workbench error-note">
           {{ sessionError }}
         </div>
@@ -777,9 +822,9 @@ function handleComposerKeydown(event) {
         Jump to latest
       </button>
 
-      <div class="composer-fade"></div>
+      <div v-if="!initializing" class="composer-fade"></div>
 
-      <form class="composer" @submit.prevent="submitDraft">
+      <form v-if="!initializing" class="composer" @submit.prevent="submitDraft">
         <textarea
           v-model="draft"
           :disabled="promptSubmitting"

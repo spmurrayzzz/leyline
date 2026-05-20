@@ -248,6 +248,47 @@ kbd {
   font-size: 14px;
 }
 
+.sidebar-note button {
+  display: block;
+  margin-top: 8px;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  background: #202020;
+  padding: 5px 8px;
+  color: #d4d4d4;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.sidebar-skeleton {
+  display: grid;
+  gap: 16px;
+  padding: 2px 4px;
+}
+
+.skeleton-project {
+  display: grid;
+  gap: 7px;
+}
+
+.skeleton-line {
+  height: 24px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #202020, #252525, #202020);
+  background-size: 180% 100%;
+  animation: skeleton-pulse 1.6s ease-in-out infinite;
+}
+
+.skeleton-title {
+  width: 62%;
+  height: 11px;
+  border-radius: 999px;
+}
+
+.skeleton-line.short {
+  width: 78%;
+}
+
 .error-note {
   color: #f87171;
 }
@@ -377,6 +418,12 @@ h1 {
   min-height: 0;
   overflow: auto;
   padding: 20px 44px 240px;
+}
+
+.init-workbench {
+  display: grid;
+  place-items: center;
+  padding: 0 44px;
 }
 
 .message {
@@ -588,6 +635,75 @@ h1 {
   max-width: 1080px;
   color: #777;
   font-size: 14px;
+}
+
+.init-panel {
+  width: min(480px, 100%);
+  border: 1px solid #282828;
+  border-radius: 18px;
+  background: #181818;
+  padding: 22px 24px 24px;
+  box-shadow: 0 18px 55px rgb(0 0 0 / 18%);
+}
+
+.init-kicker {
+  margin-bottom: 10px;
+  color: #6f6f6f;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.init-panel h2 {
+  margin: 0 0 18px;
+  color: #f0f0f0;
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.init-steps {
+  display: grid;
+  gap: 10px;
+}
+
+.init-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #858585;
+  font-size: 13px;
+}
+
+.init-step span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #3a3a3a;
+}
+
+.init-step.active span {
+  background: #3b82f6;
+  box-shadow: 0 0 0 5px rgb(59 130 246 / 10%);
+}
+
+.init-step.done span {
+  background: #4ade80;
+  box-shadow: none;
+}
+
+.init-step strong {
+  font-weight: 700;
+}
+
+@keyframes skeleton-pulse {
+  0% {
+    background-position: 100% 0;
+  }
+
+  100% {
+    background-position: -80% 0;
+  }
 }
 
 .tool-card {
