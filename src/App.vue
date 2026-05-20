@@ -371,14 +371,15 @@ async function handleRouteChange() {
 }
 
 function sessionIdFromRoute() {
-  return new URL(window.location.href).searchParams.get('session') || ''
+  const url = new URL(window.location.href)
+  const match = url.pathname.match(/^\/sessions\/([^/]+)\/?$/)
+  if (match) return decodeURIComponent(match[1])
+  return url.searchParams.get('session') || ''
 }
 
 function updateSessionRoute(id, { replaceRoute = false } = {}) {
-  const url = new URL(window.location.href)
-  if (id) url.searchParams.set('session', id)
-  else url.searchParams.delete('session')
-  const next = `${url.pathname}${url.search}${url.hash}`
+  const hash = window.location.hash
+  const next = id ? `/sessions/${encodeURIComponent(id)}${hash}` : `/${hash}`
   const current = window.location.pathname
     + window.location.search
     + window.location.hash
