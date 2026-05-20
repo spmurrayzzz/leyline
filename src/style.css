@@ -183,19 +183,25 @@ button {
 
 .search-field {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   width: 100%;
-  margin-bottom: 24px;
-  border: 1px solid transparent;
+  margin-bottom: 22px;
+  border: 1px solid var(--border-soft);
   border-radius: 10px;
-  padding: 8px 9px;
+  background: #17181e;
+  padding: 8px 10px;
   color: var(--muted);
 }
 
+.search-field:hover {
+  border-color: var(--border);
+  background: #191a21;
+}
+
 .search-field:focus-within {
-  border: 1px solid var(--border-soft);
+  border-color: var(--border);
   background: var(--panel-soft);
   color: var(--muted-strong);
 }
@@ -210,7 +216,7 @@ button {
 }
 
 .search-field input::placeholder {
-  color: var(--muted);
+  color: #8d909b;
 }
 
 kbd {

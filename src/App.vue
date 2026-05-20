@@ -680,8 +680,7 @@ function closeSettingsOnEscape(event) {
 
       <label class="search-field">
         <span>⌕</span>
-        <input v-model="sessionQuery" placeholder="Search" />
-        <kbd>⌘K</kbd>
+        <input v-model="sessionQuery" placeholder="Search sessions" />
       </label>
 
       <section class="sidebar-section">
