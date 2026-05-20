@@ -622,7 +622,7 @@ async function interruptAgent() {
   try {
     const response = await fetch('/api/pi/interrupt', { method: 'POST' })
     const data = await response.json()
-    if (!response.ok) throw new Error(data.error || 'Failed to stop agent')
+    if (!response.ok) throw new Error(data.error || 'Failed to stop run')
     agentRunning.value = false
     liveActivity.value = ''
   } catch (error) {
@@ -641,11 +641,14 @@ function handleComposerKeydown(event) {
 </script>
 
 <template>
-  <main class="agent-app">
+  <main class="leyline-app">
     <aside class="sidebar">
       <div class="brand-row">
-        <strong>Agent</strong>
-        <span>local</span>
+        <div class="brand-mark">⌁</div>
+        <div>
+          <strong>Leyline</strong>
+          <span>pi runtime</span>
+        </div>
       </div>
 
       <label class="search-field">
@@ -766,7 +769,7 @@ function handleComposerKeydown(event) {
         @scroll="handleWorkbenchScroll"
       >
         <div v-if="initializing" class="init-panel">
-          <div class="init-kicker">Starting Agent</div>
+          <div class="init-kicker">Starting Leyline</div>
           <h2>Loading workspace…</h2>
           <div class="init-steps">
             <div class="init-step active">
@@ -855,7 +858,7 @@ function handleComposerKeydown(event) {
           v-if="liveAssistantBlocks.length"
           class="message compact-message transcript-message assistant-message live-message"
         >
-          <div class="message-meta">Agent</div>
+          <div class="message-meta">Leyline</div>
           <template
             v-for="(block, index) in liveAssistantBlocks"
             :key="`live-${index}`"
@@ -909,7 +912,7 @@ function handleComposerKeydown(event) {
             :class="{ 'stop-button': agentRunning }"
             :type="agentRunning ? 'button' : 'submit'"
             :disabled="agentRunning ? interrupting : promptSubmitting || !draft.trim()"
-            :title="agentRunning ? 'Stop agent' : 'Send message'"
+            :title="agentRunning ? 'Stop Leyline' : 'Send message'"
             @click="agentRunning && interruptAgent()"
           >
             {{ agentRunning ? '■' : promptSubmitting ? '…' : '↑' }}

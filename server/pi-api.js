@@ -486,7 +486,7 @@ function textFromContent(content) {
 
 function labelForRole(role) {
   if (role === 'user') return 'You'
-  if (role === 'assistant') return 'Agent'
+  if (role === 'assistant') return 'Leyline'
   if (role === 'custom') return 'Custom'
   if (role === 'compactionSummary') return 'Compaction summary'
   if (role === 'branchSummary') return 'Branch summary'
