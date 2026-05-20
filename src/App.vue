@@ -626,8 +626,11 @@ function handleComposerKeydown(event) {
         >
           <div class="project-title">
             <button @click="toggleProject(project)">
-              <span>
-                {{ isProjectExpanded(project) ? '⌄' : '›' }}
+              <span class="project-label">
+                <span
+                  class="project-caret"
+                  :class="{ expanded: isProjectExpanded(project) }"
+                >›</span>
                 <span v-html="highlightedText(project.name)"></span>
               </span>
               <time>{{ project.sessions.length }}</time>
