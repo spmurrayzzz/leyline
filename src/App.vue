@@ -27,6 +27,7 @@ const runtimeEvents = ref([])
 const promptSubmitting = ref(false)
 const interrupting = ref(false)
 const promptError = ref('')
+const eventStreamError = ref('')
 const agentRunning = ref(false)
 const liveActivity = ref('')
 const liveAssistantText = ref('')
@@ -100,15 +101,24 @@ function openEventStream() {
   eventSource.addEventListener('runtime_event', (event) => {
     const data = JSON.parse(event.data)
     runtimeEvents.value = [...runtimeEvents.value.slice(-99), data]
+    scheduleSessionRefresh(data.activeSessionId, data.event)
+    console.log('pi runtime event', data)
+
+    if (data.activeSessionId !== selectedSessionId.value) return
+
     agentRunning.value = isRunningEvent(data.event)
     liveActivity.value = activityText(data.event)
     updateLiveAssistant(data.event)
+    surfaceRuntimeError(data.event)
     scheduleLiveScroll(data.activeSessionId)
-    scheduleSessionRefresh(data.activeSessionId, data.event)
-    console.log('pi runtime event', data)
   })
 
+  eventSource.onopen = () => {
+    eventStreamError.value = ''
+  }
+
   eventSource.onerror = () => {
+    eventStreamError.value = 'Runtime event stream disconnected'
     console.warn('pi event stream disconnected')
   }
 }
@@ -237,6 +247,11 @@ function activityText(event) {
   if (type === 'tool_execution_end') return 'Reading result…'
   if (type === 'agent_end' || type === 'error' || type === 'aborted') return ''
   return liveActivity.value
+}
+
+function surfaceRuntimeError(event) {
+  if (event?.type !== 'error') return
+  promptError.value = event.error?.message || event.message || 'Runtime error'
 }
 
 function updateLiveAssistant(event) {
@@ -768,7 +783,9 @@ function handleComposerKeydown(event) {
           placeholder="Ask for follow-up changes or attach images"
           @keydown="handleComposerKeydown"
         ></textarea>
-        <div v-if="promptError" class="composer-error">{{ promptError }}</div>
+        <div v-if="promptError || eventStreamError" class="composer-error">
+          {{ promptError || eventStreamError }}
+        </div>
         <div class="composer-bar">
           <button type="button">✳ Claude Opus 4.5</button>
           <button type="button">High · Normal</button>
