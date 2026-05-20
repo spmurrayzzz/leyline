@@ -11,6 +11,7 @@ const markdown = new MarkdownIt({
 const sessions = ref([])
 const sessionsError = ref('')
 const sessionsLoading = ref(true)
+const creatingSessionCwd = ref('')
 const sessionQuery = ref('')
 const selectedSessionId = ref('')
 const expandedProjects = ref(new Set())
@@ -94,17 +95,44 @@ function openEventStream() {
   }
 }
 
-async function loadSessions() {
+async function loadSessions({ selectFirst = true } = {}) {
   try {
     const response = await fetch('/api/pi/sessions')
     const data = await response.json()
     if (!response.ok) throw new Error(data.error || 'Failed to load sessions')
     sessions.value = data.sessions || []
-    if (sessions.value[0]) await selectSession(sessions.value[0])
+    if (selectFirst && sessions.value[0]) await selectSession(sessions.value[0])
   } catch (error) {
     sessionsError.value = error.message
   } finally {
     sessionsLoading.value = false
+  }
+}
+
+async function createSession(project) {
+  creatingSessionCwd.value = project.cwd
+  sessionError.value = ''
+
+  try {
+    const response = await fetch('/api/pi/sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cwd: project.cwd }),
+    })
+    const data = await response.json()
+    if (!response.ok) throw new Error(data.error || 'Failed to create session')
+
+    await loadSessions({ selectFirst: false })
+    sessionDetail.value = data.detail
+    selectedSessionId.value = data.detail.session.id
+    expandedTools.value = new Set()
+    localEntries.value = []
+    expandProject(project.cwd)
+    await scrollToLatest()
+  } catch (error) {
+    sessionError.value = error.message
+  } finally {
+    creatingSessionCwd.value = ''
   }
 }
 
@@ -374,13 +402,23 @@ function handleComposerKeydown(event) {
           :key="project.cwd"
           class="project"
         >
-          <button class="project-title" @click="toggleProject(project)">
-            <span>
-              {{ isProjectExpanded(project) ? '⌄' : '›' }}
-              <span v-html="highlightedText(project.name)"></span>
-            </span>
-            <time>{{ project.sessions.length }}</time>
-          </button>
+          <div class="project-title">
+            <button @click="toggleProject(project)">
+              <span>
+                {{ isProjectExpanded(project) ? '⌄' : '›' }}
+                <span v-html="highlightedText(project.name)"></span>
+              </span>
+              <time>{{ project.sessions.length }}</time>
+            </button>
+            <button
+              class="new-session-button"
+              :disabled="creatingSessionCwd === project.cwd"
+              title="New session"
+              @click="createSession(project)"
+            >
+              +
+            </button>
+          </div>
 
           <template v-if="isProjectExpanded(project)">
             <button

@@ -134,25 +134,39 @@ kbd {
 }
 
 .project-title {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto;
   align-items: center;
-  justify-content: space-between;
-  width: 100%;
+  gap: 4px;
   margin-bottom: 4px;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  padding: 2px 4px;
   color: #747474;
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.05em;
   line-height: 1.2;
-  text-align: left;
   text-transform: uppercase;
 }
 
-.project-title:hover {
+.project-title button {
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  padding: 2px 4px;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  text-transform: inherit;
+}
+
+.project-title > button:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.project-title button:hover {
   background: #202020;
   color: #bdbdbd;
 }
@@ -166,6 +180,23 @@ kbd {
   font-size: 10px;
   font-weight: 800;
   text-align: center;
+}
+
+.new-session-button {
+  width: 20px;
+  height: 20px;
+  color: #686868 !important;
+  font-size: 14px !important;
+  line-height: 1 !important;
+  text-align: center !important;
+}
+
+.new-session-button:hover {
+  color: #d7e4ff !important;
+}
+
+.new-session-button:disabled {
+  opacity: 0.45;
 }
 
 .session {

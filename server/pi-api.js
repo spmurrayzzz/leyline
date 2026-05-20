@@ -34,8 +34,21 @@ export function piApi() {
 
         try {
           if (url.pathname === '/sessions') {
-            const sessions = await SessionManager.listAll()
-            return json(res, { sessions: sessions.map(toSessionDto) })
+            if (req.method === 'GET') {
+              const sessions = await listSessions()
+              return json(res, { sessions: sessions.map(toSessionDto) })
+            }
+
+            if (req.method === 'POST') {
+              const body = await readJson(req)
+              const active = await createNewSession(body.cwd)
+              return json(res, {
+                active,
+                detail: toActiveSessionDetailDto(),
+              })
+            }
+
+            return json(res, { error: 'Method not allowed' }, 405)
           }
 
           if (url.pathname === '/active-session') {
@@ -61,6 +74,10 @@ export function piApi() {
 
           const match = url.pathname.match(/^\/sessions\/([^/]+)$/)
           if (match) {
+            if (isActiveSession(match[1])) {
+              return json(res, toActiveSessionDetailDto())
+            }
+
             const session = await findSession(match[1])
             if (!session) return json(res, { error: 'Session not found' }, 404)
             return json(res, toSessionDetailDto(session))
@@ -75,12 +92,26 @@ export function piApi() {
   }
 }
 
+async function listSessions() {
+  const sessions = await SessionManager.listAll()
+  if (!activeRuntime) return sessions
+  if (sessions.some((session) => session.id === activeSessionId)) return sessions
+  return [activeSessionInfo(), ...sessions]
+}
+
 async function findSession(id) {
+  if (isActiveSession(id)) return activeSessionInfo()
   const sessions = await SessionManager.listAll()
   return sessions.find((session) => session.id === id)
 }
 
+function isActiveSession(id) {
+  return activeRuntime && id === activeSessionId
+}
+
 async function switchActiveSession(session) {
+  if (isActiveSession(session.id)) return activeSessionDto()
+
   if (!activeRuntime) {
     activeRuntime = await createAgentSessionRuntime(createRuntime, {
       cwd: session.cwd,
@@ -94,6 +125,31 @@ async function switchActiveSession(session) {
   activeSessionId = session.id
   await bindActiveSession()
 
+  return activeSessionDto()
+}
+
+async function createNewSession(cwd) {
+  if (!cwd) throw new Error('cwd is required')
+
+  if (activeRuntime && activeRuntime.cwd === cwd) {
+    const result = await activeRuntime.newSession()
+    if (result.cancelled) throw new Error('New session cancelled')
+  } else {
+    unsubscribeActiveSession?.()
+    activeRuntime?.session.dispose()
+    activeRuntime = await createAgentSessionRuntime(createRuntime, {
+      cwd,
+      agentDir: getAgentDir(),
+      sessionManager: SessionManager.create(cwd),
+    })
+  }
+
+  activeSessionId = activeRuntime.session.sessionManager.getSessionId()
+  await bindActiveSession()
+  return activeSessionDto()
+}
+
+function activeSessionDto() {
   return {
     id: activeSessionId,
     path: activeRuntime.session.sessionFile,
@@ -164,10 +220,19 @@ function stringifyEvent(data) {
 }
 
 function toSessionDetailDto(session) {
-  const manager = SessionManager.open(session.path)
+  return toSessionDetailFromManager(SessionManager.open(session.path), session)
+}
+
+function toActiveSessionDetailDto() {
+  return toSessionDetailFromManager(
+    activeRuntime.session.sessionManager,
+    activeSessionInfo(),
+  )
+}
+
+function toSessionDetailFromManager(manager, session) {
   const header = manager.getHeader()
   const entries = manager.getBranch()
-
   const toolCalls = collectToolCalls(entries)
 
   return {
@@ -180,6 +245,25 @@ function toSessionDetailDto(session) {
       created: session.created,
     },
     entries: entries.map((entry) => toEntryDto(entry, toolCalls)).filter(Boolean),
+  }
+}
+
+function activeSessionInfo() {
+  const manager = activeRuntime.session.sessionManager
+  const header = manager.getHeader()
+  const entries = manager.getBranch()
+  const messageCount = entries.filter((entry) => entry.type === 'message').length
+  const created = new Date(header.timestamp)
+
+  return {
+    id: manager.getSessionId(),
+    path: manager.getSessionFile(),
+    cwd: header.cwd || activeRuntime.cwd,
+    name: undefined,
+    firstMessage: '(no messages)',
+    created,
+    modified: created,
+    messageCount,
   }
 }
 
