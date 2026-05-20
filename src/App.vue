@@ -45,6 +45,7 @@ const sessionQuery = ref('')
 const selectedSessionId = ref('')
 const expandedProjects = ref(new Set())
 const sidebarOpen = ref(false)
+const desktopSidebarHidden = ref(false)
 const sessionDetail = ref(null)
 const sessionLoading = ref(false)
 const sessionError = ref('')
@@ -624,10 +625,17 @@ function handleComposerKeydown(event) {
   event.preventDefault()
   submitDraft()
 }
+
 </script>
 
 <template>
-  <main class="leyline-app" :class="{ 'sidebar-open': sidebarOpen }">
+  <main
+    class="leyline-app"
+    :class="{
+      'sidebar-open': sidebarOpen,
+      'sidebar-hidden': desktopSidebarHidden,
+    }"
+  >
     <button
       v-if="sidebarOpen"
       class="sidebar-scrim"
@@ -636,12 +644,26 @@ function handleComposerKeydown(event) {
       @click="sidebarOpen = false"
     ></button>
 
+    <button
+      v-if="desktopSidebarHidden"
+      class="sidebar-reveal-button"
+      type="button"
+      aria-label="Show sessions"
+      @click="desktopSidebarHidden = false"
+    >›</button>
+
     <aside class="sidebar">
       <div class="brand-row">
         <div class="brand-mark">⌁</div>
         <div>
           <strong>Leyline</strong>
         </div>
+        <button
+          class="sidebar-collapse-button"
+          type="button"
+          aria-label="Hide sessions"
+          @click="desktopSidebarHidden = true"
+        >‹</button>
       </div>
 
       <label class="search-field">

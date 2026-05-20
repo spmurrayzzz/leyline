@@ -52,20 +52,82 @@ button {
   grid-template-columns: 276px 1fr;
   height: 100vh;
   background: var(--bg);
+  transition: grid-template-columns 180ms ease;
 }
 
-.sidebar-scrim,
+.sidebar-scrim {
+  display: none;
+}
+
 .mobile-sidebar-button {
   display: none;
 }
 
+.sidebar-collapse-button,
+.sidebar-reveal-button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border-soft);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 18px;
+}
+
+.sidebar-collapse-button:hover,
+.sidebar-reveal-button:hover {
+  border-color: var(--border);
+  background: var(--panel-soft);
+  color: var(--muted-strong);
+}
+
+.sidebar-reveal-button {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 10;
+  background: #15161b;
+  animation: reveal-fade 140ms ease;
+}
+
+.leyline-app.sidebar-hidden {
+  grid-template-columns: 0 1fr;
+}
+
+.leyline-app.sidebar-hidden .sidebar {
+  border-right-color: transparent;
+  pointer-events: none;
+  transform: translateX(-100%);
+}
+
 .sidebar {
   display: flex;
+  overflow: hidden;
   flex-direction: column;
+  width: 276px;
+  min-width: 276px;
   min-height: 0;
   border-right: 1px solid var(--border-soft);
   background: var(--sidebar);
   padding: 18px 14px 14px;
+  transform: translateX(0);
+  transition:
+    border-color 180ms ease,
+    transform 180ms ease;
+}
+
+@keyframes reveal-fade {
+  from {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .brand-row {
@@ -74,6 +136,10 @@ button {
   gap: 10px;
   margin-bottom: 32px;
   padding: 4px 4px 0;
+}
+
+.sidebar-collapse-button {
+  margin-left: auto;
 }
 
 .brand-mark {
@@ -1339,9 +1405,23 @@ textarea::placeholder {
     --content-max: 100%;
   }
 
-  .leyline-app {
+  .leyline-app,
+  .leyline-app.sidebar-hidden {
     grid-template-columns: 1fr;
     overflow: hidden;
+  }
+
+  .leyline-app.sidebar-hidden .sidebar {
+    width: min(86vw, 320px);
+    min-width: 0;
+    border-right: 1px solid var(--border-soft);
+    padding: 18px 14px 14px;
+    pointer-events: auto;
+  }
+
+  .sidebar-reveal-button,
+  .sidebar-collapse-button {
+    display: none;
   }
 
   .sidebar {
