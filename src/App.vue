@@ -31,6 +31,7 @@ import {
   messageBlocksFor,
   renderedBlock,
   renderedMessage,
+  skillSummaries,
   textFromBlocks,
   textFromContent,
 } from './lib/transcript'
@@ -52,6 +53,7 @@ const sessionDetail = ref(null)
 const sessionLoading = ref(false)
 const sessionError = ref('')
 const expandedTools = ref(new Set())
+const expandedSkills = ref(new Set())
 const localEntries = ref([])
 const draft = ref('')
 const workbench = ref(null)
@@ -293,6 +295,7 @@ async function createSessionForCwd(cwd) {
     selectedSessionId.value = data.detail.session.id
     updateSessionRoute(data.detail.session.id)
     expandedTools.value = new Set()
+    expandedSkills.value = new Set()
     localEntries.value = []
     liveActivity.value = ''
     liveAssistantText.value = ''
@@ -323,6 +326,7 @@ async function selectSession(session, options = {}) {
     await activateSession(session)
     sessionDetail.value = data
     expandedTools.value = new Set()
+    expandedSkills.value = new Set()
     localEntries.value = []
     liveActivity.value = ''
     liveAssistantText.value = ''
@@ -380,6 +384,7 @@ function clearSelectedSession() {
   sessionError.value = ''
   promptError.value = ''
   expandedTools.value = new Set()
+  expandedSkills.value = new Set()
   localEntries.value = []
   liveActivity.value = ''
   liveAssistantText.value = ''
@@ -528,6 +533,17 @@ function toggleTool(entry) {
   if (next.has(entry.id)) next.delete(entry.id)
   else next.add(entry.id)
   expandedTools.value = next
+}
+
+function isSkillExpanded(entry) {
+  return expandedSkills.value.has(entry.id)
+}
+
+function toggleSkill(entry) {
+  const next = new Set(expandedSkills.value)
+  if (next.has(entry.id)) next.delete(entry.id)
+  else next.add(entry.id)
+  expandedSkills.value = next
 }
 
 function scheduleLiveScroll(activeSessionId) {
@@ -1159,6 +1175,28 @@ function closeSettingsOnEscape(event) {
                   ></div>
                 </template>
               </template>
+              <div
+                v-else-if="skillSummaries(entry).length"
+                class="skill-summary-list"
+              >
+                <button
+                  v-for="skill in skillSummaries(entry)"
+                  :key="skill.name"
+                  class="skill-summary"
+                  type="button"
+                  :title="skill.location"
+                  @click="toggleSkill(entry)"
+                >
+                  <span>[skill]</span>
+                  <strong>{{ skill.name }}</strong>
+                  <em>{{ isSkillExpanded(entry) ? 'hide' : 'expand' }}</em>
+                </button>
+                <div
+                  v-if="isSkillExpanded(entry)"
+                  class="skill-expanded entry-text markdown-body"
+                  v-html="renderedMessage(entry)"
+                ></div>
+              </div>
               <div
                 v-else
                 class="entry-text markdown-body"

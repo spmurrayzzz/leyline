@@ -22,6 +22,22 @@ export function renderedBlock(block) {
   return markdown.render(block.text || '')
 }
 
+export function skillSummaries(entry) {
+  if (entry.role !== 'user' || !entry.text?.trimStart().startsWith('<skill ')) {
+    return []
+  }
+
+  return Array.from(entry.text.matchAll(/<skill\s+([^>]*)>/g))
+    .map((match) => ({
+      name: attributeValue(match[1], 'name') || 'unknown',
+      location: attributeValue(match[1], 'location'),
+    }))
+}
+
+function attributeValue(source, name) {
+  return source.match(new RegExp(`${name}="([^"]+)"`))?.[1]
+}
+
 export function messageBlocksFor(entry) {
   if (entry.blocks?.length) return entry.blocks
   return [{ type: 'text', text: entry.text }]

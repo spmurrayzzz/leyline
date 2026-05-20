@@ -1086,6 +1086,55 @@ h1 {
   color: #bfb5ff;
 }
 
+.skill-summary-list {
+  display: grid;
+  gap: 8px;
+}
+
+.skill-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  border: 1px solid rgb(124 92 255 / 22%);
+  border-radius: 9px;
+  background: rgb(124 92 255 / 10%);
+  padding: 7px 9px;
+  color: #d9d5e8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.skill-summary:hover {
+  border-color: rgb(124 92 255 / 40%);
+  background: rgb(124 92 255 / 14%);
+}
+
+.skill-summary span {
+  color: #9d7dff;
+  font-weight: 800;
+}
+
+.skill-summary strong {
+  color: #e4e2ec;
+  font-weight: 700;
+}
+
+.skill-summary em {
+  color: var(--muted);
+  font-style: normal;
+}
+
+.skill-expanded {
+  max-height: 520px;
+  overflow: auto;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: #111217;
+  padding: 10px 12px;
+}
+
 .summary-message {
   border-left: 2px solid #4f5360;
   padding-left: 12px;
