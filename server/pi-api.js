@@ -397,8 +397,23 @@ function toMessageEntryDto(entry, toolCalls) {
     role: message.role,
     label: labelForRole(message.role),
     text,
+    blocks: messageBlocks(message.content),
     timestamp: entry.timestamp,
   }
+}
+
+function messageBlocks(content) {
+  if (!Array.isArray(content)) return []
+
+  return content
+    .map((block) => {
+      if (block.type === 'text') return { type: 'text', text: block.text }
+      if (block.type === 'thinking') {
+        return { type: 'thinking', text: block.thinking }
+      }
+      return undefined
+    })
+    .filter((block) => block?.text)
 }
 
 function toolAnnotation(toolName, call) {

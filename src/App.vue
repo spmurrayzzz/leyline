@@ -29,6 +29,7 @@ const promptError = ref('')
 const agentRunning = ref(false)
 const liveActivity = ref('')
 const liveAssistantText = ref('')
+const liveAssistantBlocks = ref([])
 const stickToBottom = ref(true)
 const hasNewOutput = ref(false)
 let eventSource
@@ -145,6 +146,7 @@ async function createSession(project) {
     localEntries.value = []
     liveActivity.value = ''
     liveAssistantText.value = ''
+    liveAssistantBlocks.value = []
     expandProject(project.cwd)
     stickToBottom.value = true
     hasNewOutput.value = false
@@ -170,6 +172,7 @@ async function selectSession(session) {
     localEntries.value = []
     liveActivity.value = ''
     liveAssistantText.value = ''
+    liveAssistantBlocks.value = []
     expandProject(session.cwd)
     stickToBottom.value = true
     hasNewOutput.value = false
@@ -199,7 +202,10 @@ function scheduleSessionRefresh(activeSessionId, event) {
     try {
       sessionDetail.value = await loadSessionDetail(selectedSessionId.value)
       await loadSessions({ selectFirst: false })
-      if (shouldClearLiveAssistant(event)) liveAssistantText.value = ''
+      if (shouldClearLiveAssistant(event)) {
+        liveAssistantText.value = ''
+        liveAssistantBlocks.value = []
+      }
       if (wasStuck) await scrollToLatest()
       else hasNewOutput.value = true
     } catch (error) {
@@ -234,12 +240,14 @@ function activityText(event) {
 
 function updateLiveAssistant(event) {
   if (event?.type === 'message_update' && event.message?.role === 'assistant') {
-    liveAssistantText.value = textFromContent(event.message.content)
+    liveAssistantBlocks.value = messageBlocks(event.message.content)
+    liveAssistantText.value = textFromBlocks(liveAssistantBlocks.value)
     return
   }
 
   if (['error', 'aborted'].includes(event?.type)) {
     liveAssistantText.value = ''
+    liveAssistantBlocks.value = []
   }
 }
 
@@ -255,13 +263,27 @@ function textFromContent(content) {
   if (!content) return ''
   if (typeof content === 'string') return content
   if (!Array.isArray(content)) return String(content)
+  return textFromBlocks(messageBlocks(content))
+}
+
+function messageBlocks(content) {
+  if (!Array.isArray(content)) return []
 
   return content
     .map((block) => {
-      if (block.type === 'text') return block.text
-      return ''
+      if (block.type === 'text') return { type: 'text', text: block.text }
+      if (block.type === 'thinking') {
+        return { type: 'thinking', text: block.thinking }
+      }
+      return undefined
     })
-    .filter(Boolean)
+    .filter((block) => block?.text)
+}
+
+function textFromBlocks(blocks) {
+  return blocks
+    .filter((block) => block.type === 'text')
+    .map((block) => block.text)
     .join('\n')
 }
 
@@ -441,6 +463,14 @@ function renderedMessage(entry) {
   return markdown.render(messageText(entry))
 }
 
+function renderedBlock(block) {
+  return markdown.render(block.text || '')
+}
+
+function messageBlocksFor(entry) {
+  return entry.blocks?.length ? entry.blocks : [{ type: 'text', text: entry.text }]
+}
+
 function isToolExpanded(entry) {
   return expandedTools.value.has(entry.id)
 }
@@ -510,6 +540,7 @@ async function submitDraft() {
     promptError.value = error.message
     liveActivity.value = ''
     liveAssistantText.value = ''
+    liveAssistantBlocks.value = []
   } finally {
     promptSubmitting.value = false
   }
@@ -642,20 +673,53 @@ function handleComposerKeydown(event) {
               :class="entryClass(entry)"
             >
               <div class="message-meta">{{ entry.label }}</div>
-              <div class="entry-text markdown-body" v-html="renderedMessage(entry)"></div>
+              <template v-if="entry.role === 'assistant' && entry.blocks?.length">
+                <template
+                  v-for="(block, index) in messageBlocksFor(entry)"
+                  :key="`${entry.id}-${index}`"
+                >
+                  <div
+                    v-if="block.type === 'thinking'"
+                    class="thinking-block"
+                  >
+                    <div class="thinking-label">Thinking</div>
+                    <pre>{{ block.text }}</pre>
+                  </div>
+                  <div
+                    v-else
+                    class="entry-text markdown-body assistant-text-block"
+                    v-html="renderedBlock(block)"
+                  ></div>
+                </template>
+              </template>
+              <div
+                v-else
+                class="entry-text markdown-body"
+                v-html="renderedMessage(entry)"
+              ></div>
             </article>
           </template>
         </template>
 
         <article
-          v-if="liveAssistantText"
+          v-if="liveAssistantBlocks.length"
           class="message compact-message transcript-message assistant-message live-message"
         >
           <div class="message-meta">Agent</div>
-          <div
-            class="entry-text markdown-body"
-            v-html="markdown.render(liveAssistantText)"
-          ></div>
+          <template
+            v-for="(block, index) in liveAssistantBlocks"
+            :key="`live-${index}`"
+          >
+            <div v-if="block.type === 'thinking'" class="thinking-block">
+              <div class="thinking-label">Thinking</div>
+              <pre>{{ block.text }}</pre>
+            </div>
+            <div
+              v-else
+              class="entry-text markdown-body assistant-text-block"
+              v-html="renderedBlock(block)"
+            ></div>
+          </template>
         </article>
 
         <div v-if="liveActivity" class="event-row live-activity">

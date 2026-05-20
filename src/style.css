@@ -402,6 +402,38 @@ h1 {
   padding-left: 12px;
 }
 
+.thinking-block {
+  max-height: 180px;
+  overflow: auto;
+  margin: 0 0 12px;
+  border: 1px solid #2a2a2a;
+  border-radius: 9px;
+  background: #181818;
+  padding: 9px 11px;
+}
+
+.thinking-label {
+  margin-bottom: 5px;
+  color: #737373;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.thinking-block pre {
+  margin: 0;
+  color: #a3a3a3;
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.assistant-text-block + .thinking-block,
+.thinking-block + .assistant-text-block {
+  margin-top: 12px;
+}
+
 .user-message {
   margin-top: 22px;
   border: 1px solid rgb(59 130 246 / 14%);
