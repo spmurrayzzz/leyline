@@ -24,6 +24,7 @@ const draft = ref('')
 const workbench = ref(null)
 const activeRuntimeSession = ref(null)
 const runtimeEvents = ref([])
+const eventLogOpen = ref(false)
 const promptSubmitting = ref(false)
 const interrupting = ref(false)
 const promptError = ref('')
@@ -80,6 +81,7 @@ const entries = computed(() => [
   ...(sessionDetail.value?.entries || []),
   ...localEntries.value,
 ])
+const eventLog = computed(() => runtimeEvents.value.slice(-20).reverse())
 
 onMounted(async () => {
   openEventStream()
@@ -98,11 +100,15 @@ function openEventStream() {
 
   eventSource.addEventListener('active_session', (event) => {
     activeRuntimeSession.value = JSON.parse(event.data)
+    appendRuntimeEvent({
+      type: 'active_session',
+      summary: projectName(activeRuntimeSession.value.cwd),
+    })
   })
 
   eventSource.addEventListener('runtime_event', (event) => {
     const data = JSON.parse(event.data)
-    runtimeEvents.value = [...runtimeEvents.value.slice(-99), data]
+    appendRuntimeEvent(data)
     scheduleSessionRefresh(data.activeSessionId, data.event)
     console.log('pi runtime event', data)
 
@@ -118,13 +124,22 @@ function openEventStream() {
   eventSource.onopen = () => {
     eventStreamConnected.value = true
     eventStreamError.value = ''
+    appendRuntimeEvent({ type: 'connected' })
   }
 
   eventSource.onerror = () => {
     eventStreamConnected.value = false
     eventStreamError.value = 'Runtime event stream disconnected'
+    appendRuntimeEvent({ type: 'disconnected' })
     console.warn('pi event stream disconnected')
   }
+}
+
+function appendRuntimeEvent(event) {
+  runtimeEvents.value = [
+    ...runtimeEvents.value.slice(-99),
+    { ...event, loggedAt: new Date().toISOString() },
+  ]
 }
 
 async function loadSessions({ selectFirst = true } = {}) {
@@ -238,6 +253,34 @@ function isRunningEvent(event) {
   if (type === 'tool_execution_start') return true
   if (['agent_end', 'error', 'aborted'].includes(type)) return false
   return agentRunning.value
+}
+
+function eventType(item) {
+  return item.event?.type || item.type || 'event'
+}
+
+function eventSummary(item) {
+  if (item.summary) return item.summary
+  const event = item.event || item
+  const type = event.type || item.type
+
+  if (type === 'tool_call') return toolLabel(event.toolName)
+  if (type === 'tool_execution_start') {
+    return `${toolLabel(event.toolName)}${toolTarget(event.args)}`
+  }
+  if (type === 'tool_execution_end') return toolLabel(event.toolName)
+  if (type === 'message_update') return event.message?.role || 'message'
+  if (type === 'message_end') return event.message?.role || 'message'
+  if (type === 'error') return event.error?.message || event.message || 'error'
+  return item.activeSessionId ? item.activeSessionId.slice(0, 8) : 'runtime'
+}
+
+function eventTime(item) {
+  return new Intl.DateTimeFormat(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+  }).format(new Date(item.loggedAt))
 }
 
 function activityText(event) {
@@ -689,10 +732,32 @@ function handleComposerKeydown(event) {
         </div>
         <div v-if="selectedSession" class="topbar-meta">
           <span v-if="agentRunning" class="running-pill">running</span>
+          <button
+            class="event-log-button"
+            type="button"
+            @click="eventLogOpen = !eventLogOpen"
+          >
+            Events {{ runtimeEvents.length }}
+          </button>
           <span>{{ selectedSession.messageCount }} messages</span>
           <span>modified {{ formatDate(selectedSession.modified) }}</span>
         </div>
       </header>
+
+      <section v-if="eventLogOpen" class="event-log-panel">
+        <div class="event-log-header">
+          <strong>Runtime events</strong>
+          <button type="button" @click="eventLogOpen = false">×</button>
+        </div>
+        <div v-if="eventLog.length === 0" class="event-log-empty">
+          No events yet
+        </div>
+        <div v-for="item in eventLog" :key="item.loggedAt" class="event-log-row">
+          <time>{{ eventTime(item) }}</time>
+          <code>{{ eventType(item) }}</code>
+          <span>{{ eventSummary(item) }}</span>
+        </div>
+      </section>
 
       <div
         ref="workbench"

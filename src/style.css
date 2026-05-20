@@ -414,6 +414,89 @@ h1 {
   font-weight: 800;
 }
 
+.event-log-button {
+  border: 1px solid #333;
+  border-radius: 999px;
+  background: #1d1d1d;
+  padding: 3px 8px;
+  color: #8f8f8f;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.event-log-button:hover {
+  border-color: #444;
+  color: #d4d4d4;
+}
+
+.event-log-panel {
+  position: absolute;
+  top: 58px;
+  right: 22px;
+  z-index: 4;
+  width: 440px;
+  max-height: 420px;
+  overflow: auto;
+  border: 1px solid #303030;
+  border-radius: 14px;
+  background: #181818;
+  padding: 10px;
+  box-shadow: 0 18px 55px rgb(0 0 0 / 30%);
+}
+
+.event-log-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  color: #d4d4d4;
+  font-size: 12px;
+}
+
+.event-log-header button {
+  border: 0;
+  background: transparent;
+  color: #777;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.event-log-row {
+  display: grid;
+  grid-template-columns: 76px 132px 1fr;
+  gap: 8px;
+  align-items: center;
+  border-top: 1px solid #252525;
+  padding: 7px 0;
+  color: #858585;
+  font-size: 11px;
+}
+
+.event-log-row code {
+  overflow: hidden;
+  border: 1px solid #303030;
+  border-radius: 6px;
+  background: #202020;
+  padding: 2px 5px;
+  color: #bdbdbd;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.event-log-row span {
+  overflow: hidden;
+  color: #a3a3a3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.event-log-empty {
+  border-top: 1px solid #252525;
+  padding-top: 10px;
+  color: #777;
+  font-size: 12px;
+}
+
 .workbench {
   min-height: 0;
   overflow: auto;
