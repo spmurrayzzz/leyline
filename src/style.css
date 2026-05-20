@@ -344,10 +344,20 @@ h1 {
   white-space: nowrap;
 }
 
+.running-pill {
+  border: 1px solid rgb(59 130 246 / 30%);
+  border-radius: 999px;
+  background: rgb(37 99 235 / 12%);
+  padding: 2px 7px;
+  color: #93c5fd;
+  font-size: 11px;
+  font-weight: 800;
+}
+
 .workbench {
   min-height: 0;
   overflow: auto;
-  padding: 20px 44px 190px;
+  padding: 20px 44px 240px;
 }
 
 .message {
@@ -385,6 +395,11 @@ h1 {
 
 .assistant-message .message-meta {
   color: #707070;
+}
+
+.live-message {
+  border-left: 2px solid rgb(59 130 246 / 45%);
+  padding-left: 12px;
 }
 
 .user-message {
@@ -506,6 +521,16 @@ h1 {
   color: #a3a3a3;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 11px;
+}
+
+.live-activity {
+  margin-top: 14px;
+}
+
+.live-activity strong {
+  border-color: rgb(59 130 246 / 25%);
+  background: rgb(37 99 235 / 10%);
+  color: #bfdbfe;
 }
 
 .empty-workbench {
@@ -685,6 +710,21 @@ h1 {
   background: linear-gradient(rgb(19 19 19 / 0), #131313 62%);
 }
 
+.jump-latest-button {
+  position: absolute;
+  right: 52px;
+  bottom: 152px;
+  z-index: 2;
+  border: 1px solid rgb(59 130 246 / 35%);
+  border-radius: 999px;
+  background: #1d2638;
+  padding: 6px 10px;
+  color: #bfdbfe;
+  font-size: 12px;
+  font-weight: 800;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 28%);
+}
+
 .composer {
   position: absolute;
   bottom: 22px;
@@ -718,6 +758,13 @@ textarea::placeholder {
   color: #555;
 }
 
+.composer-error {
+  margin: 0 20px 9px;
+  color: #f87171;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .composer-bar {
   padding: 0 12px 12px;
 }
@@ -734,4 +781,8 @@ textarea::placeholder {
   background: #274690 !important;
   color: white !important;
   font-size: 20px;
+}
+
+.send-button:disabled {
+  opacity: 0.45;
 }

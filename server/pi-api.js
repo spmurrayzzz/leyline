@@ -64,6 +64,16 @@ export function piApi() {
             return json(res, { active })
           }
 
+          if (url.pathname === '/prompt') {
+            if (req.method !== 'POST') {
+              return json(res, { error: 'Method not allowed' }, 405)
+            }
+
+            const body = await readJson(req)
+            await promptActiveSession(body.text)
+            return json(res, { ok: true, active: activeSessionDto() })
+          }
+
           if (url.pathname === '/events') {
             if (req.method !== 'GET') {
               return json(res, { error: 'Method not allowed' }, 405)
@@ -126,6 +136,27 @@ async function switchActiveSession(session) {
   await bindActiveSession()
 
   return activeSessionDto()
+}
+
+async function promptActiveSession(text) {
+  if (!activeRuntime) throw new Error('No active session')
+  if (!text?.trim()) throw new Error('text is required')
+
+  let preflightSucceeded = false
+  await new Promise((resolve, reject) => {
+    activeRuntime.session
+      .prompt(text, {
+        source: 'api',
+        preflightResult: (didSucceed) => {
+          if (!didSucceed) return
+          preflightSucceeded = true
+          resolve()
+        },
+      })
+      .catch((error) => {
+        if (!preflightSucceeded) reject(error)
+      })
+  })
 }
 
 async function createNewSession(cwd) {

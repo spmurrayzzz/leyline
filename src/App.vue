@@ -24,7 +24,16 @@ const draft = ref('')
 const workbench = ref(null)
 const activeRuntimeSession = ref(null)
 const runtimeEvents = ref([])
+const promptSubmitting = ref(false)
+const promptError = ref('')
+const agentRunning = ref(false)
+const liveActivity = ref('')
+const liveAssistantText = ref('')
+const stickToBottom = ref(true)
+const hasNewOutput = ref(false)
 let eventSource
+let refreshTimer
+let scrollFrame
 
 const visibleProjects = computed(() => {
   const projects = new Map()
@@ -74,6 +83,8 @@ onMounted(async () => {
 
 onUnmounted(() => {
   eventSource?.close()
+  clearTimeout(refreshTimer)
+  cancelAnimationFrame(scrollFrame)
 })
 
 function openEventStream() {
@@ -87,6 +98,11 @@ function openEventStream() {
   eventSource.addEventListener('runtime_event', (event) => {
     const data = JSON.parse(event.data)
     runtimeEvents.value = [...runtimeEvents.value.slice(-99), data]
+    agentRunning.value = isRunningEvent(data.event)
+    liveActivity.value = activityText(data.event)
+    updateLiveAssistant(data.event)
+    scheduleLiveScroll(data.activeSessionId)
+    scheduleSessionRefresh(data.activeSessionId)
     console.log('pi runtime event', data)
   })
 
@@ -127,7 +143,11 @@ async function createSession(project) {
     selectedSessionId.value = data.detail.session.id
     expandedTools.value = new Set()
     localEntries.value = []
+    liveActivity.value = ''
+    liveAssistantText.value = ''
     expandProject(project.cwd)
+    stickToBottom.value = true
+    hasNewOutput.value = false
     await scrollToLatest()
   } catch (error) {
     sessionError.value = error.message
@@ -140,22 +160,114 @@ async function selectSession(session) {
   selectedSessionId.value = session.id
   sessionLoading.value = true
   sessionError.value = ''
+  promptError.value = ''
 
   try {
-    const response = await fetch(`/api/pi/sessions/${session.id}`)
-    const data = await response.json()
-    if (!response.ok) throw new Error(data.error || 'Failed to load session')
+    const data = await loadSessionDetail(session.id)
     await activateSession(session)
     sessionDetail.value = data
     expandedTools.value = new Set()
     localEntries.value = []
+    liveActivity.value = ''
+    liveAssistantText.value = ''
     expandProject(session.cwd)
+    stickToBottom.value = true
+    hasNewOutput.value = false
   } catch (error) {
     sessionError.value = error.message
   } finally {
     sessionLoading.value = false
     await scrollToLatest()
   }
+}
+
+async function loadSessionDetail(id) {
+  const response = await fetch(`/api/pi/sessions/${id}`)
+  const data = await response.json()
+  if (!response.ok) throw new Error(data.error || 'Failed to load session')
+  return data
+}
+
+function scheduleSessionRefresh(activeSessionId) {
+  if (activeSessionId !== selectedSessionId.value) return
+
+  clearTimeout(refreshTimer)
+  refreshTimer = setTimeout(async () => {
+    try {
+      sessionDetail.value = await loadSessionDetail(selectedSessionId.value)
+      await loadSessions({ selectFirst: false })
+      if (stickToBottom.value) await scrollToLatest()
+      else hasNewOutput.value = true
+    } catch (error) {
+      sessionError.value = error.message
+    }
+  }, 250)
+}
+
+function isRunningEvent(event) {
+  const type = event?.type || ''
+  if (['agent_start', 'message_start', 'tool_call'].includes(type)) return true
+  if (type === 'tool_execution_start') return true
+  if (['agent_end', 'error', 'aborted'].includes(type)) return false
+  return agentRunning.value
+}
+
+function activityText(event) {
+  const type = event?.type || ''
+  if (type === 'agent_start' || type === 'turn_start') return 'Thinking…'
+  if (type === 'message_update' && !liveAssistantText.value) {
+    return 'Writing response…'
+  }
+  if (type === 'message_update') return ''
+  if (type === 'tool_call') return `Preparing ${toolLabel(event.toolName)}…`
+  if (type === 'tool_execution_start') {
+    return `Running ${toolLabel(event.toolName)}${toolTarget(event.args)}`
+  }
+  if (type === 'tool_execution_end') return 'Reading result…'
+  if (type === 'agent_end' || type === 'error' || type === 'aborted') return ''
+  return liveActivity.value
+}
+
+function updateLiveAssistant(event) {
+  if (event?.type === 'message_update' && event.message?.role === 'assistant') {
+    liveAssistantText.value = textFromContent(event.message.content)
+    return
+  }
+
+  if (event?.type === 'message_end' && event.message?.role === 'assistant') {
+    liveAssistantText.value = ''
+  }
+
+  if (['agent_end', 'error', 'aborted'].includes(event?.type)) {
+    liveAssistantText.value = ''
+  }
+}
+
+function textFromContent(content) {
+  if (!content) return ''
+  if (typeof content === 'string') return content
+  if (!Array.isArray(content)) return String(content)
+
+  return content
+    .map((block) => {
+      if (block.type === 'text') return block.text
+      return ''
+    })
+    .filter(Boolean)
+    .join('\n')
+}
+
+function toolLabel(toolName) {
+  if (!toolName) return 'tool'
+  if (toolName === 'bash') return 'bash'
+  return toolName
+}
+
+function toolTarget(args) {
+  if (!args) return ''
+  const value = args.command || args.path
+  if (!value) return ''
+  return ` · ${String(value).slice(0, 80)}`
 }
 
 async function activateSession(session) {
@@ -334,6 +446,36 @@ function toggleTool(entry) {
   expandedTools.value = next
 }
 
+function scheduleLiveScroll(activeSessionId) {
+  if (activeSessionId !== selectedSessionId.value) return
+  if (!liveAssistantText.value && !liveActivity.value) return
+
+  if (!stickToBottom.value) {
+    hasNewOutput.value = true
+    return
+  }
+
+  cancelAnimationFrame(scrollFrame)
+  scrollFrame = requestAnimationFrame(() => {
+    scrollToLatest()
+  })
+}
+
+function handleWorkbenchScroll() {
+  if (!workbench.value) return
+  const distance = workbench.value.scrollHeight
+    - workbench.value.scrollTop
+    - workbench.value.clientHeight
+  stickToBottom.value = distance < 80
+  if (stickToBottom.value) hasNewOutput.value = false
+}
+
+async function jumpToLatest() {
+  stickToBottom.value = true
+  hasNewOutput.value = false
+  await scrollToLatest()
+}
+
 async function scrollToLatest() {
   await nextTick()
   if (!workbench.value) return
@@ -342,23 +484,29 @@ async function scrollToLatest() {
 
 async function submitDraft() {
   const text = draft.value.trim()
-  if (!text) return
+  if (!text || promptSubmitting.value) return
 
-  localEntries.value.push({
-    id: `local-user-${Date.now()}`,
-    type: 'message',
-    role: 'user',
-    label: 'You',
-    text,
-  })
-  localEntries.value.push({
-    id: `local-note-${Date.now()}`,
-    type: 'summary',
-    label: 'Not wired',
-    text: 'Prompt submission is local-only for now. No pi session state was changed.',
-  })
-  draft.value = ''
-  await scrollToLatest()
+  promptSubmitting.value = true
+  promptError.value = ''
+
+  try {
+    const response = await fetch('/api/pi/prompt', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    })
+    const data = await response.json()
+    if (!response.ok) throw new Error(data.error || 'Failed to submit prompt')
+    draft.value = ''
+    agentRunning.value = true
+    liveActivity.value = 'Thinking…'
+  } catch (error) {
+    promptError.value = error.message
+    liveActivity.value = ''
+    liveAssistantText.value = ''
+  } finally {
+    promptSubmitting.value = false
+  }
 }
 
 function handleComposerKeydown(event) {
@@ -445,12 +593,13 @@ function handleComposerKeydown(event) {
           <span>{{ selectedSession?.cwd }}</span>
         </div>
         <div v-if="selectedSession" class="topbar-meta">
+          <span v-if="agentRunning" class="running-pill">running</span>
           <span>{{ selectedSession.messageCount }} messages</span>
           <span>modified {{ formatDate(selectedSession.modified) }}</span>
         </div>
       </header>
 
-      <div ref="workbench" class="workbench">
+      <div ref="workbench" class="workbench" @scroll="handleWorkbenchScroll">
         <div v-if="sessionLoading" class="empty-workbench">Loading session…</div>
         <div v-else-if="sessionError" class="empty-workbench error-note">
           {{ sessionError }}
@@ -491,22 +640,55 @@ function handleComposerKeydown(event) {
             </article>
           </template>
         </template>
+
+        <article
+          v-if="liveAssistantText"
+          class="message compact-message transcript-message assistant-message live-message"
+        >
+          <div class="message-meta">Agent</div>
+          <div
+            class="entry-text markdown-body"
+            v-html="markdown.render(liveAssistantText)"
+          ></div>
+        </article>
+
+        <div v-if="liveActivity" class="event-row live-activity">
+          <span>Live</span>
+          <strong>{{ liveActivity }}</strong>
+        </div>
       </div>
+
+      <button
+        v-if="hasNewOutput"
+        class="jump-latest-button"
+        type="button"
+        @click="jumpToLatest"
+      >
+        Jump to latest
+      </button>
 
       <div class="composer-fade"></div>
 
       <form class="composer" @submit.prevent="submitDraft">
         <textarea
           v-model="draft"
+          :disabled="promptSubmitting"
           placeholder="Ask for follow-up changes or attach images"
           @keydown="handleComposerKeydown"
         ></textarea>
+        <div v-if="promptError" class="composer-error">{{ promptError }}</div>
         <div class="composer-bar">
           <button type="button">✳ Claude Opus 4.5</button>
           <button type="button">High · Normal</button>
           <button type="button">⚒ Build</button>
           <button type="button">▢ Full access</button>
-          <button class="send-button" type="submit">↑</button>
+          <button
+            class="send-button"
+            type="submit"
+            :disabled="promptSubmitting || !draft.trim()"
+          >
+            {{ promptSubmitting ? '…' : '↑' }}
+          </button>
         </div>
       </form>
     </section>
