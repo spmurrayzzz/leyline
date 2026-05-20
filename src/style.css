@@ -478,9 +478,117 @@ kbd {
 }
 
 .settings-button {
-  align-self: flex-start;
-  padding: 8px 4px;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  margin-top: 12px;
+  border-color: var(--border-soft);
+  border-radius: 10px;
+  background: transparent;
   color: var(--muted);
+  font-size: 13px;
+}
+
+.settings-button:hover {
+  border-color: var(--border);
+  background: var(--panel-soft);
+  color: var(--muted-strong);
+}
+
+.settings-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  border: 0;
+  background: rgb(0 0 0 / 42%);
+}
+
+.settings-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 31;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: min(380px, 100vw);
+  height: 100vh;
+  border-left: 1px solid var(--border);
+  background: #131419;
+  padding: 18px;
+  box-shadow: -20px 0 60px rgb(0 0 0 / 45%);
+}
+
+.settings-drawer-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--border-soft);
+  padding-bottom: 16px;
+}
+
+.settings-drawer-header strong {
+  display: block;
+  color: var(--text);
+  font-size: 15px;
+}
+
+.settings-drawer-header span {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.settings-drawer-header button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.settings-group {
+  display: grid;
+  gap: 10px;
+}
+
+.settings-group h2 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.settings-group dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.settings-group dl > div {
+  display: grid;
+  gap: 5px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--panel);
+  padding: 10px;
+}
+
+.settings-group dt {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.settings-group dd {
+  overflow-wrap: anywhere;
+  margin: 0;
+  color: #d9dbe4;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .main-pane {

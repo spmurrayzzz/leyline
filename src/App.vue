@@ -55,6 +55,7 @@ const draft = ref('')
 const workbench = ref(null)
 const activeRuntimeSession = ref(null)
 const eventLogOpen = ref(false)
+const settingsOpen = ref(false)
 const promptSubmitting = ref(false)
 const interrupting = ref(false)
 const switchingModel = ref(false)
@@ -202,13 +203,20 @@ const composerChips = computed(() => {
       : '',
   ].filter(Boolean)
 })
+const eventStreamLabel = computed(() => {
+  if (eventStreamConnected.value) return 'Connected'
+  if (eventStreamError.value) return 'Error'
+  return 'Connecting'
+})
 
 onMounted(async () => {
+  window.addEventListener('keydown', closeSettingsOnEscape)
   openEventStream()
   await loadSessions()
 })
 
 onUnmounted(() => {
+  window.removeEventListener('keydown', closeSettingsOnEscape)
   closeEventStream()
   closeTerminalPanel()
   clearTimeout(refreshTimer)
@@ -626,6 +634,10 @@ function handleComposerKeydown(event) {
   submitDraft()
 }
 
+function closeSettingsOnEscape(event) {
+  if (event.key === 'Escape') settingsOpen.value = false
+}
+
 </script>
 
 <template>
@@ -756,7 +768,13 @@ function handleComposerKeydown(event) {
         </div>
       </section>
 
-      <button class="settings-button">⚙ Settings</button>
+      <button
+        class="settings-button"
+        type="button"
+        title="Settings"
+        aria-label="Open settings"
+        @click="settingsOpen = true"
+      >⚙</button>
     </aside>
 
     <section class="main-pane">
@@ -1092,5 +1110,72 @@ function handleComposerKeydown(event) {
         </div>
       </form>
     </section>
+
+    <button
+      v-if="settingsOpen"
+      class="settings-backdrop"
+      type="button"
+      aria-label="Close settings"
+      @click="settingsOpen = false"
+    ></button>
+    <aside v-if="settingsOpen" class="settings-drawer" aria-label="Settings">
+      <header class="settings-drawer-header">
+        <div>
+          <strong>Settings</strong>
+          <span>Runtime and session state</span>
+        </div>
+        <button type="button" @click="settingsOpen = false">×</button>
+      </header>
+
+      <section class="settings-group">
+        <h2>Runtime</h2>
+        <dl>
+          <div>
+            <dt>Model</dt>
+            <dd>{{ currentModelLabel }}</dd>
+          </div>
+          <div>
+            <dt>Thinking</dt>
+            <dd>{{ currentThinkingLabel }}</dd>
+          </div>
+          <div>
+            <dt>Mode</dt>
+            <dd>{{ currentModeLabel }}</dd>
+          </div>
+          <div>
+            <dt>Tools</dt>
+            <dd>{{ composerChips[0] || 'Unknown' }}</dd>
+          </div>
+          <div>
+            <dt>Events</dt>
+            <dd>{{ eventStreamLabel }}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="settings-group">
+        <h2>Session</h2>
+        <dl>
+          <div>
+            <dt>Project</dt>
+            <dd>{{ projectName(selectedSession?.cwd) }}</dd>
+          </div>
+          <div>
+            <dt>CWD</dt>
+            <dd>{{ selectedSession?.cwd || 'No session selected' }}</dd>
+          </div>
+          <div>
+            <dt>Path</dt>
+            <dd>
+              {{ selectedSession?.path || activeRuntimeSession?.path || '—' }}
+            </dd>
+          </div>
+          <div>
+            <dt>Messages</dt>
+            <dd>{{ selectedSession?.messageCount ?? '—' }}</dd>
+          </div>
+        </dl>
+      </section>
+    </aside>
   </main>
 </template>
