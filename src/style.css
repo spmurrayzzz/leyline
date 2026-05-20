@@ -1,5 +1,6 @@
 :root {
   color: #e8e9ef;
+  color-scheme: dark;
   background: #0d0e11;
   --bg: #0d0e11;
   --sidebar: #14151a;
@@ -596,6 +597,22 @@ h1 {
   min-height: 0;
   overflow: auto;
   padding: 20px 44px 240px;
+  scrollbar-color: #4b4658 transparent;
+  scrollbar-width: thin;
+}
+
+.workbench::-webkit-scrollbar {
+  width: 10px;
+}
+
+.workbench::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.workbench::-webkit-scrollbar-thumb {
+  border: 3px solid #0b0c0f;
+  border-radius: 999px;
+  background: #4b4658;
 }
 
 .init-workbench {
