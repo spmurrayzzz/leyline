@@ -162,6 +162,11 @@ const selectedModelKey = computed(() => {
 const currentModelLabel = computed(() => {
   return modelChip(activeRuntimeSession.value?.state?.model)
 })
+const currentMobileModelLabel = computed(() => {
+  const model = activeRuntimeSession.value?.state?.model
+  if (!model?.id) return 'Model'
+  return formatMode(model.id).replace(/^Gpt\b/, 'GPT')
+})
 const availableThinkingLevels = computed(() => {
   return activeRuntimeSession.value?.state?.availableThinkingLevels || []
 })
@@ -169,12 +174,23 @@ const currentThinkingLabel = computed(() => {
   const level = activeRuntimeSession.value?.state?.thinkingLevel
   return level ? `Thinking · ${formatMode(level)}` : 'Thinking'
 })
+const currentMobileThinkingLabel = computed(() => {
+  const level = activeRuntimeSession.value?.state?.thinkingLevel
+  if (!level) return 'Think'
+  return `Think ${level === 'medium' ? 'Med' : formatMode(level)}`
+})
 const currentModeLabel = computed(() => {
   const state = activeRuntimeSession.value?.state || {}
   return modeChip(
     state.steeringMode && formatMode(state.steeringMode),
     state.followUpMode && formatMode(state.followUpMode),
   ) || 'Mode'
+})
+const currentMobileModeLabel = computed(() => {
+  const state = activeRuntimeSession.value?.state || {}
+  const mode = state.followUpMode || state.steeringMode
+  if (mode === 'one-at-a-time') return 'One'
+  return mode ? formatMode(mode) : 'Mode'
 })
 const composerChips = computed(() => {
   const state = activeRuntimeSession.value?.state || {}
@@ -931,7 +947,10 @@ function handleComposerKeydown(event) {
               :disabled="agentRunning || promptSubmitting || switchingModel"
               @click="togglePicker('model')"
             >
-              <span class="model-label">{{ currentModelLabel }}</span>
+              <span class="model-label desktop-label">{{ currentModelLabel }}</span>
+              <span class="model-label mobile-label">
+                {{ currentMobileModelLabel }}
+              </span>
               <span class="model-caret">▾</span>
             </button>
             <div v-if="modelPickerOpen" class="model-menu">
@@ -954,7 +973,12 @@ function handleComposerKeydown(event) {
               :disabled="agentRunning || promptSubmitting || switchingThinking"
               @click="togglePicker('thinking')"
             >
-              <span class="model-label">{{ currentThinkingLabel }}</span>
+              <span class="model-label desktop-label">
+                {{ currentThinkingLabel }}
+              </span>
+              <span class="model-label mobile-label">
+                {{ currentMobileThinkingLabel }}
+              </span>
               <span class="model-caret">▾</span>
             </button>
             <div v-if="thinkingPickerOpen" class="model-menu small-menu">
@@ -983,7 +1007,10 @@ function handleComposerKeydown(event) {
               :disabled="agentRunning || promptSubmitting || switchingMode"
               @click="togglePicker('mode')"
             >
-              <span class="model-label">{{ currentModeLabel }}</span>
+              <span class="model-label desktop-label">{{ currentModeLabel }}</span>
+              <span class="model-label mobile-label">
+                {{ currentMobileModeLabel }}
+              </span>
               <span class="model-caret">▾</span>
             </button>
             <div v-if="modePickerOpen" class="model-menu mode-menu">

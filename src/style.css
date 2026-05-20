@@ -1244,6 +1244,10 @@ textarea::placeholder {
   white-space: nowrap;
 }
 
+.mobile-label {
+  display: none;
+}
+
 .model-caret {
   flex: 0 0 auto;
   color: var(--muted-strong);
@@ -1483,27 +1487,55 @@ textarea::placeholder {
   }
 
   .composer-bar {
-    gap: 7px;
-    overflow-x: auto;
-    min-height: 46px;
-    margin-right: 46px;
-    padding: 0 0 10px 10px;
-    scrollbar-width: none;
-  }
-
-  .composer-bar::-webkit-scrollbar {
-    display: none;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto 36px;
+    gap: 13px;
+    align-items: center;
+    min-height: 42px;
+    border-top: 1px solid rgb(255 255 255 / 5%);
+    padding: 0 10px 10px 14px;
   }
 
   .model-picker,
   .small-picker {
-    flex: 0 0 auto;
-    max-width: 170px;
+    min-width: 0;
+    max-width: none;
   }
 
   .model-picker-button,
   .composer-chip {
-    max-width: 170px;
+    max-width: none;
+  }
+
+  .composer-bar > .composer-chip:not(.model-picker-button) {
+    display: none;
+  }
+
+  .composer-bar .model-picker-button {
+    height: 32px;
+    border: 0 !important;
+    background: transparent !important;
+    padding: 0 !important;
+    color: var(--muted-strong);
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .composer-bar .model-picker-button:hover {
+    color: #d8d1ff;
+  }
+
+  .desktop-label {
+    display: none;
+  }
+
+  .mobile-label {
+    display: block;
+  }
+
+  .model-caret {
+    font-size: 11px;
+    opacity: 0.72;
   }
 
   .model-menu {
@@ -1511,13 +1543,9 @@ textarea::placeholder {
   }
 
   .send-button {
-    position: absolute;
-    right: 10px;
-    bottom: 10px;
-    flex: 0 0 auto;
     width: 36px;
     height: 36px;
-    box-shadow: -12px 0 18px #15121d;
+    margin-left: 0;
   }
 
   .jump-latest-button {
