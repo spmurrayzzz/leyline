@@ -818,3 +818,9 @@ textarea::placeholder {
 .send-button:disabled {
   opacity: 0.45;
 }
+
+.stop-button {
+  background: #7f1d1d !important;
+  color: #fecaca !important;
+  font-size: 14px;
+}

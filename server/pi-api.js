@@ -74,6 +74,15 @@ export function piApi() {
             return json(res, { ok: true, active: activeSessionDto() })
           }
 
+          if (url.pathname === '/interrupt') {
+            if (req.method !== 'POST') {
+              return json(res, { error: 'Method not allowed' }, 405)
+            }
+
+            await interruptActiveSession()
+            return json(res, { ok: true, active: activeSessionDto() })
+          }
+
           if (url.pathname === '/events') {
             if (req.method !== 'GET') {
               return json(res, { error: 'Method not allowed' }, 405)
@@ -157,6 +166,11 @@ async function promptActiveSession(text) {
         if (!preflightSucceeded) reject(error)
       })
   })
+}
+
+async function interruptActiveSession() {
+  if (!activeRuntime) throw new Error('No active session')
+  await activeRuntime.session.abort()
 }
 
 async function createNewSession(cwd) {

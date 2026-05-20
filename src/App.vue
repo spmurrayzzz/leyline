@@ -25,6 +25,7 @@ const workbench = ref(null)
 const activeRuntimeSession = ref(null)
 const runtimeEvents = ref([])
 const promptSubmitting = ref(false)
+const interrupting = ref(false)
 const promptError = ref('')
 const agentRunning = ref(false)
 const liveActivity = ref('')
@@ -520,7 +521,7 @@ async function scrollToLatest() {
 
 async function submitDraft() {
   const text = draft.value.trim()
-  if (!text || promptSubmitting.value) return
+  if (!text || promptSubmitting.value || agentRunning.value) return
 
   promptSubmitting.value = true
   promptError.value = ''
@@ -543,6 +544,27 @@ async function submitDraft() {
     liveAssistantBlocks.value = []
   } finally {
     promptSubmitting.value = false
+  }
+}
+
+async function interruptAgent() {
+  if (!agentRunning.value || interrupting.value) return
+
+  interrupting.value = true
+  promptError.value = ''
+  liveActivity.value = 'Stopping…'
+
+  try {
+    const response = await fetch('/api/pi/interrupt', { method: 'POST' })
+    const data = await response.json()
+    if (!response.ok) throw new Error(data.error || 'Failed to stop agent')
+    agentRunning.value = false
+    liveActivity.value = ''
+  } catch (error) {
+    promptError.value = error.message
+    liveActivity.value = ''
+  } finally {
+    interrupting.value = false
   }
 }
 
@@ -754,10 +776,13 @@ function handleComposerKeydown(event) {
           <button type="button">▢ Full access</button>
           <button
             class="send-button"
-            type="submit"
-            :disabled="promptSubmitting || !draft.trim()"
+            :class="{ 'stop-button': agentRunning }"
+            :type="agentRunning ? 'button' : 'submit'"
+            :disabled="agentRunning ? interrupting : promptSubmitting || !draft.trim()"
+            :title="agentRunning ? 'Stop agent' : 'Send message'"
+            @click="agentRunning && interruptAgent()"
           >
-            {{ promptSubmitting ? '…' : '↑' }}
+            {{ agentRunning ? '■' : promptSubmitting ? '…' : '↑' }}
           </button>
         </div>
       </form>
