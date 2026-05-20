@@ -36,6 +36,7 @@ body {
 }
 
 button,
+input,
 textarea {
   color: inherit;
   font: inherit;
@@ -156,6 +157,7 @@ kbd {
 
 .section-header {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   margin-bottom: 14px;
   color: var(--muted);
@@ -163,6 +165,61 @@ kbd {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.section-action {
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  padding: 1px 5px;
+  color: var(--muted);
+  font: inherit;
+}
+
+.section-action:hover {
+  background: var(--panel-soft);
+  color: #cfc5ff;
+}
+
+.new-session-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+  margin: -4px 0 14px;
+}
+
+.new-session-form input {
+  min-width: 0;
+  border: 1px solid var(--border-soft);
+  border-radius: 9px;
+  outline: 0;
+  background: var(--panel-soft);
+  padding: 6px 8px;
+  color: #e2e3e8;
+  font-size: 12px;
+}
+
+.new-session-form input::placeholder {
+  color: var(--muted);
+}
+
+.new-session-form input:focus {
+  border-color: var(--accent-border);
+}
+
+.new-session-form button {
+  border: 1px solid var(--accent-border);
+  border-radius: 9px;
+  background: var(--accent-soft);
+  padding: 6px 8px;
+  color: #d8d1ff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.new-session-form button:disabled,
+.new-session-form input:disabled {
+  opacity: 0.55;
 }
 
 .project {

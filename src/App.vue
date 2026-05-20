@@ -39,6 +39,8 @@ const sessions = ref([])
 const sessionsError = ref('')
 const sessionsLoading = ref(true)
 const creatingSessionCwd = ref('')
+const newSessionCwd = ref('')
+const newSessionFormOpen = ref(false)
 const sessionQuery = ref('')
 const selectedSessionId = ref('')
 const expandedProjects = ref(new Set())
@@ -210,11 +212,18 @@ async function loadSessions({ selectFirst = true } = {}) {
 }
 
 async function createSession(project) {
-  creatingSessionCwd.value = project.cwd
+  await createSessionForCwd(project.cwd)
+}
+
+async function createSessionForCwd(cwd) {
+  const targetCwd = cwd?.trim() || ''
+  if (!targetCwd) return
+
+  creatingSessionCwd.value = targetCwd
   sessionError.value = ''
 
   try {
-    const data = await createPiSession(project.cwd)
+    const data = await createPiSession(targetCwd)
 
     await loadSessions({ selectFirst: false })
     sessionDetail.value = data.detail
@@ -224,7 +233,9 @@ async function createSession(project) {
     liveActivity.value = ''
     liveAssistantText.value = ''
     liveAssistantBlocks.value = []
-    expandProject(project.cwd)
+    expandProject(targetCwd)
+    newSessionCwd.value = ''
+    newSessionFormOpen.value = false
     stickToBottom.value = true
     hasNewOutput.value = false
     await scrollToLatest()
@@ -615,8 +626,29 @@ function handleComposerKeydown(event) {
       <section class="sidebar-section">
         <div class="section-header">
           <span>Sessions</span>
-          <span>↕ ＋</span>
+          <button
+            type="button"
+            class="section-action"
+            title="New session"
+            @click="newSessionFormOpen = !newSessionFormOpen"
+          >＋</button>
         </div>
+
+        <form
+          v-if="newSessionFormOpen"
+          class="new-session-form"
+          @submit.prevent="createSessionForCwd(newSessionCwd)"
+        >
+          <input
+            v-model="newSessionCwd"
+            placeholder="Project cwd"
+            :disabled="!!creatingSessionCwd"
+          />
+          <button
+            type="submit"
+            :disabled="!newSessionCwd.trim() || !!creatingSessionCwd"
+          >Create</button>
+        </form>
 
         <div v-if="sessionsLoading" class="sidebar-skeleton">
           <div v-for="index in 3" :key="index" class="skeleton-project">
