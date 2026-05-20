@@ -1,6 +1,6 @@
 <script setup>
 import MarkdownIt from 'markdown-it'
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 
 const markdown = new MarkdownIt({
   html: false,
@@ -21,6 +21,9 @@ const expandedTools = ref(new Set())
 const localEntries = ref([])
 const draft = ref('')
 const workbench = ref(null)
+const activeRuntimeSession = ref(null)
+const runtimeEvents = ref([])
+let eventSource
 
 const visibleProjects = computed(() => {
   const projects = new Map()
@@ -64,8 +67,32 @@ const entries = computed(() => [
 ])
 
 onMounted(async () => {
+  openEventStream()
   await loadSessions()
 })
+
+onUnmounted(() => {
+  eventSource?.close()
+})
+
+function openEventStream() {
+  eventSource?.close()
+  eventSource = new EventSource('/api/pi/events')
+
+  eventSource.addEventListener('active_session', (event) => {
+    activeRuntimeSession.value = JSON.parse(event.data)
+  })
+
+  eventSource.addEventListener('runtime_event', (event) => {
+    const data = JSON.parse(event.data)
+    runtimeEvents.value = [...runtimeEvents.value.slice(-99), data]
+    console.log('pi runtime event', data)
+  })
+
+  eventSource.onerror = () => {
+    console.warn('pi event stream disconnected')
+  }
+}
 
 async function loadSessions() {
   try {
