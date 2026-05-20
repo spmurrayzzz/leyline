@@ -606,6 +606,10 @@ kbd {
   background: #0b0c0f;
 }
 
+.leyline-app.start-state .main-pane {
+  grid-template-rows: 1fr;
+}
+
 .topbar {
   display: flex;
   align-items: center;
@@ -800,10 +804,197 @@ h1 {
   background: #4b4658;
 }
 
-.init-workbench {
+.init-workbench,
+.start-workbench-shell {
   display: grid;
   place-items: center;
-  padding: 0 44px;
+  padding: 0 44px 12vh;
+}
+
+.start-panel {
+  display: grid;
+  justify-items: center;
+  width: min(820px, 100%);
+}
+
+.start-panel h2 {
+  margin: 0 0 30px;
+  color: #ececf3;
+  font-size: 32px;
+  font-weight: 680;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+}
+
+.start-composer {
+  position: relative;
+  width: min(720px, 100%);
+  border: 1px solid #35323f;
+  border-radius: 22px;
+  background: #17161d;
+  box-shadow: 0 18px 60px rgb(0 0 0 / 42%);
+}
+
+.start-composer:focus-within {
+  border-color: #4a415f;
+}
+
+.start-composer textarea {
+  height: 92px;
+  padding: 18px 20px 8px;
+  color: #e5e6ec;
+  font-size: 15px;
+}
+
+.start-composer textarea::placeholder {
+  color: #605b6c;
+}
+
+.start-composer-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0 12px 12px;
+}
+
+.start-composer-chip {
+  height: 28px;
+  border-color: #312d3d;
+  background: #1a1722;
+  padding: 7px 10px;
+  color: var(--muted-strong);
+}
+
+.start-picker {
+  max-width: 150px;
+}
+
+.start-picker .model-picker-button {
+  max-width: 150px;
+}
+
+.start-project-button,
+.start-send-button,
+.start-project-menu button {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted-strong);
+}
+
+.start-project-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 190px;
+  height: 28px;
+  border-color: #312d3d;
+  border-radius: 999px;
+  background: #1a1722;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.start-project-button em {
+  color: var(--muted);
+  font-style: normal;
+}
+
+.start-project-button:hover,
+.start-composer-chip:hover {
+  border-color: var(--accent-border);
+  background: #201a32;
+  color: var(--text);
+}
+
+.start-send-button {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: #5f52b8;
+  color: white;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.start-send-button:disabled {
+  opacity: 0.45;
+}
+
+.start-project-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 12px;
+  z-index: 5;
+  display: grid;
+  gap: 3px;
+  width: 300px;
+  border: 1px solid #312d3d;
+  border-radius: 14px;
+  background: #111018;
+  padding: 10px;
+  box-shadow: 0 18px 60px rgb(0 0 0 / 45%);
+}
+
+.start-project-menu label {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+  color: var(--muted);
+}
+
+.start-project-menu input {
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #e5e6ec;
+}
+
+.start-project-menu input::placeholder {
+  color: var(--muted);
+}
+
+.start-project-menu button {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 12px;
+  text-align: left;
+}
+
+.start-project-menu button:hover {
+  background: #201a32;
+  color: var(--text);
+}
+
+.start-project-menu strong {
+  overflow: hidden;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.start-project-menu em {
+  color: #cfc7ff;
+  font-style: normal;
+}
+
+.start-project-divider {
+  height: 1px;
+  margin: 6px 0;
+  background: #312d3d;
 }
 
 .message {

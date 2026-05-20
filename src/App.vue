@@ -41,6 +41,8 @@ const sessionsLoading = ref(true)
 const creatingSessionCwd = ref('')
 const newSessionCwd = ref('')
 const newSessionFormOpen = ref(false)
+const startProjectPickerOpen = ref(false)
+const startProjectQuery = ref('')
 const sessionQuery = ref('')
 const selectedSessionId = ref('')
 const expandedProjects = ref(new Set())
@@ -208,28 +210,62 @@ const eventStreamLabel = computed(() => {
   if (eventStreamError.value) return 'Error'
   return 'Connecting'
 })
+const topbarTitle = computed(() => {
+  if (initializing.value) return 'Loading workspace'
+  if (selectedSession.value) return projectName(selectedSession.value.cwd)
+  return 'Leyline'
+})
+const topbarSubtitle = computed(() => {
+  if (initializing.value) return 'Reading local pi state'
+  return selectedSession.value?.cwd || 'Choose a session or start fresh'
+})
+const initEventLabel = computed(() => {
+  return eventStreamConnected.value
+    ? 'Runtime events connected'
+    : 'Connecting runtime events'
+})
+const startProjectOptions = computed(() => {
+  const query = startProjectQuery.value.trim().toLowerCase()
+  return visibleProjects.value.filter((project) => {
+    return !query || fuzzyScore(project.name, query) > 0
+  })
+})
+const startProjectLabel = computed(() => {
+  return newSessionCwd.value ? projectName(newSessionCwd.value) : 'Choose project'
+})
 
 onMounted(async () => {
   window.addEventListener('keydown', closeSettingsOnEscape)
+  window.addEventListener('popstate', handleRouteChange)
   openEventStream()
-  await loadSessions()
+  await loadSessions({ routeSessionId: sessionIdFromRoute() })
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', closeSettingsOnEscape)
+  window.removeEventListener('popstate', handleRouteChange)
   closeEventStream()
   closeTerminalPanel()
   clearTimeout(refreshTimer)
   cancelAnimationFrame(scrollFrame)
 })
 
-async function loadSessions({ selectFirst = true } = {}) {
+async function loadSessions({ routeSessionId = '', selectFirst = false } = {}) {
   sessionsLoading.value = true
   sessionsError.value = ''
 
   try {
     sessions.value = await fetchSessions()
-    if (selectFirst && sessions.value[0]) await selectSession(sessions.value[0])
+    if (!newSessionCwd.value && sessions.value[0]?.cwd) {
+      newSessionCwd.value = sessions.value[0].cwd
+    }
+    const routedSession = routeSessionId
+      ? sessions.value.find((session) => session.id === routeSessionId)
+      : null
+
+    if (routedSession) await selectSession(routedSession, { replaceRoute: true })
+    else if (routeSessionId) sessionError.value = 'Session not found'
+    else if (selectFirst && sessions.value[0]) await selectSession(sessions.value[0])
   } catch (error) {
     sessionsError.value = error.message
   } finally {
@@ -252,8 +288,10 @@ async function createSessionForCwd(cwd) {
     const data = await createPiSession(targetCwd)
 
     await loadSessions({ selectFirst: false })
+    activeRuntimeSession.value = data.active
     sessionDetail.value = data.detail
     selectedSessionId.value = data.detail.session.id
+    updateSessionRoute(data.detail.session.id)
     expandedTools.value = new Set()
     localEntries.value = []
     liveActivity.value = ''
@@ -274,7 +312,7 @@ async function createSessionForCwd(cwd) {
   }
 }
 
-async function selectSession(session) {
+async function selectSession(session, options = {}) {
   selectedSessionId.value = session.id
   sessionLoading.value = true
   sessionError.value = ''
@@ -292,6 +330,7 @@ async function selectSession(session) {
     expandProject(session.cwd)
     stickToBottom.value = true
     hasNewOutput.value = false
+    updateSessionRoute(session.id, options)
   } catch (error) {
     sessionError.value = error.message
   } finally {
@@ -304,6 +343,47 @@ async function selectSession(session) {
 
 async function loadSessionDetail(id) {
   return fetchSessionDetail(id)
+}
+
+async function handleRouteChange() {
+  const id = sessionIdFromRoute()
+  if (!id) {
+    clearSelectedSession()
+    return
+  }
+
+  const session = sessions.value.find((item) => item.id === id)
+  if (session) await selectSession(session, { replaceRoute: true })
+  else await loadSessions({ routeSessionId: id })
+}
+
+function sessionIdFromRoute() {
+  return new URL(window.location.href).searchParams.get('session') || ''
+}
+
+function updateSessionRoute(id, { replaceRoute = false } = {}) {
+  const url = new URL(window.location.href)
+  if (id) url.searchParams.set('session', id)
+  else url.searchParams.delete('session')
+  const next = `${url.pathname}${url.search}${url.hash}`
+  const current = window.location.pathname
+    + window.location.search
+    + window.location.hash
+  if (next === current) return
+  const method = replaceRoute ? 'replaceState' : 'pushState'
+  window.history[method]({}, '', next)
+}
+
+function clearSelectedSession() {
+  selectedSessionId.value = ''
+  sessionDetail.value = null
+  sessionError.value = ''
+  promptError.value = ''
+  expandedTools.value = new Set()
+  localEntries.value = []
+  liveActivity.value = ''
+  liveAssistantText.value = ''
+  liveAssistantBlocks.value = []
 }
 
 function scheduleSessionRefresh(activeSessionId, event) {
@@ -431,6 +511,12 @@ function toggleProject(project) {
   if (next.has(project.cwd)) next.delete(project.cwd)
   else next.add(project.cwd)
   expandedProjects.value = next
+}
+
+function selectStartProject(cwd) {
+  newSessionCwd.value = cwd
+  startProjectPickerOpen.value = false
+  startProjectQuery.value = ''
 }
 
 function isToolExpanded(entry) {
@@ -634,6 +720,19 @@ function handleComposerKeydown(event) {
   submitDraft()
 }
 
+function handleStartComposerKeydown(event) {
+  if (event.key !== 'Enter' || event.shiftKey) return
+  event.preventDefault()
+  submitStartDraft()
+}
+
+async function submitStartDraft() {
+  const text = draft.value.trim()
+  if (!newSessionCwd.value.trim() || creatingSessionCwd.value) return
+  await createSessionForCwd(newSessionCwd.value)
+  if (text) await submitDraft()
+}
+
 function closeSettingsOnEscape(event) {
   if (event.key === 'Escape') settingsOpen.value = false
 }
@@ -646,6 +745,7 @@ function closeSettingsOnEscape(event) {
     :class="{
       'sidebar-open': sidebarOpen,
       'sidebar-hidden': desktopSidebarHidden,
+      'start-state': !initializing && !selectedSession,
     }"
   >
     <button
@@ -777,7 +877,7 @@ function closeSettingsOnEscape(event) {
     </aside>
 
     <section class="main-pane">
-      <header class="topbar">
+      <header v-if="initializing || selectedSession" class="topbar">
         <button
           class="mobile-sidebar-button"
           type="button"
@@ -785,12 +885,8 @@ function closeSettingsOnEscape(event) {
           @click="sidebarOpen = true"
         >☰</button>
         <div class="topbar-project">
-          <strong>
-            {{ initializing ? 'Loading workspace' : projectName(selectedSession?.cwd) }}
-          </strong>
-          <span>
-            {{ initializing ? 'Reading local pi state' : selectedSession?.cwd }}
-          </span>
+          <strong>{{ topbarTitle }}</strong>
+          <span>{{ topbarSubtitle }}</span>
         </div>
         <div v-if="selectedSession" class="topbar-meta">
           <span v-if="agentRunning" class="running-pill">running</span>
@@ -831,7 +927,10 @@ function closeSettingsOnEscape(event) {
       <div
         ref="workbench"
         class="workbench"
-        :class="{ 'init-workbench': initializing }"
+        :class="{
+          'init-workbench': initializing,
+          'start-workbench-shell': !initializing && !selectedSession,
+        }"
         @scroll="handleWorkbenchScroll"
       >
         <div v-if="initializing" class="init-panel">
@@ -844,9 +943,7 @@ function closeSettingsOnEscape(event) {
             </div>
             <div class="init-step" :class="{ done: eventStreamConnected }">
               <span></span>
-              <strong>
-                {{ eventStreamConnected ? 'Runtime events connected' : 'Connecting runtime events' }}
-              </strong>
+              <strong>{{ initEventLabel }}</strong>
             </div>
             <div class="init-step">
               <span></span>
@@ -859,6 +956,157 @@ function closeSettingsOnEscape(event) {
         </div>
         <div v-else-if="sessionError" class="empty-workbench error-note">
           {{ sessionError }}
+        </div>
+        <div v-else-if="!selectedSession" class="start-panel">
+          <h2>What should we work on?</h2>
+          <form class="start-composer" @submit.prevent="submitStartDraft">
+            <textarea
+              v-model="draft"
+              placeholder="Ask Leyline anything"
+              :disabled="!!creatingSessionCwd"
+              @keydown="handleStartComposerKeydown"
+            ></textarea>
+            <div class="start-composer-bar">
+              <button
+                class="start-project-button"
+                type="button"
+                @click="startProjectPickerOpen = !startProjectPickerOpen"
+              >
+                <span>▱</span>
+                {{ startProjectLabel }}
+                <em>⌄</em>
+              </button>
+              <div class="model-picker start-picker">
+                <button
+                  class="composer-chip model-picker-button start-composer-chip"
+                  type="button"
+                  :disabled="switchingModel || availableModels.length === 0"
+                  @click="togglePicker('model')"
+                >
+                  <span class="model-label">{{ currentModelLabel }}</span>
+                  <span class="model-caret">▾</span>
+                </button>
+                <div v-if="modelPickerOpen" class="model-menu">
+                  <button
+                    v-for="model in availableModels"
+                    :key="modelKey(model)"
+                    type="button"
+                    :class="{ active: modelKey(model) === selectedModelKey }"
+                    @click="selectModel(model)"
+                  >
+                    <span>{{ modelChip(model) }}</span>
+                    <span v-if="modelKey(model) === selectedModelKey">✓</span>
+                  </button>
+                </div>
+              </div>
+              <div class="model-picker small-picker start-picker">
+                <button
+                  class="composer-chip model-picker-button start-composer-chip"
+                  type="button"
+                  :disabled="switchingThinking || !availableThinkingLevels.length"
+                  @click="togglePicker('thinking')"
+                >
+                  <span class="model-label">{{ currentThinkingLabel }}</span>
+                  <span class="model-caret">▾</span>
+                </button>
+                <div v-if="thinkingPickerOpen" class="model-menu small-menu">
+                  <button
+                    v-for="level in availableThinkingLevels"
+                    :key="level"
+                    type="button"
+                    :class="{
+                      active: level === activeRuntimeSession?.state?.thinkingLevel,
+                    }"
+                    @click="selectThinkingLevel(level)"
+                  >
+                    <span>{{ formatMode(level) }}</span>
+                    <span
+                      v-if="level === activeRuntimeSession?.state?.thinkingLevel"
+                    >✓</span>
+                  </button>
+                </div>
+              </div>
+              <div class="model-picker small-picker start-picker">
+                <button
+                  class="composer-chip model-picker-button start-composer-chip"
+                  type="button"
+                  :disabled="switchingMode || !activeRuntimeSession"
+                  @click="togglePicker('mode')"
+                >
+                  <span class="model-label">{{ currentModeLabel }}</span>
+                  <span class="model-caret">▾</span>
+                </button>
+                <div v-if="modePickerOpen" class="model-menu mode-menu">
+                  <div class="mode-menu-label">Steering</div>
+                  <button
+                    v-for="value in ['one-at-a-time', 'all']"
+                    :key="`start-steering-${value}`"
+                    type="button"
+                    :class="{
+                      active: value === activeRuntimeSession?.state?.steeringMode,
+                    }"
+                    @click="selectMode('steeringMode', value)"
+                  >
+                    <span>{{ formatMode(value) }}</span>
+                    <span
+                      v-if="value === activeRuntimeSession?.state?.steeringMode"
+                    >✓</span>
+                  </button>
+                  <div class="mode-menu-label">Follow-up</div>
+                  <button
+                    v-for="value in ['one-at-a-time', 'all']"
+                    :key="`start-follow-up-${value}`"
+                    type="button"
+                    :class="{
+                      active: value === activeRuntimeSession?.state?.followUpMode,
+                    }"
+                    @click="selectMode('followUpMode', value)"
+                  >
+                    <span>{{ formatMode(value) }}</span>
+                    <span
+                      v-if="value === activeRuntimeSession?.state?.followUpMode"
+                    >✓</span>
+                  </button>
+                </div>
+              </div>
+              <span
+                v-for="chip in composerChips"
+                :key="chip"
+                class="composer-chip start-composer-chip"
+              >
+                {{ chip }}
+              </span>
+              <button
+                class="start-send-button"
+                type="submit"
+                :disabled="!newSessionCwd.trim() || !!creatingSessionCwd"
+              >↑</button>
+            </div>
+            <div v-if="startProjectPickerOpen" class="start-project-menu">
+              <label>
+                <span>⌕</span>
+                <input
+                  v-model="startProjectQuery"
+                  placeholder="Search projects"
+                />
+              </label>
+              <button
+                v-for="project in startProjectOptions"
+                :key="project.cwd"
+                type="button"
+                @click="selectStartProject(project.cwd)"
+              >
+                <span>▱</span>
+                <strong>{{ project.name }}</strong>
+                <em v-if="project.cwd === newSessionCwd">✓</em>
+              </button>
+              <div class="start-project-divider"></div>
+              <button type="button" @click="newSessionFormOpen = true">
+                <span>＋</span>
+                <strong>Add new project</strong>
+              </button>
+            </div>
+          </form>
         </div>
         <div v-else-if="entries.length === 0" class="empty-workbench">
           No transcript entries found.
@@ -966,9 +1214,13 @@ function closeSettingsOnEscape(event) {
         <div ref="terminalEl" class="terminal-frame"></div>
       </section>
 
-      <div v-if="!initializing" class="composer-fade"></div>
+      <div v-if="selectedSession && !initializing" class="composer-fade"></div>
 
-      <form v-if="!initializing" class="composer" @submit.prevent="submitDraft">
+      <form
+        v-if="selectedSession && !initializing"
+        class="composer"
+        @submit.prevent="submitDraft"
+      >
         <textarea
           v-model="draft"
           :disabled="promptSubmitting"
