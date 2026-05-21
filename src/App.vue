@@ -1190,6 +1190,13 @@ function closePickerMenus() {
                 <span>{{ isToolExpanded(entry) ? '⌄' : '›' }}</span>
                 <span>{{ entry.label }}</span>
                 <code v-if="entry.code">{{ entry.code }}</code>
+                <span
+                  v-if="entry.contextLabel"
+                  class="tool-context-pill"
+                  :class="{ 'is-excluded': entry.excludeFromContext }"
+                >
+                  {{ entry.contextLabel }}
+                </span>
                 <em>{{ entry.isError ? 'error' : 'completed' }}</em>
               </div>
               <pre v-if="isToolExpanded(entry)" class="tool-output">{{ entry.text }}</pre>

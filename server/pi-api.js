@@ -763,6 +763,8 @@ function toMessageEntryDto(entry, toolCalls) {
   }
 
   if (message.role === 'bashExecution') {
+    const excludeFromContext = message.excludeFromContext === true
+
     return {
       id: entry.id,
       type: 'tool',
@@ -770,6 +772,8 @@ function toMessageEntryDto(entry, toolCalls) {
       code: message.command,
       text: truncate(message.output || '', 900),
       isError: message.exitCode && message.exitCode !== 0,
+      excludeFromContext,
+      contextLabel: excludeFromContext ? 'not in context' : 'in context',
       timestamp: entry.timestamp,
     }
   }
