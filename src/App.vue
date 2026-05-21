@@ -1262,7 +1262,7 @@ function closePickerMenus() {
           v-if="liveAssistantBlocks.length"
           class="message compact-message transcript-message assistant-message live-message"
         >
-          <div class="message-meta">Leyline</div>
+          <div class="message-meta">Agent</div>
           <template
             v-for="(block, index) in liveAssistantBlocks"
             :key="`live-${index}`"
