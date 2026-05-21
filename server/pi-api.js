@@ -552,7 +552,7 @@ function ensureNodePtyHelperExecutable() {
     'prebuilds',
     `darwin-${process.arch}`,
     'spawn-helper',
-  )
+  ).replace('app.asar', 'app.asar.unpacked')
 
   if (!existsSync(helper)) return
   const mode = statSync(helper).mode
