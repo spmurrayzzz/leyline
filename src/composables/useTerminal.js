@@ -89,7 +89,9 @@ export function useTerminal() {
         terminalCwd.value = payload.cwd
         terminalStatus.value = 'connected'
       }
-      if (payload.type === 'data') term.write(payload.data)
+      if (payload.type === 'data') {
+        term.write(payload.data, () => term.scrollToBottom())
+      }
       if (payload.type === 'error') {
         terminalStatus.value = 'error'
         term.write(`\r\n${payload.message}\r\n`)
@@ -107,9 +109,15 @@ export function useTerminal() {
 
   function resizeTerminal() {
     if (!terminalInstance || !terminalEl.value) return
-    const cols = Math.max(40, Math.floor(terminalEl.value.clientWidth / 7.4))
-    const rows = Math.max(8, Math.floor(terminalEl.value.clientHeight / 15))
+    const style = window.getComputedStyle(terminalEl.value)
+    const width = terminalEl.value.clientWidth - cssPixels(style.paddingLeft)
+      - cssPixels(style.paddingRight)
+    const height = terminalEl.value.clientHeight - cssPixels(style.paddingTop)
+      - cssPixels(style.paddingBottom)
+    const cols = Math.max(40, Math.floor(width / 7.4))
+    const rows = Math.max(8, Math.floor(height / 15) - 1)
     terminalInstance.resize(cols, rows)
+    terminalInstance.scrollToBottom()
     if (terminalSocket?.readyState === WebSocket.OPEN) {
       terminalSocket.send(JSON.stringify({ type: 'resize', cols, rows }))
     }
@@ -124,6 +132,10 @@ export function useTerminal() {
     terminalStatus,
     toggleTerminal,
   }
+}
+
+function cssPixels(value) {
+  return Number.parseFloat(value) || 0
 }
 
 function parseTerminalMessage(data) {
