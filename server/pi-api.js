@@ -515,13 +515,26 @@ async function runtimeState(cwd) {
   }
 }
 
+const THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh']
+
 function modelDto(model) {
   if (!model) return undefined
   return {
     id: model.id,
     name: model.name,
     provider: model.provider,
+    availableThinkingLevels: modelThinkingLevels(model),
   }
+}
+
+function modelThinkingLevels(model) {
+  if (!model.reasoning) return ['off']
+  return THINKING_LEVELS.filter((level) => {
+    const mapped = model.thinkingLevelMap?.[level]
+    if (mapped === null) return false
+    if (level === 'xhigh') return mapped !== undefined
+    return true
+  })
 }
 
 function openTerminal(ws) {

@@ -62,6 +62,7 @@ const workbench = ref(null)
 const activeRuntimeSession = ref(null)
 const startRuntimeState = ref(null)
 const startSelectedModel = ref(null)
+const startSelectedThinkingLevel = ref(null)
 const eventLogOpen = ref(false)
 const settingsOpen = ref(false)
 const promptSubmitting = ref(false)
@@ -315,6 +316,7 @@ async function loadStartRuntimeState(cwd) {
     if (newSessionCwd.value !== targetCwd || selectedSession.value) return
     startRuntimeState.value = state
     startSelectedModel.value = null
+    startSelectedThinkingLevel.value = null
   } catch (error) {
     if (!startRuntimeState.value) promptError.value = error.message
   }
@@ -750,10 +752,26 @@ async function selectModel(model) {
   promptError.value = ''
 
   if (!selectedSession.value) {
+    const state = startRuntimeState.value?.state || {}
+    const levels = model.availableThinkingLevels || []
+    const selectedThinking = startSelectedThinkingLevel.value
+    const thinkingLevel = clampThinkingLevel(
+      selectedThinking || state.thinkingLevel,
+      levels,
+    )
+
+    if (selectedThinking !== null) {
+      startSelectedThinkingLevel.value = thinkingLevel
+    }
     startSelectedModel.value = model
     startRuntimeState.value = {
       ...startRuntimeState.value,
-      state: { ...startRuntimeState.value?.state, model },
+      state: {
+        ...state,
+        model,
+        availableThinkingLevels: levels,
+        thinkingLevel,
+      },
     }
     switchingModel.value = false
     return
@@ -769,7 +787,7 @@ async function selectModel(model) {
 }
 
 async function selectThinkingLevel(level) {
-  if (!level || level === activeRuntimeSession.value?.state?.thinkingLevel) {
+  if (!level || level === composerRuntime.value?.state?.thinkingLevel) {
     thinkingPickerOpen.value = false
     return
   }
@@ -777,6 +795,16 @@ async function selectThinkingLevel(level) {
   switchingThinking.value = true
   thinkingPickerOpen.value = false
   promptError.value = ''
+
+  if (!selectedSession.value) {
+    startSelectedThinkingLevel.value = level
+    startRuntimeState.value = {
+      ...startRuntimeState.value,
+      state: { ...startRuntimeState.value?.state, thinkingLevel: level },
+    }
+    switchingThinking.value = false
+    return
+  }
 
   try {
     activeRuntimeSession.value = await switchPiThinkingLevel(level)
@@ -817,6 +845,23 @@ function modelKey(model) {
   return JSON.stringify([model.provider, model.id])
 }
 
+function clampThinkingLevel(level, levels) {
+  if (!levels.length) return 'off'
+  if (levels.includes(level)) return level
+
+  const order = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh']
+  const index = order.indexOf(level)
+  if (index === -1) return levels[0]
+
+  for (let i = index; i < order.length; i++) {
+    if (levels.includes(order[i])) return order[i]
+  }
+  for (let i = index - 1; i >= 0; i--) {
+    if (levels.includes(order[i])) return order[i]
+  }
+  return levels[0]
+}
+
 function handleComposerKeydown(event) {
   if (event.key !== 'Enter' || event.shiftKey) return
   event.preventDefault()
@@ -832,10 +877,14 @@ function handleStartComposerKeydown(event) {
 async function submitStartDraft() {
   const text = draft.value.trim()
   const model = startSelectedModel.value
+  const thinkingLevel = startSelectedThinkingLevel.value
   if (!newSessionCwd.value.trim() || creatingSessionCwd.value) return
   await createSessionForCwd(newSessionCwd.value)
   if (model && selectedSession.value) {
     activeRuntimeSession.value = await switchPiModel(model.provider, model.id)
+  }
+  if (thinkingLevel && selectedSession.value) {
+    activeRuntimeSession.value = await switchPiThinkingLevel(thinkingLevel)
   }
   if (text) await submitDraft()
 }
@@ -1159,13 +1208,13 @@ function closePickerMenus() {
                     :key="level"
                     type="button"
                     :class="{
-                      active: level === activeRuntimeSession?.state?.thinkingLevel,
+                      active: level === composerRuntime?.state?.thinkingLevel,
                     }"
                     @click="selectThinkingLevel(level)"
                   >
                     <span>{{ formatMode(level) }}</span>
                     <span
-                      v-if="level === activeRuntimeSession?.state?.thinkingLevel"
+                      v-if="level === composerRuntime?.state?.thinkingLevel"
                     >✓</span>
                   </button>
                 </div>
@@ -1457,13 +1506,13 @@ function closePickerMenus() {
                 :key="level"
                 type="button"
                 :class="{
-                  active: level === activeRuntimeSession?.state?.thinkingLevel,
+                  active: level === composerRuntime?.state?.thinkingLevel,
                 }"
                 @click="selectThinkingLevel(level)"
               >
                 <span>{{ formatMode(level) }}</span>
                 <span
-                  v-if="level === activeRuntimeSession?.state?.thinkingLevel"
+                  v-if="level === composerRuntime?.state?.thinkingLevel"
                 >
                   ✓
                 </span>
