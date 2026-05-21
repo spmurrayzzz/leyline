@@ -97,6 +97,15 @@ export async function piApiHandler(req, res) {
       return json(res, { active })
     }
 
+    if (url.pathname === '/state') {
+      if (req.method !== 'GET') {
+        return json(res, { error: 'Method not allowed' }, 405)
+      }
+
+      const active = await runtimeState(url.searchParams.get('cwd'))
+      return json(res, { active })
+    }
+
     if (url.pathname === '/prompt') {
       if (req.method !== 'POST') {
         return json(res, { error: 'Method not allowed' }, 405)
@@ -465,16 +474,44 @@ function activeSessionDto() {
 }
 
 function activeSessionStateDto() {
+  return sessionStateDto(activeRuntime.session, activeRuntime.services)
+}
+
+function sessionStateDto(session, services) {
   return {
-    model: modelDto(activeRuntime.session.model),
-    availableModels: activeRuntime.services.modelRegistry
-      .getAvailable()
-      .map(modelDto),
-    thinkingLevel: activeRuntime.session.thinkingLevel,
-    availableThinkingLevels: activeRuntime.session.getAvailableThinkingLevels(),
-    steeringMode: activeRuntime.session.steeringMode,
-    followUpMode: activeRuntime.session.followUpMode,
-    activeToolCount: activeRuntime.session.getActiveToolNames().length,
+    model: modelDto(session.model),
+    availableModels: services.modelRegistry.getAvailable().map(modelDto),
+    thinkingLevel: session.thinkingLevel,
+    availableThinkingLevels: session.getAvailableThinkingLevels(),
+    steeringMode: session.steeringMode,
+    followUpMode: session.followUpMode,
+    activeToolCount: session.getActiveToolNames().length,
+  }
+}
+
+async function runtimeState(cwd) {
+  const targetCwd = cwd || activeRuntime?.cwd || process.cwd()
+  if (activeRuntime?.cwd === targetCwd) return activeSessionDto()
+
+  const result = await createRuntime({
+    cwd: targetCwd,
+    agentDir: getAgentDir(),
+    sessionManager: SessionManager.create(
+      targetCwd,
+      configuredSessionDir(targetCwd),
+    ),
+  })
+
+  try {
+    return {
+      id: '',
+      path: result.session.sessionFile,
+      cwd: targetCwd,
+      diagnostics: result.diagnostics,
+      state: sessionStateDto(result.session, result.services),
+    }
+  } finally {
+    result.session.dispose()
   }
 }
 

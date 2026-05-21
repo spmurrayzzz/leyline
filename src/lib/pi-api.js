@@ -22,6 +22,15 @@ export async function activatePiSession(id) {
   return data.active
 }
 
+export async function fetchPiRuntimeState(cwd) {
+  const query = cwd ? `?cwd=${encodeURIComponent(cwd)}` : ''
+  const data = await apiRequest(
+    `/api/pi/state${query}`,
+    'Failed to load runtime state',
+  )
+  return data.active
+}
+
 export function submitPrompt(text) {
   return apiRequest('/api/pi/prompt', 'Failed to submit prompt', {
     method: 'POST',

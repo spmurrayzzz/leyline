@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRuntimeEvents } from './composables/useRuntimeEvents'
 import { useTerminal } from './composables/useTerminal'
 import { fuzzyScore, highlightedText as highlightFuzzyText } from './lib/fuzzy'
@@ -17,6 +17,7 @@ import {
 import {
   activatePiSession,
   createPiSession,
+  fetchPiRuntimeState,
   fetchSessionDetail,
   fetchSessions,
   interruptPiSession,
@@ -59,6 +60,8 @@ const localEntries = ref([])
 const draft = ref('')
 const workbench = ref(null)
 const activeRuntimeSession = ref(null)
+const startRuntimeState = ref(null)
+const startSelectedModel = ref(null)
 const eventLogOpen = ref(false)
 const settingsOpen = ref(false)
 const promptSubmitting = ref(false)
@@ -159,49 +162,54 @@ const {
     scheduleLiveScroll(data.activeSessionId)
   },
 })
+const composerRuntime = computed(() => {
+  return selectedSession.value
+    ? activeRuntimeSession.value
+    : startRuntimeState.value
+})
 const availableModels = computed(() => {
-  return activeRuntimeSession.value?.state?.availableModels || []
+  return composerRuntime.value?.state?.availableModels || []
 })
 const selectedModelKey = computed(() => {
-  const model = activeRuntimeSession.value?.state?.model
+  const model = composerRuntime.value?.state?.model
   if (!model) return ''
   return modelKey(model)
 })
 const currentModelLabel = computed(() => {
-  return modelChip(activeRuntimeSession.value?.state?.model)
+  return modelChip(composerRuntime.value?.state?.model)
 })
 const currentMobileModelLabel = computed(() => {
-  const model = activeRuntimeSession.value?.state?.model
+  const model = composerRuntime.value?.state?.model
   if (!model?.id) return 'Model'
   return formatMode(model.id).replace(/^Gpt\b/, 'GPT')
 })
 const availableThinkingLevels = computed(() => {
-  return activeRuntimeSession.value?.state?.availableThinkingLevels || []
+  return composerRuntime.value?.state?.availableThinkingLevels || []
 })
 const currentThinkingLabel = computed(() => {
-  const level = activeRuntimeSession.value?.state?.thinkingLevel
+  const level = composerRuntime.value?.state?.thinkingLevel
   return level ? `Thinking · ${formatMode(level)}` : 'Thinking'
 })
 const currentMobileThinkingLabel = computed(() => {
-  const level = activeRuntimeSession.value?.state?.thinkingLevel
+  const level = composerRuntime.value?.state?.thinkingLevel
   if (!level) return 'Think'
   return `Think ${level === 'medium' ? 'Med' : formatMode(level)}`
 })
 const currentModeLabel = computed(() => {
-  const state = activeRuntimeSession.value?.state || {}
+  const state = composerRuntime.value?.state || {}
   return modeChip(
     state.steeringMode && formatMode(state.steeringMode),
     state.followUpMode && formatMode(state.followUpMode),
   ) || 'Mode'
 })
 const currentMobileModeLabel = computed(() => {
-  const state = activeRuntimeSession.value?.state || {}
+  const state = composerRuntime.value?.state || {}
   const mode = state.followUpMode || state.steeringMode
   if (mode === 'one-at-a-time') return 'One'
   return mode ? formatMode(mode) : 'Mode'
 })
 const composerChips = computed(() => {
-  const state = activeRuntimeSession.value?.state || {}
+  const state = composerRuntime.value?.state || {}
 
   return [
     typeof state.activeToolCount === 'number'
@@ -243,6 +251,10 @@ const sendButtonLabel = computed(() => {
   return '↑'
 })
 
+watch(newSessionCwd, (cwd) => {
+  loadStartRuntimeState(cwd)
+})
+
 onMounted(async () => {
   window.addEventListener('keydown', closeMenusOnEscape)
   window.addEventListener('click', closeMenusOnOutsideClick)
@@ -274,6 +286,7 @@ async function loadSessions({
     sessions.value = nextSessions
     if (!newSessionCwd.value && sessions.value[0]?.cwd) {
       newSessionCwd.value = sessions.value[0].cwd
+      await loadStartRuntimeState(newSessionCwd.value)
     }
     const routedSession = routeSessionId
       ? sessions.value.find((session) => session.id === routeSessionId)
@@ -290,6 +303,20 @@ async function loadSessions({
     }
   } finally {
     if (showLoading) sessionsLoading.value = false
+  }
+}
+
+async function loadStartRuntimeState(cwd) {
+  const targetCwd = cwd?.trim()
+  if (!targetCwd || selectedSession.value) return
+
+  try {
+    const state = await fetchPiRuntimeState(targetCwd)
+    if (newSessionCwd.value !== targetCwd || selectedSession.value) return
+    startRuntimeState.value = state
+    startSelectedModel.value = null
+  } catch (error) {
+    if (!startRuntimeState.value) promptError.value = error.message
   }
 }
 
@@ -722,6 +749,16 @@ async function selectModel(model) {
   modelPickerOpen.value = false
   promptError.value = ''
 
+  if (!selectedSession.value) {
+    startSelectedModel.value = model
+    startRuntimeState.value = {
+      ...startRuntimeState.value,
+      state: { ...startRuntimeState.value?.state, model },
+    }
+    switchingModel.value = false
+    return
+  }
+
   try {
     activeRuntimeSession.value = await switchPiModel(model.provider, model.id)
   } catch (error) {
@@ -794,8 +831,12 @@ function handleStartComposerKeydown(event) {
 
 async function submitStartDraft() {
   const text = draft.value.trim()
+  const model = startSelectedModel.value
   if (!newSessionCwd.value.trim() || creatingSessionCwd.value) return
   await createSessionForCwd(newSessionCwd.value)
+  if (model && selectedSession.value) {
+    activeRuntimeSession.value = await switchPiModel(model.provider, model.id)
+  }
   if (text) await submitDraft()
 }
 
