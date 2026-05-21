@@ -821,7 +821,7 @@ function closePickerMenus() {
           aria-label="Go to home"
           @click="navigateHome"
         >
-          <span class="brand-mark">⌁</span>
+          <img class="brand-mark" src="/favicon.svg" alt="" />
           <span class="brand-name">
             <strong>Leyline</strong>
           </span>

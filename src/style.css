@@ -155,20 +155,16 @@ button {
 
 .brand-home:hover .brand-mark {
   border-color: var(--accent-border);
-  color: #d6d0ea;
 }
 
 .brand-mark {
-  display: grid;
-  place-items: center;
+  display: block;
   width: 30px;
   height: 30px;
+  padding: 3px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: #1c1a25;
-  color: #c0b7d8;
-  font-size: 21px;
-  line-height: 1;
 }
 
 .brand-name {
