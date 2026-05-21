@@ -57,6 +57,7 @@ const sessionLoading = ref(false)
 const sessionError = ref('')
 const expandedTools = ref(new Set())
 const expandedSkills = ref(new Set())
+const copiedEntryId = ref('')
 const localEntries = ref([])
 const draft = ref('')
 const workbench = ref(null)
@@ -95,6 +96,7 @@ const {
 } = useTerminal()
 let refreshTimer
 let scrollFrame
+let copiedTimer
 
 const visibleProjects = computed(() => {
   const projects = new Map()
@@ -274,6 +276,7 @@ onUnmounted(() => {
   closeEventStream()
   closeTerminalPanel()
   clearTimeout(refreshTimer)
+  clearTimeout(copiedTimer)
   cancelAnimationFrame(scrollFrame)
 })
 
@@ -601,6 +604,51 @@ function toggleSkill(entry) {
   if (next.has(entry.id)) next.delete(entry.id)
   else next.add(entry.id)
   expandedSkills.value = next
+}
+
+function entryCopyText(entry) {
+  if (entry.type === 'event') return `${entry.label} ${entry.text}`.trim()
+  if (entry.type === 'tool') return entry.text || ''
+  if (entry.blocks?.length) {
+    return messageBlocksFor(entry).map((block) => block.text).join('\n\n')
+  }
+  return entry.text || ''
+}
+
+function liveAssistantCopyText() {
+  return liveAssistantBlocks.value.map((block) => block.text).join('\n\n')
+}
+
+async function copyTranscriptItem(id, text) {
+  if (!text) return
+
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable')
+    await navigator.clipboard.writeText(text)
+  } catch {
+    const textarea = document.createElement('textarea')
+    textarea.value = text
+    textarea.style.position = 'fixed'
+    textarea.style.opacity = '0'
+    document.body.appendChild(textarea)
+    textarea.select()
+    document.execCommand('copy')
+    textarea.remove()
+  }
+
+  copiedEntryId.value = id
+  clearTimeout(copiedTimer)
+  copiedTimer = setTimeout(() => {
+    if (copiedEntryId.value === id) copiedEntryId.value = ''
+  }, 1200)
+}
+
+function copyTitle(id) {
+  return copiedEntryId.value === id ? 'Copied' : 'Copy to clipboard'
+}
+
+function copyGlyph(id) {
+  return copiedEntryId.value === id ? '✓' : '⧉'
 }
 
 function scheduleLiveScroll(activeSessionId) {
@@ -1386,6 +1434,14 @@ function closePickerMenus() {
             <div v-if="entry.type === 'event'" class="event-row">
               <span>{{ entry.label }}</span>
               <strong>{{ entry.text }}</strong>
+              <button
+                class="copy-button"
+                type="button"
+                :title="copyTitle(entry.id)"
+                @click="copyTranscriptItem(entry.id, entryCopyText(entry))"
+              >
+                {{ copyGlyph(entry.id) }}
+              </button>
             </div>
 
             <article
@@ -1406,6 +1462,14 @@ function closePickerMenus() {
                   {{ entry.contextLabel }}
                 </span>
                 <em>{{ entry.isError ? 'error' : 'completed' }}</em>
+                <button
+                  class="copy-button"
+                  type="button"
+                  :title="copyTitle(entry.id)"
+                  @click.stop="copyTranscriptItem(entry.id, entryCopyText(entry))"
+                >
+                  {{ copyGlyph(entry.id) }}
+                </button>
               </div>
               <pre v-if="isToolExpanded(entry)" class="tool-output">{{ entry.text }}</pre>
             </article>
@@ -1415,7 +1479,17 @@ function closePickerMenus() {
               class="message compact-message transcript-message"
               :class="entryClass(entry)"
             >
-              <div class="message-meta">{{ entry.label }}</div>
+              <div class="message-meta message-meta-row">
+                <span>{{ entry.label }}</span>
+                <button
+                  class="copy-button"
+                  type="button"
+                  :title="copyTitle(entry.id)"
+                  @click="copyTranscriptItem(entry.id, entryCopyText(entry))"
+                >
+                  {{ copyGlyph(entry.id) }}
+                </button>
+              </div>
               <template v-if="entry.role === 'assistant' && entry.blocks?.length">
                 <template
                   v-for="(block, index) in messageBlocksFor(entry)"
@@ -1470,7 +1544,17 @@ function closePickerMenus() {
           v-if="liveAssistantBlocks.length"
           class="message compact-message transcript-message assistant-message live-message"
         >
-          <div class="message-meta">Agent</div>
+          <div class="message-meta message-meta-row">
+            <span>Agent</span>
+            <button
+              class="copy-button"
+              type="button"
+              :title="copyTitle('live-assistant')"
+              @click="copyTranscriptItem('live-assistant', liveAssistantCopyText())"
+            >
+              {{ copyGlyph('live-assistant') }}
+            </button>
+          </div>
           <template
             v-for="(block, index) in liveAssistantBlocks"
             :key="`live-${index}`"
