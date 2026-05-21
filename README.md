@@ -8,14 +8,8 @@ state, prompts, model controls, runtime events, and an embedded terminal.
 
 ## Features
 
-- Browse pi sessions grouped by project
-- Fuzzy-search visible sessions and projects
-- Read rendered session transcripts with collapsed tool output
-- Create or activate pi sessions from the UI
-- Submit prompts to the active pi runtime
-- Switch model, thinking level, and mode for the active runtime
-- Watch live runtime events and assistant output
-- Open an embedded terminal over WebSocket
+Browse, search, create, and run pi sessions from a local web UI, with rendered
+transcripts, live runtime output, model/mode controls, and an embedded terminal.
 
 ## Requirements
 
