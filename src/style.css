@@ -804,6 +804,7 @@ h1 {
   overflow: auto;
   padding: 20px 44px 240px;
   scrollbar-color: #4b4658 transparent;
+  scrollbar-gutter: stable;
   scrollbar-width: thin;
 }
 
