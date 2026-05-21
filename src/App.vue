@@ -17,6 +17,7 @@ import {
 import {
   activatePiSession,
   createPiSession,
+  deletePiSession,
   fetchPiRuntimeState,
   fetchSessionDetail,
   fetchSessions,
@@ -71,6 +72,8 @@ const switchingModel = ref(false)
 const switchingThinking = ref(false)
 const switchingMode = ref(false)
 const reloadingSession = ref(false)
+const deletingSessionId = ref('')
+const deleteConfirmSession = ref(null)
 const modelPickerOpen = ref(false)
 const thinkingPickerOpen = ref(false)
 const modePickerOpen = ref(false)
@@ -666,6 +669,40 @@ async function submitDraft() {
   }
 }
 
+function requestDeleteSession(session) {
+  if (!session || deletingSessionId.value) return
+  deleteConfirmSession.value = session
+}
+
+function cancelDeleteSession() {
+  if (deletingSessionId.value) return
+  deleteConfirmSession.value = null
+}
+
+async function confirmDeleteSession() {
+  const session = deleteConfirmSession.value
+  if (!session || deletingSessionId.value) return
+
+  deletingSessionId.value = session.id
+  sessionError.value = ''
+  promptError.value = ''
+
+  try {
+    await deletePiSession(session.id)
+    deleteConfirmSession.value = null
+    sessions.value = sessions.value.filter((item) => item.id !== session.id)
+    if (selectedSessionId.value === session.id) {
+      clearSelectedSession()
+      updateSessionRoute('')
+    }
+  } catch (error) {
+    if (selectedSessionId.value === session.id) promptError.value = error.message
+    else sessionError.value = error.message
+  } finally {
+    deletingSessionId.value = ''
+  }
+}
+
 async function reloadSession() {
   if (reloadingSession.value) return
 
@@ -892,6 +929,7 @@ async function submitStartDraft() {
 function closeMenusOnEscape(event) {
   if (event.key !== 'Escape') return
   settingsOpen.value = false
+  cancelDeleteSession()
   closePickerMenus()
 }
 
@@ -1031,16 +1069,37 @@ function closePickerMenus() {
           </div>
 
           <template v-if="isProjectExpanded(project)">
-            <button
+            <div
               v-for="session in project.sessions.slice(0, 5)"
               :key="session.path || session.id"
               class="session"
               :class="{ active: session.id === selectedSessionId }"
+              role="button"
+              tabindex="0"
               @click="selectSession(session)"
+              @keydown.enter="selectSession(session)"
+              @keydown.space.prevent="selectSession(session)"
             >
               <span v-html="highlightedText(sessionTitle(session))"></span>
               <time>{{ sessionTime(session) }}</time>
-            </button>
+              <button
+                class="session-delete-button"
+                type="button"
+                title="Delete session"
+                aria-label="Delete session"
+                :disabled="deletingSessionId === session.id"
+                @click.stop="requestDeleteSession(session)"
+              >
+                <span v-if="deletingSessionId === session.id">…</span>
+                <svg v-else viewBox="0 0 16 16" aria-hidden="true">
+                  <path d="M3.5 4.5h9"></path>
+                  <path d="M6.5 4.5v-2h3v2"></path>
+                  <path d="M5 6.5l.5 6h5l.5-6"></path>
+                  <path d="M7 7.5v4"></path>
+                  <path d="M9 7.5v4"></path>
+                </svg>
+              </button>
+            </div>
           </template>
         </div>
       </section>
@@ -1091,6 +1150,23 @@ function closePickerMenus() {
             @click="eventLogOpen = !eventLogOpen"
           >
             Events {{ runtimeEvents.length }}
+          </button>
+          <button
+            class="delete-session-button"
+            type="button"
+            title="Delete session"
+            aria-label="Delete session"
+            :disabled="deletingSessionId === selectedSession.id"
+            @click="requestDeleteSession(selectedSession)"
+          >
+            <span v-if="deletingSessionId === selectedSession.id">…</span>
+            <svg v-else viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M3.5 4.5h9"></path>
+              <path d="M6.5 4.5v-2h3v2"></path>
+              <path d="M5 6.5l.5 6h5l.5-6"></path>
+              <path d="M7 7.5v4"></path>
+              <path d="M9 7.5v4"></path>
+            </svg>
           </button>
           <span>{{ selectedSession.messageCount }} messages</span>
           <span>modified {{ formatDate(selectedSession.modified) }}</span>
@@ -1594,6 +1670,50 @@ function closePickerMenus() {
         </div>
       </form>
     </section>
+
+    <div
+      v-if="deleteConfirmSession"
+      class="confirm-backdrop"
+      role="presentation"
+      @click.self="cancelDeleteSession"
+    >
+      <section
+        class="confirm-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delete-session-title"
+      >
+        <div class="confirm-icon">
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M3.5 4.5h9"></path>
+            <path d="M6.5 4.5v-2h3v2"></path>
+            <path d="M5 6.5l.5 6h5l.5-6"></path>
+            <path d="M7 7.5v4"></path>
+            <path d="M9 7.5v4"></path>
+          </svg>
+        </div>
+        <div class="confirm-copy">
+          <h2 id="delete-session-title">Delete session?</h2>
+          <p>
+            Move “{{ sessionTitle(deleteConfirmSession) }}” to Leyline trash.
+          </p>
+        </div>
+        <div class="confirm-actions">
+          <button
+            type="button"
+            class="confirm-cancel"
+            :disabled="!!deletingSessionId"
+            @click="cancelDeleteSession"
+          >Cancel</button>
+          <button
+            type="button"
+            class="confirm-delete"
+            :disabled="!!deletingSessionId"
+            @click="confirmDeleteSession"
+          >{{ deletingSessionId ? 'Deleting…' : 'Delete' }}</button>
+        </div>
+      </section>
+    </div>
 
     <button
       v-if="settingsOpen"

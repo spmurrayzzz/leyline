@@ -1,7 +1,7 @@
 import { chmodSync, existsSync, statSync } from 'node:fs'
-import { readdir, readFile, stat } from 'node:fs/promises'
+import { mkdir, readdir, readFile, rename, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join, relative } from 'node:path'
 import { createRequire } from 'node:module'
 import pty from 'node-pty'
 import { WebSocket, WebSocketServer } from 'ws'
@@ -174,6 +174,15 @@ export async function piApiHandler(req, res) {
 
     const match = url.pathname.match(/^\/sessions\/([^/]+)$/)
     if (match) {
+      if (req.method === 'DELETE') {
+        const trashed = await trashSession(match[1])
+        return json(res, { ok: true, trashed })
+      }
+
+      if (req.method !== 'GET') {
+        return json(res, { error: 'Method not allowed' }, 405)
+      }
+
       if (isActiveSession(match[1])) {
         return json(res, toActiveSessionDetailDto())
       }
@@ -394,6 +403,43 @@ async function promptActiveSession(text) {
 async function interruptActiveSession() {
   if (!activeRuntime) throw new Error('No active session')
   await activeRuntime.session.abort()
+}
+
+async function trashSession(id) {
+  const session = await findSession(id)
+  if (!session) throw new Error('Session not found')
+  if (isActiveSession(id)) {
+    if (activeRuntime.session.isStreaming) {
+      throw new Error('Wait for the current response to finish before deleting.')
+    }
+    if (activeRuntime.session.isCompacting) {
+      throw new Error('Wait for compaction to finish before deleting.')
+    }
+  }
+
+  const trashPath = trashSessionPath(session)
+  await mkdir(dirname(trashPath), { recursive: true })
+  await rename(session.path, trashPath)
+
+  if (isActiveSession(id)) {
+    unsubscribeActiveSession?.()
+    unsubscribeActiveSession = undefined
+    activeRuntime.session.dispose()
+    activeRuntime = undefined
+    activeSessionId = undefined
+  }
+
+  return { path: trashPath }
+}
+
+function trashSessionPath(session) {
+  const sessionDir = configuredSessionDir(session.cwd) || dirname(session.path)
+  const rel = relative(sessionDir, session.path)
+  const safeRel = rel && !rel.startsWith('..') && rel !== session.path
+    ? rel
+    : basename(session.path)
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+  return join(dirname(sessionDir), 'leyline-trash', stamp, safeRel)
 }
 
 async function reloadActiveSession() {

@@ -398,19 +398,24 @@ kbd {
 
 .session {
   display: flex;
+  position: relative;
+  align-items: center;
   justify-content: space-between;
   width: calc(100% - 12px);
   margin-left: 12px;
   gap: 10px;
-  padding: 6px 9px;
+  padding: 6px 30px 6px 9px;
   color: #aaaeba;
   font-size: 13px;
   font-weight: 500;
   text-align: left;
+  cursor: pointer;
 }
 
 .session span {
   overflow: hidden;
+  min-width: 0;
+  flex: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -418,6 +423,54 @@ kbd {
 .session time {
   flex: none;
   color: var(--muted);
+}
+
+.session-delete-button {
+  display: grid;
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  line-height: 1;
+  opacity: 0;
+  transform: translateY(-50%);
+}
+
+.session-delete-button svg,
+.delete-session-button svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
+.session:hover .session-delete-button,
+.session:focus-within .session-delete-button {
+  opacity: 1;
+}
+
+.session:hover time,
+.session:focus-within time {
+  opacity: 0;
+}
+
+.session-delete-button:hover {
+  background: transparent;
+  color: #fca5a5;
+}
+
+.session-delete-button:disabled {
+  opacity: 0.7;
 }
 
 .sidebar-note {
@@ -525,6 +578,108 @@ kbd {
   z-index: 30;
   border: 0;
   background: rgb(0 0 0 / 42%);
+}
+
+.confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / 54%);
+  padding: 18px;
+}
+
+.confirm-modal {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 14px;
+  width: min(420px, 100%);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: #15161c;
+  padding: 16px;
+  box-shadow: 0 24px 80px rgb(0 0 0 / 52%);
+}
+
+.confirm-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgb(248 113 113 / 28%);
+  border-radius: 10px;
+  background: rgb(248 113 113 / 10%);
+  color: #fca5a5;
+}
+
+.confirm-icon svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
+.confirm-copy {
+  min-width: 0;
+}
+
+.confirm-copy h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 15px;
+}
+
+.confirm-copy p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.confirm-actions {
+  display: flex;
+  grid-column: 1 / -1;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.confirm-actions button {
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 7px 11px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.confirm-cancel {
+  background: var(--panel-soft);
+  color: var(--muted-strong);
+}
+
+.confirm-delete {
+  border-color: rgb(248 113 113 / 36%) !important;
+  background: rgb(248 113 113 / 14%);
+  color: #fca5a5;
+}
+
+.confirm-actions button:hover:not(:disabled) {
+  border-color: var(--accent-border);
+  color: #e2e3e8;
+}
+
+.confirm-delete:hover:not(:disabled) {
+  border-color: rgb(248 113 113 / 54%) !important;
+  color: #fecaca;
+}
+
+.confirm-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .settings-drawer {
@@ -716,7 +871,8 @@ h1 {
   font-weight: 800;
 }
 
-.event-log-button {
+.event-log-button,
+.delete-session-button {
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--panel-soft);
@@ -726,9 +882,27 @@ h1 {
   font-weight: 800;
 }
 
-.event-log-button:hover {
+.delete-session-button {
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 24px;
+  padding: 0;
+}
+
+.event-log-button:hover,
+.delete-session-button:hover {
   border-color: var(--accent-border);
   color: #e2e3e8;
+}
+
+.delete-session-button:hover {
+  border-color: rgb(248 113 113 / 44%);
+  color: #fca5a5;
+}
+
+.delete-session-button:disabled {
+  opacity: 0.6;
 }
 
 .event-log-panel {

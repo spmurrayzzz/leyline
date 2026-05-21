@@ -14,6 +14,12 @@ export function fetchSessionDetail(id) {
   return apiRequest(`/api/pi/sessions/${id}`, 'Failed to load session')
 }
 
+export function deletePiSession(id) {
+  return apiRequest(`/api/pi/sessions/${id}`, 'Failed to delete session', {
+    method: 'DELETE',
+  })
+}
+
 export async function activatePiSession(id) {
   const data = await apiRequest('/api/pi/active-session', 'Failed to activate session', {
     method: 'POST',
