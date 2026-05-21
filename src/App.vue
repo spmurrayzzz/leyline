@@ -20,6 +20,7 @@ import {
   fetchSessionDetail,
   fetchSessions,
   interruptPiSession,
+  reloadPiSession,
   submitPrompt,
   switchPiMode,
   switchPiModel,
@@ -65,6 +66,7 @@ const interrupting = ref(false)
 const switchingModel = ref(false)
 const switchingThinking = ref(false)
 const switchingMode = ref(false)
+const reloadingSession = ref(false)
 const modelPickerOpen = ref(false)
 const thinkingPickerOpen = ref(false)
 const modePickerOpen = ref(false)
@@ -234,6 +236,11 @@ const startProjectOptions = computed(() => {
 })
 const startProjectLabel = computed(() => {
   return newSessionCwd.value ? projectName(newSessionCwd.value) : 'Choose project'
+})
+const sendButtonLabel = computed(() => {
+  if (agentRunning.value) return '■'
+  if (promptSubmitting.value || reloadingSession.value) return '…'
+  return '↑'
 })
 
 onMounted(async () => {
@@ -603,6 +610,7 @@ async function scrollToLatest() {
 async function submitDraft() {
   const text = draft.value.trim()
   if (!text || promptSubmitting.value || agentRunning.value) return
+  if (reloadingSession.value) return
 
   const localEntry = pendingUserEntry(text)
   localEntries.value = [...localEntries.value, localEntry]
@@ -626,6 +634,30 @@ async function submitDraft() {
     liveAssistantBlocks.value = []
   } finally {
     promptSubmitting.value = false
+  }
+}
+
+async function reloadSession() {
+  if (reloadingSession.value) return
+
+  reloadingSession.value = true
+  promptError.value = ''
+  liveActivity.value = [
+    'Reloading keybindings, extensions, skills, prompts, themes…',
+  ].join('')
+
+  try {
+    activeRuntimeSession.value = await reloadPiSession()
+    liveActivity.value = ''
+    await loadSessions({ selectFirst: false, showLoading: false })
+    if (selectedSessionId.value) {
+      sessionDetail.value = await loadSessionDetail(selectedSessionId.value)
+    }
+  } catch (error) {
+    promptError.value = error.message
+    liveActivity.value = ''
+  } finally {
+    reloadingSession.value = false
   }
 }
 
@@ -923,13 +955,23 @@ function closePickerMenus() {
         </div>
       </section>
 
-      <button
-        class="settings-button"
-        type="button"
-        title="Settings"
-        aria-label="Open settings"
-        @click="settingsOpen = true"
-      >⚙</button>
+      <div class="sidebar-actions">
+        <button
+          class="settings-button"
+          type="button"
+          title="Reload runtime"
+          aria-label="Reload runtime"
+          :disabled="!selectedSession || agentRunning || reloadingSession"
+          @click="reloadSession"
+        >{{ reloadingSession ? '…' : '↻' }}</button>
+        <button
+          class="settings-button"
+          type="button"
+          title="Settings"
+          aria-label="Open settings"
+          @click="settingsOpen = true"
+        >⚙</button>
+      </div>
     </aside>
 
     <section class="main-pane">
@@ -1313,7 +1355,7 @@ function closePickerMenus() {
       >
         <textarea
           v-model="draft"
-          :disabled="promptSubmitting"
+          :disabled="promptSubmitting || reloadingSession"
           placeholder="Ask for follow-up changes or attach images"
           @keydown="handleComposerKeydown"
         ></textarea>
@@ -1325,7 +1367,10 @@ function closePickerMenus() {
             <button
               class="composer-chip model-picker-button"
               type="button"
-              :disabled="agentRunning || promptSubmitting || switchingModel"
+              :disabled="agentRunning
+                || promptSubmitting
+                || reloadingSession
+                || switchingModel"
               @click="togglePicker('model')"
             >
               <span class="model-label desktop-label">{{ currentModelLabel }}</span>
@@ -1351,7 +1396,10 @@ function closePickerMenus() {
             <button
               class="composer-chip model-picker-button"
               type="button"
-              :disabled="agentRunning || promptSubmitting || switchingThinking"
+              :disabled="agentRunning
+                || promptSubmitting
+                || reloadingSession
+                || switchingThinking"
               @click="togglePicker('thinking')"
             >
               <span class="model-label desktop-label">
@@ -1385,7 +1433,10 @@ function closePickerMenus() {
             <button
               class="composer-chip model-picker-button"
               type="button"
-              :disabled="agentRunning || promptSubmitting || switchingMode"
+              :disabled="agentRunning
+                || promptSubmitting
+                || reloadingSession
+                || switchingMode"
               @click="togglePicker('mode')"
             >
               <span class="model-label desktop-label">{{ currentModeLabel }}</span>
@@ -1442,11 +1493,13 @@ function closePickerMenus() {
             class="send-button"
             :class="{ 'stop-button': agentRunning }"
             :type="agentRunning ? 'button' : 'submit'"
-            :disabled="agentRunning ? interrupting : promptSubmitting || !draft.trim()"
+            :disabled="agentRunning
+              ? interrupting
+              : promptSubmitting || reloadingSession || !draft.trim()"
             :title="agentRunning ? 'Stop Leyline' : 'Send message'"
             @click="agentRunning && interruptAgent()"
           >
-            {{ agentRunning ? '■' : promptSubmitting ? '…' : '↑' }}
+            {{ sendButtonLabel }}
           </button>
         </div>
       </form>

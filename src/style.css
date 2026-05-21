@@ -490,12 +490,17 @@ kbd {
   font-weight: 900;
 }
 
+.sidebar-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
 .settings-button {
   display: grid;
   place-items: center;
   width: 30px;
   height: 30px;
-  margin-top: 12px;
   border-color: var(--border-soft);
   border-radius: 10px;
   background: transparent;
@@ -503,10 +508,15 @@ kbd {
   font-size: 13px;
 }
 
-.settings-button:hover {
+.settings-button:hover:not(:disabled) {
   border-color: var(--border);
   background: var(--panel-soft);
   color: var(--muted-strong);
+}
+
+.settings-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .settings-backdrop {

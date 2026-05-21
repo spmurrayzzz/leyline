@@ -107,6 +107,15 @@ export async function piApiHandler(req, res) {
       return json(res, { ok: true, active: activeSessionDto() })
     }
 
+    if (url.pathname === '/reload') {
+      if (req.method !== 'POST') {
+        return json(res, { error: 'Method not allowed' }, 405)
+      }
+
+      await reloadActiveSession()
+      return json(res, { ok: true, active: activeSessionDto() })
+    }
+
     if (url.pathname === '/model') {
       if (req.method !== 'POST') {
         return json(res, { error: 'Method not allowed' }, 405)
@@ -376,6 +385,19 @@ async function promptActiveSession(text) {
 async function interruptActiveSession() {
   if (!activeRuntime) throw new Error('No active session')
   await activeRuntime.session.abort()
+}
+
+async function reloadActiveSession() {
+  if (!activeRuntime) throw new Error('No active session')
+  if (activeRuntime.session.isStreaming) {
+    throw new Error('Wait for the current response to finish before reloading.')
+  }
+  if (activeRuntime.session.isCompacting) {
+    throw new Error('Wait for compaction to finish before reloading.')
+  }
+
+  await activeRuntime.session.reload()
+  await bindActiveSession()
 }
 
 async function setActiveModel(provider, id) {

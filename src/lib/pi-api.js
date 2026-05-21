@@ -35,6 +35,13 @@ export function interruptPiSession() {
   })
 }
 
+export async function reloadPiSession() {
+  const data = await apiRequest('/api/pi/reload', 'Failed to reload', {
+    method: 'POST',
+  })
+  return data.active
+}
+
 export async function switchPiModel(provider, id) {
   const data = await apiRequest('/api/pi/model', 'Failed to switch model', {
     method: 'POST',
