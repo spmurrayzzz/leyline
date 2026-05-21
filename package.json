@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "local-publish": "./scripts/local-publish.sh",
     "electron:dev": "LEYLINE_DEV_SERVER_URL=http://localhost:5173 electron .",
     "electron:build": "npm run build && electron-packager . Leyline --out release --overwrite --prune=true --icon assets/icon --asar.unpack='**/{*.node,spawn-helper}' --ignore='^/(screenshots|src|scripts)(/|$)' --ignore='^/vite.config.js$'",
     "screenshot": "node scripts/screenshot.js",
