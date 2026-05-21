@@ -1091,11 +1091,20 @@ h1 {
   padding: 0 10px;
   font-size: 12px;
   font-weight: 750;
+  line-height: 1;
 }
 
-.start-project-button em {
-  color: var(--muted);
-  font-style: normal;
+.start-project-icon {
+  flex: none;
+  line-height: 1;
+}
+
+.start-project-label {
+  overflow: hidden;
+  min-width: 0;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .start-project-button:hover,

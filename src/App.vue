@@ -1289,9 +1289,9 @@ function closePickerMenus() {
                 type="button"
                 @click="startProjectPickerOpen = !startProjectPickerOpen"
               >
-                <span>▱</span>
-                {{ startProjectLabel }}
-                <em>⌄</em>
+                <span class="start-project-icon">▱</span>
+                <span class="start-project-label">{{ startProjectLabel }}</span>
+                <span class="model-caret">▾</span>
               </button>
               <div class="model-picker start-picker">
                 <button
