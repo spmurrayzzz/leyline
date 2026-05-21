@@ -1,7 +1,14 @@
 import { chmodSync, existsSync, statSync } from 'node:fs'
 import { mkdir, readdir, readFile, rename, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { basename, dirname, join, relative } from 'node:path'
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+} from 'node:path'
 import { createRequire } from 'node:module'
 import pty from 'node-pty'
 import { WebSocket, WebSocketServer } from 'ws'
@@ -106,6 +113,14 @@ export async function piApiHandler(req, res) {
       return json(res, { active })
     }
 
+    if (url.pathname === '/fs') {
+      if (req.method !== 'GET') {
+        return json(res, { error: 'Method not allowed' }, 405)
+      }
+
+      return json(res, await readDirectory(url.searchParams.get('path')))
+    }
+
     if (url.pathname === '/prompt') {
       if (req.method !== 'POST') {
         return json(res, { error: 'Method not allowed' }, 405)
@@ -196,6 +211,39 @@ export async function piApiHandler(req, res) {
   } catch (error) {
     return json(res, { error: error.message }, 500)
   }
+}
+
+async function readDirectory(path) {
+  const current = normalizeFsPath(path)
+  const info = await stat(current)
+  if (!info.isDirectory()) throw new Error('Path is not a folder')
+
+  const entries = await readdir(current, { withFileTypes: true })
+  const directories = entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => ({
+      name: entry.name,
+      path: join(current, entry.name),
+      hidden: entry.name.startsWith('.'),
+    }))
+    .sort((a, b) => {
+      if (a.hidden !== b.hidden) return a.hidden ? 1 : -1
+      return a.name.localeCompare(b.name)
+    })
+
+  return {
+    path: current,
+    parent: dirname(current) === current ? '' : dirname(current),
+    home: homedir(),
+    directories,
+  }
+}
+
+function normalizeFsPath(path) {
+  const value = path?.trim() || homedir()
+  if (value === '~') return homedir()
+  if (value.startsWith('~/')) return join(homedir(), value.slice(2))
+  return isAbsolute(value) ? resolve(value) : resolve(process.cwd(), value)
 }
 
 async function listSessions() {

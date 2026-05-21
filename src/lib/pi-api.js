@@ -14,6 +14,11 @@ export function fetchSessionDetail(id) {
   return apiRequest(`/api/pi/sessions/${id}`, 'Failed to load session')
 }
 
+export function fetchFsDirectory(path) {
+  const query = path ? `?path=${encodeURIComponent(path)}` : ''
+  return apiRequest(`/api/pi/fs${query}`, 'Failed to read folder')
+}
+
 export function deletePiSession(id) {
   return apiRequest(`/api/pi/sessions/${id}`, 'Failed to delete session', {
     method: 'DELETE',

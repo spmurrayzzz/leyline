@@ -18,6 +18,7 @@ import {
   activatePiSession,
   createPiSession,
   deletePiSession,
+  fetchFsDirectory,
   fetchPiRuntimeState,
   fetchSessionDetail,
   fetchSessions,
@@ -44,7 +45,14 @@ const sessionsError = ref('')
 const sessionsLoading = ref(true)
 const creatingSessionCwd = ref('')
 const newSessionCwd = ref('')
-const newSessionFormOpen = ref(false)
+const projectBrowserOpen = ref(false)
+const projectBrowserPath = ref('')
+const projectBrowserInput = ref('')
+const projectBrowserParent = ref('')
+const projectBrowserHome = ref('')
+const projectBrowserEntries = ref([])
+const projectBrowserLoading = ref(false)
+const projectBrowserError = ref('')
 const startProjectPickerOpen = ref(false)
 const startProjectQuery = ref('')
 const sessionQuery = ref('')
@@ -355,7 +363,7 @@ async function createSessionForCwd(cwd) {
     liveAssistantBlocks.value = []
     expandProject(targetCwd)
     newSessionCwd.value = ''
-    newSessionFormOpen.value = false
+    projectBrowserOpen.value = false
     stickToBottom.value = true
     hasNewOutput.value = false
     await scrollToLatest()
@@ -582,6 +590,38 @@ function selectStartProject(cwd) {
   newSessionCwd.value = cwd
   startProjectPickerOpen.value = false
   startProjectQuery.value = ''
+}
+
+async function openProjectBrowser(path = '') {
+  startProjectPickerOpen.value = false
+  projectBrowserOpen.value = true
+  await browseProjectPath(
+    path || newSessionCwd.value || selectedSession.value?.cwd,
+  )
+}
+
+async function browseProjectPath(path = '') {
+  projectBrowserLoading.value = true
+  projectBrowserError.value = ''
+
+  try {
+    const data = await fetchFsDirectory(path)
+    projectBrowserPath.value = data.path
+    projectBrowserInput.value = data.path
+    projectBrowserParent.value = data.parent || ''
+    projectBrowserHome.value = data.home || ''
+    projectBrowserEntries.value = data.directories || []
+    newSessionCwd.value = data.path
+  } catch (error) {
+    projectBrowserError.value = error.message
+    projectBrowserInput.value = path || projectBrowserInput.value
+  } finally {
+    projectBrowserLoading.value = false
+  }
+}
+
+function closeProjectBrowser() {
+  projectBrowserOpen.value = false
 }
 
 function isToolExpanded(entry) {
@@ -977,11 +1017,13 @@ async function submitStartDraft() {
 function closeMenusOnEscape(event) {
   if (event.key !== 'Escape') return
   settingsOpen.value = false
+  closeProjectBrowser()
   cancelDeleteSession()
   closePickerMenus()
 }
 
 function closeMenusOnOutsideClick(event) {
+  if (event.target.closest('.project-browser-modal')) return
   if (event.target.closest('.model-picker')) return
   if (event.target.closest('.start-project-button, .start-project-menu')) return
   closePickerMenus()
@@ -1021,6 +1063,77 @@ function closePickerMenus() {
       @click="desktopSidebarHidden = false"
     >›</button>
 
+    <div
+      v-if="projectBrowserOpen"
+      class="project-browser-backdrop"
+      @click.self="closeProjectBrowser"
+    >
+      <section class="project-browser-modal" aria-label="Choose project folder">
+        <header class="project-browser-header">
+          <div>
+            <strong>Choose project folder</strong>
+            <span>{{ projectBrowserPath || 'Loading folders…' }}</span>
+          </div>
+          <button type="button" @click="closeProjectBrowser">×</button>
+        </header>
+
+        <form
+          class="project-browser-path"
+          @submit.prevent="browseProjectPath(projectBrowserInput)"
+        >
+          <input
+            v-model="projectBrowserInput"
+            placeholder="~/dev/project"
+            :disabled="projectBrowserLoading"
+          />
+          <button type="submit" :disabled="projectBrowserLoading">Go</button>
+        </form>
+
+        <div class="project-browser-shortcuts">
+          <button
+            type="button"
+            :disabled="projectBrowserLoading || !projectBrowserHome"
+            @click="browseProjectPath(projectBrowserHome)"
+          >Home</button>
+          <button
+            type="button"
+            :disabled="projectBrowserLoading || !projectBrowserParent"
+            @click="browseProjectPath(projectBrowserParent)"
+          >Up</button>
+        </div>
+
+        <div v-if="projectBrowserError" class="project-browser-error">
+          {{ projectBrowserError }}
+        </div>
+        <div v-else class="project-browser-list">
+          <button
+            v-for="entry in projectBrowserEntries"
+            :key="entry.path"
+            type="button"
+            :class="{ hidden: entry.hidden }"
+            @click="browseProjectPath(entry.path)"
+          >
+            <span>▱</span>
+            <strong>{{ entry.name }}</strong>
+          </button>
+          <div
+            v-if="!projectBrowserLoading && projectBrowserEntries.length === 0"
+            class="project-browser-empty"
+          >No folders here</div>
+        </div>
+
+        <footer class="project-browser-actions">
+          <button type="button" @click="closeProjectBrowser">Cancel</button>
+          <button
+            type="button"
+            class="project-browser-primary"
+            :disabled="!projectBrowserPath || !!creatingSessionCwd"
+            @click="createSessionForCwd(projectBrowserPath)"
+          >Open here</button>
+        </footer>
+      </section>
+    </div>
+
     <aside class="sidebar">
       <div class="brand-row">
         <button
@@ -1054,25 +1167,9 @@ function closePickerMenus() {
             type="button"
             class="section-action"
             title="New session"
-            @click="newSessionFormOpen = !newSessionFormOpen"
+            @click="openProjectBrowser()"
           >＋</button>
         </div>
-
-        <form
-          v-if="newSessionFormOpen"
-          class="new-session-form"
-          @submit.prevent="createSessionForCwd(newSessionCwd)"
-        >
-          <input
-            v-model="newSessionCwd"
-            placeholder="Project cwd"
-            :disabled="!!creatingSessionCwd"
-          />
-          <button
-            type="submit"
-            :disabled="!newSessionCwd.trim() || !!creatingSessionCwd"
-          >Create</button>
-        </form>
 
         <div v-if="sessionsLoading" class="sidebar-skeleton">
           <div v-for="index in 3" :key="index" class="skeleton-project">
@@ -1418,7 +1515,7 @@ function closePickerMenus() {
                 <em v-if="project.cwd === newSessionCwd">✓</em>
               </button>
               <div class="start-project-divider"></div>
-              <button type="button" @click="newSessionFormOpen = true">
+              <button type="button" @click="openProjectBrowser()">
                 <span>＋</span>
                 <strong>Add new project</strong>
               </button>
