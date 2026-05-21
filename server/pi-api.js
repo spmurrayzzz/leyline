@@ -42,127 +42,132 @@ export function piApi() {
   return {
     name: 'pi-api',
     configureServer(server) {
-      const terminalServer = new WebSocketServer({ noServer: true })
-
-      terminalServer.on('connection', openTerminal)
-      server.httpServer.on('upgrade', (req, socket, head) => {
-        const url = new URL(req.url, 'http://localhost')
-        if (url.pathname !== '/api/pi/terminal') return
-
-        terminalServer.handleUpgrade(req, socket, head, (ws) => {
-          terminalServer.emit('connection', ws, req)
-        })
-      })
-
-      server.middlewares.use('/api/pi', async (req, res) => {
-        const url = new URL(req.url, 'http://localhost')
-
-        try {
-          if (url.pathname === '/sessions') {
-            if (req.method === 'GET') {
-              const sessions = await listSessions()
-              return json(res, { sessions: sessions.map(toSessionDto) })
-            }
-
-            if (req.method === 'POST') {
-              const body = await readJson(req)
-              const active = await createNewSession(body.cwd)
-              return json(res, {
-                active,
-                detail: toActiveSessionDetailDto(),
-              })
-            }
-
-            return json(res, { error: 'Method not allowed' }, 405)
-          }
-
-          if (url.pathname === '/active-session') {
-            if (req.method !== 'POST') {
-              return json(res, { error: 'Method not allowed' }, 405)
-            }
-
-            const body = await readJson(req)
-            const session = await findSession(body.id)
-            if (!session) return json(res, { error: 'Session not found' }, 404)
-
-            const active = await switchActiveSession(session)
-            return json(res, { active })
-          }
-
-          if (url.pathname === '/prompt') {
-            if (req.method !== 'POST') {
-              return json(res, { error: 'Method not allowed' }, 405)
-            }
-
-            const body = await readJson(req)
-            await promptActiveSession(body.text)
-            return json(res, { ok: true, active: activeSessionDto() })
-          }
-
-          if (url.pathname === '/model') {
-            if (req.method !== 'POST') {
-              return json(res, { error: 'Method not allowed' }, 405)
-            }
-
-            const body = await readJson(req)
-            await setActiveModel(body.provider, body.id)
-            return json(res, { ok: true, active: activeSessionDto() })
-          }
-
-          if (url.pathname === '/thinking') {
-            if (req.method !== 'POST') {
-              return json(res, { error: 'Method not allowed' }, 405)
-            }
-
-            const body = await readJson(req)
-            setActiveThinkingLevel(body.level)
-            return json(res, { ok: true, active: activeSessionDto() })
-          }
-
-          if (url.pathname === '/mode') {
-            if (req.method !== 'POST') {
-              return json(res, { error: 'Method not allowed' }, 405)
-            }
-
-            const body = await readJson(req)
-            setActiveMode(body)
-            return json(res, { ok: true, active: activeSessionDto() })
-          }
-
-          if (url.pathname === '/interrupt') {
-            if (req.method !== 'POST') {
-              return json(res, { error: 'Method not allowed' }, 405)
-            }
-
-            await interruptActiveSession()
-            return json(res, { ok: true, active: activeSessionDto() })
-          }
-
-          if (url.pathname === '/events') {
-            if (req.method !== 'GET') {
-              return json(res, { error: 'Method not allowed' }, 405)
-            }
-
-            return openEventStream(req, res)
-          }
-
-          const match = url.pathname.match(/^\/sessions\/([^/]+)$/)
-          if (match) {
-            if (isActiveSession(match[1])) {
-              return json(res, toActiveSessionDetailDto())
-            }
-
-            const session = await findSession(match[1])
-            if (!session) return json(res, { error: 'Session not found' }, 404)
-            return json(res, toSessionDetailDto(session))
-          }
-
-          return json(res, { error: 'Not found' }, 404)
-        } catch (error) {
-          return json(res, { error: error.message }, 500)
-        }
-      })
+      configurePiWebSocketServer(server.httpServer)
+      server.middlewares.use('/api/pi', piApiHandler)
     },
+  }
+}
+
+export function configurePiWebSocketServer(httpServer) {
+  const terminalServer = new WebSocketServer({ noServer: true })
+
+  terminalServer.on('connection', openTerminal)
+  httpServer.on('upgrade', (req, socket, head) => {
+    const url = new URL(req.url, 'http://localhost')
+    if (url.pathname !== '/api/pi/terminal') return
+
+    terminalServer.handleUpgrade(req, socket, head, (ws) => {
+      terminalServer.emit('connection', ws, req)
+    })
+  })
+}
+
+export async function piApiHandler(req, res) {
+  const url = new URL(req.url, 'http://localhost')
+
+  try {
+    if (url.pathname === '/sessions') {
+      if (req.method === 'GET') {
+        const sessions = await listSessions()
+        return json(res, { sessions: sessions.map(toSessionDto) })
+      }
+
+      if (req.method === 'POST') {
+        const body = await readJson(req)
+        const active = await createNewSession(body.cwd)
+        return json(res, {
+          active,
+          detail: toActiveSessionDetailDto(),
+        })
+      }
+
+      return json(res, { error: 'Method not allowed' }, 405)
+    }
+
+    if (url.pathname === '/active-session') {
+      if (req.method !== 'POST') {
+        return json(res, { error: 'Method not allowed' }, 405)
+      }
+
+      const body = await readJson(req)
+      const session = await findSession(body.id)
+      if (!session) return json(res, { error: 'Session not found' }, 404)
+
+      const active = await switchActiveSession(session)
+      return json(res, { active })
+    }
+
+    if (url.pathname === '/prompt') {
+      if (req.method !== 'POST') {
+        return json(res, { error: 'Method not allowed' }, 405)
+      }
+
+      const body = await readJson(req)
+      await promptActiveSession(body.text)
+      return json(res, { ok: true, active: activeSessionDto() })
+    }
+
+    if (url.pathname === '/model') {
+      if (req.method !== 'POST') {
+        return json(res, { error: 'Method not allowed' }, 405)
+      }
+
+      const body = await readJson(req)
+      await setActiveModel(body.provider, body.id)
+      return json(res, { ok: true, active: activeSessionDto() })
+    }
+
+    if (url.pathname === '/thinking') {
+      if (req.method !== 'POST') {
+        return json(res, { error: 'Method not allowed' }, 405)
+      }
+
+      const body = await readJson(req)
+      setActiveThinkingLevel(body.level)
+      return json(res, { ok: true, active: activeSessionDto() })
+    }
+
+    if (url.pathname === '/mode') {
+      if (req.method !== 'POST') {
+        return json(res, { error: 'Method not allowed' }, 405)
+      }
+
+      const body = await readJson(req)
+      setActiveMode(body)
+      return json(res, { ok: true, active: activeSessionDto() })
+    }
+
+    if (url.pathname === '/interrupt') {
+      if (req.method !== 'POST') {
+        return json(res, { error: 'Method not allowed' }, 405)
+      }
+
+      await interruptActiveSession()
+      return json(res, { ok: true, active: activeSessionDto() })
+    }
+
+    if (url.pathname === '/events') {
+      if (req.method !== 'GET') {
+        return json(res, { error: 'Method not allowed' }, 405)
+      }
+
+      return openEventStream(req, res)
+    }
+
+    const match = url.pathname.match(/^\/sessions\/([^/]+)$/)
+    if (match) {
+      if (isActiveSession(match[1])) {
+        return json(res, toActiveSessionDetailDto())
+      }
+
+      const session = await findSession(match[1])
+      if (!session) return json(res, { error: 'Session not found' }, 404)
+      return json(res, toSessionDetailDto(session))
+    }
+
+    return json(res, { error: 'Not found' }, 404)
+  } catch (error) {
+    return json(res, { error: error.message }, 500)
   }
 }
 

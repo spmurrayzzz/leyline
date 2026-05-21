@@ -6,3 +6,4 @@ dist/
 !.env.example
 screenshots/
 MEMORY.md
+release/
