@@ -1,6 +1,7 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import PierrePreview from './components/PierrePreview.vue'
+import LiveAssistantMessage from './components/LiveAssistantMessage.vue'
 import ProjectBrowser from './components/ProjectBrowser.vue'
 import SessionSidebar from './components/SessionSidebar.vue'
 import TranscriptEntry from './components/TranscriptEntry.vue'
@@ -35,7 +36,6 @@ import {
   imageBlocksFor,
   messageBlocks,
   messageBlocksFor,
-  renderedBlock,
   textFromBlocks,
   textFromContent,
 } from './lib/transcript'
@@ -1582,36 +1582,11 @@ function closePickerMenus() {
           />
         </template>
 
-        <article
-          v-if="liveAssistantBlocks.length"
-          class="message compact-message transcript-message assistant-message live-message"
-        >
-          <div class="message-meta message-meta-row">
-            <span>Agent</span>
-            <button
-              class="copy-button"
-              type="button"
-              :title="copyTitle('live-assistant')"
-              @click="copyTranscriptItem('live-assistant', liveAssistantCopyText())"
-            >
-              {{ copyGlyph('live-assistant') }}
-            </button>
-          </div>
-          <template
-            v-for="(block, index) in liveAssistantBlocks"
-            :key="`live-${index}`"
-          >
-            <div v-if="block.type === 'thinking'" class="thinking-block">
-              <div class="thinking-label">Thinking</div>
-              <pre>{{ block.text }}</pre>
-            </div>
-            <div
-              v-else
-              class="entry-text markdown-body assistant-text-block"
-              v-html="renderedBlock(block)"
-            ></div>
-          </template>
-        </article>
+        <LiveAssistantMessage
+          :blocks="liveAssistantBlocks"
+          :copied-entry-id="copiedEntryId"
+          @copy="copyTranscriptItem('live-assistant', liveAssistantCopyText())"
+        />
 
         <div v-if="liveActivity" class="event-row live-activity">
           <span>Live</span>
