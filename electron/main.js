@@ -1,6 +1,10 @@
+import { execFile } from 'node:child_process'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { promisify } from 'node:util'
 import { app, BrowserWindow } from 'electron'
+
+const execFileAsync = promisify(execFile)
 
 let leylineServer
 let mainWindow
@@ -102,7 +106,34 @@ async function appUrl() {
   return leylineServer.url
 }
 
-app.whenReady().then(createWindow)
+async function loadLoginShellEnvironment() {
+  if (process.platform !== 'darwin') return
+
+  const shell = process.env.SHELL || '/bin/zsh'
+
+  try {
+    const { stdout } = await execFileAsync(
+      shell,
+      ['-ilc', '/usr/bin/env -0'],
+      { encoding: 'buffer', maxBuffer: 1024 * 1024, timeout: 5000 },
+    )
+
+    for (const entry of stdout.toString('utf8').split('\0')) {
+      const index = entry.indexOf('=')
+      if (index <= 0) continue
+
+      const key = entry.slice(0, index)
+      const value = entry.slice(index + 1)
+      if (!process.env[key]) process.env[key] = value
+    }
+  } catch {
+  }
+}
+
+app.whenReady().then(async () => {
+  await loadLoginShellEnvironment()
+  await createWindow()
+})
 
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) createWindow()
