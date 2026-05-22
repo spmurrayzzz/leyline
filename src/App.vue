@@ -1,6 +1,7 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import PierrePreview from './components/PierrePreview.vue'
+import ProjectBrowser from './components/ProjectBrowser.vue'
 import { useRuntimeEvents } from './composables/useRuntimeEvents'
 import { useTerminal } from './composables/useTerminal'
 import { fuzzyScore, highlightedText as highlightFuzzyText } from './lib/fuzzy'
@@ -19,7 +20,6 @@ import {
   activatePiSession,
   createPiSession,
   deletePiSession,
-  fetchFsDirectory,
   fetchPiRuntimeState,
   fetchSessionDetail,
   fetchSessions,
@@ -49,13 +49,7 @@ const sessionsLoading = ref(true)
 const creatingSessionCwd = ref('')
 const newSessionCwd = ref('')
 const projectBrowserOpen = ref(false)
-const projectBrowserPath = ref('')
-const projectBrowserInput = ref('')
-const projectBrowserParent = ref('')
-const projectBrowserHome = ref('')
-const projectBrowserEntries = ref([])
-const projectBrowserLoading = ref(false)
-const projectBrowserError = ref('')
+const projectBrowserInitialPath = ref('')
 const startProjectPickerOpen = ref(false)
 const startProjectQuery = ref('')
 const sessionQuery = ref('')
@@ -635,32 +629,15 @@ function selectStartProject(cwd) {
   startProjectQuery.value = ''
 }
 
-async function openProjectBrowser(path = '') {
+function openProjectBrowser(path = '') {
   startProjectPickerOpen.value = false
+  projectBrowserInitialPath.value =
+    path || newSessionCwd.value || selectedSession.value?.cwd || ''
   projectBrowserOpen.value = true
-  await browseProjectPath(
-    path || newSessionCwd.value || selectedSession.value?.cwd,
-  )
 }
 
-async function browseProjectPath(path = '') {
-  projectBrowserLoading.value = true
-  projectBrowserError.value = ''
-
-  try {
-    const data = await fetchFsDirectory(path)
-    projectBrowserPath.value = data.path
-    projectBrowserInput.value = data.path
-    projectBrowserParent.value = data.parent || ''
-    projectBrowserHome.value = data.home || ''
-    projectBrowserEntries.value = data.directories || []
-    newSessionCwd.value = data.path
-  } catch (error) {
-    projectBrowserError.value = error.message
-    projectBrowserInput.value = path || projectBrowserInput.value
-  } finally {
-    projectBrowserLoading.value = false
-  }
+function handleProjectBrowserBrowse(cwd) {
+  newSessionCwd.value = cwd
 }
 
 function closeProjectBrowser() {
@@ -1257,76 +1234,14 @@ function closePickerMenus() {
       @click="desktopSidebarHidden = false"
     >›</button>
 
-    <div
+    <ProjectBrowser
       v-if="projectBrowserOpen"
-      class="project-browser-backdrop"
-      @click.self="closeProjectBrowser"
-    >
-      <section class="project-browser-modal" aria-label="Choose project folder">
-        <header class="project-browser-header">
-          <div>
-            <strong>Choose project folder</strong>
-            <span>{{ projectBrowserPath || 'Loading folders…' }}</span>
-          </div>
-          <button type="button" @click="closeProjectBrowser">×</button>
-        </header>
-
-        <form
-          class="project-browser-path"
-          @submit.prevent="browseProjectPath(projectBrowserInput)"
-        >
-          <input
-            v-model="projectBrowserInput"
-            placeholder="~/dev/project"
-            :disabled="projectBrowserLoading"
-          />
-          <button type="submit" :disabled="projectBrowserLoading">Go</button>
-        </form>
-
-        <div class="project-browser-shortcuts">
-          <button
-            type="button"
-            :disabled="projectBrowserLoading || !projectBrowserHome"
-            @click="browseProjectPath(projectBrowserHome)"
-          >Home</button>
-          <button
-            type="button"
-            :disabled="projectBrowserLoading || !projectBrowserParent"
-            @click="browseProjectPath(projectBrowserParent)"
-          >Up</button>
-        </div>
-
-        <div v-if="projectBrowserError" class="project-browser-error">
-          {{ projectBrowserError }}
-        </div>
-        <div v-else class="project-browser-list">
-          <button
-            v-for="entry in projectBrowserEntries"
-            :key="entry.path"
-            type="button"
-            :class="{ hidden: entry.hidden }"
-            @click="browseProjectPath(entry.path)"
-          >
-            <span>▱</span>
-            <strong>{{ entry.name }}</strong>
-          </button>
-          <div
-            v-if="!projectBrowserLoading && projectBrowserEntries.length === 0"
-            class="project-browser-empty"
-          >No folders here</div>
-        </div>
-
-        <footer class="project-browser-actions">
-          <button type="button" @click="closeProjectBrowser">Cancel</button>
-          <button
-            type="button"
-            class="project-browser-primary"
-            :disabled="!projectBrowserPath || !!creatingSessionCwd"
-            @click="createSessionForCwd(projectBrowserPath)"
-          >Open here</button>
-        </footer>
-      </section>
-    </div>
+      :busy="!!creatingSessionCwd"
+      :initial-path="projectBrowserInitialPath"
+      @browse="handleProjectBrowserBrowse"
+      @close="closeProjectBrowser"
+      @select="createSessionForCwd"
+    />
 
     <aside class="sidebar">
       <div class="brand-row">
