@@ -1,5 +1,6 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import PierrePreview from './components/PierrePreview.vue'
 import { useRuntimeEvents } from './composables/useRuntimeEvents'
 import { useTerminal } from './composables/useTerminal'
 import { fuzzyScore, highlightedText as highlightFuzzyText } from './lib/fuzzy'
@@ -78,6 +79,7 @@ const startSelectedModel = ref(null)
 const startSelectedThinkingLevel = ref(null)
 const eventLogOpen = ref(false)
 const settingsOpen = ref(false)
+const fullscreenTool = ref(null)
 const promptSubmitting = ref(false)
 const interrupting = ref(false)
 const switchingModel = ref(false)
@@ -676,6 +678,14 @@ function toggleTool(entry) {
   expandedTools.value = next
 }
 
+function openToolFullscreen(entry) {
+  fullscreenTool.value = entry
+}
+
+function closeToolFullscreen() {
+  fullscreenTool.value = null
+}
+
 function isSkillExpanded(entry) {
   return expandedSkills.value.has(entry.id)
 }
@@ -689,11 +699,40 @@ function toggleSkill(entry) {
 
 function entryCopyText(entry) {
   if (entry.type === 'event') return `${entry.label} ${entry.text}`.trim()
-  if (entry.type === 'tool') return entry.text || ''
+  if (entry.type === 'tool') return toolCopyText(entry)
   if (entry.blocks?.length) {
     return messageBlocksFor(entry).map((block) => block.text).join('\n\n')
   }
   return entry.text || ''
+}
+
+function toolCopyText(entry) {
+  const preview = entry.preview
+  if (!preview) return entry.text || ''
+  if (preview.kind === 'patch') return preview.patch || entry.text || ''
+  if (preview.kind === 'file') return preview.content || entry.text || ''
+  if (preview.kind === 'diff') return previewDiffText(preview)
+  return entry.text || ''
+}
+
+function previewDiffText(preview) {
+  const path = preview.path || 'tool-output.txt'
+  const oldLines = splitDiffLines(preview.oldText || '')
+  const newLines = splitDiffLines(preview.newText || '')
+  const oldCount = Math.max(oldLines.length, 1)
+  const newCount = Math.max(newLines.length, 1)
+
+  return [
+    `--- a/${path}`,
+    `+++ b/${path}`,
+    `@@ -1,${oldCount} +1,${newCount} @@`,
+    ...oldLines.map((line) => `-${line}`),
+    ...newLines.map((line) => `+${line}`),
+  ].join('\n')
+}
+
+function splitDiffLines(text) {
+  return text.replace(/\n$/, '').split('\n')
 }
 
 function liveAssistantCopyText() {
@@ -1171,6 +1210,7 @@ async function submitStartDraft() {
 function closeMenusOnEscape(event) {
   if (event.key !== 'Escape') return
   settingsOpen.value = false
+  closeToolFullscreen()
   closeProjectBrowser()
   cancelDeleteSession()
   closePickerMenus()
@@ -1753,6 +1793,15 @@ function closePickerMenus() {
                 </span>
                 <em>{{ entry.isError ? 'error' : 'completed' }}</em>
                 <button
+                  v-if="entry.preview"
+                  class="copy-button"
+                  type="button"
+                  title="Open full screen"
+                  @click.stop="openToolFullscreen(entry)"
+                >
+                  ⛶
+                </button>
+                <button
                   class="copy-button"
                   type="button"
                   :title="copyTitle(entry.id)"
@@ -1761,7 +1810,26 @@ function closePickerMenus() {
                   {{ copyGlyph(entry.id) }}
                 </button>
               </div>
-              <pre v-if="isToolExpanded(entry)" class="tool-output">{{ entry.text }}</pre>
+              <div
+                v-if="isToolExpanded(entry)"
+                class="tool-expanded-body"
+                @click.stop
+              >
+                <template v-if="entry.preview">
+                  <div class="tool-preview-clip">
+                    <PierrePreview :preview="entry.preview" clipped />
+                    <div class="tool-preview-fade"></div>
+                  </div>
+                  <button
+                    class="tool-preview-cta"
+                    type="button"
+                    @click="openToolFullscreen(entry)"
+                  >
+                    Open full screen
+                  </button>
+                </template>
+                <pre v-else class="tool-output">{{ entry.text }}</pre>
+              </div>
             </article>
 
             <article
@@ -2202,5 +2270,39 @@ function closePickerMenus() {
         </dl>
       </section>
     </aside>
+
+    <div
+      v-if="fullscreenTool"
+      class="tool-fullscreen-backdrop"
+      @click="closeToolFullscreen"
+    >
+      <section class="tool-fullscreen" @click.stop>
+        <header class="tool-fullscreen-header">
+          <div>
+            <span>{{ fullscreenTool.label }}</span>
+            <code v-if="fullscreenTool.code">{{ fullscreenTool.code }}</code>
+          </div>
+          <div>
+            <button
+              class="copy-button"
+              type="button"
+              :title="copyTitle(fullscreenTool.id)"
+              @click="copyTranscriptItem(fullscreenTool.id, entryCopyText(fullscreenTool))"
+            >
+              {{ copyGlyph(fullscreenTool.id) }}
+            </button>
+            <button type="button" @click="closeToolFullscreen">×</button>
+          </div>
+        </header>
+        <div class="tool-fullscreen-body">
+          <PierrePreview
+            v-if="fullscreenTool.preview"
+            :preview="fullscreenTool.preview"
+            :clipped="false"
+          />
+          <pre v-else class="tool-output">{{ fullscreenTool.text }}</pre>
+        </div>
+      </section>
+    </div>
   </main>
 </template>

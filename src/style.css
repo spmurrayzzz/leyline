@@ -2004,17 +2004,134 @@ h1 {
   background: #181a21;
 }
 
+.tool-expanded-body {
+  margin-top: 9px;
+  border-top: 1px solid var(--border-soft);
+  padding-top: 9px;
+}
+
 .tool-output {
   overflow: auto;
   max-height: 280px;
-  margin: 9px 0 0;
-  border-top: 1px solid var(--border-soft);
-  padding-top: 9px;
+  margin: 0;
   color: #b8b8b8;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 12px;
   line-height: 1.45;
   white-space: pre-wrap;
+}
+
+.tool-preview-clip {
+  position: relative;
+  overflow: hidden;
+  max-height: 420px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: #0f1014;
+}
+
+.pierre-preview {
+  min-height: 0;
+}
+
+.pierre-preview-inner {
+  min-height: 0;
+}
+
+.tool-preview-fade {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 72px;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgb(15 16 20 / 0%), #0f1014);
+}
+
+.tool-preview-cta {
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #1a1c23;
+  padding: 6px 9px;
+  color: #d7d7dc;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tool-preview-cta:hover {
+  border-color: #5b5f75;
+  background: #20232c;
+}
+
+.tool-fullscreen-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  background: rgb(0 0 0 / 72%);
+  padding: 28px;
+}
+
+.tool-fullscreen {
+  display: flex;
+  overflow: hidden;
+  width: min(1280px, 100%);
+  min-height: 0;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: #101116;
+  box-shadow: 0 24px 80px rgb(0 0 0 / 42%);
+  flex-direction: column;
+}
+
+.tool-fullscreen-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border-bottom: 1px solid var(--border);
+  padding: 11px 13px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.tool-fullscreen-header div {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 9px;
+}
+
+.tool-fullscreen-header code {
+  overflow: hidden;
+  max-width: 62vw;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--panel-soft);
+  padding: 2px 6px;
+  color: #cfcfcf;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-fullscreen-header button {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #181a21;
+  color: var(--text);
+}
+
+.tool-fullscreen-body {
+  overflow: auto;
+  min-height: 0;
+  padding: 12px;
 }
 
 .error-card {

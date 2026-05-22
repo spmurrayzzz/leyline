@@ -995,13 +995,15 @@ function toMessageEntryDto(entry, toolCalls) {
   if (message.role === 'toolResult') {
     const call = toolCalls.get(message.toolCallId)
     const annotation = toolAnnotation(message.toolName, call)
+    const preview = toolPreview(message.toolName, call, text)
 
     return {
       id: entry.id,
       type: 'tool',
       label: annotation.label,
       code: annotation.code,
-      text: truncate(text, 900),
+      text: preview ? text : truncate(text, 900),
+      preview,
       isError: message.isError,
       timestamp: entry.timestamp,
     }
@@ -1015,7 +1017,10 @@ function toMessageEntryDto(entry, toolCalls) {
       type: 'tool',
       label: 'Bash',
       code: message.command,
-      text: truncate(message.output || '', 900),
+      text: bashPreview(message.output || '')
+        ? message.output || ''
+        : truncate(message.output || '', 900),
+      preview: bashPreview(message.output || ''),
       isError: message.exitCode && message.exitCode !== 0,
       excludeFromContext,
       contextLabel: excludeFromContext ? 'not in context' : 'in context',
@@ -1053,6 +1058,40 @@ function messageBlocks(content) {
       return undefined
     })
     .filter((block) => block?.text || block?.data)
+}
+
+function toolPreview(toolName, call, text) {
+  const args = call?.arguments || {}
+
+  if (toolName === 'read' && args.path && !skillNameFromPath(args.path)) {
+    return { kind: 'file', path: args.path, content: text }
+  }
+
+  if (toolName === 'bash') return bashPreview(text)
+
+  if (toolName === 'edit' && args.path) {
+    const edit = args.edits?.[0]
+    const oldText = args.oldText ?? edit?.oldText
+    const newText = args.newText ?? edit?.newText
+    if (oldText !== undefined && newText !== undefined) {
+      return { kind: 'diff', path: args.path, oldText, newText }
+    }
+  }
+
+  if (toolName === 'write' && args.path && args.content !== undefined) {
+    return { kind: 'file', path: args.path, content: args.content }
+  }
+
+  return undefined
+}
+
+function bashPreview(text) {
+  if (!looksLikePatch(text)) return undefined
+  return { kind: 'patch', patch: text }
+}
+
+function looksLikePatch(text) {
+  return /^diff --git /m.test(text) || /^--- .+\n\+\+\+ /m.test(text)
 }
 
 function toolAnnotation(toolName, call) {

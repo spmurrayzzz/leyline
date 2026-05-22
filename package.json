@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "0.74.0",
+    "@pierre/diffs": "1.2.0-beta.6",
     "@vitejs/plugin-vue": "latest",
     "@xterm/xterm": "6.0.0",
     "markdown-it": "14.1.1",
