@@ -154,6 +154,16 @@ export async function piApiHandler(req, res) {
       return json(res, { ok: true, active: activeSessionDto() })
     }
 
+    if (url.pathname === '/edit-prompt') {
+      if (req.method !== 'POST') {
+        return json(res, { error: 'Method not allowed' }, 405)
+      }
+
+      const body = await readJson(req)
+      await editActivePrompt(body.entryId, body.text, body.images)
+      return json(res, { ok: true, active: activeSessionDto() })
+    }
+
     if (url.pathname === '/fork') {
       if (req.method !== 'POST') {
         return json(res, { error: 'Method not allowed' }, 405)
@@ -511,6 +521,26 @@ function validateImages(images) {
 async function interruptActiveSession() {
   if (!activeRuntime) throw new Error('No active session')
   await activeRuntime.session.abort()
+}
+
+async function editActivePrompt(entryId, text, images = []) {
+  if (!activeRuntime) throw new Error('No active session')
+  if (!entryId) throw new Error('entryId is required')
+  if (activeRuntime.session.isStreaming) {
+    throw new Error('Wait for the current response to finish before editing.')
+  }
+  if (activeRuntime.session.isCompacting) {
+    throw new Error('Wait for compaction to finish before editing.')
+  }
+
+  const entry = activeRuntime.session.sessionManager.getEntry(entryId)
+  if (entry?.type !== 'message' || entry.message?.role !== 'user') {
+    throw new Error('Only user messages can be edited')
+  }
+
+  const result = await activeRuntime.session.navigateTree(entryId)
+  if (result.cancelled) throw new Error('Edit cancelled')
+  await promptActiveSession(text, images)
 }
 
 async function forkActiveSession(entryId) {

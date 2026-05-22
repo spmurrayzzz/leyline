@@ -25,6 +25,7 @@ const props = defineProps({
 
 const emit = defineEmits([
   'copy',
+  'edit',
   'fork',
   'open-tool-fullscreen',
   'toggle-skill',
@@ -131,6 +132,15 @@ function copyGlyph(id) {
   >
     <div class="message-meta message-meta-row">
       <span>{{ entry.label }}</span>
+      <button
+        v-if="entry.role === 'user'"
+        class="copy-button"
+        type="button"
+        title="Edit message"
+        @click="emit('edit', entry)"
+      >
+        ✎
+      </button>
       <button
         class="copy-button"
         type="button"

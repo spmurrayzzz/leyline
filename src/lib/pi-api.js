@@ -49,6 +49,13 @@ export function submitPrompt(text, images = []) {
   })
 }
 
+export function editPrompt(entryId, text, images = []) {
+  return apiRequest('/api/pi/edit-prompt', 'Failed to edit prompt', {
+    method: 'POST',
+    body: { entryId, text, images },
+  })
+}
+
 export function interruptPiSession() {
   return apiRequest('/api/pi/interrupt', 'Failed to stop run', {
     method: 'POST',

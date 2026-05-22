@@ -52,6 +52,10 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  editingLabel: {
+    type: String,
+    default: '',
+  },
   error: {
     type: String,
     default: '',
@@ -97,6 +101,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits([
+  'cancel-edit',
   'interrupt',
   'keydown',
   'paste',
@@ -119,6 +124,10 @@ function updateDraft(event) {
 
 <template>
   <form class="composer" @submit.prevent="emit('submit')">
+    <div v-if="editingLabel" class="editing-banner">
+      <span>{{ editingLabel }}</span>
+      <button type="button" @click="emit('cancel-edit')">Cancel</button>
+    </div>
     <textarea
       :value="draft"
       :disabled="promptSubmitting || reloadingSession"

@@ -24,6 +24,7 @@ import {
   activatePiSession,
   createPiSession,
   deletePiSession,
+  editPrompt,
   fetchPiRuntimeState,
   fetchSessionDetail,
   fetchSessions,
@@ -83,6 +84,7 @@ const reloadingSession = ref(false)
 const deletingSessionId = ref('')
 const deleteConfirmSession = ref(null)
 const forkingEntryId = ref('')
+const editingEntry = ref(null)
 const modelPickerOpen = ref(false)
 const thinkingPickerOpen = ref(false)
 const modePickerOpen = ref(false)
@@ -275,6 +277,10 @@ const sendButtonLabel = computed(() => {
   if (promptSubmitting.value || reloadingSession.value) return '…'
   return '↑'
 })
+const editingLabel = computed(() => {
+  if (!editingEntry.value) return ''
+  return 'Editing earlier message · send to replace the current branch'
+})
 const slashQuery = computed(() => {
   const match = draft.value.match(/^\/([^\s]*)$/)
   return match ? match[1].toLowerCase() : ''
@@ -396,6 +402,7 @@ async function createSessionForCwd(cwd) {
     expandedTools.value = new Set()
     expandedSkills.value = new Set()
     localEntries.value = []
+    editingEntry.value = null
     liveActivity.value = ''
     liveAssistantText.value = ''
     liveAssistantBlocks.value = []
@@ -427,6 +434,7 @@ async function selectSession(session, options = {}) {
     expandedTools.value = new Set()
     expandedSkills.value = new Set()
     localEntries.value = []
+    editingEntry.value = null
     liveActivity.value = ''
     liveAssistantText.value = ''
     liveAssistantBlocks.value = []
@@ -486,6 +494,7 @@ function clearSelectedSession() {
   expandedTools.value = new Set()
   expandedSkills.value = new Set()
   localEntries.value = []
+  editingEntry.value = null
   liveActivity.value = ''
   liveAssistantText.value = ''
   liveAssistantBlocks.value = []
@@ -796,7 +805,10 @@ async function submitDraft() {
   if (promptSubmitting.value || agentRunning.value) return
   if (reloadingSession.value) return
 
+  const editing = editingEntry.value
+  const previousDetail = sessionDetail.value
   const localEntry = pendingUserEntry(text, images)
+  if (editing) trimSessionToEntry(editing.id)
   localEntries.value = [...localEntries.value, localEntry]
   promptSubmitting.value = true
   promptError.value = ''
@@ -804,12 +816,15 @@ async function submitDraft() {
   else hasNewOutput.value = true
 
   try {
-    await submitPrompt(text, images)
+    if (editing) await editPrompt(editing.id, text, images)
+    else await submitPrompt(text, images)
     draft.value = ''
     attachedImages.value = []
+    editingEntry.value = null
     agentRunning.value = true
     liveActivity.value = 'Thinking…'
   } catch (error) {
+    if (editing) sessionDetail.value = previousDetail
     localEntries.value = localEntries.value.filter((entry) => {
       return entry.id !== localEntry.id
     })
@@ -820,6 +835,38 @@ async function submitDraft() {
   } finally {
     promptSubmitting.value = false
   }
+}
+
+function startEditingEntry(entry) {
+  if (agentRunning.value || promptSubmitting.value || !entry?.id) return
+  if (entry.role !== 'user') return
+
+  editingEntry.value = entry
+  draft.value = entry.text || textFromBlocks(messageBlocksFor(entry))
+  attachedImages.value = imageBlocksFor(entry).map((image) => ({
+    ...image,
+    preview: imageSrcForComposer(image),
+  }))
+  promptError.value = ''
+  closePickerMenus()
+}
+
+function cancelEditingEntry() {
+  editingEntry.value = null
+}
+
+function trimSessionToEntry(entryId) {
+  const detail = sessionDetail.value
+  const index = detail?.entries?.findIndex((entry) => entry.id === entryId)
+  if (!detail || index < 0) return
+  sessionDetail.value = {
+    ...detail,
+    entries: detail.entries.slice(0, index),
+  }
+}
+
+function imageSrcForComposer(image) {
+  return `data:${image.mimeType};base64,${image.data}`
 }
 
 function requestDeleteSession(session) {
@@ -872,6 +919,7 @@ async function forkSession(entry) {
     expandedTools.value = new Set()
     expandedSkills.value = new Set()
     localEntries.value = []
+    editingEntry.value = null
     liveActivity.value = ''
     liveAssistantText.value = ''
     liveAssistantBlocks.value = []
@@ -1229,6 +1277,7 @@ function closeMenusOnEscape(event) {
   closeToolFullscreen()
   closeProjectBrowser()
   cancelDeleteSession()
+  cancelEditingEntry()
   closePickerMenus()
 }
 
@@ -1472,6 +1521,7 @@ function closePickerMenus() {
             :skill-expanded="isSkillExpanded(entry)"
             :tool-expanded="isToolExpanded(entry)"
             @copy="copyEntry"
+            @edit="startEditingEntry"
             @fork="forkSession"
             @open-tool-fullscreen="openToolFullscreen"
             @toggle-skill="toggleSkill"
@@ -1528,6 +1578,7 @@ function closePickerMenus() {
         :current-mode-label="currentModeLabel"
         :current-model-label="currentModelLabel"
         :current-thinking-label="currentThinkingLabel"
+        :editing-label="editingLabel"
         :error="promptError || eventStreamError || imageSupportWarning"
         :interrupting="interrupting"
         :model-key="modelKey"
@@ -1546,6 +1597,7 @@ function closePickerMenus() {
         :switching-thinking="switchingThinking"
         :thinking-level="composerRuntime?.state?.thinkingLevel"
         :thinking-picker-open="thinkingPickerOpen"
+        @cancel-edit="cancelEditingEntry"
         @interrupt="interruptAgent"
         @keydown="handleComposerKeydown"
         @paste="handleComposerPaste"
