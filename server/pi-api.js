@@ -154,6 +154,20 @@ export async function piApiHandler(req, res) {
       return json(res, { ok: true, active: activeSessionDto() })
     }
 
+    if (url.pathname === '/fork') {
+      if (req.method !== 'POST') {
+        return json(res, { error: 'Method not allowed' }, 405)
+      }
+
+      const body = await readJson(req)
+      const active = await forkActiveSession(body.entryId)
+      return json(res, {
+        ok: true,
+        active,
+        detail: toActiveSessionDetailDto(),
+      })
+    }
+
     if (url.pathname === '/reload') {
       if (req.method !== 'POST') {
         return json(res, { error: 'Method not allowed' }, 405)
@@ -497,6 +511,23 @@ function validateImages(images) {
 async function interruptActiveSession() {
   if (!activeRuntime) throw new Error('No active session')
   await activeRuntime.session.abort()
+}
+
+async function forkActiveSession(entryId) {
+  if (!activeRuntime) throw new Error('No active session')
+  if (!entryId) throw new Error('entryId is required')
+  if (activeRuntime.session.isStreaming) {
+    throw new Error('Wait for the current response to finish before forking.')
+  }
+  if (activeRuntime.session.isCompacting) {
+    throw new Error('Wait for compaction to finish before forking.')
+  }
+
+  const result = await activeRuntime.fork(entryId, { position: 'at' })
+  if (result.cancelled) throw new Error('Fork cancelled')
+  activeSessionId = activeRuntime.session.sessionManager.getSessionId()
+  await bindActiveSession()
+  return activeSessionDto()
 }
 
 async function trashSession(id) {

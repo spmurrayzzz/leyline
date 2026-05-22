@@ -25,6 +25,7 @@ const props = defineProps({
 
 const emit = defineEmits([
   'copy',
+  'fork',
   'open-tool-fullscreen',
   'toggle-skill',
   'toggle-tool',
@@ -43,6 +44,14 @@ function copyGlyph(id) {
   <div v-if="entry.type === 'event'" class="event-row">
     <span>{{ entry.label }}</span>
     <strong>{{ entry.text }}</strong>
+    <button
+      class="copy-button"
+      type="button"
+      title="Fork from here"
+      @click="emit('fork', entry)"
+    >
+      ⎇
+    </button>
     <button
       class="copy-button"
       type="button"
@@ -83,6 +92,14 @@ function copyGlyph(id) {
       <button
         class="copy-button"
         type="button"
+        title="Fork from here"
+        @click.stop="emit('fork', entry)"
+      >
+        ⎇
+      </button>
+      <button
+        class="copy-button"
+        type="button"
         :title="copyTitle(entry.id)"
         @click.stop="emit('copy', entry)"
       >
@@ -114,6 +131,14 @@ function copyGlyph(id) {
   >
     <div class="message-meta message-meta-row">
       <span>{{ entry.label }}</span>
+      <button
+        class="copy-button"
+        type="button"
+        title="Fork from here"
+        @click="emit('fork', entry)"
+      >
+        ⎇
+      </button>
       <button
         class="copy-button"
         type="button"

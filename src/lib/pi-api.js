@@ -55,6 +55,13 @@ export function interruptPiSession() {
   })
 }
 
+export function forkPiSession(entryId) {
+  return apiRequest('/api/pi/fork', 'Failed to fork session', {
+    method: 'POST',
+    body: { entryId },
+  })
+}
+
 export async function reloadPiSession() {
   const data = await apiRequest('/api/pi/reload', 'Failed to reload', {
     method: 'POST',

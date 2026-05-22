@@ -27,6 +27,7 @@ import {
   fetchPiRuntimeState,
   fetchSessionDetail,
   fetchSessions,
+  forkPiSession,
   interruptPiSession,
   reloadPiSession,
   submitPrompt,
@@ -81,6 +82,7 @@ const switchingMode = ref(false)
 const reloadingSession = ref(false)
 const deletingSessionId = ref('')
 const deleteConfirmSession = ref(null)
+const forkingEntryId = ref('')
 const modelPickerOpen = ref(false)
 const thinkingPickerOpen = ref(false)
 const modePickerOpen = ref(false)
@@ -854,6 +856,40 @@ async function confirmDeleteSession() {
   }
 }
 
+async function forkSession(entry) {
+  if (!entry?.id || forkingEntryId.value || agentRunning.value) return
+
+  forkingEntryId.value = entry.id
+  sessionError.value = ''
+  promptError.value = ''
+  liveActivity.value = 'Forking session…'
+
+  try {
+    const data = await forkPiSession(entry.id)
+    activeRuntimeSession.value = data.active
+    sessionDetail.value = data.detail
+    selectedSessionId.value = data.detail.session.id
+    expandedTools.value = new Set()
+    expandedSkills.value = new Set()
+    localEntries.value = []
+    liveActivity.value = ''
+    liveAssistantText.value = ''
+    liveAssistantBlocks.value = []
+    expandProject(data.detail.session.cwd)
+    updateSessionRoute(data.detail.session.id)
+    stickToBottom.value = true
+    hasNewOutput.value = false
+    await loadSessions({ selectFirst: false, showLoading: false })
+    await scrollToLatest()
+    if (terminalOpen.value) await connectTerminal()
+  } catch (error) {
+    promptError.value = error.message
+    liveActivity.value = ''
+  } finally {
+    forkingEntryId.value = ''
+  }
+}
+
 async function reloadSession() {
   if (reloadingSession.value) return
 
@@ -1436,6 +1472,7 @@ function closePickerMenus() {
             :skill-expanded="isSkillExpanded(entry)"
             :tool-expanded="isToolExpanded(entry)"
             @copy="copyEntry"
+            @fork="forkSession"
             @open-tool-fullscreen="openToolFullscreen"
             @toggle-skill="toggleSkill"
             @toggle-tool="toggleTool"
