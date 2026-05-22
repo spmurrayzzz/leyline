@@ -1,4 +1,5 @@
 <script setup>
+import { ref } from 'vue'
 import { formatMode, modelChip } from '../lib/format'
 
 const props = defineProps({
@@ -101,6 +102,15 @@ const emit = defineEmits([
   'update:draft',
 ])
 
+const textarea = ref(null)
+
+function focus() {
+  if (props.promptSubmitting || props.reloadingSession) return
+  textarea.value?.focus()
+}
+
+defineExpose({ focus })
+
 function updateDraft(event) {
   emit('update:draft', event.target.value)
   emit('show-slash-picker')
@@ -114,6 +124,7 @@ function updateDraft(event) {
       <button type="button" @click="emit('cancel-edit')">Cancel</button>
     </div>
     <textarea
+      ref="textarea"
       :value="draft"
       :disabled="promptSubmitting || reloadingSession"
       placeholder="Ask for follow-up changes or attach images"

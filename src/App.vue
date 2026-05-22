@@ -82,6 +82,7 @@ const deletingSessionId = ref('')
 const deleteConfirmSession = ref(null)
 const forkingEntryId = ref('')
 const editingEntry = ref(null)
+const composerRef = ref(null)
 const modelPickerOpen = ref(false)
 const thinkingPickerOpen = ref(false)
 const slashActiveIndex = ref(0)
@@ -1084,6 +1085,7 @@ function startEditingEntry(entry) {
   }))
   promptError.value = ''
   closePickerMenus()
+  nextTick(() => composerRef.value?.focus())
 }
 
 function cancelEditingEntry() {
@@ -1791,6 +1793,7 @@ function closePickerMenus() {
 
       <SessionComposer
         v-if="selectedSession && !initializing"
+        ref="composerRef"
         v-model:draft="draft"
         :agent-running="agentRunning"
         :attached-images="attachedImages"
