@@ -1192,6 +1192,7 @@ h1 {
 .start-composer {
   position: relative;
   width: min(720px, 100%);
+  overflow: hidden;
   border: 1px solid #35323f;
   border-radius: 22px;
   background: #17161d;
@@ -1207,8 +1208,8 @@ h1 {
 }
 
 .start-composer textarea {
-  height: 92px;
-  padding: 18px 20px 8px;
+  height: 78px;
+  padding: 18px 20px 4px;
   color: #e5e6ec;
   font-size: 15px;
 }
@@ -1256,15 +1257,46 @@ h1 {
 }
 
 .start-composer-bar {
+  display: grid;
+  min-width: 0;
+  padding: 0;
+}
+
+.composer-primary-row,
+.composer-context-row,
+.composer-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
   min-width: 0;
-  padding: 0 12px 12px;
+}
+
+.composer-primary-row {
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 12px 12px 20px;
+}
+
+.composer-row-spacer {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.composer-actions {
+  flex: 0 1 auto;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.composer-context-row {
+  overflow: hidden;
+  gap: 8px;
+  border-top: 1px solid rgb(255 255 255 / 4%);
+  background: rgb(8 8 13 / 20%);
+  padding: 9px 18px 10px;
 }
 
 .start-composer-chip {
-  flex: 1 1 0;
+  overflow: hidden;
   min-width: 0;
   height: 28px;
   border-color: #312d3d;
@@ -1274,14 +1306,12 @@ h1 {
 }
 
 .start-picker {
-  flex: 1 1 0;
   min-width: 0;
-  max-width: 150px;
 }
 
 .start-picker .model-picker-button {
   width: 100%;
-  max-width: 150px;
+  max-width: none;
 }
 
 .start-project-button,
@@ -1294,11 +1324,10 @@ h1 {
 
 .start-project-button {
   display: inline-flex;
-  flex: 1.2 1 0;
   align-items: center;
   gap: 8px;
   min-width: 0;
-  max-width: 190px;
+  max-width: none;
   height: 28px;
   border-color: #312d3d;
   border-radius: 999px;
@@ -1335,7 +1364,7 @@ h1 {
   flex: none;
   width: 38px;
   height: 38px;
-  margin-left: auto;
+  margin-left: 0;
   border-radius: 50%;
   background: #5f52b8;
   color: white;
@@ -2120,6 +2149,7 @@ h1 {
   bottom: 22px;
   left: 50%;
   width: min(var(--content-max), calc(100% - 88px));
+  overflow: hidden;
   transform: translateX(-50%);
   border: 1px solid #3d3650;
   border-radius: 22px;
@@ -2130,12 +2160,12 @@ h1 {
 textarea {
   display: block;
   width: 100%;
-  height: 94px;
+  height: 78px;
   resize: none;
   border: 0;
   outline: 0;
   background: transparent;
-  padding: 17px 20px 6px;
+  padding: 17px 20px 4px;
   color: #e5e6ec;
   font-size: 15px;
 }
@@ -2156,7 +2186,8 @@ textarea::placeholder {
 }
 
 .composer-bar {
-  padding: 0 12px 12px;
+  display: grid;
+  padding: 0;
 }
 
 .composer-chip {
@@ -2176,6 +2207,7 @@ textarea::placeholder {
 
 .model-picker {
   position: relative;
+  min-width: 0;
   max-width: 280px;
 }
 
@@ -2270,9 +2302,10 @@ textarea::placeholder {
 }
 
 .send-button {
+  flex: none;
   width: 38px;
   height: 38px;
-  margin-left: auto;
+  margin-left: 0;
   border-radius: 50% !important;
   background: #684cd6 !important;
   color: white !important;
@@ -2456,14 +2489,35 @@ textarea::placeholder {
     font-size: 16px;
   }
 
-  .composer-bar {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto 36px;
-    gap: 13px;
-    align-items: center;
+  .composer-bar,
+  .start-composer-bar {
+    gap: 9px;
     min-height: 42px;
-    border-top: 1px solid rgb(255 255 255 / 5%);
     padding: 0 10px 10px 14px;
+  }
+
+  .composer-primary-row {
+    gap: 8px;
+  }
+
+  .composer-actions {
+    flex: 1 1 auto;
+    justify-content: flex-end;
+    gap: 13px;
+  }
+
+  .composer-row-spacer {
+    display: none;
+  }
+
+  .composer-context-row {
+    overflow-x: auto;
+    padding-top: 9px;
+    scrollbar-width: none;
+  }
+
+  .composer-context-row::-webkit-scrollbar {
+    display: none;
   }
 
   .model-picker,
@@ -2477,11 +2531,12 @@ textarea::placeholder {
     max-width: none;
   }
 
-  .composer-bar > .composer-chip:not(.model-picker-button) {
+  .composer-context-row > .composer-chip:nth-of-type(n + 2) {
     display: none;
   }
 
-  .composer-bar .model-picker-button {
+  .composer-bar .model-picker-button,
+  .start-composer-bar .model-picker-button {
     height: 32px;
     border: 0 !important;
     background: transparent !important;
@@ -2491,7 +2546,8 @@ textarea::placeholder {
     font-weight: 800;
   }
 
-  .composer-bar .model-picker-button:hover {
+  .composer-bar .model-picker-button:hover,
+  .start-composer-bar .model-picker-button:hover {
     color: #d8d1ff;
   }
 

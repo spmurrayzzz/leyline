@@ -1457,120 +1457,127 @@ function closePickerMenus() {
               {{ imageSupportWarning }}
             </div>
             <div class="start-composer-bar">
-              <button
-                class="start-project-button"
-                type="button"
-                @click="startProjectPickerOpen = !startProjectPickerOpen"
-              >
-                <span class="start-project-icon">▱</span>
-                <span class="start-project-label">{{ startProjectLabel }}</span>
-                <span class="model-caret">▾</span>
-              </button>
-              <div class="model-picker start-picker">
-                <button
-                  class="composer-chip model-picker-button start-composer-chip"
-                  type="button"
-                  :disabled="switchingModel || availableModels.length === 0"
-                  @click="togglePicker('model')"
-                >
-                  <span class="model-label">{{ currentModelLabel }}</span>
-                  <span class="model-caret">▾</span>
-                </button>
-                <div v-if="modelPickerOpen" class="model-menu">
+              <div class="composer-primary-row">
+                <div class="composer-row-spacer"></div>
+                <div class="composer-actions">
+                  <div class="model-picker start-picker">
+                    <button
+                      class="composer-chip model-picker-button start-composer-chip"
+                      type="button"
+                      :disabled="switchingModel || availableModels.length === 0"
+                      @click="togglePicker('model')"
+                    >
+                      <span class="model-label">{{ currentModelLabel }}</span>
+                      <span class="model-caret">▾</span>
+                    </button>
+                    <div v-if="modelPickerOpen" class="model-menu">
+                      <button
+                        v-for="model in availableModels"
+                        :key="modelKey(model)"
+                        type="button"
+                        :class="{ active: modelKey(model) === selectedModelKey }"
+                        @click="selectModel(model)"
+                      >
+                        <span>{{ modelChip(model) }}</span>
+                        <span v-if="modelKey(model) === selectedModelKey">✓</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="model-picker small-picker start-picker">
+                    <button
+                      class="composer-chip model-picker-button start-composer-chip"
+                      type="button"
+                      :disabled="switchingThinking || !availableThinkingLevels.length"
+                      @click="togglePicker('thinking')"
+                    >
+                      <span class="model-label">{{ currentThinkingLabel }}</span>
+                      <span class="model-caret">▾</span>
+                    </button>
+                    <div v-if="thinkingPickerOpen" class="model-menu small-menu">
+                      <button
+                        v-for="level in availableThinkingLevels"
+                        :key="level"
+                        type="button"
+                        :class="{
+                          active: level === composerRuntime?.state?.thinkingLevel,
+                        }"
+                        @click="selectThinkingLevel(level)"
+                      >
+                        <span>{{ formatMode(level) }}</span>
+                        <span
+                          v-if="level === composerRuntime?.state?.thinkingLevel"
+                        >✓</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="model-picker small-picker start-picker">
+                    <button
+                      class="composer-chip model-picker-button start-composer-chip"
+                      type="button"
+                      :disabled="switchingMode || !activeRuntimeSession"
+                      @click="togglePicker('mode')"
+                    >
+                      <span class="model-label">{{ currentModeLabel }}</span>
+                      <span class="model-caret">▾</span>
+                    </button>
+                    <div v-if="modePickerOpen" class="model-menu mode-menu">
+                      <div class="mode-menu-label">Steering</div>
+                      <button
+                        v-for="value in ['one-at-a-time', 'all']"
+                        :key="`start-steering-${value}`"
+                        type="button"
+                        :class="{
+                          active: value === activeRuntimeSession?.state?.steeringMode,
+                        }"
+                        @click="selectMode('steeringMode', value)"
+                      >
+                        <span>{{ formatMode(value) }}</span>
+                        <span
+                          v-if="value === activeRuntimeSession?.state?.steeringMode"
+                        >✓</span>
+                      </button>
+                      <div class="mode-menu-label">Follow-up</div>
+                      <button
+                        v-for="value in ['one-at-a-time', 'all']"
+                        :key="`start-follow-up-${value}`"
+                        type="button"
+                        :class="{
+                          active: value === activeRuntimeSession?.state?.followUpMode,
+                        }"
+                        @click="selectMode('followUpMode', value)"
+                      >
+                        <span>{{ formatMode(value) }}</span>
+                        <span
+                          v-if="value === activeRuntimeSession?.state?.followUpMode"
+                        >✓</span>
+                      </button>
+                    </div>
+                  </div>
                   <button
-                    v-for="model in availableModels"
-                    :key="modelKey(model)"
-                    type="button"
-                    :class="{ active: modelKey(model) === selectedModelKey }"
-                    @click="selectModel(model)"
-                  >
-                    <span>{{ modelChip(model) }}</span>
-                    <span v-if="modelKey(model) === selectedModelKey">✓</span>
-                  </button>
+                    class="start-send-button"
+                    type="submit"
+                    :disabled="!newSessionCwd.trim() || !!creatingSessionCwd"
+                  >↑</button>
                 </div>
               </div>
-              <div class="model-picker small-picker start-picker">
+              <div class="composer-context-row">
                 <button
-                  class="composer-chip model-picker-button start-composer-chip"
+                  class="start-project-button"
                   type="button"
-                  :disabled="switchingThinking || !availableThinkingLevels.length"
-                  @click="togglePicker('thinking')"
+                  @click="startProjectPickerOpen = !startProjectPickerOpen"
                 >
-                  <span class="model-label">{{ currentThinkingLabel }}</span>
+                  <span class="start-project-icon">▱</span>
+                  <span class="start-project-label">{{ startProjectLabel }}</span>
                   <span class="model-caret">▾</span>
                 </button>
-                <div v-if="thinkingPickerOpen" class="model-menu small-menu">
-                  <button
-                    v-for="level in availableThinkingLevels"
-                    :key="level"
-                    type="button"
-                    :class="{
-                      active: level === composerRuntime?.state?.thinkingLevel,
-                    }"
-                    @click="selectThinkingLevel(level)"
-                  >
-                    <span>{{ formatMode(level) }}</span>
-                    <span
-                      v-if="level === composerRuntime?.state?.thinkingLevel"
-                    >✓</span>
-                  </button>
-                </div>
-              </div>
-              <div class="model-picker small-picker start-picker">
-                <button
-                  class="composer-chip model-picker-button start-composer-chip"
-                  type="button"
-                  :disabled="switchingMode || !activeRuntimeSession"
-                  @click="togglePicker('mode')"
+                <span
+                  v-for="chip in composerChips"
+                  :key="chip"
+                  class="composer-chip start-composer-chip"
                 >
-                  <span class="model-label">{{ currentModeLabel }}</span>
-                  <span class="model-caret">▾</span>
-                </button>
-                <div v-if="modePickerOpen" class="model-menu mode-menu">
-                  <div class="mode-menu-label">Steering</div>
-                  <button
-                    v-for="value in ['one-at-a-time', 'all']"
-                    :key="`start-steering-${value}`"
-                    type="button"
-                    :class="{
-                      active: value === activeRuntimeSession?.state?.steeringMode,
-                    }"
-                    @click="selectMode('steeringMode', value)"
-                  >
-                    <span>{{ formatMode(value) }}</span>
-                    <span
-                      v-if="value === activeRuntimeSession?.state?.steeringMode"
-                    >✓</span>
-                  </button>
-                  <div class="mode-menu-label">Follow-up</div>
-                  <button
-                    v-for="value in ['one-at-a-time', 'all']"
-                    :key="`start-follow-up-${value}`"
-                    type="button"
-                    :class="{
-                      active: value === activeRuntimeSession?.state?.followUpMode,
-                    }"
-                    @click="selectMode('followUpMode', value)"
-                  >
-                    <span>{{ formatMode(value) }}</span>
-                    <span
-                      v-if="value === activeRuntimeSession?.state?.followUpMode"
-                    >✓</span>
-                  </button>
-                </div>
+                  {{ chip }}
+                </span>
               </div>
-              <span
-                v-for="chip in composerChips"
-                :key="chip"
-                class="composer-chip start-composer-chip"
-              >
-                {{ chip }}
-              </span>
-              <button
-                class="start-send-button"
-                type="submit"
-                :disabled="!newSessionCwd.trim() || !!creatingSessionCwd"
-              >↑</button>
             </div>
             <div v-if="startProjectPickerOpen" class="start-project-menu">
               <label>
@@ -1808,144 +1815,151 @@ function closePickerMenus() {
           {{ promptError || eventStreamError || imageSupportWarning }}
         </div>
         <div class="composer-bar">
-          <div class="model-picker">
-            <button
-              class="composer-chip model-picker-button"
-              type="button"
-              :disabled="agentRunning
-                || promptSubmitting
-                || reloadingSession
-                || switchingModel"
-              @click="togglePicker('model')"
-            >
-              <span class="model-label desktop-label">{{ currentModelLabel }}</span>
-              <span class="model-label mobile-label">
-                {{ currentMobileModelLabel }}
-              </span>
-              <span class="model-caret">▾</span>
-            </button>
-            <div v-if="modelPickerOpen" class="model-menu">
+          <div class="composer-primary-row">
+            <div class="composer-row-spacer"></div>
+            <div class="composer-actions">
+              <div class="model-picker">
+                <button
+                  class="composer-chip model-picker-button"
+                  type="button"
+                  :disabled="agentRunning
+                    || promptSubmitting
+                    || reloadingSession
+                    || switchingModel"
+                  @click="togglePicker('model')"
+                >
+                  <span class="model-label desktop-label">{{ currentModelLabel }}</span>
+                  <span class="model-label mobile-label">
+                    {{ currentMobileModelLabel }}
+                  </span>
+                  <span class="model-caret">▾</span>
+                </button>
+                <div v-if="modelPickerOpen" class="model-menu">
+                  <button
+                    v-for="model in availableModels"
+                    :key="modelKey(model)"
+                    type="button"
+                    :class="{ active: modelKey(model) === selectedModelKey }"
+                    @click="selectModel(model)"
+                  >
+                    <span>{{ modelChip(model) }}</span>
+                    <span v-if="modelKey(model) === selectedModelKey">✓</span>
+                  </button>
+                </div>
+              </div>
+              <div class="model-picker small-picker">
+                <button
+                  class="composer-chip model-picker-button"
+                  type="button"
+                  :disabled="agentRunning
+                    || promptSubmitting
+                    || reloadingSession
+                    || switchingThinking"
+                  @click="togglePicker('thinking')"
+                >
+                  <span class="model-label desktop-label">
+                    {{ currentThinkingLabel }}
+                  </span>
+                  <span class="model-label mobile-label">
+                    {{ currentMobileThinkingLabel }}
+                  </span>
+                  <span class="model-caret">▾</span>
+                </button>
+                <div v-if="thinkingPickerOpen" class="model-menu small-menu">
+                  <button
+                    v-for="level in availableThinkingLevels"
+                    :key="level"
+                    type="button"
+                    :class="{
+                      active: level === composerRuntime?.state?.thinkingLevel,
+                    }"
+                    @click="selectThinkingLevel(level)"
+                  >
+                    <span>{{ formatMode(level) }}</span>
+                    <span
+                      v-if="level === composerRuntime?.state?.thinkingLevel"
+                    >
+                      ✓
+                    </span>
+                  </button>
+                </div>
+              </div>
+              <div class="model-picker small-picker">
+                <button
+                  class="composer-chip model-picker-button"
+                  type="button"
+                  :disabled="agentRunning
+                    || promptSubmitting
+                    || reloadingSession
+                    || switchingMode"
+                  @click="togglePicker('mode')"
+                >
+                  <span class="model-label desktop-label">{{ currentModeLabel }}</span>
+                  <span class="model-label mobile-label">
+                    {{ currentMobileModeLabel }}
+                  </span>
+                  <span class="model-caret">▾</span>
+                </button>
+                <div v-if="modePickerOpen" class="model-menu mode-menu">
+                  <div class="mode-menu-label">Steering</div>
+                  <button
+                    v-for="value in ['one-at-a-time', 'all']"
+                    :key="`steering-${value}`"
+                    type="button"
+                    :class="{
+                      active: value === activeRuntimeSession?.state?.steeringMode,
+                    }"
+                    @click="selectMode('steeringMode', value)"
+                  >
+                    <span>{{ formatMode(value) }}</span>
+                    <span
+                      v-if="value === activeRuntimeSession?.state?.steeringMode"
+                    >
+                      ✓
+                    </span>
+                  </button>
+                  <div class="mode-menu-label">Follow-up</div>
+                  <button
+                    v-for="value in ['one-at-a-time', 'all']"
+                    :key="`follow-up-${value}`"
+                    type="button"
+                    :class="{
+                      active: value === activeRuntimeSession?.state?.followUpMode,
+                    }"
+                    @click="selectMode('followUpMode', value)"
+                  >
+                    <span>{{ formatMode(value) }}</span>
+                    <span
+                      v-if="value === activeRuntimeSession?.state?.followUpMode"
+                    >
+                      ✓
+                    </span>
+                  </button>
+                </div>
+              </div>
               <button
-                v-for="model in availableModels"
-                :key="modelKey(model)"
-                type="button"
-                :class="{ active: modelKey(model) === selectedModelKey }"
-                @click="selectModel(model)"
+                class="send-button"
+                :class="{ 'stop-button': agentRunning }"
+                :type="agentRunning ? 'button' : 'submit'"
+                :disabled="agentRunning
+                  ? interrupting
+                  : promptSubmitting || reloadingSession || !canSubmitDraft"
+                :title="agentRunning ? 'Stop Leyline' : 'Send message'"
+                @click="agentRunning && interruptAgent()"
               >
-                <span>{{ modelChip(model) }}</span>
-                <span v-if="modelKey(model) === selectedModelKey">✓</span>
+                {{ sendButtonLabel }}
               </button>
             </div>
           </div>
-          <div class="model-picker small-picker">
-            <button
-              class="composer-chip model-picker-button"
-              type="button"
-              :disabled="agentRunning
-                || promptSubmitting
-                || reloadingSession
-                || switchingThinking"
-              @click="togglePicker('thinking')"
+          <div class="composer-context-row">
+            <span
+              v-for="chip in composerChips"
+              :key="chip"
+              class="composer-chip"
             >
-              <span class="model-label desktop-label">
-                {{ currentThinkingLabel }}
-              </span>
-              <span class="model-label mobile-label">
-                {{ currentMobileThinkingLabel }}
-              </span>
-              <span class="model-caret">▾</span>
-            </button>
-            <div v-if="thinkingPickerOpen" class="model-menu small-menu">
-              <button
-                v-for="level in availableThinkingLevels"
-                :key="level"
-                type="button"
-                :class="{
-                  active: level === composerRuntime?.state?.thinkingLevel,
-                }"
-                @click="selectThinkingLevel(level)"
-              >
-                <span>{{ formatMode(level) }}</span>
-                <span
-                  v-if="level === composerRuntime?.state?.thinkingLevel"
-                >
-                  ✓
-                </span>
-              </button>
-            </div>
+              {{ chip }}
+            </span>
           </div>
-          <div class="model-picker small-picker">
-            <button
-              class="composer-chip model-picker-button"
-              type="button"
-              :disabled="agentRunning
-                || promptSubmitting
-                || reloadingSession
-                || switchingMode"
-              @click="togglePicker('mode')"
-            >
-              <span class="model-label desktop-label">{{ currentModeLabel }}</span>
-              <span class="model-label mobile-label">
-                {{ currentMobileModeLabel }}
-              </span>
-              <span class="model-caret">▾</span>
-            </button>
-            <div v-if="modePickerOpen" class="model-menu mode-menu">
-              <div class="mode-menu-label">Steering</div>
-              <button
-                v-for="value in ['one-at-a-time', 'all']"
-                :key="`steering-${value}`"
-                type="button"
-                :class="{
-                  active: value === activeRuntimeSession?.state?.steeringMode,
-                }"
-                @click="selectMode('steeringMode', value)"
-              >
-                <span>{{ formatMode(value) }}</span>
-                <span
-                  v-if="value === activeRuntimeSession?.state?.steeringMode"
-                >
-                  ✓
-                </span>
-              </button>
-              <div class="mode-menu-label">Follow-up</div>
-              <button
-                v-for="value in ['one-at-a-time', 'all']"
-                :key="`follow-up-${value}`"
-                type="button"
-                :class="{
-                  active: value === activeRuntimeSession?.state?.followUpMode,
-                }"
-                @click="selectMode('followUpMode', value)"
-              >
-                <span>{{ formatMode(value) }}</span>
-                <span
-                  v-if="value === activeRuntimeSession?.state?.followUpMode"
-                >
-                  ✓
-                </span>
-              </button>
-            </div>
-          </div>
-          <span
-            v-for="chip in composerChips"
-            :key="chip"
-            class="composer-chip"
-          >
-            {{ chip }}
-          </span>
-          <button
-            class="send-button"
-            :class="{ 'stop-button': agentRunning }"
-            :type="agentRunning ? 'button' : 'submit'"
-            :disabled="agentRunning
-              ? interrupting
-              : promptSubmitting || reloadingSession || !canSubmitDraft"
-            :title="agentRunning ? 'Stop Leyline' : 'Send message'"
-            @click="agentRunning && interruptAgent()"
-          >
-            {{ sendButtonLabel }}
-          </button>
         </div>
       </form>
     </section>
