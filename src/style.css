@@ -1226,6 +1226,8 @@ h1 {
 }
 
 .start-composer-chip {
+  flex: 1 1 0;
+  min-width: 0;
   height: 28px;
   border-color: #312d3d;
   background: #1a1722;
@@ -1234,10 +1236,13 @@ h1 {
 }
 
 .start-picker {
+  flex: 1 1 0;
+  min-width: 0;
   max-width: 150px;
 }
 
 .start-picker .model-picker-button {
+  width: 100%;
   max-width: 150px;
 }
 
@@ -1251,8 +1256,10 @@ h1 {
 
 .start-project-button {
   display: inline-flex;
+  flex: 1.2 1 0;
   align-items: center;
   gap: 8px;
+  min-width: 0;
   max-width: 190px;
   height: 28px;
   border-color: #312d3d;
