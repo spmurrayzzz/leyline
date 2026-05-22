@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import PierrePreview from './components/PierrePreview.vue'
 import ProjectBrowser from './components/ProjectBrowser.vue'
+import SessionSidebar from './components/SessionSidebar.vue'
 import { useRuntimeEvents } from './composables/useRuntimeEvents'
 import { useTerminal } from './composables/useTerminal'
 import { fuzzyScore, highlightedText as highlightFuzzyText } from './lib/fuzzy'
@@ -12,7 +13,6 @@ import {
   modeChip,
   modelChip,
   projectName,
-  sessionTime,
   toolLabel,
   toolTarget,
 } from './lib/format'
@@ -1243,139 +1243,31 @@ function closePickerMenus() {
       @select="createSessionForCwd"
     />
 
-    <aside class="sidebar">
-      <div class="brand-row">
-        <button
-          class="brand-home"
-          type="button"
-          aria-label="Go to home"
-          @click="navigateHome"
-        >
-          <img class="brand-mark" src="/favicon.svg" alt="" />
-          <span class="brand-name">
-            <strong>Leyline</strong>
-          </span>
-        </button>
-        <button
-          class="sidebar-collapse-button"
-          type="button"
-          aria-label="Hide sessions"
-          @click="desktopSidebarHidden = true"
-        >‹</button>
-      </div>
-
-      <label class="search-field">
-        <span>⌕</span>
-        <input v-model="sessionQuery" placeholder="Search sessions" />
-      </label>
-
-      <section class="sidebar-section">
-        <div class="section-header">
-          <span>Sessions</span>
-          <button
-            type="button"
-            class="section-action"
-            title="New session"
-            @click="openProjectBrowser()"
-          >＋</button>
-        </div>
-
-        <div v-if="sessionsLoading" class="sidebar-skeleton">
-          <div v-for="index in 3" :key="index" class="skeleton-project">
-            <div class="skeleton-line skeleton-title"></div>
-            <div class="skeleton-line"></div>
-            <div class="skeleton-line short"></div>
-          </div>
-        </div>
-        <div v-else-if="sessionsError" class="sidebar-note error-note">
-          {{ sessionsError }}
-          <button type="button" @click="loadSessions()">Retry</button>
-        </div>
-        <div v-else-if="visibleProjects.length === 0" class="sidebar-note">
-          No sessions found
-        </div>
-
-        <div
-          v-for="project in visibleProjects"
-          v-else
-          :key="project.cwd"
-          class="project"
-        >
-          <div class="project-title">
-            <button @click="toggleProject(project)">
-              <span class="project-label">
-                <span
-                  class="project-caret"
-                  :class="{ expanded: isProjectExpanded(project) }"
-                >›</span>
-                <span v-html="highlightedText(project.name)"></span>
-              </span>
-              <time>{{ project.sessions.length }}</time>
-            </button>
-            <button
-              class="new-session-button"
-              :disabled="creatingSessionCwd === project.cwd"
-              title="New session"
-              @click="createSession(project)"
-            >
-              +
-            </button>
-          </div>
-
-          <template v-if="isProjectExpanded(project)">
-            <div
-              v-for="session in project.sessions.slice(0, 5)"
-              :key="session.path || session.id"
-              class="session"
-              :class="{ active: session.id === selectedSessionId }"
-              role="button"
-              tabindex="0"
-              @click="selectSession(session)"
-              @keydown.enter="selectSession(session)"
-              @keydown.space.prevent="selectSession(session)"
-            >
-              <span v-html="highlightedText(sessionTitle(session))"></span>
-              <time>{{ sessionTime(session) }}</time>
-              <button
-                class="session-delete-button"
-                type="button"
-                title="Delete session"
-                aria-label="Delete session"
-                :disabled="deletingSessionId === session.id"
-                @click.stop="requestDeleteSession(session)"
-              >
-                <span v-if="deletingSessionId === session.id">…</span>
-                <svg v-else viewBox="0 0 16 16" aria-hidden="true">
-                  <path d="M3.5 4.5h9"></path>
-                  <path d="M6.5 4.5v-2h3v2"></path>
-                  <path d="M5 6.5l.5 6h5l.5-6"></path>
-                  <path d="M7 7.5v4"></path>
-                  <path d="M9 7.5v4"></path>
-                </svg>
-              </button>
-            </div>
-          </template>
-        </div>
-      </section>
-
-      <div class="sidebar-actions">
-        <button
-          class="settings-button"
-          type="button"
-          title="Reload runtime"
-          aria-label="Reload runtime"
-          :disabled="!selectedSession || agentRunning || reloadingSession"
-          @click="reloadSession"
-        >{{ reloadingSession ? '…' : '↻' }}</button>
-        <button
-          class="settings-button"
-          type="button"
-          title="Settings"
-          aria-label="Open settings"
-          @click="settingsOpen = true"
-        >⚙</button>
-      </div>
-    </aside>
+    <SessionSidebar
+      v-model:query="sessionQuery"
+      :agent-running="agentRunning"
+      :creating-session-cwd="creatingSessionCwd"
+      :deleting-session-id="deletingSessionId"
+      :expanded-project="isProjectExpanded"
+      :highlighted-text="highlightedText"
+      :reloading-session="reloadingSession"
+      :selected-session="selectedSession"
+      :selected-session-id="selectedSessionId"
+      :session-title="sessionTitle"
+      :sessions-error="sessionsError"
+      :sessions-loading="sessionsLoading"
+      :visible-projects="visibleProjects"
+      @create-session="createSession"
+      @hide="desktopSidebarHidden = true"
+      @navigate-home="navigateHome"
+      @open-project-browser="openProjectBrowser"
+      @open-settings="settingsOpen = true"
+      @reload-session="reloadSession"
+      @request-delete-session="requestDeleteSession"
+      @retry-sessions="loadSessions"
+      @select-session="selectSession"
+      @toggle-project="toggleProject"
+    />
 
     <section class="main-pane">
       <header v-if="initializing || selectedSession" class="topbar">
