@@ -1456,11 +1456,15 @@ h1 {
   display: grid;
   gap: 3px;
   width: 300px;
+  max-height: min(360px, 34dvh);
+  overflow-y: auto;
   border: 1px solid #312d3d;
   border-radius: 14px;
   background: #111018;
   padding: 10px;
   box-shadow: 0 18px 60px rgb(0 0 0 / 45%);
+  scrollbar-color: #4b4658 transparent;
+  scrollbar-width: thin;
 }
 
 .start-project-menu label {
