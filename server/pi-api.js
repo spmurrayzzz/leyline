@@ -1063,6 +1063,8 @@ function toMessageEntryDto(entry, toolCalls) {
       type: 'tool',
       label: annotation.label,
       code: annotation.code,
+      toolCallId: message.toolCallId,
+      toolName: message.toolName,
       text: preview ? text : truncate(text, 900),
       preview,
       isError: message.isError,
@@ -1078,6 +1080,7 @@ function toMessageEntryDto(entry, toolCalls) {
       type: 'tool',
       label: 'Bash',
       code: message.command,
+      toolName: 'bash',
       text: bashPreview(message.output || '')
         ? message.output || ''
         : truncate(message.output || '', 900),
@@ -1089,13 +1092,16 @@ function toMessageEntryDto(entry, toolCalls) {
     }
   }
 
+  const blocks = messageBlocks(message.content)
+  if (message.role === 'assistant' && !blocks.length) return undefined
+
   return {
     id: entry.id,
     type: 'message',
     role: message.role,
     label: labelForRole(message.role),
     text,
-    blocks: messageBlocks(message.content),
+    blocks,
     timestamp: entry.timestamp,
   }
 }

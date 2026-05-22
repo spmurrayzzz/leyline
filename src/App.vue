@@ -95,6 +95,8 @@ const agentRunning = ref(false)
 const liveActivity = ref('')
 const liveAssistantText = ref('')
 const liveAssistantBlocks = ref([])
+const liveAssistantMessages = ref([])
+const liveTools = ref([])
 const stickToBottom = ref(true)
 const hasNewOutput = ref(false)
 const {
@@ -108,7 +110,14 @@ const {
 } = useTerminal()
 let refreshTimer
 let scrollFrame
+let liveAssistantFrame
+let liveToolSeq = 0
+let liveItemSeq = 0
+let activeLiveAssistantId = ''
+let pendingAssistantEvent
 let copiedTimer
+const liveToolSettleTimers = new Map()
+const liveToolVisualFloorMs = 450
 
 const visibleProjects = computed(() => {
   const projects = new Map()
@@ -147,10 +156,37 @@ const visibleProjects = computed(() => {
 })
 const selectedSession = computed(() => sessionDetail.value?.session)
 const initializing = computed(() => sessionsLoading.value && !selectedSession.value)
-const entries = computed(() => [
+const rawEntries = computed(() => [
   ...(sessionDetail.value?.entries || []),
   ...localEntries.value,
 ])
+const liveItems = computed(() => [
+  ...liveAssistantMessages.value,
+  ...liveTools.value,
+  liveActivity.value ? {
+    id: 'live-activity',
+    seq: Number.MAX_SAFE_INTEGER,
+    type: 'activity',
+    text: liveActivity.value,
+  } : null,
+].filter(Boolean).sort((a, b) => a.seq - b.seq))
+const liveTurnActive = computed(() => {
+  return agentRunning.value
+    || liveTools.value.length > 0
+    || liveAssistantMessages.value.length > 0
+    || Boolean(liveActivity.value)
+})
+const entries = computed(() => {
+  let list = rawEntries.value
+  if (liveTurnActive.value) {
+    const lastUser = list.findLastIndex((entry) => entry.role === 'user')
+    if (lastUser >= 0) list = list.slice(0, lastUser + 1)
+  }
+
+  return list.filter((entry) => {
+    return isRenderableEntry(entry) && !isCoveredByLiveTool(entry)
+  })
+})
 const {
   appendRuntimeEvent,
   closeEventStream,
@@ -175,6 +211,7 @@ const {
 
     agentRunning.value = isRunningEvent(data.event)
     liveActivity.value = activityText(data.event)
+    updateLiveTool(data.event)
     updateLiveAssistant(data.event)
     surfaceRuntimeError(data.event)
     scheduleLiveScroll(data.activeSessionId)
@@ -329,7 +366,9 @@ onUnmounted(() => {
   closeTerminalPanel()
   clearTimeout(refreshTimer)
   clearTimeout(copiedTimer)
+  clearLiveToolSettleTimers()
   cancelAnimationFrame(scrollFrame)
+  cancelAnimationFrame(liveAssistantFrame)
 })
 
 async function loadSessions({
@@ -403,9 +442,7 @@ async function createSessionForCwd(cwd) {
     expandedSkills.value = new Set()
     localEntries.value = []
     editingEntry.value = null
-    liveActivity.value = ''
-    liveAssistantText.value = ''
-    liveAssistantBlocks.value = []
+    resetLiveState()
     expandProject(targetCwd)
     newSessionCwd.value = ''
     projectBrowserOpen.value = false
@@ -435,9 +472,7 @@ async function selectSession(session, options = {}) {
     expandedSkills.value = new Set()
     localEntries.value = []
     editingEntry.value = null
-    liveActivity.value = ''
-    liveAssistantText.value = ''
-    liveAssistantBlocks.value = []
+    resetLiveState()
     expandProject(session.cwd)
     stickToBottom.value = true
     hasNewOutput.value = false
@@ -495,9 +530,19 @@ function clearSelectedSession() {
   expandedSkills.value = new Set()
   localEntries.value = []
   editingEntry.value = null
+  resetLiveState()
+}
+
+function resetLiveState() {
   liveActivity.value = ''
   liveAssistantText.value = ''
   liveAssistantBlocks.value = []
+  liveAssistantMessages.value = []
+  liveTools.value = []
+  activeLiveAssistantId = ''
+  pendingAssistantEvent = undefined
+  clearLiveToolSettleTimers()
+  cancelAnimationFrame(liveAssistantFrame)
 }
 
 function navigateHome() {
@@ -519,10 +564,7 @@ function scheduleSessionRefresh(activeSessionId, event) {
       sessionDetail.value = detail
       reconcileLocalEntries(detail)
       updateSelectedSessionSummary(detail.session)
-      if (shouldClearLiveAssistant(event)) {
-        liveAssistantText.value = ''
-        liveAssistantBlocks.value = []
-      }
+      reconcileLiveTools(detail)
       if (wasStuck) await scrollToLatest()
       else hasNewOutput.value = true
     } catch (error) {
@@ -566,11 +608,9 @@ function activityText(event) {
     return 'Writing response…'
   }
   if (type === 'message_update') return ''
-  if (type === 'tool_call') return `Preparing ${toolLabel(event.toolName)}…`
-  if (type === 'tool_execution_start') {
-    return `Running ${toolLabel(event.toolName)}${toolTarget(event.args)}`
-  }
-  if (type === 'tool_execution_end') return 'Reading result…'
+  if (type === 'tool_call') return ''
+  if (type === 'tool_execution_start') return ''
+  if (type === 'tool_execution_end') return ''
   if (type === 'agent_end' || type === 'error' || type === 'aborted') return ''
   return liveActivity.value
 }
@@ -580,25 +620,231 @@ function surfaceRuntimeError(event) {
   promptError.value = event.error?.message || event.message || 'Runtime error'
 }
 
-function updateLiveAssistant(event) {
-  if (event?.type === 'message_update' && event.message?.role === 'assistant') {
-    liveAssistantBlocks.value = messageBlocks(event.message.content)
-    liveAssistantText.value = textFromBlocks(liveAssistantBlocks.value)
+function updateLiveTool(event) {
+  const type = event?.type || ''
+
+  if (type === 'tool_call') {
+    upsertLiveTool(event, 'preparing')
     return
   }
 
-  if (['error', 'aborted'].includes(event?.type)) {
-    liveAssistantText.value = ''
-    liveAssistantBlocks.value = []
+  if (type === 'tool_execution_start') {
+    upsertLiveTool(event, 'running')
+    return
+  }
+
+  if (type === 'tool_execution_end') {
+    upsertLiveTool(event, event.error || event.isError ? 'error' : 'reading')
+    return
+  }
+
+  if (type === 'agent_end') finishLiveTools('completed')
+  if (type === 'error') finishLiveTools('error')
+  if (type === 'aborted') finishLiveTools('aborted')
+}
+
+function upsertLiveTool(event, status) {
+  const key = liveToolKey(event)
+  const existing = findLiveTool(event, key)
+  const id = existing?.id || key || `live-tool-${++liveToolSeq}`
+  const now = Date.now()
+  const next = {
+    id,
+    seq: existing?.seq || ++liveItemSeq,
+    type: 'tool',
+    toolCallId: event.toolCallId || event.id || event.callId || '',
+    toolName: event.toolName || 'tool',
+    label: toolLabel(event.toolName),
+    code: liveToolCode(event) || existing?.code || '',
+    status,
+    startedAt: existing?.startedAt || now,
+  }
+
+  if (existing) {
+    liveTools.value = liveTools.value.map((tool) => {
+      return tool.id === existing.id ? { ...tool, ...next } : tool
+    })
+    return
+  }
+
+  liveTools.value = [...liveTools.value, next]
+}
+
+function findLiveTool(event, key) {
+  if (key) {
+    const keyed = liveTools.value.find((tool) => tool.toolCallId === key)
+    if (keyed) return keyed
+  }
+
+  const toolName = event.toolName || 'tool'
+  const code = liveToolCode(event)
+  return [...liveTools.value].reverse().find((tool) => {
+    if (tool.toolName !== toolName) return false
+    if (tool.toolCallId) return false
+    if (code && tool.code && tool.code !== code) return false
+    return !['completed', 'error', 'aborted'].includes(tool.status)
+  })
+}
+
+function liveToolKey(event) {
+  return event.toolCallId || event.id || event.callId || ''
+}
+
+function liveToolCode(event) {
+  const args = event.args || event.input || {}
+  return args.command || args.path || ''
+}
+
+function liveToolStatus(tool) {
+  if (tool.status === 'preparing') return 'preparing'
+  if (tool.status === 'running') return 'running'
+  if (tool.status === 'reading') return 'reading result'
+  if (tool.status === 'error') return 'error'
+  if (tool.status === 'aborted') return 'aborted'
+  return 'completed'
+}
+
+function finishLiveTools(status) {
+  liveTools.value = liveTools.value.map((tool) => {
+    if (tool.persistedEntry) return tool
+    return { ...tool, status }
+  })
+}
+
+function reconcileLiveTools(detail) {
+  const persisted = (detail.entries || []).filter((entry) => {
+    return entry.type === 'tool'
+  })
+
+  liveTools.value = liveTools.value.map((tool) => {
+    const entry = persisted.find((item) => liveToolMatchesEntry(tool, item))
+    if (!entry) return tool
+    if (!liveToolFloorElapsed(tool)) {
+      scheduleLiveToolSettle(tool.id)
+      return { ...tool, persistedEntry: entry }
+    }
+    return settledLiveTool(tool, entry)
+  })
+}
+
+function liveToolFloorElapsed(tool) {
+  return Date.now() - (tool.startedAt || 0) >= liveToolVisualFloorMs
+}
+
+function scheduleLiveToolSettle(id) {
+  if (liveToolSettleTimers.has(id)) return
+  const tool = liveTools.value.find((item) => item.id === id)
+  const remaining = Math.max(
+    0,
+    liveToolVisualFloorMs - (Date.now() - (tool?.startedAt || 0)),
+  )
+  const timer = setTimeout(() => {
+    liveToolSettleTimers.delete(id)
+    settleLiveTool(id)
+  }, remaining)
+  liveToolSettleTimers.set(id, timer)
+}
+
+function settleLiveTool(id) {
+  liveTools.value = liveTools.value.map((tool) => {
+    if (tool.id !== id || !tool.persistedEntry) return tool
+    return settledLiveTool(tool, tool.persistedEntry)
+  })
+}
+
+function settledLiveTool(tool, entry) {
+  return {
+    ...tool,
+    label: entry.label || tool.label,
+    code: entry.code || tool.code,
+    status: entry.isError ? 'error' : 'completed',
+    persistedEntry: entry,
   }
 }
 
-function shouldClearLiveAssistant(event) {
-  if (event?.type === 'message_end' && event.message?.role === 'assistant') {
-    return true
+function clearLiveToolSettleTimers() {
+  for (const timer of liveToolSettleTimers.values()) clearTimeout(timer)
+  liveToolSettleTimers.clear()
+}
+
+function isRenderableEntry(entry) {
+  if (entry.type !== 'message') return true
+  if (entry.role !== 'assistant') return true
+  return Boolean(entry.blocks?.length || entry.text?.trim())
+}
+
+function isCoveredByLiveTool(entry) {
+  if (entry.type !== 'tool') return false
+  return liveTools.value.some((tool) => liveToolMatchesEntry(tool, entry))
+}
+
+function liveToolMatchesEntry(tool, entry) {
+  if (tool.toolCallId && entry.toolCallId) {
+    return tool.toolCallId === entry.toolCallId
   }
 
-  return event?.type === 'agent_end'
+  if (tool.toolName && entry.toolName && tool.toolName !== entry.toolName) {
+    return false
+  }
+
+  if (tool.code && entry.code) return tool.code === entry.code
+  return Boolean(tool.toolName && entry.toolName)
+}
+
+function updateLiveAssistant(event) {
+  if (event?.type === 'message_start') activeLiveAssistantId = ''
+
+  if (event?.type === 'message_update' && event.message?.role === 'assistant') {
+    pendingAssistantEvent = event
+    cancelAnimationFrame(liveAssistantFrame)
+    liveAssistantFrame = requestAnimationFrame(flushLiveAssistant)
+    return
+  }
+
+  if (event?.type === 'message_end' && event.message?.role === 'assistant') {
+    activeLiveAssistantId = ''
+  }
+
+  if (['error', 'aborted'].includes(event?.type)) clearLiveAssistant()
+}
+
+function flushLiveAssistant() {
+  const event = pendingAssistantEvent
+  pendingAssistantEvent = undefined
+  if (!event) return
+  const blocks = messageBlocks(event.message.content)
+  if (!blocks.length) return
+  const text = textFromBlocks(blocks)
+  const id = activeLiveAssistantId || `live-assistant-${++liveItemSeq}`
+  activeLiveAssistantId = id
+  const existing = liveAssistantMessages.value.find((item) => item.id === id)
+  const next = {
+    id,
+    seq: existing?.seq || liveItemSeq,
+    type: 'assistant',
+    blocks,
+    text,
+  }
+
+  if (existing) {
+    liveAssistantMessages.value = liveAssistantMessages.value.map((item) => {
+      return item.id === id ? next : item
+    })
+  } else {
+    liveAssistantMessages.value = [...liveAssistantMessages.value, next]
+  }
+
+  liveAssistantBlocks.value = blocks
+  liveAssistantText.value = text
+}
+
+function clearLiveAssistant() {
+  pendingAssistantEvent = undefined
+  cancelAnimationFrame(liveAssistantFrame)
+  liveAssistantText.value = ''
+  liveAssistantBlocks.value = []
+  liveAssistantMessages.value = []
+  activeLiveAssistantId = ''
 }
 
 async function activateSession(session) {
@@ -722,8 +968,8 @@ function splitDiffLines(text) {
   return text.replace(/\n$/, '').split('\n')
 }
 
-function liveAssistantCopyText() {
-  return liveAssistantBlocks.value.map((block) => block.text).join('\n\n')
+function liveAssistantCopyText(blocks = liveAssistantBlocks.value) {
+  return blocks.map((block) => block.text).join('\n\n')
 }
 
 async function copyEntry(entry) {
@@ -764,7 +1010,11 @@ function copyGlyph(id) {
 
 function scheduleLiveScroll(activeSessionId) {
   if (activeSessionId !== selectedSessionId.value) return
-  if (!liveAssistantText.value && !liveActivity.value) return
+  if (!liveAssistantMessages.value.length
+    && !liveActivity.value
+    && !liveTools.value.length) {
+    return
+  }
 
   if (!stickToBottom.value) {
     hasNewOutput.value = true
@@ -807,6 +1057,10 @@ async function submitDraft() {
 
   const editing = editingEntry.value
   const previousDetail = sessionDetail.value
+  liveAssistantMessages.value = []
+  liveTools.value = []
+  activeLiveAssistantId = ''
+  clearLiveToolSettleTimers()
   const localEntry = pendingUserEntry(text, images)
   if (editing) trimSessionToEntry(editing.id)
   localEntries.value = [...localEntries.value, localEntry]
@@ -829,9 +1083,7 @@ async function submitDraft() {
       return entry.id !== localEntry.id
     })
     promptError.value = error.message
-    liveActivity.value = ''
-    liveAssistantText.value = ''
-    liveAssistantBlocks.value = []
+    resetLiveState()
   } finally {
     promptSubmitting.value = false
   }
@@ -920,9 +1172,7 @@ async function forkSession(entry) {
     expandedSkills.value = new Set()
     localEntries.value = []
     editingEntry.value = null
-    liveActivity.value = ''
-    liveAssistantText.value = ''
-    liveAssistantBlocks.value = []
+    resetLiveState()
     expandProject(data.detail.session.cwd)
     updateSessionRoute(data.detail.session.id)
     stickToBottom.value = true
@@ -1529,16 +1779,38 @@ function closePickerMenus() {
           />
         </template>
 
-        <LiveAssistantMessage
-          :blocks="liveAssistantBlocks"
-          :copied-entry-id="copiedEntryId"
-          @copy="copyTranscriptItem('live-assistant', liveAssistantCopyText())"
-        />
+        <TransitionGroup name="live-row" tag="div" class="live-stack">
+          <div v-for="item in liveItems" :key="item.id" class="live-item">
+            <article
+              v-if="item.type === 'tool'"
+              class="tool-card transcript-tool live-tool-card"
+              :class="{
+                'is-running': item.status === 'running',
+                'is-completed': item.status === 'completed',
+                'error-card': item.status === 'error',
+              }"
+            >
+              <div class="tool-card-header">
+                <span class="live-tool-spinner"></span>
+                <span>{{ item.label }}</span>
+                <code v-if="item.code">{{ item.code }}</code>
+                <em>{{ liveToolStatus(item) }}</em>
+              </div>
+            </article>
 
-        <div v-if="liveActivity" class="event-row live-activity">
-          <span>Live</span>
-          <strong>{{ liveActivity }}</strong>
-        </div>
+            <LiveAssistantMessage
+              v-else-if="item.type === 'assistant'"
+              :blocks="item.blocks"
+              :copied-entry-id="copiedEntryId"
+              @copy="copyTranscriptItem(item.id, liveAssistantCopyText(item.blocks))"
+            />
+
+            <div v-else class="live-status-card">
+              <span></span>
+              <strong>{{ item.text }}</strong>
+            </div>
+          </div>
+        </TransitionGroup>
       </div>
 
       <button
