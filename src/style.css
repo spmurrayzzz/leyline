@@ -1217,6 +1217,73 @@ h1 {
   color: #605b6c;
 }
 
+.slash-picker {
+  position: absolute;
+  right: 10px;
+  bottom: calc(100% + 10px);
+  left: 10px;
+  z-index: 25;
+  overflow-x: hidden;
+  overflow-y: auto;
+  max-height: min(420px, calc(100vh - 140px));
+  border: 1px solid #342f42;
+  border-radius: 16px;
+  background: #111018;
+  box-shadow: 0 20px 70px rgb(0 0 0 / 50%);
+}
+
+.slash-picker button {
+  display: grid;
+  grid-template-columns: minmax(120px, 180px) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 10px 12px;
+  color: var(--muted-strong);
+  font-size: 12px;
+  text-align: left;
+}
+
+.slash-picker button:hover,
+.slash-picker button.active {
+  background: #201a32;
+  color: var(--text);
+}
+
+.slash-command-name {
+  overflow: hidden;
+  color: #d7cffd;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slash-command-description {
+  overflow: hidden;
+  color: var(--muted-strong);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slash-command-source {
+  border: 1px solid #302b3b;
+  border-radius: 999px;
+  padding: 4px 7px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.start-composer .slash-picker {
+  top: calc(100% + 10px);
+  bottom: auto;
+}
+
 .attachment-tray {
   display: flex;
   flex-wrap: wrap;

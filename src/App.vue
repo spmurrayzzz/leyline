@@ -89,6 +89,8 @@ const deleteConfirmSession = ref(null)
 const modelPickerOpen = ref(false)
 const thinkingPickerOpen = ref(false)
 const modePickerOpen = ref(false)
+const slashActiveIndex = ref(0)
+const slashPickerDismissed = ref(false)
 const promptError = ref('')
 const agentRunning = ref(false)
 const liveActivity = ref('')
@@ -276,9 +278,36 @@ const sendButtonLabel = computed(() => {
   if (promptSubmitting.value || reloadingSession.value) return '…'
   return '↑'
 })
+const slashQuery = computed(() => {
+  const match = draft.value.match(/^\/([^\s]*)$/)
+  return match ? match[1].toLowerCase() : ''
+})
+const slashPickerOpen = computed(() => {
+  return !slashPickerDismissed.value
+    && /^\/[^\s]*$/.test(draft.value)
+    && slashCommandItems.value.length > 0
+})
+const slashCommands = computed(() => {
+  return composerRuntime.value?.state?.slashCommands || []
+})
+const slashCommandItems = computed(() => {
+  const query = slashQuery.value
+  return slashCommands.value
+    .map((command) => ({
+      ...command,
+      score: query ? slashCommandScore(command, query) : 1,
+    }))
+    .filter((command) => command.score > 0)
+    .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))
+    .slice(0, 8)
+})
 
 watch(newSessionCwd, (cwd) => {
   loadStartRuntimeState(cwd)
+})
+
+watch(slashCommandItems, () => {
+  slashActiveIndex.value = 0
 })
 
 onMounted(async () => {
@@ -991,6 +1020,67 @@ function modelKey(model) {
   return JSON.stringify([model.provider, model.id])
 }
 
+function slashCommandScore(command, query) {
+  return Math.max(
+    fuzzyScore(command.name, query),
+    fuzzyScore(command.description || '', query),
+  )
+}
+
+function slashCommandSourceLabel(source) {
+  if (source === 'prompt') return 'Prompt'
+  if (source === 'skill') return 'Skill'
+  if (source === 'extension') return 'Command'
+  return 'Command'
+}
+
+function selectSlashCommand(command) {
+  if (!command?.name) return
+  draft.value = `/${command.name} `
+  slashActiveIndex.value = 0
+  slashPickerDismissed.value = true
+}
+
+function showSlashPicker() {
+  slashPickerDismissed.value = false
+}
+
+function handleSlashPickerKeydown(event) {
+  if (!slashPickerOpen.value) return false
+
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    slashPickerDismissed.value = true
+    return true
+  }
+
+  if (!slashCommandItems.value.length) return false
+
+  if (event.key === 'ArrowDown') {
+    event.preventDefault()
+    slashActiveIndex.value = (
+      slashActiveIndex.value + 1
+    ) % slashCommandItems.value.length
+    return true
+  }
+
+  if (event.key === 'ArrowUp') {
+    event.preventDefault()
+    slashActiveIndex.value = (
+      slashActiveIndex.value - 1 + slashCommandItems.value.length
+    ) % slashCommandItems.value.length
+    return true
+  }
+
+  if (event.key === 'Tab' || event.key === 'Enter') {
+    event.preventDefault()
+    selectSlashCommand(slashCommandItems.value[slashActiveIndex.value])
+    return true
+  }
+
+  return false
+}
+
 function clampThinkingLevel(level, levels) {
   if (!levels.length) return 'off'
   if (levels.includes(level)) return level
@@ -1009,6 +1099,7 @@ function clampThinkingLevel(level, levels) {
 }
 
 function handleComposerKeydown(event) {
+  if (handleSlashPickerKeydown(event)) return
   if (event.key !== 'Enter' || event.shiftKey) return
   event.preventDefault()
   submitDraft()
@@ -1056,6 +1147,7 @@ function fileToImageContent(file) {
 }
 
 function handleStartComposerKeydown(event) {
+  if (handleSlashPickerKeydown(event)) return
   if (event.key !== 'Enter' || event.shiftKey) return
   event.preventDefault()
   submitStartDraft()
@@ -1441,8 +1533,26 @@ function closePickerMenus() {
               placeholder="Ask Leyline anything"
               :disabled="!!creatingSessionCwd"
               @keydown="handleStartComposerKeydown"
+              @input="showSlashPicker"
               @paste="handleComposerPaste"
             ></textarea>
+            <div v-if="slashPickerOpen" class="slash-picker">
+              <button
+                v-for="(command, index) in slashCommandItems"
+                :key="`${command.source}-${command.name}`"
+                type="button"
+                :class="{ active: index === slashActiveIndex }"
+                @mousedown.prevent="selectSlashCommand(command)"
+              >
+                <span class="slash-command-name">/{{ command.name }}</span>
+                <span class="slash-command-description">
+                  {{ command.description || 'No description' }}
+                </span>
+                <span class="slash-command-source">
+                  {{ slashCommandSourceLabel(command.source) }}
+                </span>
+              </button>
+            </div>
             <div v-if="attachedImages.length" class="attachment-tray">
               <div
                 v-for="(image, index) in attachedImages"
@@ -1796,8 +1906,26 @@ function closePickerMenus() {
           :disabled="promptSubmitting || reloadingSession"
           placeholder="Ask for follow-up changes or attach images"
           @keydown="handleComposerKeydown"
+          @input="showSlashPicker"
           @paste="handleComposerPaste"
         ></textarea>
+        <div v-if="slashPickerOpen" class="slash-picker">
+          <button
+            v-for="(command, index) in slashCommandItems"
+            :key="`${command.source}-${command.name}`"
+            type="button"
+            :class="{ active: index === slashActiveIndex }"
+            @mousedown.prevent="selectSlashCommand(command)"
+          >
+            <span class="slash-command-name">/{{ command.name }}</span>
+            <span class="slash-command-description">
+              {{ command.description || 'No description' }}
+            </span>
+            <span class="slash-command-source">
+              {{ slashCommandSourceLabel(command.source) }}
+            </span>
+          </button>
+        </div>
         <div v-if="attachedImages.length" class="attachment-tray">
           <div
             v-for="(image, index) in attachedImages"

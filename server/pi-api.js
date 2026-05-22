@@ -29,6 +29,29 @@ let unsubscribeActiveSession
 
 const sseClients = new Set()
 const SESSION_DIR_ENV = 'PI_CODING_AGENT_SESSION_DIR'
+const HIDDEN_SLASH_COMMANDS = new Set([
+  'changelog',
+  'clone',
+  'compact',
+  'copy',
+  'export',
+  'fork',
+  'hotkeys',
+  'import',
+  'login',
+  'logout',
+  'model',
+  'name',
+  'new',
+  'quit',
+  'reload',
+  'resume',
+  'scoped-models',
+  'session',
+  'settings',
+  'share',
+  'tree',
+])
 
 process.env.PI_CODING_AGENT ??= 'true'
 
@@ -603,7 +626,34 @@ function sessionStateDto(session, services) {
     steeringMode: session.steeringMode,
     followUpMode: session.followUpMode,
     activeToolCount: session.getActiveToolNames().length,
+    slashCommands: slashCommandDtos(session),
   }
+}
+
+function slashCommandDtos(session) {
+  const commands = [
+    ...session.extensionRunner.getRegisteredCommands().map((command) => ({
+      name: command.invocationName,
+      description: command.description,
+      source: 'extension',
+    })),
+    ...session.promptTemplates.map((template) => ({
+      name: template.name,
+      description: template.description,
+      source: 'prompt',
+    })),
+    ...session.resourceLoader.getSkills().skills.map((skill) => ({
+      name: `skill:${skill.name}`,
+      description: skill.description,
+      source: 'skill',
+    })),
+  ]
+
+  return commands
+    .filter((command) => {
+      return command.name && !HIDDEN_SLASH_COMMANDS.has(command.name)
+    })
+    .sort((a, b) => a.name.localeCompare(b.name))
 }
 
 async function runtimeState(cwd) {
