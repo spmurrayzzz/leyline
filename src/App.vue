@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import PierrePreview from './components/PierrePreview.vue'
 import LiveAssistantMessage from './components/LiveAssistantMessage.vue'
 import ProjectBrowser from './components/ProjectBrowser.vue'
+import SessionComposer from './components/SessionComposer.vue'
 import SessionSidebar from './components/SessionSidebar.vue'
 import TranscriptEntry from './components/TranscriptEntry.vue'
 import { useRuntimeEvents } from './composables/useRuntimeEvents'
@@ -1615,200 +1616,52 @@ function closePickerMenus() {
 
       <div v-if="selectedSession && !initializing" class="composer-fade"></div>
 
-      <form
+      <SessionComposer
         v-if="selectedSession && !initializing"
-        class="composer"
-        @submit.prevent="submitDraft"
-      >
-        <textarea
-          v-model="draft"
-          :disabled="promptSubmitting || reloadingSession"
-          placeholder="Ask for follow-up changes or attach images"
-          @keydown="handleComposerKeydown"
-          @input="showSlashPicker"
-          @paste="handleComposerPaste"
-        ></textarea>
-        <div v-if="slashPickerOpen" class="slash-picker">
-          <button
-            v-for="(command, index) in slashCommandItems"
-            :key="`${command.source}-${command.name}`"
-            type="button"
-            :class="{ active: index === slashActiveIndex }"
-            @mousedown.prevent="selectSlashCommand(command)"
-          >
-            <span class="slash-command-name">/{{ command.name }}</span>
-            <span class="slash-command-description">
-              {{ command.description || 'No description' }}
-            </span>
-            <span class="slash-command-source">
-              {{ slashCommandSourceLabel(command.source) }}
-            </span>
-          </button>
-        </div>
-        <div v-if="attachedImages.length" class="attachment-tray">
-          <div
-            v-for="(image, index) in attachedImages"
-            :key="`${image.mimeType}-${index}`"
-            class="attachment-chip"
-          >
-            <img :src="image.preview" alt="Pasted image" />
-            <button type="button" @click="removeAttachedImage(index)">×</button>
-          </div>
-        </div>
-        <div
-          v-if="promptError || eventStreamError || imageSupportWarning"
-          class="composer-error"
-        >
-          {{ promptError || eventStreamError || imageSupportWarning }}
-        </div>
-        <div class="composer-bar">
-          <div class="composer-primary-row">
-            <div class="composer-row-spacer"></div>
-            <div class="composer-actions">
-              <div class="model-picker">
-                <button
-                  class="composer-chip model-picker-button"
-                  type="button"
-                  :disabled="agentRunning
-                    || promptSubmitting
-                    || reloadingSession
-                    || switchingModel"
-                  @click="togglePicker('model')"
-                >
-                  <span class="model-label desktop-label">{{ currentModelLabel }}</span>
-                  <span class="model-label mobile-label">
-                    {{ currentMobileModelLabel }}
-                  </span>
-                  <span class="model-caret">▾</span>
-                </button>
-                <div v-if="modelPickerOpen" class="model-menu">
-                  <button
-                    v-for="model in availableModels"
-                    :key="modelKey(model)"
-                    type="button"
-                    :class="{ active: modelKey(model) === selectedModelKey }"
-                    @click="selectModel(model)"
-                  >
-                    <span>{{ modelChip(model) }}</span>
-                    <span v-if="modelKey(model) === selectedModelKey">✓</span>
-                  </button>
-                </div>
-              </div>
-              <div class="model-picker small-picker">
-                <button
-                  class="composer-chip model-picker-button"
-                  type="button"
-                  :disabled="agentRunning
-                    || promptSubmitting
-                    || reloadingSession
-                    || switchingThinking"
-                  @click="togglePicker('thinking')"
-                >
-                  <span class="model-label desktop-label">
-                    {{ currentThinkingLabel }}
-                  </span>
-                  <span class="model-label mobile-label">
-                    {{ currentMobileThinkingLabel }}
-                  </span>
-                  <span class="model-caret">▾</span>
-                </button>
-                <div v-if="thinkingPickerOpen" class="model-menu small-menu">
-                  <button
-                    v-for="level in availableThinkingLevels"
-                    :key="level"
-                    type="button"
-                    :class="{
-                      active: level === composerRuntime?.state?.thinkingLevel,
-                    }"
-                    @click="selectThinkingLevel(level)"
-                  >
-                    <span>{{ formatMode(level) }}</span>
-                    <span
-                      v-if="level === composerRuntime?.state?.thinkingLevel"
-                    >
-                      ✓
-                    </span>
-                  </button>
-                </div>
-              </div>
-              <div class="model-picker small-picker">
-                <button
-                  class="composer-chip model-picker-button"
-                  type="button"
-                  :disabled="agentRunning
-                    || promptSubmitting
-                    || reloadingSession
-                    || switchingMode"
-                  @click="togglePicker('mode')"
-                >
-                  <span class="model-label desktop-label">{{ currentModeLabel }}</span>
-                  <span class="model-label mobile-label">
-                    {{ currentMobileModeLabel }}
-                  </span>
-                  <span class="model-caret">▾</span>
-                </button>
-                <div v-if="modePickerOpen" class="model-menu mode-menu">
-                  <div class="mode-menu-label">Steering</div>
-                  <button
-                    v-for="value in ['one-at-a-time', 'all']"
-                    :key="`steering-${value}`"
-                    type="button"
-                    :class="{
-                      active: value === activeRuntimeSession?.state?.steeringMode,
-                    }"
-                    @click="selectMode('steeringMode', value)"
-                  >
-                    <span>{{ formatMode(value) }}</span>
-                    <span
-                      v-if="value === activeRuntimeSession?.state?.steeringMode"
-                    >
-                      ✓
-                    </span>
-                  </button>
-                  <div class="mode-menu-label">Follow-up</div>
-                  <button
-                    v-for="value in ['one-at-a-time', 'all']"
-                    :key="`follow-up-${value}`"
-                    type="button"
-                    :class="{
-                      active: value === activeRuntimeSession?.state?.followUpMode,
-                    }"
-                    @click="selectMode('followUpMode', value)"
-                  >
-                    <span>{{ formatMode(value) }}</span>
-                    <span
-                      v-if="value === activeRuntimeSession?.state?.followUpMode"
-                    >
-                      ✓
-                    </span>
-                  </button>
-                </div>
-              </div>
-              <button
-                class="send-button"
-                :class="{ 'stop-button': agentRunning }"
-                :type="agentRunning ? 'button' : 'submit'"
-                :disabled="agentRunning
-                  ? interrupting
-                  : promptSubmitting || reloadingSession || !canSubmitDraft"
-                :title="agentRunning ? 'Stop Leyline' : 'Send message'"
-                @click="agentRunning && interruptAgent()"
-              >
-                {{ sendButtonLabel }}
-              </button>
-            </div>
-          </div>
-          <div class="composer-context-row">
-            <span
-              v-for="chip in composerChips"
-              :key="chip"
-              class="composer-chip"
-            >
-              {{ chip }}
-            </span>
-          </div>
-        </div>
-      </form>
+        v-model:draft="draft"
+        :active-runtime-state="activeRuntimeSession?.state"
+        :agent-running="agentRunning"
+        :attached-images="attachedImages"
+        :available-models="availableModels"
+        :available-thinking-levels="availableThinkingLevels"
+        :can-submit-draft="canSubmitDraft"
+        :chips="composerChips"
+        :current-mobile-mode-label="currentMobileModeLabel"
+        :current-mobile-model-label="currentMobileModelLabel"
+        :current-mobile-thinking-label="currentMobileThinkingLabel"
+        :current-mode-label="currentModeLabel"
+        :current-model-label="currentModelLabel"
+        :current-thinking-label="currentThinkingLabel"
+        :error="promptError || eventStreamError || imageSupportWarning"
+        :interrupting="interrupting"
+        :model-key="modelKey"
+        :model-picker-open="modelPickerOpen"
+        :mode-picker-open="modePickerOpen"
+        :prompt-submitting="promptSubmitting"
+        :reloading-session="reloadingSession"
+        :selected-model-key="selectedModelKey"
+        :send-button-label="sendButtonLabel"
+        :slash-active-index="slashActiveIndex"
+        :slash-command-items="slashCommandItems"
+        :slash-command-source-label="slashCommandSourceLabel"
+        :slash-picker-open="slashPickerOpen"
+        :switching-mode="switchingMode"
+        :switching-model="switchingModel"
+        :switching-thinking="switchingThinking"
+        :thinking-level="composerRuntime?.state?.thinkingLevel"
+        :thinking-picker-open="thinkingPickerOpen"
+        @interrupt="interruptAgent"
+        @keydown="handleComposerKeydown"
+        @paste="handleComposerPaste"
+        @remove-image="removeAttachedImage"
+        @select-mode="selectMode"
+        @select-model="selectModel"
+        @select-slash-command="selectSlashCommand"
+        @select-thinking="selectThinkingLevel"
+        @show-slash-picker="showSlashPicker"
+        @submit="submitDraft"
+        @toggle-picker="togglePicker"
+      />
     </section>
 
     <div
