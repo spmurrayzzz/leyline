@@ -4,6 +4,7 @@ import PierrePreview from './components/PierrePreview.vue'
 import LiveAssistantMessage from './components/LiveAssistantMessage.vue'
 import ProjectBrowser from './components/ProjectBrowser.vue'
 import SessionComposer from './components/SessionComposer.vue'
+import StartComposer from './components/StartComposer.vue'
 import SessionSidebar from './components/SessionSidebar.vue'
 import TranscriptEntry from './components/TranscriptEntry.vue'
 import { useRuntimeEvents } from './composables/useRuntimeEvents'
@@ -1376,193 +1377,51 @@ function closePickerMenus() {
         </div>
         <div v-else-if="!selectedSession" class="start-panel">
           <h2>What should we work on?</h2>
-          <form class="start-composer" @submit.prevent="submitStartDraft">
-            <textarea
-              v-model="draft"
-              placeholder="Ask Leyline anything"
-              :disabled="!!creatingSessionCwd"
-              @keydown="handleStartComposerKeydown"
-              @input="showSlashPicker"
-              @paste="handleComposerPaste"
-            ></textarea>
-            <div v-if="slashPickerOpen" class="slash-picker">
-              <button
-                v-for="(command, index) in slashCommandItems"
-                :key="`${command.source}-${command.name}`"
-                type="button"
-                :class="{ active: index === slashActiveIndex }"
-                @mousedown.prevent="selectSlashCommand(command)"
-              >
-                <span class="slash-command-name">/{{ command.name }}</span>
-                <span class="slash-command-description">
-                  {{ command.description || 'No description' }}
-                </span>
-                <span class="slash-command-source">
-                  {{ slashCommandSourceLabel(command.source) }}
-                </span>
-              </button>
-            </div>
-            <div v-if="attachedImages.length" class="attachment-tray">
-              <div
-                v-for="(image, index) in attachedImages"
-                :key="`${image.mimeType}-${index}`"
-                class="attachment-chip"
-              >
-                <img :src="image.preview" alt="Pasted image" />
-                <button type="button" @click="removeAttachedImage(index)">×</button>
-              </div>
-            </div>
-            <div v-if="imageSupportWarning" class="composer-error">
-              {{ imageSupportWarning }}
-            </div>
-            <div class="start-composer-bar">
-              <div class="composer-primary-row">
-                <div class="composer-row-spacer"></div>
-                <div class="composer-actions">
-                  <div class="model-picker start-picker">
-                    <button
-                      class="composer-chip model-picker-button start-composer-chip"
-                      type="button"
-                      :disabled="switchingModel || availableModels.length === 0"
-                      @click="togglePicker('model')"
-                    >
-                      <span class="model-label">{{ currentModelLabel }}</span>
-                      <span class="model-caret">▾</span>
-                    </button>
-                    <div v-if="modelPickerOpen" class="model-menu">
-                      <button
-                        v-for="model in availableModels"
-                        :key="modelKey(model)"
-                        type="button"
-                        :class="{ active: modelKey(model) === selectedModelKey }"
-                        @click="selectModel(model)"
-                      >
-                        <span>{{ modelChip(model) }}</span>
-                        <span v-if="modelKey(model) === selectedModelKey">✓</span>
-                      </button>
-                    </div>
-                  </div>
-                  <div class="model-picker small-picker start-picker">
-                    <button
-                      class="composer-chip model-picker-button start-composer-chip"
-                      type="button"
-                      :disabled="switchingThinking || !availableThinkingLevels.length"
-                      @click="togglePicker('thinking')"
-                    >
-                      <span class="model-label">{{ currentThinkingLabel }}</span>
-                      <span class="model-caret">▾</span>
-                    </button>
-                    <div v-if="thinkingPickerOpen" class="model-menu small-menu">
-                      <button
-                        v-for="level in availableThinkingLevels"
-                        :key="level"
-                        type="button"
-                        :class="{
-                          active: level === composerRuntime?.state?.thinkingLevel,
-                        }"
-                        @click="selectThinkingLevel(level)"
-                      >
-                        <span>{{ formatMode(level) }}</span>
-                        <span
-                          v-if="level === composerRuntime?.state?.thinkingLevel"
-                        >✓</span>
-                      </button>
-                    </div>
-                  </div>
-                  <div class="model-picker small-picker start-picker">
-                    <button
-                      class="composer-chip model-picker-button start-composer-chip"
-                      type="button"
-                      :disabled="switchingMode || !activeRuntimeSession"
-                      @click="togglePicker('mode')"
-                    >
-                      <span class="model-label">{{ currentModeLabel }}</span>
-                      <span class="model-caret">▾</span>
-                    </button>
-                    <div v-if="modePickerOpen" class="model-menu mode-menu">
-                      <div class="mode-menu-label">Steering</div>
-                      <button
-                        v-for="value in ['one-at-a-time', 'all']"
-                        :key="`start-steering-${value}`"
-                        type="button"
-                        :class="{
-                          active: value === activeRuntimeSession?.state?.steeringMode,
-                        }"
-                        @click="selectMode('steeringMode', value)"
-                      >
-                        <span>{{ formatMode(value) }}</span>
-                        <span
-                          v-if="value === activeRuntimeSession?.state?.steeringMode"
-                        >✓</span>
-                      </button>
-                      <div class="mode-menu-label">Follow-up</div>
-                      <button
-                        v-for="value in ['one-at-a-time', 'all']"
-                        :key="`start-follow-up-${value}`"
-                        type="button"
-                        :class="{
-                          active: value === activeRuntimeSession?.state?.followUpMode,
-                        }"
-                        @click="selectMode('followUpMode', value)"
-                      >
-                        <span>{{ formatMode(value) }}</span>
-                        <span
-                          v-if="value === activeRuntimeSession?.state?.followUpMode"
-                        >✓</span>
-                      </button>
-                    </div>
-                  </div>
-                  <button
-                    class="start-send-button"
-                    type="submit"
-                    :disabled="!newSessionCwd.trim() || !!creatingSessionCwd"
-                  >↑</button>
-                </div>
-              </div>
-              <div class="composer-context-row">
-                <button
-                  class="start-project-button"
-                  type="button"
-                  @click="startProjectPickerOpen = !startProjectPickerOpen"
-                >
-                  <span class="start-project-icon">▱</span>
-                  <span class="start-project-label">{{ startProjectLabel }}</span>
-                  <span class="model-caret">▾</span>
-                </button>
-                <span
-                  v-for="chip in composerChips"
-                  :key="chip"
-                  class="composer-chip start-composer-chip"
-                >
-                  {{ chip }}
-                </span>
-              </div>
-            </div>
-            <div v-if="startProjectPickerOpen" class="start-project-menu">
-              <label>
-                <span>⌕</span>
-                <input
-                  v-model="startProjectQuery"
-                  placeholder="Search projects"
-                />
-              </label>
-              <button
-                v-for="project in startProjectOptions"
-                :key="project.cwd"
-                type="button"
-                @click="selectStartProject(project.cwd)"
-              >
-                <span>▱</span>
-                <strong>{{ project.name }}</strong>
-                <em v-if="project.cwd === newSessionCwd">✓</em>
-              </button>
-              <div class="start-project-divider"></div>
-              <button type="button" @click="openProjectBrowser()">
-                <span>＋</span>
-                <strong>Add new project</strong>
-              </button>
-            </div>
-          </form>
+          <StartComposer
+            v-model:draft="draft"
+            v-model:start-project-query="startProjectQuery"
+            :active-runtime-state="activeRuntimeSession?.state"
+            :attached-images="attachedImages"
+            :available-models="availableModels"
+            :available-thinking-levels="availableThinkingLevels"
+            :chips="composerChips"
+            :creating-session-cwd="creatingSessionCwd"
+            :current-mode-label="currentModeLabel"
+            :current-model-label="currentModelLabel"
+            :current-thinking-label="currentThinkingLabel"
+            :image-support-warning="imageSupportWarning"
+            :model-key="modelKey"
+            :model-picker-open="modelPickerOpen"
+            :mode-disabled="!activeRuntimeSession"
+            :mode-picker-open="modePickerOpen"
+            :new-session-cwd="newSessionCwd"
+            :selected-model-key="selectedModelKey"
+            :slash-active-index="slashActiveIndex"
+            :slash-command-items="slashCommandItems"
+            :slash-command-source-label="slashCommandSourceLabel"
+            :slash-picker-open="slashPickerOpen"
+            :start-project-label="startProjectLabel"
+            :start-project-options="startProjectOptions"
+            :start-project-picker-open="startProjectPickerOpen"
+            :switching-mode="switchingMode"
+            :switching-model="switchingModel"
+            :switching-thinking="switchingThinking"
+            :thinking-level="composerRuntime?.state?.thinkingLevel"
+            :thinking-picker-open="thinkingPickerOpen"
+            @keydown="handleStartComposerKeydown"
+            @open-project-browser="openProjectBrowser"
+            @paste="handleComposerPaste"
+            @remove-image="removeAttachedImage"
+            @select-mode="selectMode"
+            @select-model="selectModel"
+            @select-project="selectStartProject"
+            @select-slash-command="selectSlashCommand"
+            @select-thinking="selectThinkingLevel"
+            @show-slash-picker="showSlashPicker"
+            @submit="submitStartDraft"
+            @toggle-picker="togglePicker"
+            @toggle-project-picker="startProjectPickerOpen = !startProjectPickerOpen"
+          />
         </div>
         <div v-else-if="entries.length === 0" class="empty-workbench">
           No transcript entries found.
