@@ -2439,11 +2439,13 @@ h1 {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  min-height: 38px;
   border-bottom: 1px solid #2f293d;
-  padding: 9px 14px 0;
+  padding: 7px 14px;
   color: #c9c0ff;
   font-size: 12px;
   font-weight: 800;
+  line-height: 1.2;
 }
 
 .editing-banner button {
@@ -2454,6 +2456,7 @@ h1 {
   color: var(--muted-strong);
   font-size: 11px;
   font-weight: 800;
+  line-height: 1;
 }
 
 .editing-banner button:hover {
