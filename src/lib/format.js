@@ -4,15 +4,6 @@ export function modelChip(model) {
   return `${provider}${formatModelId(model.id)}`
 }
 
-export function modeChip(steeringMode, followUpMode) {
-  if (!steeringMode && !followUpMode) return ''
-  if (steeringMode === followUpMode) return `Mode · ${steeringMode}`
-  return [
-    steeringMode ? `Steer · ${steeringMode}` : '',
-    followUpMode ? `Follow-up · ${followUpMode}` : '',
-  ].filter(Boolean).join(' / ')
-}
-
 export function formatMode(value) {
   return String(value)
     .replace(/[-_]/g, ' ')

@@ -1183,7 +1183,7 @@ h1 {
 .start-panel {
   display: grid;
   justify-items: center;
-  width: min(820px, 100%);
+  width: min(900px, 100%);
 }
 
 .start-panel h2 {
@@ -1197,7 +1197,8 @@ h1 {
 
 .start-composer {
   position: relative;
-  width: min(720px, 100%);
+  width: min(900px, 100%);
+  min-width: min(760px, calc(100vw - 88px));
   border: 1px solid #35323f;
   border-radius: 22px;
   background: #17161d;
@@ -1213,8 +1214,8 @@ h1 {
 }
 
 .start-composer textarea {
-  height: 78px;
-  padding: 18px 20px 4px;
+  height: 58px;
+  padding: 18px 20px 0;
   color: #e5e6ec;
   font-size: 15px;
 }
@@ -2425,6 +2426,7 @@ h1 {
   bottom: 22px;
   left: 50%;
   width: min(var(--content-max), calc(100% - 88px));
+  min-width: min(760px, calc(100vw - 88px));
   transform: translateX(-50%);
   border: 1px solid #3d3650;
   border-radius: 22px;
@@ -2792,6 +2794,11 @@ textarea::placeholder {
 
   .composer-fade {
     height: 166px;
+  }
+
+  .composer,
+  .start-composer {
+    min-width: 0;
   }
 
   .composer {

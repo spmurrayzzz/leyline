@@ -2,10 +2,6 @@
 import { formatMode, modelChip } from '../lib/format'
 
 const props = defineProps({
-  activeRuntimeState: {
-    type: Object,
-    default: () => ({}),
-  },
   attachedImages: {
     type: Array,
     default: () => [],
@@ -23,10 +19,6 @@ const props = defineProps({
     default: () => [],
   },
   creatingSessionCwd: {
-    type: String,
-    default: '',
-  },
-  currentModeLabel: {
     type: String,
     default: '',
   },
@@ -51,8 +43,6 @@ const props = defineProps({
     required: true,
   },
   modelPickerOpen: Boolean,
-  modeDisabled: Boolean,
-  modePickerOpen: Boolean,
   newSessionCwd: {
     type: String,
     default: '',
@@ -87,7 +77,6 @@ const props = defineProps({
     type: String,
     default: '',
   },
-  switchingMode: Boolean,
   switchingModel: Boolean,
   switchingThinking: Boolean,
   thinkingLevel: {
@@ -102,7 +91,6 @@ const emit = defineEmits([
   'open-project-browser',
   'paste',
   'remove-image',
-  'select-mode',
   'select-model',
   'select-project',
   'select-slash-command',
@@ -208,41 +196,6 @@ function updateDraft(event) {
               >
                 <span>{{ formatMode(level) }}</span>
                 <span v-if="level === thinkingLevel">✓</span>
-              </button>
-            </div>
-          </div>
-          <div class="model-picker small-picker start-picker">
-            <button
-              class="composer-chip model-picker-button start-composer-chip"
-              type="button"
-              :disabled="switchingMode || modeDisabled"
-              @click="emit('toggle-picker', 'mode')"
-            >
-              <span class="model-label">{{ currentModeLabel }}</span>
-              <span class="model-caret">▾</span>
-            </button>
-            <div v-if="modePickerOpen" class="model-menu mode-menu">
-              <div class="mode-menu-label">Steering</div>
-              <button
-                v-for="value in ['one-at-a-time', 'all']"
-                :key="`start-steering-${value}`"
-                type="button"
-                :class="{ active: value === activeRuntimeState.steeringMode }"
-                @click="emit('select-mode', 'steeringMode', value)"
-              >
-                <span>{{ formatMode(value) }}</span>
-                <span v-if="value === activeRuntimeState.steeringMode">✓</span>
-              </button>
-              <div class="mode-menu-label">Follow-up</div>
-              <button
-                v-for="value in ['one-at-a-time', 'all']"
-                :key="`start-follow-up-${value}`"
-                type="button"
-                :class="{ active: value === activeRuntimeState.followUpMode }"
-                @click="emit('select-mode', 'followUpMode', value)"
-              >
-                <span>{{ formatMode(value) }}</span>
-                <span v-if="value === activeRuntimeState.followUpMode">✓</span>
               </button>
             </div>
           </div>

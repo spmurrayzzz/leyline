@@ -55,9 +55,11 @@ const HIDDEN_SLASH_COMMANDS = new Set([
 
 process.env.PI_CODING_AGENT ??= 'true'
 
+const ONE_AT_A_TIME = 'one-at-a-time'
+
 const createRuntime = async ({ cwd, sessionManager, sessionStartEvent }) => {
   const services = await createAgentSessionServices({ cwd })
-  return {
+  const runtime = {
     ...(await createAgentSessionFromServices({
       services,
       sessionManager,
@@ -66,6 +68,8 @@ const createRuntime = async ({ cwd, sessionManager, sessionStartEvent }) => {
     services,
     diagnostics: services.diagnostics,
   }
+  forceOneAtATime(runtime.session)
+  return runtime
 }
 
 export function piApi() {
@@ -212,8 +216,8 @@ export async function piApiHandler(req, res) {
         return json(res, { error: 'Method not allowed' }, 405)
       }
 
-      const body = await readJson(req)
-      setActiveMode(body)
+      await readJson(req)
+      setActiveMode()
       return json(res, { ok: true, active: activeSessionDto() })
     }
 
@@ -468,6 +472,7 @@ async function switchActiveSession(session) {
     await activeRuntime.switchSession(session.path)
   }
 
+  forceOneAtATime(activeRuntime.session)
   activeSessionId = session.id
   await bindActiveSession()
 
@@ -476,6 +481,7 @@ async function switchActiveSession(session) {
 
 async function promptActiveSession(text, images = []) {
   if (!activeRuntime) throw new Error('No active session')
+  forceOneAtATime(activeRuntime.session)
   const promptText = typeof text === 'string' ? text : ''
   const promptImages = validateImages(images)
   if (!promptText.trim() && promptImages.length === 0) {
@@ -555,6 +561,7 @@ async function forkActiveSession(entryId) {
 
   const result = await activeRuntime.fork(entryId, { position: 'at' })
   if (result.cancelled) throw new Error('Fork cancelled')
+  forceOneAtATime(activeRuntime.session)
   activeSessionId = activeRuntime.session.sessionManager.getSessionId()
   await bindActiveSession()
   return activeSessionDto()
@@ -607,6 +614,7 @@ async function reloadActiveSession() {
   }
 
   await activeRuntime.session.reload()
+  forceOneAtATime(activeRuntime.session)
   await bindActiveSession()
 }
 
@@ -628,19 +636,14 @@ function setActiveThinkingLevel(level) {
   activeRuntime.session.setThinkingLevel(level)
 }
 
-function setActiveMode({ steeringMode, followUpMode }) {
+function setActiveMode() {
   if (!activeRuntime) throw new Error('No active session')
-  if (steeringMode) {
-    activeRuntime.session.setSteeringMode(validMode(steeringMode))
-  }
-  if (followUpMode) {
-    activeRuntime.session.setFollowUpMode(validMode(followUpMode))
-  }
+  forceOneAtATime(activeRuntime.session)
 }
 
-function validMode(mode) {
-  if (mode === 'all' || mode === 'one-at-a-time') return mode
-  throw new Error('Mode must be all or one-at-a-time')
+function forceOneAtATime(session) {
+  session.setSteeringMode(ONE_AT_A_TIME)
+  session.setFollowUpMode(ONE_AT_A_TIME)
 }
 
 async function createNewSession(cwd) {
@@ -659,6 +662,7 @@ async function createNewSession(cwd) {
     })
   }
 
+  forceOneAtATime(activeRuntime.session)
   activeSessionId = activeRuntime.session.sessionManager.getSessionId()
   await bindActiveSession()
   return activeSessionDto()

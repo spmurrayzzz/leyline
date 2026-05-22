@@ -96,14 +96,6 @@ export async function switchPiThinkingLevel(level) {
   return data.active
 }
 
-export async function switchPiMode(body) {
-  const data = await apiRequest('/api/pi/mode', 'Failed to switch mode', {
-    method: 'POST',
-    body,
-  })
-  return data.active
-}
-
 async function apiRequest(url, fallbackError, options = {}) {
   if (typeof fallbackError !== 'string') {
     options = fallbackError

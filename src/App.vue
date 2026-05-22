@@ -14,7 +14,6 @@ import {
   eventTime,
   formatDate,
   formatMode,
-  modeChip,
   modelChip,
   projectName,
   toolLabel,
@@ -32,7 +31,6 @@ import {
   interruptPiSession,
   reloadPiSession,
   submitPrompt,
-  switchPiMode,
   switchPiModel,
   switchPiThinkingLevel,
 } from './lib/pi-api'
@@ -79,7 +77,6 @@ const promptSubmitting = ref(false)
 const interrupting = ref(false)
 const switchingModel = ref(false)
 const switchingThinking = ref(false)
-const switchingMode = ref(false)
 const reloadingSession = ref(false)
 const deletingSessionId = ref('')
 const deleteConfirmSession = ref(null)
@@ -87,7 +84,6 @@ const forkingEntryId = ref('')
 const editingEntry = ref(null)
 const modelPickerOpen = ref(false)
 const thinkingPickerOpen = ref(false)
-const modePickerOpen = ref(false)
 const slashActiveIndex = ref(0)
 const slashPickerDismissed = ref(false)
 const promptError = ref('')
@@ -249,19 +245,6 @@ const currentMobileThinkingLabel = computed(() => {
   const level = composerRuntime.value?.state?.thinkingLevel
   if (!level) return 'Think'
   return `Think ${level === 'medium' ? 'Med' : formatMode(level)}`
-})
-const currentModeLabel = computed(() => {
-  const state = composerRuntime.value?.state || {}
-  return modeChip(
-    state.steeringMode && formatMode(state.steeringMode),
-    state.followUpMode && formatMode(state.followUpMode),
-  ) || 'Mode'
-})
-const currentMobileModeLabel = computed(() => {
-  const state = composerRuntime.value?.state || {}
-  const mode = state.followUpMode || state.steeringMode
-  if (mode === 'one-at-a-time') return 'One'
-  return mode ? formatMode(mode) : 'Mode'
 })
 const composerChips = computed(() => {
   const state = composerRuntime.value?.state || {}
@@ -1343,30 +1326,9 @@ async function selectThinkingLevel(level) {
   }
 }
 
-async function selectMode(key, value) {
-  const state = activeRuntimeSession.value?.state || {}
-  if (!key || !value || state[key] === value) {
-    modePickerOpen.value = false
-    return
-  }
-
-  switchingMode.value = true
-  modePickerOpen.value = false
-  promptError.value = ''
-
-  try {
-    activeRuntimeSession.value = await switchPiMode({ [key]: value })
-  } catch (error) {
-    promptError.value = error.message
-  } finally {
-    switchingMode.value = false
-  }
-}
-
 function togglePicker(name) {
   modelPickerOpen.value = name === 'model' && !modelPickerOpen.value
   thinkingPickerOpen.value = name === 'thinking' && !thinkingPickerOpen.value
-  modePickerOpen.value = name === 'mode' && !modePickerOpen.value
 }
 
 function modelKey(model) {
@@ -1541,7 +1503,6 @@ function closeMenusOnOutsideClick(event) {
 function closePickerMenus() {
   modelPickerOpen.value = false
   thinkingPickerOpen.value = false
-  modePickerOpen.value = false
   startProjectPickerOpen.value = false
 }
 
@@ -1715,20 +1676,16 @@ function closePickerMenus() {
           <StartComposer
             v-model:draft="draft"
             v-model:start-project-query="startProjectQuery"
-            :active-runtime-state="activeRuntimeSession?.state"
             :attached-images="attachedImages"
             :available-models="availableModels"
             :available-thinking-levels="availableThinkingLevels"
             :chips="composerChips"
             :creating-session-cwd="creatingSessionCwd"
-            :current-mode-label="currentModeLabel"
             :current-model-label="currentModelLabel"
             :current-thinking-label="currentThinkingLabel"
             :image-support-warning="imageSupportWarning"
             :model-key="modelKey"
             :model-picker-open="modelPickerOpen"
-            :mode-disabled="!activeRuntimeSession"
-            :mode-picker-open="modePickerOpen"
             :new-session-cwd="newSessionCwd"
             :selected-model-key="selectedModelKey"
             :slash-active-index="slashActiveIndex"
@@ -1738,7 +1695,6 @@ function closePickerMenus() {
             :start-project-label="startProjectLabel"
             :start-project-options="startProjectOptions"
             :start-project-picker-open="startProjectPickerOpen"
-            :switching-mode="switchingMode"
             :switching-model="switchingModel"
             :switching-thinking="switchingThinking"
             :thinking-level="composerRuntime?.state?.thinkingLevel"
@@ -1747,7 +1703,6 @@ function closePickerMenus() {
             @open-project-browser="openProjectBrowser"
             @paste="handleComposerPaste"
             @remove-image="removeAttachedImage"
-            @select-mode="selectMode"
             @select-model="selectModel"
             @select-project="selectStartProject"
             @select-slash-command="selectSlashCommand"
@@ -1837,17 +1792,14 @@ function closePickerMenus() {
       <SessionComposer
         v-if="selectedSession && !initializing"
         v-model:draft="draft"
-        :active-runtime-state="activeRuntimeSession?.state"
         :agent-running="agentRunning"
         :attached-images="attachedImages"
         :available-models="availableModels"
         :available-thinking-levels="availableThinkingLevels"
         :can-submit-draft="canSubmitDraft"
         :chips="composerChips"
-        :current-mobile-mode-label="currentMobileModeLabel"
         :current-mobile-model-label="currentMobileModelLabel"
         :current-mobile-thinking-label="currentMobileThinkingLabel"
-        :current-mode-label="currentModeLabel"
         :current-model-label="currentModelLabel"
         :current-thinking-label="currentThinkingLabel"
         :editing-label="editingLabel"
@@ -1855,7 +1807,6 @@ function closePickerMenus() {
         :interrupting="interrupting"
         :model-key="modelKey"
         :model-picker-open="modelPickerOpen"
-        :mode-picker-open="modePickerOpen"
         :prompt-submitting="promptSubmitting"
         :reloading-session="reloadingSession"
         :selected-model-key="selectedModelKey"
@@ -1864,7 +1815,6 @@ function closePickerMenus() {
         :slash-command-items="slashCommandItems"
         :slash-command-source-label="slashCommandSourceLabel"
         :slash-picker-open="slashPickerOpen"
-        :switching-mode="switchingMode"
         :switching-model="switchingModel"
         :switching-thinking="switchingThinking"
         :thinking-level="composerRuntime?.state?.thinkingLevel"
@@ -1874,7 +1824,6 @@ function closePickerMenus() {
         @keydown="handleComposerKeydown"
         @paste="handleComposerPaste"
         @remove-image="removeAttachedImage"
-        @select-mode="selectMode"
         @select-model="selectModel"
         @select-slash-command="selectSlashCommand"
         @select-thinking="selectThinkingLevel"
@@ -1954,10 +1903,6 @@ function closePickerMenus() {
           <div>
             <dt>Thinking</dt>
             <dd>{{ currentThinkingLabel }}</dd>
-          </div>
-          <div>
-            <dt>Mode</dt>
-            <dd>{{ currentModeLabel }}</dd>
           </div>
           <div>
             <dt>Tools</dt>
