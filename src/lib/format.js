@@ -1,13 +1,10 @@
 export function modelChip(model) {
-  if (!model) return 'No model'
-  const provider = model.provider ? `${formatProvider(model.provider)} · ` : ''
-  return `${provider}${formatModelId(model.id)}`
+  if (!model) return 'no model'
+  return [model.provider, model.id].filter(Boolean).join('/')
 }
 
 export function formatMode(value) {
-  return String(value)
-    .replace(/[-_]/g, ' ')
-    .replace(/\b\w/g, (letter) => letter.toUpperCase())
+  return String(value).replace(/[-_]/g, ' ').toLowerCase()
 }
 
 export function projectName(cwd) {
@@ -60,20 +57,3 @@ export function toolTarget(args) {
   return ` · ${String(value).slice(0, 80)}`
 }
 
-function formatProvider(value) {
-  return String(value)
-    .split(/[-_]/g)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ')
-}
-
-function formatModelId(value) {
-  return String(value || 'Unknown model')
-    .replace(/^(anthropic\.|claude-|openai\/)/, '')
-    .replace(/[-_]/g, ' ')
-    .replace(/\b\d{8}\b/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/\b\w/g, (letter) => letter.toUpperCase())
-}

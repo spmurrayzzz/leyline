@@ -231,21 +231,19 @@ const currentModelLabel = computed(() => {
   return modelChip(composerRuntime.value?.state?.model)
 })
 const currentMobileModelLabel = computed(() => {
-  const model = composerRuntime.value?.state?.model
-  if (!model?.id) return 'Model'
-  return formatMode(model.id).replace(/^Gpt\b/, 'GPT')
+  return modelChip(composerRuntime.value?.state?.model)
 })
 const availableThinkingLevels = computed(() => {
   return composerRuntime.value?.state?.availableThinkingLevels || []
 })
 const currentThinkingLabel = computed(() => {
   const level = composerRuntime.value?.state?.thinkingLevel
-  return level ? `Thinking · ${formatMode(level)}` : 'Thinking'
+  return level ? `thinking · ${formatMode(level)}` : 'thinking'
 })
 const currentMobileThinkingLabel = computed(() => {
   const level = composerRuntime.value?.state?.thinkingLevel
-  if (!level) return 'Think'
-  return `Think ${level === 'medium' ? 'Med' : formatMode(level)}`
+  if (!level) return 'think'
+  return `think ${level === 'medium' ? 'med' : formatMode(level)}`
 })
 const composerChips = computed(() => {
   const state = composerRuntime.value?.state || {}
