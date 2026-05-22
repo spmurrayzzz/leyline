@@ -1192,7 +1192,6 @@ h1 {
 .start-composer {
   position: relative;
   width: min(720px, 100%);
-  overflow: hidden;
   border: 1px solid #35323f;
   border-radius: 22px;
   background: #17161d;
@@ -2149,7 +2148,6 @@ h1 {
   bottom: 22px;
   left: 50%;
   width: min(var(--content-max), calc(100% - 88px));
-  overflow: hidden;
   transform: translateX(-50%);
   border: 1px solid #3d3650;
   border-radius: 22px;
