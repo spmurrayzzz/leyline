@@ -22,6 +22,14 @@ export function renderedBlock(block) {
   return markdown.render(block.text || '')
 }
 
+export function imageSrc(block) {
+  return `data:${block.mimeType};base64,${block.data}`
+}
+
+export function imageBlocksFor(entry) {
+  return (entry.blocks || []).filter((block) => block.type === 'image')
+}
+
 export function skillSummaries(entry) {
   if (entry.role !== 'user' || !entry.text?.trimStart().startsWith('<skill ')) {
     return []
@@ -56,12 +64,19 @@ export function messageBlocks(content) {
   return content
     .map((block) => {
       if (block.type === 'text') return { type: 'text', text: block.text }
+      if (block.type === 'image') {
+        return {
+          type: 'image',
+          data: block.data,
+          mimeType: block.mimeType,
+        }
+      }
       if (block.type === 'thinking') {
         return { type: 'thinking', text: block.thinking }
       }
       return undefined
     })
-    .filter((block) => block?.text)
+    .filter((block) => block?.text || block?.data)
 }
 
 export function textFromBlocks(blocks) {

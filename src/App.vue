@@ -31,6 +31,8 @@ import {
 } from './lib/pi-api'
 import {
   entryClass,
+  imageBlocksFor,
+  imageSrc,
   messageBlocks,
   messageBlocksFor,
   renderedBlock,
@@ -68,6 +70,7 @@ const expandedSkills = ref(new Set())
 const copiedEntryId = ref('')
 const localEntries = ref([])
 const draft = ref('')
+const attachedImages = ref([])
 const workbench = ref(null)
 const activeRuntimeSession = ref(null)
 const startRuntimeState = ref(null)
@@ -230,6 +233,15 @@ const composerChips = computed(() => {
       ? `${state.activeToolCount} tools`
       : '',
   ].filter(Boolean)
+})
+const imageSupportWarning = computed(() => {
+  const model = composerRuntime.value?.state?.model
+  if (!attachedImages.value.length || !model || model.supportsImages) return ''
+  return `${modelChip(model)} does not support images.`
+})
+const canSubmitDraft = computed(() => {
+  if (imageSupportWarning.value) return false
+  return draft.value.trim() || attachedImages.value.length > 0
 })
 const eventStreamLabel = computed(() => {
   if (eventStreamConnected.value) return 'Connected'
@@ -729,10 +741,12 @@ async function scrollToLatest() {
 
 async function submitDraft() {
   const text = draft.value.trim()
-  if (!text || promptSubmitting.value || agentRunning.value) return
+  const images = attachedImages.value.map(({ preview, ...image }) => image)
+  if (!text && images.length === 0) return
+  if (promptSubmitting.value || agentRunning.value) return
   if (reloadingSession.value) return
 
-  const localEntry = pendingUserEntry(text)
+  const localEntry = pendingUserEntry(text, images)
   localEntries.value = [...localEntries.value, localEntry]
   promptSubmitting.value = true
   promptError.value = ''
@@ -740,8 +754,9 @@ async function submitDraft() {
   else hasNewOutput.value = true
 
   try {
-    await submitPrompt(text)
+    await submitPrompt(text, images)
     draft.value = ''
+    attachedImages.value = []
     agentRunning.value = true
     liveActivity.value = 'Thinking…'
   } catch (error) {
@@ -834,13 +849,18 @@ async function interruptAgent() {
   }
 }
 
-function pendingUserEntry(text) {
+function pendingUserEntry(text, images = []) {
+  const blocks = []
+  if (text) blocks.push({ type: 'text', text })
+  blocks.push(...images)
+
   return {
     id: `local-${Date.now()}`,
     type: 'message',
     role: 'user',
     label: 'You',
     text,
+    blocks,
   }
 }
 
@@ -850,6 +870,7 @@ function reconcileLocalEntries(detail) {
       return entry.type === 'message'
         && entry.role === localEntry.role
         && entry.text === localEntry.text
+        && imageBlocksFor(entry).length === imageBlocksFor(localEntry).length
     })
   })
 }
@@ -993,6 +1014,47 @@ function handleComposerKeydown(event) {
   submitDraft()
 }
 
+async function handleComposerPaste(event) {
+  const files = Array.from(event.clipboardData?.files || [])
+    .filter((file) => file.type.startsWith('image/'))
+  if (!files.length) return
+
+  event.preventDefault()
+  promptError.value = ''
+
+  try {
+    const images = await Promise.all(files.map(fileToImageContent))
+    attachedImages.value = [...attachedImages.value, ...images]
+  } catch (error) {
+    promptError.value = error.message
+  }
+}
+
+function removeAttachedImage(index) {
+  attachedImages.value = attachedImages.value.filter((_, itemIndex) => {
+    return itemIndex !== index
+  })
+}
+
+function fileToImageContent(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.addEventListener('load', () => {
+      const result = String(reader.result || '')
+      const comma = result.indexOf(',')
+      if (comma === -1) reject(new Error('Could not read image'))
+      else resolve({
+        type: 'image',
+        data: result.slice(comma + 1),
+        mimeType: file.type,
+        preview: result,
+      })
+    })
+    reader.addEventListener('error', () => reject(reader.error))
+    reader.readAsDataURL(file)
+  })
+}
+
 function handleStartComposerKeydown(event) {
   if (event.key !== 'Enter' || event.shiftKey) return
   event.preventDefault()
@@ -1011,7 +1073,7 @@ async function submitStartDraft() {
   if (thinkingLevel && selectedSession.value) {
     activeRuntimeSession.value = await switchPiThinkingLevel(thinkingLevel)
   }
-  if (text) await submitDraft()
+  if (text || attachedImages.value.length) await submitDraft()
 }
 
 function closeMenusOnEscape(event) {
@@ -1379,7 +1441,21 @@ function closePickerMenus() {
               placeholder="Ask Leyline anything"
               :disabled="!!creatingSessionCwd"
               @keydown="handleStartComposerKeydown"
+              @paste="handleComposerPaste"
             ></textarea>
+            <div v-if="attachedImages.length" class="attachment-tray">
+              <div
+                v-for="(image, index) in attachedImages"
+                :key="`${image.mimeType}-${index}`"
+                class="attachment-chip"
+              >
+                <img :src="image.preview" alt="Pasted image" />
+                <button type="button" @click="removeAttachedImage(index)">×</button>
+              </div>
+            </div>
+            <div v-if="imageSupportWarning" class="composer-error">
+              {{ imageSupportWarning }}
+            </div>
             <div class="start-composer-bar">
               <button
                 class="start-project-button"
@@ -1633,6 +1709,14 @@ function closePickerMenus() {
                 class="entry-text markdown-body"
                 v-html="renderedMessage(entry)"
               ></div>
+              <div v-if="imageBlocksFor(entry).length" class="message-images">
+                <img
+                  v-for="(image, index) in imageBlocksFor(entry)"
+                  :key="`${entry.id}-image-${index}`"
+                  :src="imageSrc(image)"
+                  alt="Attached image"
+                />
+              </div>
             </article>
           </template>
         </template>
@@ -1705,9 +1789,23 @@ function closePickerMenus() {
           :disabled="promptSubmitting || reloadingSession"
           placeholder="Ask for follow-up changes or attach images"
           @keydown="handleComposerKeydown"
+          @paste="handleComposerPaste"
         ></textarea>
-        <div v-if="promptError || eventStreamError" class="composer-error">
-          {{ promptError || eventStreamError }}
+        <div v-if="attachedImages.length" class="attachment-tray">
+          <div
+            v-for="(image, index) in attachedImages"
+            :key="`${image.mimeType}-${index}`"
+            class="attachment-chip"
+          >
+            <img :src="image.preview" alt="Pasted image" />
+            <button type="button" @click="removeAttachedImage(index)">×</button>
+          </div>
+        </div>
+        <div
+          v-if="promptError || eventStreamError || imageSupportWarning"
+          class="composer-error"
+        >
+          {{ promptError || eventStreamError || imageSupportWarning }}
         </div>
         <div class="composer-bar">
           <div class="model-picker">
@@ -1842,7 +1940,7 @@ function closePickerMenus() {
             :type="agentRunning ? 'button' : 'submit'"
             :disabled="agentRunning
               ? interrupting
-              : promptSubmitting || reloadingSession || !draft.trim()"
+              : promptSubmitting || reloadingSession || !canSubmitDraft"
             :title="agentRunning ? 'Stop Leyline' : 'Send message'"
             @click="agentRunning && interruptAgent()"
           >

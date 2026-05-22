@@ -127,7 +127,7 @@ export async function piApiHandler(req, res) {
       }
 
       const body = await readJson(req)
-      await promptActiveSession(body.text)
+      await promptActiveSession(body.text, body.images)
       return json(res, { ok: true, active: activeSessionDto() })
     }
 
@@ -427,14 +427,19 @@ async function switchActiveSession(session) {
   return activeSessionDto()
 }
 
-async function promptActiveSession(text) {
+async function promptActiveSession(text, images = []) {
   if (!activeRuntime) throw new Error('No active session')
-  if (!text?.trim()) throw new Error('text is required')
+  const promptText = typeof text === 'string' ? text : ''
+  const promptImages = validateImages(images)
+  if (!promptText.trim() && promptImages.length === 0) {
+    throw new Error('text or image is required')
+  }
 
   let preflightSucceeded = false
   await new Promise((resolve, reject) => {
     activeRuntime.session
-      .prompt(text, {
+      .prompt(promptText, {
+        images: promptImages,
         source: 'api',
         preflightResult: (didSucceed) => {
           if (!didSucceed) return
@@ -445,6 +450,24 @@ async function promptActiveSession(text) {
       .catch((error) => {
         if (!preflightSucceeded) reject(error)
       })
+  })
+}
+
+function validateImages(images) {
+  if (!images) return []
+  if (!Array.isArray(images)) throw new Error('images must be an array')
+
+  return images.map((image) => {
+    if (image?.type !== 'image') throw new Error('invalid image')
+    if (typeof image.data !== 'string') throw new Error('invalid image data')
+    if (!/^image\/(png|jpe?g|gif|webp)$/.test(image.mimeType || '')) {
+      throw new Error('unsupported image type')
+    }
+    return {
+      type: 'image',
+      data: image.data,
+      mimeType: image.mimeType,
+    }
   })
 }
 
@@ -617,6 +640,7 @@ function modelDto(model) {
     id: model.id,
     name: model.name,
     provider: model.provider,
+    supportsImages: model.input?.includes('image') === true,
     availableThinkingLevels: modelThinkingLevels(model),
   }
 }
@@ -966,12 +990,19 @@ function messageBlocks(content) {
   return content
     .map((block) => {
       if (block.type === 'text') return { type: 'text', text: block.text }
+      if (block.type === 'image') {
+        return {
+          type: 'image',
+          data: block.data,
+          mimeType: block.mimeType,
+        }
+      }
       if (block.type === 'thinking') {
         return { type: 'thinking', text: block.thinking }
       }
       return undefined
     })
-    .filter((block) => block?.text)
+    .filter((block) => block?.text || block?.data)
 }
 
 function toolAnnotation(toolName, call) {
@@ -1021,7 +1052,7 @@ function textFromContent(content) {
       if (block.type === 'text') return block.text
       if (block.type === 'thinking') return block.thinking
       if (block.type === 'toolCall') return ''
-      if (block.type === 'image') return '[image]'
+      if (block.type === 'image') return ''
       return ''
     })
     .filter(Boolean)
