@@ -35,11 +35,40 @@ Open the Vite URL shown in the terminal, usually:
 http://localhost:5173/
 ```
 
+## Optional Electron app
+
+The browser/Vite workflow is the primary development path, but Leyline can also
+run as a local Electron desktop app.
+
+For Electron development, start Vite in one terminal:
+
+```sh
+npm run dev
+```
+
+Then launch Electron in another terminal:
+
+```sh
+npm run electron:dev
+```
+
+To build a packaged desktop app:
+
+```sh
+npm run electron:build
+```
+
+The packaged app is written to `release/`. The build first creates the Vite
+`dist/` output, then packages Electron with the app icon from `assets/icon` and
+unpacks native terminal dependencies needed by `node-pty`.
+
 ## Useful commands
 
 ```sh
 npm run build
 npm run preview
+npm run electron:dev
+npm run electron:build
 npm run screenshot
 ```
 
