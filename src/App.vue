@@ -784,7 +784,8 @@ function updateLiveAssistant(event) {
   }
 
   if (event?.type === 'message_end' && event.message?.role === 'assistant') {
-    activeLiveAssistantId = ''
+    if (pendingAssistantEvent) flushLiveAssistant()
+    finishLiveAssistant()
   }
 
   if (['error', 'aborted'].includes(event?.type)) clearLiveAssistant()
@@ -806,6 +807,7 @@ function flushLiveAssistant() {
     type: 'assistant',
     blocks,
     text,
+    streaming: true,
   }
 
   if (existing) {
@@ -818,6 +820,16 @@ function flushLiveAssistant() {
 
   liveAssistantBlocks.value = blocks
   liveAssistantText.value = text
+}
+
+function finishLiveAssistant() {
+  const id = activeLiveAssistantId
+  if (id) {
+    liveAssistantMessages.value = liveAssistantMessages.value.map((item) => {
+      return item.id === id ? { ...item, streaming: false } : item
+    })
+  }
+  activeLiveAssistantId = ''
 }
 
 function clearLiveAssistant() {
@@ -1768,6 +1780,8 @@ function closePickerMenus() {
               v-else-if="item.type === 'assistant'"
               :blocks="item.blocks"
               :copied-entry-id="copiedEntryId"
+              :message-id="item.id"
+              :streaming="item.streaming"
               @copy="copyTranscriptItem(item.id, liveAssistantCopyText(item.blocks))"
             />
 

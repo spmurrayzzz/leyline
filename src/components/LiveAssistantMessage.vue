@@ -1,5 +1,5 @@
 <script setup>
-import { renderedBlock } from '../lib/transcript'
+import SmoothMarkdownBlock from './SmoothMarkdownBlock.vue'
 
 const props = defineProps({
   blocks: {
@@ -9,6 +9,14 @@ const props = defineProps({
   copiedEntryId: {
     type: String,
     default: '',
+  },
+  messageId: {
+    type: String,
+    default: 'live-assistant',
+  },
+  streaming: {
+    type: Boolean,
+    default: false,
   },
 })
 
@@ -44,11 +52,12 @@ function copyGlyph(id) {
         <div class="thinking-label">Thinking</div>
         <pre>{{ block.text }}</pre>
       </div>
-      <div
+      <SmoothMarkdownBlock
         v-else
-        class="entry-text markdown-body assistant-text-block"
-        v-html="renderedBlock(block)"
-      ></div>
+        :block="block"
+        :stream-key="`${messageId}-${index}`"
+        :streaming="streaming"
+      />
     </template>
   </article>
 </template>
