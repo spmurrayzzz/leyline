@@ -718,19 +718,32 @@ async function trashSession(id) {
     }
   }
 
-  const trashPath = trashSessionPath(session)
-  await mkdir(dirname(trashPath), { recursive: true })
-  await rename(session.path, trashPath)
-
-  if (isActiveSession(id)) {
-    unsubscribeActiveSession?.()
-    unsubscribeActiveSession = undefined
-    activeRuntime.session.dispose()
-    activeRuntime = undefined
-    activeSessionId = undefined
+  if (isActiveSession(id) && !existsSync(session.path)) {
+    discardActiveSession()
+    return { path: null }
   }
 
+  const trashPath = trashSessionPath(session)
+  await mkdir(dirname(trashPath), { recursive: true })
+  try {
+    await rename(session.path, trashPath)
+  } catch (error) {
+    if (!isActiveSession(id) || error?.code !== 'ENOENT') throw error
+    discardActiveSession()
+    return { path: null }
+  }
+
+  if (isActiveSession(id)) discardActiveSession()
+
   return { path: trashPath }
+}
+
+function discardActiveSession() {
+  unsubscribeActiveSession?.()
+  unsubscribeActiveSession = undefined
+  activeRuntime.session.dispose()
+  activeRuntime = undefined
+  activeSessionId = undefined
 }
 
 function trashSessionPath(session) {
