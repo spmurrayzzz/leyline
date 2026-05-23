@@ -3176,6 +3176,48 @@ h1 {
   color: var(--text);
 }
 
+.queued-message-drawer {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  left: 0;
+  display: grid;
+  gap: 5px;
+  border: 1px solid #332b4a;
+  border-radius: 16px;
+  background: #1b1630;
+  padding: 11px 16px 10px;
+  color: #827b92;
+  font-size: 12px;
+  box-shadow: 0 10px 34px rgb(0 0 0 / 28%);
+}
+
+.queued-message-row {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.queued-message-row span {
+  color: #8f83c9;
+  font-weight: 800;
+}
+
+.queued-message-row strong {
+  overflow: hidden;
+  color: #aaa4b7;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queued-message-hint {
+  color: #6f687d;
+  font-weight: 700;
+}
+
 textarea {
   display: block;
   width: 100%;
@@ -3336,9 +3378,15 @@ textarea::placeholder {
 }
 
 .stop-button {
-  background: #7f1d1d !important;
-  color: #fecaca !important;
+  border-color: #ef4444 !important;
+  background: #dc2626 !important;
+  color: #fff !important;
   font-size: 14px;
+  box-shadow: 0 0 0 3px rgb(220 38 38 / 16%);
+}
+
+.stop-button:hover:not(:disabled) {
+  background: #ef4444 !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

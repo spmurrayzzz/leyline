@@ -193,7 +193,11 @@ export async function piApiHandler(req, res) {
       }
 
       const body = await readJson(req)
-      await promptActiveSession(body.text, body.images)
+      await promptActiveSession(
+        body.text,
+        body.images,
+        body.streamingBehavior,
+      )
       return json(res, { ok: true, active: activeSessionDto() })
     }
 
@@ -529,7 +533,7 @@ async function switchActiveSession(session) {
   return activeSessionDto()
 }
 
-async function promptActiveSession(text, images = []) {
+async function promptActiveSession(text, images = [], streamingBehavior) {
   if (!activeRuntime) throw new Error('No active session')
   forceOneAtATime(activeRuntime.session)
   const promptText = typeof text === 'string' ? text : ''
@@ -537,12 +541,17 @@ async function promptActiveSession(text, images = []) {
   if (!promptText.trim() && promptImages.length === 0) {
     throw new Error('text or image is required')
   }
+  if (streamingBehavior
+    && !['steer', 'followUp'].includes(streamingBehavior)) {
+    throw new Error('invalid streaming behavior')
+  }
 
   let preflightSucceeded = false
   await new Promise((resolve, reject) => {
     activeRuntime.session
       .prompt(promptText, {
         images: promptImages,
+        streamingBehavior,
         source: 'api',
         preflightResult: (didSucceed) => {
           if (!didSucceed) return
@@ -743,6 +752,10 @@ function sessionStateDto(session, services) {
     activeToolCount: session.getActiveToolNames().length,
     contextUsage: session.getContextUsage?.(),
     slashCommands: slashCommandDtos(session),
+    queuedMessages: {
+      steering: [...session.getSteeringMessages()],
+      followUp: [...session.getFollowUpMessages()],
+    },
     extensionUi: extensionUiState,
     goal: goalStateFromSession(session),
   }
@@ -959,7 +972,9 @@ async function bindActiveSession() {
       activeSessionId,
       event,
     })
-    if (isGoalStateEvent(event)) broadcastActiveSession()
+    if (event.type === 'queue_update' || isGoalStateEvent(event)) {
+      broadcastActiveSession()
+    }
   })
   broadcastActiveSession()
 }

@@ -42,10 +42,10 @@ export async function fetchPiRuntimeState(cwd) {
   return data.active
 }
 
-export function submitPrompt(text, images = []) {
+export function submitPrompt(text, images = [], streamingBehavior) {
   return apiRequest('/api/pi/prompt', 'Failed to submit prompt', {
     method: 'POST',
-    body: { text, images },
+    body: { text, images, streamingBehavior },
   })
 }
 

@@ -72,6 +72,10 @@ const props = defineProps({
   },
   modelPickerOpen: Boolean,
   promptSubmitting: Boolean,
+  queuedMessages: {
+    type: Object,
+    default: () => ({ steering: [], followUp: [] }),
+  },
   placeholder: {
     type: String,
     default: 'Ask for follow-up changes or attach images',
@@ -148,6 +152,30 @@ function updateDraft(event) {
     <div v-if="editingLabel" class="editing-banner">
       <span>{{ editingLabel }}</span>
       <button type="button" @click="emit('cancel-edit')">Cancel</button>
+    </div>
+    <div
+      v-if="queuedMessages.steering.length || queuedMessages.followUp.length"
+      class="queued-message-drawer"
+    >
+      <div
+        v-for="(message, index) in queuedMessages.steering"
+        :key="`steering-${index}-${message}`"
+        class="queued-message-row"
+      >
+        <span>Steering</span>
+        <strong>{{ message }}</strong>
+      </div>
+      <div
+        v-for="(message, index) in queuedMessages.followUp"
+        :key="`follow-up-${index}-${message}`"
+        class="queued-message-row"
+      >
+        <span>Follow-up</span>
+        <strong>{{ message }}</strong>
+      </div>
+      <div class="queued-message-hint">
+        Enter queues steering · Option+Enter queues follow-up
+      </div>
     </div>
     <textarea
       ref="textarea"
@@ -259,7 +287,7 @@ function updateDraft(event) {
             :disabled="agentRunning
               ? interrupting
               : promptSubmitting || reloadingSession || !canSubmitDraft"
-            :title="agentRunning ? 'Stop Leyline' : 'Send message'"
+            :title="agentRunning ? 'Stop generation' : 'Send message'"
             @click="agentRunning && emit('interrupt')"
           >
             {{ sendButtonLabel }}

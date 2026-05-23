@@ -239,6 +239,7 @@ const {
     liveActivity.value = activityText(data.event)
     updateLiveTool(data.event)
     updateLiveAssistant(data.event)
+    updateRuntimeQueue(data.event)
     surfaceRuntimeError(data.event)
     scheduleLiveScroll(data.activeSessionId)
   },
@@ -283,10 +284,18 @@ const composerChips = computed(() => {
   const state = composerRuntime.value?.state || {}
 
   return [
+    agentRunning.value ? 'Enter queues steering' : '',
     typeof state.activeToolCount === 'number'
       ? `${state.activeToolCount} tools`
       : '',
   ].filter(Boolean)
+})
+const queuedMessages = computed(() => {
+  const queue = activeRuntimeSession.value?.state?.queuedMessages || {}
+  return {
+    steering: queue.steering || [],
+    followUp: queue.followUp || [],
+  }
 })
 const contextUsage = computed(() => {
   return selectedSession.value?.contextUsage
@@ -421,6 +430,13 @@ const sendButtonLabel = computed(() => {
   if (agentRunning.value) return '■'
   if (promptSubmitting.value || reloadingSession.value) return '…'
   return '↑'
+})
+const composerPlaceholder = computed(() => {
+  if (agentRunning.value) {
+    return 'Type to steer the current run; Option+Enter queues follow-up'
+  }
+  if (isEmptySelectedSession.value) return 'Describe the first task or attach images'
+  return 'Ask for follow-up changes or attach images'
 })
 const startupSteps = computed(() => {
   const run = startupRun.value
@@ -1531,6 +1547,20 @@ async function scrollToLatest() {
   workbench.value.scrollTop = workbench.value.scrollHeight
 }
 
+function updateRuntimeQueue(event) {
+  if (event.type !== 'queue_update' || !activeRuntimeSession.value) return
+  activeRuntimeSession.value = {
+    ...activeRuntimeSession.value,
+    state: {
+      ...activeRuntimeSession.value.state,
+      queuedMessages: {
+        steering: event.steering || [],
+        followUp: event.followUp || [],
+      },
+    },
+  }
+}
+
 function patchRuntimeExtensionUi(extensionUi, goal) {
   if (!activeRuntimeSession.value) return
   activeRuntimeSession.value = {
@@ -1585,12 +1615,33 @@ function trimNumber(value) {
   return value.toFixed(1).replace(/\.0$/, '')
 }
 
-async function submitDraft() {
+async function refocusComposer() {
+  await nextTick()
+  composerRef.value?.focus()
+}
+
+async function submitDraft(streamingBehavior) {
   const text = draft.value.trim()
   const images = attachedImages.value.map(({ preview, ...image }) => image)
   if (!text && images.length === 0) return
-  if (promptSubmitting.value || agentRunning.value) return
-  if (reloadingSession.value) return
+  if (promptSubmitting.value || reloadingSession.value) return
+
+  if (agentRunning.value && !editingEntry.value) {
+    promptSubmitting.value = true
+    promptError.value = ''
+    try {
+      const data = await submitPrompt(text, images, streamingBehavior || 'steer')
+      if (data.active) activeRuntimeSession.value = data.active
+      draft.value = ''
+      attachedImages.value = []
+    } catch (error) {
+      promptError.value = error.message
+    } finally {
+      promptSubmitting.value = false
+      refocusComposer()
+    }
+    return
+  }
 
   const editing = editingEntry.value
   const previousDetail = sessionDetail.value
@@ -1640,6 +1691,7 @@ async function submitDraft() {
   } finally {
     promptSubmitting.value = false
     stopPromptSubmitTimer()
+    refocusComposer()
   }
 }
 
@@ -2047,7 +2099,7 @@ function handleComposerKeydown(event) {
   if (handleSlashPickerKeydown(event)) return
   if (event.key !== 'Enter' || event.shiftKey) return
   event.preventDefault()
-  submitDraft()
+  submitDraft(event.altKey ? 'followUp' : 'steer')
 }
 
 async function handleComposerPaste(event) {
@@ -2606,11 +2658,10 @@ function closePickerMenus() {
         }"
         :model-key="modelKey"
         :model-picker-open="modelPickerOpen"
-        :placeholder="isEmptySelectedSession
-          ? 'Describe the first task or attach images'
-          : 'Ask for follow-up changes or attach images'"
+        :placeholder="composerPlaceholder"
         :prompt-submitting="promptSubmitting"
         :reloading-session="reloadingSession"
+        :queued-messages="queuedMessages"
         :selected-model-key="selectedModelKey"
         :send-button-label="sendButtonLabel"
         :slash-active-index="slashActiveIndex"
