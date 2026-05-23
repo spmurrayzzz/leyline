@@ -1736,8 +1736,19 @@ function closePickerMenus() {
 
         <TransitionGroup name="live-row" tag="div" class="live-stack">
           <div v-for="item in liveItems" :key="item.id" class="live-item">
+            <TranscriptEntry
+              v-if="item.type === 'tool' && item.persistedEntry"
+              :copied-entry-id="copiedEntryId"
+              :entry="item.persistedEntry"
+              :tool-expanded="isToolExpanded(item.persistedEntry)"
+              @copy="copyEntry"
+              @fork="forkSession"
+              @open-tool-fullscreen="openToolFullscreen"
+              @toggle-tool="toggleTool"
+            />
+
             <article
-              v-if="item.type === 'tool'"
+              v-else-if="item.type === 'tool'"
               class="tool-card transcript-tool live-tool-card"
               :class="{
                 'is-running': item.status === 'running',

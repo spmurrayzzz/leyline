@@ -2115,6 +2115,26 @@ h1 {
   white-space: pre-wrap;
 }
 
+.json-output .json-key {
+  color: #bfb5ff;
+}
+
+.json-output .json-string {
+  color: #a7d8a9;
+}
+
+.json-output .json-number {
+  color: #f1c27d;
+}
+
+.json-output .json-boolean {
+  color: #8fc7ff;
+}
+
+.json-output .json-null {
+  color: #8f93a1;
+}
+
 .tool-preview-clip {
   position: relative;
   overflow: hidden;

@@ -7,6 +7,7 @@ import {
   messageBlocksFor,
   renderedBlock,
   renderedMessage,
+  renderedToolJson,
   skillSummaries,
 } from '../lib/transcript'
 
@@ -121,6 +122,11 @@ function copyGlyph(id) {
           Open full screen
         </button>
       </template>
+      <pre
+        v-else-if="renderedToolJson(entry)"
+        class="tool-output json-output"
+        v-html="renderedToolJson(entry)"
+      ></pre>
       <pre v-else class="tool-output">{{ entry.text }}</pre>
     </div>
   </article>

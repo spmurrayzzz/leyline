@@ -1069,7 +1069,7 @@ function toMessageEntryDto(entry, toolCalls) {
       code: annotation.code,
       toolCallId: message.toolCallId,
       toolName: message.toolName,
-      text: preview ? text : truncate(text, 900),
+      text,
       preview,
       isError: message.isError,
       timestamp: entry.timestamp,
