@@ -2190,6 +2190,17 @@ function closePickerMenus() {
         </header>
         <div class="tool-fullscreen-body">
           <div
+            v-if="
+              fullscreenTool.isError &&
+              fullscreenTool.preview &&
+              fullscreenTool.text
+            "
+            class="tool-error-summary"
+          >
+            <strong>Error</strong>
+            <pre>{{ fullscreenTool.text }}</pre>
+          </div>
+          <div
             v-if="fullscreenTool.preview?.kind === 'image'"
             class="tool-fullscreen-image"
           >

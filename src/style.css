@@ -2264,6 +2264,34 @@ h1 {
   color: #8f93a1;
 }
 
+.tool-error-summary {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 9px;
+  border: 1px solid rgb(216 138 150 / 28%);
+  border-radius: 10px;
+  background: rgb(160 78 90 / 10%);
+  padding: 9px 10px;
+}
+
+.tool-error-summary strong {
+  color: #f0a4ae;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tool-error-summary pre {
+  overflow: auto;
+  max-height: 140px;
+  margin: 0;
+  color: #e4c2c7;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
 .tool-preview-clip {
   position: relative;
   overflow: hidden;

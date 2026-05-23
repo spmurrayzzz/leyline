@@ -100,6 +100,13 @@ function copyGlyph(id) {
       </button>
     </div>
     <div v-if="toolExpanded" class="tool-expanded-body" @click.stop>
+      <div
+        v-if="entry.isError && entry.preview && entry.text"
+        class="tool-error-summary"
+      >
+        <strong>Error</strong>
+        <pre>{{ entry.text }}</pre>
+      </div>
       <template v-if="entry.preview?.kind === 'image'">
         <div class="tool-preview-clip tool-image-preview">
           <img :src="imageSrc(entry.preview)" alt="Read image preview" />
