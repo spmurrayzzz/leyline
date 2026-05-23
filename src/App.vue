@@ -395,7 +395,10 @@ const startupSteps = computed(() => {
   if (!run) return []
 
   return [
-    startupStep('accepted', 'Prompt accepted'),
+    startupStep(
+      'accepted',
+      run.hasPrompt ? 'Prompt accepted' : 'Project selected',
+    ),
     startupStep('creating', `Creating session in ${run.project}`),
     run.model ? startupStep('model', `Applying ${run.model}`) : null,
     run.thinking
@@ -626,7 +629,20 @@ async function loadStartRuntimeState(cwd) {
 }
 
 async function createSession(project) {
-  await createSessionForCwd(project.cwd)
+  if (selectedSession.value || startupRun.value) {
+    await createSessionForCwd(project.cwd)
+    return
+  }
+
+  beginStartupRun(project.cwd, { hasPrompt: false })
+
+  try {
+    await wait(startupAcceptedFloorMs)
+    await runStartupPhase('creating', () => createSessionForCwd(project.cwd))
+  } finally {
+    await wait(260)
+    finishStartupRun()
+  }
 }
 
 async function handleNativeNewSession() {
@@ -915,7 +931,11 @@ function startupStepsForRun(run) {
 }
 
 function startupStatusDetail(phase) {
-  if (phase === 'accepted') return 'Request received; preparing the run.'
+  if (phase === 'accepted') {
+    return startupRun.value?.hasPrompt
+      ? 'Request received; preparing the run.'
+      : 'Request received; preparing a fresh session.'
+  }
   if (phase === 'creating') {
     return 'Opening a fresh pi session for this project.'
   }
