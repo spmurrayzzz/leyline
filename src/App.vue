@@ -1056,11 +1056,16 @@ async function submitDraft() {
   activeLiveAssistantId = ''
   clearLiveToolSettleTimers()
   const localEntry = pendingUserEntry(text, images)
-  if (editing) trimSessionToEntry(editing.id)
+  const shouldFollowOutput = editing || stickToBottom.value
+  if (editing) {
+    trimSessionToEntry(editing.id)
+    stickToBottom.value = true
+    hasNewOutput.value = false
+  }
   localEntries.value = [...localEntries.value, localEntry]
   promptSubmitting.value = true
   promptError.value = ''
-  if (stickToBottom.value) await scrollToLatest()
+  if (shouldFollowOutput) await scrollToLatest()
   else hasNewOutput.value = true
 
   try {
