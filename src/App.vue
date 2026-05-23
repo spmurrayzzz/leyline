@@ -395,6 +395,7 @@ onMounted(async () => {
   window.addEventListener('click', closeMenusOnOutsideClick)
   window.addEventListener('popstate', handleRouteChange)
   window.addEventListener('leyline:new-session', handleNativeNewSession)
+  window.addEventListener('leyline:toggle-terminal', handleNativeToggleTerminal)
   openEventStream()
   await loadSessions({ routeSessionId: sessionIdFromRoute() })
 })
@@ -404,6 +405,7 @@ onUnmounted(() => {
   window.removeEventListener('click', closeMenusOnOutsideClick)
   window.removeEventListener('popstate', handleRouteChange)
   window.removeEventListener('leyline:new-session', handleNativeNewSession)
+  window.removeEventListener('leyline:toggle-terminal', handleNativeToggleTerminal)
   stopTerminalResize()
   closeEventStream()
   closeTerminalPanel()
@@ -505,6 +507,12 @@ async function handleNativeNewSession() {
   if (agentRunning.value || creatingSessionCwd.value) return
 
   await createSessionForCwd(selectedSession.value.cwd)
+}
+
+async function handleNativeToggleTerminal() {
+  if (!selectedSession.value || initializing.value) return
+
+  await toggleTerminal()
 }
 
 async function createSessionForCwd(cwd) {

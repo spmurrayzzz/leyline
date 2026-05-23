@@ -32,24 +32,37 @@ async function createWindow() {
   })
 
   mainWindow.webContents.on('before-input-event', (event, input) => {
+    const key = input.key?.toLowerCase()
     const isNewSession = input.type === 'keyDown'
-      && input.key?.toLowerCase() === 'n'
+      && key === 'n'
       && (input.meta || input.control)
+    const isToggleTerminal = input.type === 'keyDown'
+      && key === 't'
+      && input.meta
 
-    if (!isNewSession) return
+    if (!isNewSession && !isToggleTerminal) return
 
     event.preventDefault()
-    sendNewSessionCommand(mainWindow)
+    if (isNewSession) sendNewSessionCommand(mainWindow)
+    if (isToggleTerminal) sendToggleTerminalCommand(mainWindow)
   })
 
   await mainWindow.loadURL(url)
 }
 
 function sendNewSessionCommand(window) {
+  sendWindowCommand(window, 'leyline:new-session')
+}
+
+function sendToggleTerminalCommand(window) {
+  sendWindowCommand(window, 'leyline:toggle-terminal')
+}
+
+function sendWindowCommand(window, name) {
   if (!window || window.isDestroyed()) return
 
   window.webContents.executeJavaScript(
-    "window.dispatchEvent(new CustomEvent('leyline:new-session'))",
+    `window.dispatchEvent(new CustomEvent('${name}'))`,
   ).catch(() => {})
 }
 
