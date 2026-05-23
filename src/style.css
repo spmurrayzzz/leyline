@@ -2060,6 +2060,188 @@ h1 {
   font-size: 11px;
 }
 
+.run-status-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 13px;
+  width: min(var(--content-max), 100%);
+  margin: 14px auto 0;
+  border: 1px solid rgb(124 92 255 / 22%);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgb(124 92 255 / 10%), rgb(17 18 24 / 90%) 48%),
+    #14151b;
+  padding: 13px 14px;
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 4%) inset,
+    0 18px 46px rgb(0 0 0 / 18%);
+}
+
+.start-run-status {
+  width: min(760px, 100%);
+  margin-top: 16px;
+}
+
+.workbench-run-status {
+  margin-bottom: 6px;
+}
+
+.run-status-orb {
+  position: relative;
+  width: 12px;
+  height: 12px;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: #bfb5ff;
+  box-shadow: 0 0 0 5px rgb(124 92 255 / 12%);
+}
+
+.run-status-orb::after {
+  position: absolute;
+  inset: -5px;
+  border: 1px solid rgb(191 181 255 / 28%);
+  border-radius: inherit;
+  content: '';
+  animation: run-status-pulse 1300ms ease-out infinite;
+}
+
+.run-status-main {
+  min-width: 0;
+}
+
+.run-status-main strong,
+.run-status-main > span {
+  display: block;
+}
+
+.run-status-main strong {
+  overflow: hidden;
+  color: #ececf3;
+  font-size: 13px;
+  font-weight: 760;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.run-status-main > span {
+  margin-top: 3px;
+  color: #8f91a0;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.run-status-progress {
+  position: relative;
+  height: 2px;
+  overflow: hidden;
+  margin-top: 10px;
+  border-radius: 999px;
+  background: rgb(124 92 255 / 10%);
+}
+
+.run-status-progress i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -38%;
+  width: 38%;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    rgb(124 92 255 / 0%),
+    rgb(191 181 255 / 72%),
+    rgb(124 92 255 / 0%)
+  );
+  animation: run-status-rail 1450ms ease-in-out infinite;
+}
+
+.run-status-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.run-status-steps span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  border: 1px solid #2c2e37;
+  border-radius: 999px;
+  background: rgb(12 13 18 / 54%);
+  padding: 4px 8px;
+  color: #747887;
+  font-size: 11px;
+  font-weight: 720;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.run-status-steps span::before {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 999px;
+  background: #4b4f5d;
+  content: '';
+}
+
+.run-status-steps span.done {
+  border-color: rgb(130 214 154 / 18%);
+  color: #7fae8b;
+}
+
+.run-status-steps span.done::before {
+  background: #82d69a;
+}
+
+.run-status-steps span.active {
+  border-color: rgb(124 92 255 / 34%);
+  background: rgb(124 92 255 / 11%);
+  color: #c8c0ff;
+}
+
+.run-status-steps span.active::before {
+  background: #bfb5ff;
+  box-shadow: 0 0 0 4px rgb(124 92 255 / 13%);
+}
+
+.run-status-enter-active,
+.run-status-leave-active {
+  transition: opacity 170ms ease, transform 170ms ease;
+}
+
+.run-status-enter-from,
+.run-status-leave-to {
+  opacity: 0;
+  transform: translateY(5px) scale(0.995);
+}
+
+@keyframes run-status-pulse {
+  from {
+    opacity: 0.8;
+    transform: scale(0.8);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(1.8);
+  }
+}
+
+@keyframes run-status-rail {
+  0% {
+    transform: translateX(0);
+  }
+
+  55%,
+  100% {
+    transform: translateX(360%);
+  }
+}
+
 .empty-workbench {
   width: min(var(--content-max), 100%);
   margin-right: auto;

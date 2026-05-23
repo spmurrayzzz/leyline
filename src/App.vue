@@ -77,6 +77,9 @@ const eventLogOpen = ref(false)
 const settingsOpen = ref(false)
 const fullscreenTool = ref(null)
 const promptSubmitting = ref(false)
+const startupRun = ref(null)
+const startupPhaseSlow = ref(false)
+const promptSubmitSlow = ref(false)
 const interrupting = ref(false)
 const switchingModel = ref(false)
 const switchingThinking = ref(false)
@@ -115,6 +118,8 @@ let terminalResizeStartY = 0
 let terminalResizeStartHeight = 0
 let terminalResizeFrame = 0
 let refreshTimer
+let startupPhaseTimer
+let promptSubmitTimer
 let scrollFrame
 let liveAssistantFrame
 let liveToolSeq = 0
@@ -125,6 +130,8 @@ let copiedTimer
 let liveTurnAnchorLength = null
 const liveToolSettleTimers = new Map()
 const liveToolVisualFloorMs = 450
+const startupPhaseFloorMs = 650
+const startupAcceptedFloorMs = 420
 
 const visibleProjects = computed(() => {
   const projects = new Map()
@@ -354,6 +361,65 @@ const sendButtonLabel = computed(() => {
   if (promptSubmitting.value || reloadingSession.value) return '…'
   return '↑'
 })
+const startupSteps = computed(() => {
+  const run = startupRun.value
+  if (!run) return []
+
+  return [
+    startupStep('accepted', 'Prompt accepted'),
+    startupStep('creating', `Creating session in ${run.project}`),
+    run.model ? startupStep('model', `Applying ${run.model}`) : null,
+    run.thinking
+      ? startupStep('thinking', `Setting thinking · ${run.thinking}`)
+      : null,
+    run.hasPrompt
+      ? startupStep('submitting', 'Submitting to pi runtime')
+      : null,
+  ].filter(Boolean)
+})
+const startupStatus = computed(() => {
+  const run = startupRun.value
+  if (!run) return null
+  const active = startupSteps.value.find((step) => step.active)
+    || startupSteps.value.at(-1)
+
+  return {
+    title: active?.label || 'Preparing run',
+    detail: startupPhaseSlow.value
+      ? 'Still working; waiting on local pi runtime.'
+      : startupStatusDetail(run.phase),
+    steps: startupSteps.value,
+  }
+})
+const promptSubmitStatus = computed(() => {
+  if (!promptSubmitting.value || agentRunning.value) return null
+
+  return {
+    title: 'Submitting prompt',
+    detail: promptSubmitSlow.value
+      ? 'Still waiting for runtime preflight to finish.'
+      : 'Validating model, context, and tool state before the run starts.',
+    steps: [
+      { id: 'accepted', label: 'Prompt accepted', done: true, active: false },
+      {
+        id: 'submitting',
+        label: 'Submitting to pi runtime',
+        done: false,
+        active: true,
+      },
+    ],
+  }
+})
+const startFlowVisible = computed(() => {
+  return !selectedSession.value || Boolean(startupRun.value)
+})
+const runtimeChromeVisible = computed(() => {
+  return initializing.value || (selectedSession.value && !startupRun.value)
+})
+const workbenchRunStatus = computed(() => {
+  if (startupRun.value) return null
+  return promptSubmitStatus.value
+})
 const editingLabel = computed(() => {
   if (!editingEntry.value) return ''
   return 'Editing earlier message · send to replace the current branch'
@@ -410,6 +476,8 @@ onUnmounted(() => {
   closeEventStream()
   closeTerminalPanel()
   clearTimeout(refreshTimer)
+  clearTimeout(startupPhaseTimer)
+  clearTimeout(promptSubmitTimer)
   clearTimeout(copiedTimer)
   clearLiveToolSettleTimers()
   cancelAnimationFrame(scrollFrame)
@@ -622,6 +690,7 @@ function clearSelectedSession() {
   expandedSkills.value = new Set()
   localEntries.value = []
   editingEntry.value = null
+  finishStartupRun()
   resetLiveState()
 }
 
@@ -636,6 +705,101 @@ function resetLiveState() {
   pendingAssistantEvent = undefined
   clearLiveToolSettleTimers()
   cancelAnimationFrame(liveAssistantFrame)
+}
+
+function beginStartupRun(cwd, options = {}) {
+  startupRun.value = {
+    cwd,
+    project: projectName(cwd),
+    hasPrompt: options.hasPrompt,
+    model: options.model ? modelChip(options.model) : '',
+    thinking: options.thinkingLevel ? formatMode(options.thinkingLevel) : '',
+    phase: 'accepted',
+  }
+  setStartupPhase('accepted')
+}
+
+function setStartupPhase(phase) {
+  if (!startupRun.value) return
+
+  startupRun.value = { ...startupRun.value, phase }
+  startupPhaseSlow.value = false
+  clearTimeout(startupPhaseTimer)
+  startupPhaseTimer = setTimeout(() => {
+    if (startupRun.value?.phase === phase) startupPhaseSlow.value = true
+  }, 4500)
+}
+
+async function runStartupPhase(phase, task) {
+  setStartupPhase(phase)
+  const started = Date.now()
+  const result = await task()
+  const elapsed = Date.now() - started
+  const remaining = Math.max(0, startupPhaseFloorMs - elapsed)
+  if (remaining) await wait(remaining)
+  return result
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function finishStartupRun() {
+  startupRun.value = null
+  startupPhaseSlow.value = false
+  clearTimeout(startupPhaseTimer)
+}
+
+function startupStep(id, label) {
+  const phases = startupStepsForRun(startupRun.value)
+  const activeIndex = Math.max(0, phases.indexOf(startupRun.value?.phase))
+  const index = phases.indexOf(id)
+
+  return {
+    id,
+    label,
+    active: index === activeIndex,
+    done: index < activeIndex,
+  }
+}
+
+function startupStepsForRun(run) {
+  if (!run) return []
+  return [
+    'accepted',
+    'creating',
+    run.model ? 'model' : '',
+    run.thinking ? 'thinking' : '',
+    run.hasPrompt ? 'submitting' : '',
+  ].filter(Boolean)
+}
+
+function startupStatusDetail(phase) {
+  if (phase === 'accepted') return 'Request received; preparing the run.'
+  if (phase === 'creating') {
+    return 'Opening a fresh pi session for this project.'
+  }
+  if (phase === 'model') {
+    return 'Syncing the selected model before the first turn.'
+  }
+  if (phase === 'thinking') return 'Applying the selected reasoning level.'
+  if (phase === 'submitting') return 'Handing the prompt to the active runtime.'
+  return 'Preparing run.'
+}
+
+function startPromptSubmitTimer() {
+  promptSubmitSlow.value = false
+  clearTimeout(promptSubmitTimer)
+  promptSubmitTimer = setTimeout(() => {
+    if (promptSubmitting.value && !agentRunning.value) {
+      promptSubmitSlow.value = true
+    }
+  }, 4500)
+}
+
+function stopPromptSubmitTimer() {
+  promptSubmitSlow.value = false
+  clearTimeout(promptSubmitTimer)
 }
 
 function navigateHome() {
@@ -1244,6 +1408,7 @@ async function submitDraft() {
   localEntries.value = [...localEntries.value, localEntry]
   liveTurnAnchorLength = rawEntries.value.length
   promptSubmitting.value = true
+  startPromptSubmitTimer()
   promptError.value = ''
   if (shouldFollowOutput) await scrollToLatest()
   else hasNewOutput.value = true
@@ -1273,6 +1438,7 @@ async function submitDraft() {
     resetLiveState()
   } finally {
     promptSubmitting.value = false
+    stopPromptSubmitTimer()
   }
 }
 
@@ -1735,15 +1901,30 @@ async function submitStartDraft() {
   const text = draft.value.trim()
   const model = startSelectedModel.value
   const thinkingLevel = startSelectedThinkingLevel.value
-  if (!newSessionCwd.value.trim() || creatingSessionCwd.value) return
-  await createSessionForCwd(newSessionCwd.value)
-  if (model && selectedSession.value) {
-    activeRuntimeSession.value = await switchPiModel(model.provider, model.id)
+  const targetCwd = newSessionCwd.value.trim()
+  const hasPrompt = Boolean(text || attachedImages.value.length)
+  if (!targetCwd || creatingSessionCwd.value) return
+
+  beginStartupRun(targetCwd, { hasPrompt, model, thinkingLevel })
+
+  try {
+    await wait(startupAcceptedFloorMs)
+    await runStartupPhase('creating', () => createSessionForCwd(targetCwd))
+    if (model && selectedSession.value) {
+      activeRuntimeSession.value = await runStartupPhase('model', () => {
+        return switchPiModel(model.provider, model.id)
+      })
+    }
+    if (thinkingLevel && selectedSession.value) {
+      activeRuntimeSession.value = await runStartupPhase('thinking', () => {
+        return switchPiThinkingLevel(thinkingLevel)
+      })
+    }
+    if (hasPrompt) await runStartupPhase('submitting', submitDraft)
+  } finally {
+    await wait(260)
+    finishStartupRun()
   }
-  if (thinkingLevel && selectedSession.value) {
-    activeRuntimeSession.value = await switchPiThinkingLevel(thinkingLevel)
-  }
-  if (text || attachedImages.value.length) await submitDraft()
 }
 
 function closeMenusOnEscape(event) {
@@ -1777,7 +1958,7 @@ function closePickerMenus() {
     :class="{
       'sidebar-open': sidebarOpen,
       'sidebar-hidden': desktopSidebarHidden,
-      'start-state': !initializing && !selectedSession,
+      'start-state': !initializing && startFlowVisible,
       'terminal-open': terminalOpen,
     }"
     :style="{ '--terminal-drawer-height': `${terminalDrawerHeight}px` }"
@@ -1834,7 +2015,7 @@ function closePickerMenus() {
     />
 
     <section class="main-pane">
-      <div v-if="initializing || selectedSession" class="runtime-chrome">
+      <div v-if="runtimeChromeVisible" class="runtime-chrome">
         <header class="topbar">
         <button
           class="mobile-sidebar-button"
@@ -1935,8 +2116,8 @@ function closePickerMenus() {
         :class="{
           'init-workbench': initializing,
           'session-loading-workbench': sessionLoading,
-          'start-workbench-shell': !initializing && !selectedSession,
-          'empty-selected-workbench': isEmptySelectedSession,
+          'start-workbench-shell': !initializing && startFlowVisible,
+          'empty-selected-workbench': isEmptySelectedSession && !startupRun,
         }"
         @scroll="handleWorkbenchScroll"
       >
@@ -1968,7 +2149,7 @@ function closePickerMenus() {
         <div v-else-if="sessionError" class="empty-workbench error-note">
           {{ sessionError }}
         </div>
-        <div v-else-if="!selectedSession" class="start-panel">
+        <div v-else-if="startFlowVisible" class="start-panel">
           <h2>What should we work on?</h2>
           <StartComposer
             v-model:draft="draft"
@@ -1977,7 +2158,7 @@ function closePickerMenus() {
             :available-models="availableModels"
             :available-thinking-levels="availableThinkingLevels"
             :chips="composerChips"
-            :creating-session-cwd="creatingSessionCwd"
+            :creating-session-cwd="creatingSessionCwd || startupRun?.cwd || ''"
             :current-model-label="currentModelLabel"
             :current-thinking-label="currentThinkingLabel"
             :image-support-warning="imageSupportWarning"
@@ -2009,15 +2190,68 @@ function closePickerMenus() {
             @toggle-picker="togglePicker"
             @toggle-project-picker="startProjectPickerOpen = !startProjectPickerOpen"
           />
+          <Transition name="run-status">
+            <section
+              v-if="startupStatus"
+              class="run-status-card start-run-status"
+              aria-live="polite"
+            >
+              <div class="run-status-orb" aria-hidden="true"></div>
+              <div class="run-status-main">
+                <strong>{{ startupStatus.title }}</strong>
+                <span>{{ startupStatus.detail }}</span>
+                <div class="run-status-progress" aria-hidden="true">
+                  <i></i>
+                </div>
+                <div class="run-status-steps">
+                  <span
+                    v-for="step in startupStatus.steps"
+                    :key="step.id"
+                    :class="{
+                      done: step.done,
+                      active: step.active,
+                    }"
+                  >{{ step.label }}</span>
+                </div>
+              </div>
+            </section>
+          </Transition>
         </div>
         <div
-          v-if="isEmptySelectedSession"
+          v-if="isEmptySelectedSession && !startupRun"
           class="empty-session-panel"
         >
           <h2>What should we work on in {{ topbarTitle }}?</h2>
         </div>
 
-        <template v-else-if="selectedSession && entries.length > 0">
+        <Transition name="run-status">
+          <section
+            v-if="workbenchRunStatus"
+            class="run-status-card workbench-run-status"
+            aria-live="polite"
+          >
+            <div class="run-status-orb" aria-hidden="true"></div>
+            <div class="run-status-main">
+              <strong>{{ workbenchRunStatus.title }}</strong>
+              <span>{{ workbenchRunStatus.detail }}</span>
+              <div class="run-status-progress" aria-hidden="true">
+                <i></i>
+              </div>
+              <div class="run-status-steps">
+                <span
+                  v-for="step in workbenchRunStatus.steps"
+                  :key="step.id"
+                  :class="{
+                    done: step.done,
+                    active: step.active,
+                  }"
+                >{{ step.label }}</span>
+              </div>
+            </div>
+          </section>
+        </Transition>
+
+        <template v-if="selectedSession && !startupRun && entries.length > 0">
           <TranscriptEntry
             v-for="entry in entries"
             :key="entry.id"
@@ -2034,7 +2268,12 @@ function closePickerMenus() {
           />
         </template>
 
-        <TransitionGroup name="live-row" tag="div" class="live-stack">
+        <TransitionGroup
+          v-if="!startupRun"
+          name="live-row"
+          tag="div"
+          class="live-stack"
+        >
           <div v-for="item in liveItems" :key="item.id" class="live-item">
             <TranscriptEntry
               v-if="item.type === 'tool' && item.persistedEntry"
@@ -2117,12 +2356,15 @@ function closePickerMenus() {
       </Transition>
 
       <div
-        v-if="selectedSession && !initializing && !isEmptySelectedSession"
+        v-if="selectedSession
+          && !initializing
+          && !isEmptySelectedSession
+          && !startupRun"
         class="composer-fade"
       ></div>
 
       <SessionComposer
-        v-if="selectedSession && !initializing"
+        v-if="selectedSession && !initializing && !startupRun"
         ref="composerRef"
         v-model:draft="draft"
         :agent-running="agentRunning"
