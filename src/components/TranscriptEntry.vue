@@ -114,12 +114,14 @@ function copyGlyph(id) {
         </button>
       </template>
       <template v-else>
-        <pre
-          v-if="renderedToolJson(entry)"
-          class="tool-output json-output"
-          v-html="renderedToolJson(entry)"
-        ></pre>
-        <pre v-else class="tool-output">{{ entry.text }}</pre>
+        <div class="tool-preview-clip tool-plain-preview">
+          <pre
+            v-if="renderedToolJson(entry)"
+            class="tool-output json-output"
+            v-html="renderedToolJson(entry)"
+          ></pre>
+          <pre v-else class="tool-output">{{ entry.text }}</pre>
+        </div>
         <button
           class="tool-preview-cta"
           type="button"

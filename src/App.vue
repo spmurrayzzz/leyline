@@ -2004,12 +2004,14 @@ function closePickerMenus() {
             :preview="fullscreenTool.preview"
             :clipped="false"
           />
-          <pre
-            v-else-if="renderedToolJson(fullscreenTool)"
-            class="tool-output json-output"
-            v-html="renderedToolJson(fullscreenTool)"
-          ></pre>
-          <pre v-else class="tool-output">{{ fullscreenTool.text }}</pre>
+          <div v-else class="tool-fullscreen-plain">
+            <pre
+              v-if="renderedToolJson(fullscreenTool)"
+              class="tool-output json-output"
+              v-html="renderedToolJson(fullscreenTool)"
+            ></pre>
+            <pre v-else class="tool-output">{{ fullscreenTool.text }}</pre>
+          </div>
         </div>
       </section>
     </div>
