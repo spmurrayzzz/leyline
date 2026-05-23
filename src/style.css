@@ -1041,6 +1041,17 @@ h1 {
   font-weight: 800;
 }
 
+.topbar-runtime-pill {
+  overflow: hidden;
+  max-width: 180px;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  background: #17181e;
+  padding: 3px 8px;
+  color: #a3a3a3;
+  text-overflow: ellipsis;
+}
+
 .event-log-button,
 .delete-session-button {
   border: 1px solid var(--border);

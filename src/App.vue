@@ -750,6 +750,7 @@ function clearLiveToolSettleTimers() {
 }
 
 function isRenderableEntry(entry) {
+  if (entry.type === 'event') return false
   if (entry.type !== 'message') return true
   if (entry.role !== 'assistant') return true
   return Boolean(entry.blocks?.length || entry.text?.trim())
@@ -1599,6 +1600,8 @@ function closePickerMenus() {
         </div>
         <div v-if="selectedSession" class="topbar-meta">
           <span v-if="agentRunning" class="running-pill">running</span>
+          <span class="topbar-runtime-pill">{{ currentModelLabel }}</span>
+          <span class="topbar-runtime-pill">{{ currentThinkingLabel }}</span>
           <button
             class="event-log-button"
             type="button"

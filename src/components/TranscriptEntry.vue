@@ -49,14 +49,6 @@ function copyGlyph(id) {
     <button
       class="copy-button"
       type="button"
-      title="Fork from here"
-      @click="emit('fork', entry)"
-    >
-      ⎇
-    </button>
-    <button
-      class="copy-button"
-      type="button"
       :title="copyTitle(entry.id)"
       @click="emit('copy', entry)"
     >
