@@ -124,7 +124,7 @@ async function loadLoginShellEnvironment() {
 
       const key = entry.slice(0, index)
       const value = entry.slice(index + 1)
-      if (!process.env[key]) process.env[key] = value
+      if (key === 'PATH' || !process.env[key]) process.env[key] = value
     }
   } catch {
   }
