@@ -36,6 +36,7 @@ import {
 } from './lib/pi-api'
 import {
   imageBlocksFor,
+  imageSrc,
   messageBlocks,
   messageBlocksFor,
   renderedToolJson,
@@ -1999,8 +2000,14 @@ function closePickerMenus() {
           </div>
         </header>
         <div class="tool-fullscreen-body">
+          <div
+            v-if="fullscreenTool.preview?.kind === 'image'"
+            class="tool-fullscreen-image"
+          >
+            <img :src="imageSrc(fullscreenTool.preview)" alt="Read image preview" />
+          </div>
           <PierrePreview
-            v-if="fullscreenTool.preview"
+            v-else-if="fullscreenTool.preview"
             :preview="fullscreenTool.preview"
             :clipped="false"
           />

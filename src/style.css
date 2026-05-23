@@ -2169,6 +2169,21 @@ h1 {
   min-height: 0;
 }
 
+.tool-image-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+}
+
+.tool-image-preview img {
+  display: block;
+  max-width: 100%;
+  max-height: 396px;
+  border-radius: 8px;
+  object-fit: contain;
+}
+
 .tool-preview-fade {
   position: absolute;
   right: 0;
@@ -2267,6 +2282,25 @@ h1 {
 
 .tool-fullscreen-body .tool-output {
   max-height: none;
+}
+
+.tool-fullscreen-image {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: #0f1014;
+  padding: 16px;
+}
+
+.tool-fullscreen-image img {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100vh - 132px);
+  border-radius: 8px;
+  object-fit: contain;
 }
 
 .tool-fullscreen-plain {

@@ -100,7 +100,12 @@ function copyGlyph(id) {
       </button>
     </div>
     <div v-if="toolExpanded" class="tool-expanded-body" @click.stop>
-      <template v-if="entry.preview">
+      <template v-if="entry.preview?.kind === 'image'">
+        <div class="tool-preview-clip tool-image-preview">
+          <img :src="imageSrc(entry.preview)" alt="Read image preview" />
+        </div>
+      </template>
+      <template v-else-if="entry.preview">
         <div class="tool-preview-clip">
           <PierrePreview :preview="entry.preview" clipped />
           <div class="tool-preview-fade"></div>

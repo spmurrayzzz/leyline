@@ -1060,7 +1060,7 @@ function toMessageEntryDto(entry, toolCalls) {
   if (message.role === 'toolResult') {
     const call = toolCalls.get(message.toolCallId)
     const annotation = toolAnnotation(message.toolName, call)
-    const preview = toolPreview(message.toolName, call, text)
+    const preview = toolPreview(message.toolName, call, message.content, text)
 
     return {
       id: entry.id,
@@ -1131,10 +1131,12 @@ function messageBlocks(content) {
     .filter((block) => block?.text || block?.data)
 }
 
-function toolPreview(toolName, call, text) {
+function toolPreview(toolName, call, content, text) {
   const args = call?.arguments || {}
 
   if (toolName === 'read' && args.path && !skillNameFromPath(args.path)) {
+    const image = imageBlockFromContent(content)
+    if (image) return { kind: 'image', path: args.path, ...image }
     return { kind: 'file', path: args.path, content: text }
   }
 
@@ -1159,6 +1161,13 @@ function toolPreview(toolName, call, text) {
 function bashPreview(text) {
   if (!looksLikePatch(text)) return undefined
   return { kind: 'patch', patch: text }
+}
+
+function imageBlockFromContent(content) {
+  if (!Array.isArray(content)) return undefined
+  const image = content.find((block) => block.type === 'image' && block.data)
+  if (!image) return undefined
+  return { data: image.data, mimeType: image.mimeType || 'image/png' }
 }
 
 function looksLikePatch(text) {
