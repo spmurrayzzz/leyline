@@ -71,7 +71,7 @@ const emit = defineEmits([
         aria-label="Go to home"
         @click="emit('navigate-home')"
       >
-        <img class="brand-mark" src="/favicon.svg" alt="" />
+        <img class="brand-mark" src="/brand-mark.svg" alt="" />
         <span class="brand-name">
           <strong>Leyline</strong>
         </span>

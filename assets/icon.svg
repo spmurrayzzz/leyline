@@ -1,12 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-  <g transform="translate(12 12) scale(0.8125)">
-    <rect width="128" height="128" rx="28" fill="#111019"/>
-    <path d="M63 72c12 3 22 11 31 24" fill="none" stroke="#60a5fa" stroke-width="9" stroke-linecap="round"/>
-    <path d="M33 96c17-8 27-22 30-42 3-16 15-24 35-24" fill="none" stroke="#a78bfa" stroke-width="9" stroke-linecap="round"/>
-    <g fill="#f4f0ff">
-      <circle cx="33" cy="96" r="9"/>
-      <circle cx="98" cy="30" r="9"/>
-      <circle cx="94" cy="96" r="9"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#181826"/>
+      <stop offset="100%" stop-color="#0e0e16"/>
+    </linearGradient>
+    <filter id="shadow" x="0" y="0" width="1024" height="1024" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="12" stdDeviation="28" flood-color="#000" flood-opacity="0.45"/>
+    </filter>
+    <filter id="glyph-shadow" x="120" y="120" width="784" height="784" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="12" stdDeviation="10" flood-color="#000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  <g filter="url(#shadow)">
+    <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/>
+    <rect x="100" y="100" width="824" height="824" rx="185" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="3"/>
+    <g transform="translate(126 126) scale(6.25)">
+      <g filter="url(#glyph-shadow)">
+        <path d="M63 72c12 3 22 11 31 24" fill="none" stroke="#60a5fa" stroke-width="9" stroke-linecap="round"/>
+        <path d="M33 96c17-8 27-22 30-42 3-16 15-24 35-24" fill="none" stroke="#a78bfa" stroke-width="9" stroke-linecap="round"/>
+      </g>
+      <g fill="#f4f0ff">
+        <circle cx="33" cy="96" r="9"/>
+        <circle cx="98" cy="30" r="9"/>
+        <circle cx="94" cy="96" r="9"/>
+      </g>
     </g>
   </g>
 </svg>

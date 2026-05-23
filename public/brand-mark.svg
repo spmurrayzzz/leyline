@@ -4,17 +4,12 @@
       <stop offset="0%" stop-color="#181826"/>
       <stop offset="100%" stop-color="#0e0e16"/>
     </linearGradient>
-    <filter id="glyph-shadow" x="0" y="0" width="128" height="128" filterUnits="userSpaceOnUse">
-      <feDropShadow dx="0" dy="2" stdDeviation="1.5" flood-color="#000" flood-opacity="0.35"/>
-    </filter>
   </defs>
   <rect width="128" height="128" rx="28" fill="url(#bg)"/>
   <rect width="128" height="128" rx="28" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="1.5"/>
   <g transform="translate(12 12) scale(0.8125)">
-    <g filter="url(#glyph-shadow)">
-      <path d="M63 72c12 3 22 11 31 24" fill="none" stroke="#60a5fa" stroke-width="9" stroke-linecap="round"/>
-      <path d="M33 96c17-8 27-22 30-42 3-16 15-24 35-24" fill="none" stroke="#a78bfa" stroke-width="9" stroke-linecap="round"/>
-    </g>
+    <path d="M63 72c12 3 22 11 31 24" fill="none" stroke="#60a5fa" stroke-width="9" stroke-linecap="round"/>
+    <path d="M33 96c17-8 27-22 30-42 3-16 15-24 35-24" fill="none" stroke="#a78bfa" stroke-width="9" stroke-linecap="round"/>
     <g fill="#f4f0ff">
       <circle cx="33" cy="96" r="9"/>
       <circle cx="98" cy="30" r="9"/>

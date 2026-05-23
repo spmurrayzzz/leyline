@@ -153,18 +153,11 @@ button {
   cursor: pointer;
 }
 
-.brand-home:hover .brand-mark {
-  border-color: var(--accent-border);
-}
-
 .brand-mark {
   display: block;
   width: 30px;
   height: 30px;
-  padding: 3px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: #1c1a25;
+  filter: drop-shadow(0.5px 1px 0.5px rgba(167, 139, 250, 0.16));
 }
 
 .brand-name {
