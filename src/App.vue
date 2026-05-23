@@ -506,27 +506,23 @@ const startupStatus = computed(() => {
 })
 const promptSubmitStatus = computed(() => {
   if (!promptSubmitting.value || agentRunning.value) return null
+  if (shellCommandSubmitting.value) return null
 
-  const isShellCommand = shellCommandSubmitting.value
   return {
-    title: isShellCommand ? 'Running shell command' : 'Submitting prompt',
-    detail: isShellCommand
-      ? 'Executing in the active session working directory.'
-      : promptSubmitSlow.value
-        ? 'Still waiting for runtime preflight to finish.'
-        : 'Validating model, context, and tool state before the run starts.',
+    title: 'Submitting prompt',
+    detail: promptSubmitSlow.value
+      ? 'Still waiting for runtime preflight to finish.'
+      : 'Validating model, context, and tool state before the run starts.',
     steps: [
       {
         id: 'accepted',
-        label: isShellCommand ? 'Command accepted' : 'Prompt accepted',
+        label: 'Prompt accepted',
         done: true,
         active: false,
       },
       {
         id: 'submitting',
-        label: isShellCommand
-          ? 'Running shell command'
-          : 'Submitting to pi runtime',
+        label: 'Submitting to pi runtime',
         done: false,
         active: true,
       },
@@ -1807,7 +1803,11 @@ async function submitShellCommand(shellCommand, images) {
   startPromptSubmitTimer()
   promptError.value = ''
   if (!agentRunning.value) resetLiveState()
-  liveActivity.value = 'Running shell command…'
+  upsertLiveTool({
+    type: 'tool_execution_start',
+    toolName: 'bash',
+    args: { command: shellCommand.command },
+  }, 'running')
 
   try {
     const data = await runShellCommand(
@@ -1815,11 +1815,15 @@ async function submitShellCommand(shellCommand, images) {
       shellCommand.excludeFromContext,
     )
     if (data.active) activeRuntimeSession.value = data.active
-    if (data.detail) sessionDetail.value = data.detail
+    if (data.detail) {
+      sessionDetail.value = data.detail
+      reconcileLiveTools(data.detail)
+    }
     draft.value = ''
     await loadSessions({ selectFirst: false, showLoading: false })
     await scrollToLatest()
   } catch (error) {
+    finishLiveTools('error')
     promptError.value = error.message
   } finally {
     promptSubmitting.value = false
