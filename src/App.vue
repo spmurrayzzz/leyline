@@ -38,6 +38,7 @@ import {
   imageBlocksFor,
   messageBlocks,
   messageBlocksFor,
+  renderedToolJson,
   textFromBlocks,
   textFromContent,
 } from './lib/transcript'
@@ -2003,6 +2004,11 @@ function closePickerMenus() {
             :preview="fullscreenTool.preview"
             :clipped="false"
           />
+          <pre
+            v-else-if="renderedToolJson(fullscreenTool)"
+            class="tool-output json-output"
+            v-html="renderedToolJson(fullscreenTool)"
+          ></pre>
           <pre v-else class="tool-output">{{ fullscreenTool.text }}</pre>
         </div>
       </section>

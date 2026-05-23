@@ -2259,6 +2259,10 @@ h1 {
   padding: 12px;
 }
 
+.tool-fullscreen-body .tool-output {
+  max-height: none;
+}
+
 .error-card {
   border-color: rgb(160 78 90 / 42%);
 }

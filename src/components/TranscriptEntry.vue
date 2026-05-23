@@ -75,7 +75,6 @@ function copyGlyph(id) {
       </span>
       <em>{{ entry.isError ? 'error' : 'completed' }}</em>
       <button
-        v-if="entry.preview"
         class="copy-button"
         type="button"
         title="Open full screen"
@@ -114,12 +113,21 @@ function copyGlyph(id) {
           Open full screen
         </button>
       </template>
-      <pre
-        v-else-if="renderedToolJson(entry)"
-        class="tool-output json-output"
-        v-html="renderedToolJson(entry)"
-      ></pre>
-      <pre v-else class="tool-output">{{ entry.text }}</pre>
+      <template v-else>
+        <pre
+          v-if="renderedToolJson(entry)"
+          class="tool-output json-output"
+          v-html="renderedToolJson(entry)"
+        ></pre>
+        <pre v-else class="tool-output">{{ entry.text }}</pre>
+        <button
+          class="tool-preview-cta"
+          type="button"
+          @click="emit('open-tool-fullscreen', entry)"
+        >
+          Open full screen
+        </button>
+      </template>
     </div>
   </article>
 
