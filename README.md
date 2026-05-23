@@ -4,7 +4,7 @@ Leyline is a local web UI for pi coding-agent sessions. It uses Vue 3 and Vite
 for the frontend, with Vite middleware that talks to the pi SDK for session
 state, prompts, model controls, runtime events, and an embedded terminal.
 
-<img width="1624" height="1056" alt="image" src="https://github.com/user-attachments/assets/b1026bbb-b151-447a-85fd-c380fe8853cc" />
+<img width="1624" height="1056" alt="image" src="https://github.com/user-attachments/assets/f73c26f0-94a7-4646-809a-3fa38024b34d" />
 
 
 ## Features
