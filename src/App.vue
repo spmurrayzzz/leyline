@@ -133,6 +133,8 @@ const liveToolSettleTimers = new Map()
 const liveToolVisualFloorMs = 450
 const startupPhaseFloorMs = 650
 const startupAcceptedFloorMs = 420
+const sessionHandoffPhaseFloorMs = 320
+const sessionHandoffTotalFloorMs = 860
 
 const visibleProjects = computed(() => {
   const projects = new Map()
@@ -417,26 +419,11 @@ const sessionHandoffStatus = computed(() => {
 
   return {
     title: `Starting a new session in ${handoff.project}`,
-    detail: 'Clearing this transcript while pi prepares a fresh runtime.',
+    detail: sessionHandoffDetail(handoff.phase),
     steps: [
-      {
-        id: 'clearing',
-        label: 'Releasing current view',
-        done: true,
-        active: false,
-      },
-      {
-        id: 'creating',
-        label: 'Opening pi session',
-        done: false,
-        active: true,
-      },
-      {
-        id: 'loading',
-        label: 'Loading fresh transcript',
-        done: false,
-        active: false,
-      },
+      sessionHandoffStep(handoff, 'clearing', 'Releasing current view'),
+      sessionHandoffStep(handoff, 'creating', 'Opening pi session'),
+      sessionHandoffStep(handoff, 'loading', 'Loading fresh transcript'),
     ],
   }
 })
@@ -625,9 +612,14 @@ async function createSessionForCwd(cwd) {
     : null
 
   try {
-    const data = await createPiSession(targetCwd)
-    if (handoff) await finishSessionHandoffFloor(handoff)
+    if (handoff) await waitSessionHandoffPhaseFloor(handoff)
+    const data = handoff
+      ? await runSessionHandoffPhase(handoff, 'creating', () => {
+        return createPiSession(targetCwd)
+      })
+      : await createPiSession(targetCwd)
 
+    if (handoff) setSessionHandoffPhase(handoff, 'loading')
     await loadSessions({ selectFirst: false, showLoading: false })
     activeRuntimeSession.value = data.active
     sessionDetail.value = data.detail
@@ -644,6 +636,7 @@ async function createSessionForCwd(cwd) {
     stickToBottom.value = true
     hasNewOutput.value = false
     await scrollToLatest()
+    if (handoff) await finishSessionHandoffFloor(handoff)
     sidebarOpen.value = false
     if (terminalOpen.value) await connectTerminal()
   } catch (error) {
@@ -762,14 +755,61 @@ function beginSessionHandoff(cwd) {
     cwd,
     project: projectName(cwd),
     startedAt: Date.now(),
+    phase: 'clearing',
+    phaseStartedAt: Date.now(),
   }
   sessionHandoff.value = handoff
   return handoff
 }
 
+function sessionHandoffStep(handoff, id, label) {
+  const phases = ['clearing', 'creating', 'loading']
+  const activeIndex = Math.max(0, phases.indexOf(handoff.phase))
+  const index = phases.indexOf(id)
+
+  return {
+    id,
+    label,
+    active: index === activeIndex,
+    done: index < activeIndex,
+  }
+}
+
+function sessionHandoffDetail(phase) {
+  if (phase === 'clearing') return 'Clearing the current transcript view.'
+  if (phase === 'creating') return 'Opening a fresh pi session.'
+  if (phase === 'loading') return 'Loading the fresh transcript shell.'
+  return 'Preparing a fresh runtime.'
+}
+
+function setSessionHandoffPhase(handoff, phase) {
+  if (sessionHandoff.value?.id !== handoff.id) return
+  sessionHandoff.value = {
+    ...sessionHandoff.value,
+    phase,
+    phaseStartedAt: Date.now(),
+  }
+}
+
+async function runSessionHandoffPhase(handoff, phase, task) {
+  setSessionHandoffPhase(handoff, phase)
+  const result = await task()
+  await waitSessionHandoffPhaseFloor(handoff)
+  return result
+}
+
+async function waitSessionHandoffPhaseFloor(handoff) {
+  const current = sessionHandoff.value
+  if (current?.id !== handoff.id) return
+  const elapsed = Date.now() - current.phaseStartedAt
+  const remaining = Math.max(0, sessionHandoffPhaseFloorMs - elapsed)
+  if (remaining) await wait(remaining)
+}
+
 async function finishSessionHandoffFloor(handoff) {
+  await waitSessionHandoffPhaseFloor(handoff)
   const elapsed = Date.now() - handoff.startedAt
-  const remaining = Math.max(0, 720 - elapsed)
+  const remaining = Math.max(0, sessionHandoffTotalFloorMs - elapsed)
   if (remaining) await wait(remaining)
 }
 
