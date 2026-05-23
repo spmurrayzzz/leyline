@@ -1627,8 +1627,6 @@ function closePickerMenus() {
           <a
             class="event-log-button"
             :href="selectedSessionExportUrl"
-            target="_blank"
-            rel="noreferrer"
           >Export</a>
           <button
             class="delete-session-button"
