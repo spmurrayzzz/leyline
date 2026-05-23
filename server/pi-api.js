@@ -28,7 +28,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const BUNDLED_GOAL_EXTENSION = resolve(
   __dirname,
   '..',
-  'agent',
+  '.pi',
   'extensions',
   'goal',
   'index.ts',
