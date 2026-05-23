@@ -1750,6 +1750,32 @@ h1 {
   margin: 0 auto;
 }
 
+.workbench > .message,
+.workbench > .tool-card,
+.workbench > .live-stack,
+.workbench > .empty-session-panel {
+  transition:
+    opacity 260ms ease,
+    transform 260ms ease,
+    filter 260ms ease;
+}
+
+.session-handoff-workbench > .message,
+.session-handoff-workbench > .tool-card,
+.session-handoff-workbench > .live-stack {
+  opacity: 0;
+  filter: blur(2px);
+  pointer-events: none;
+  transform: translateY(-10px) scale(0.992);
+}
+
+.session-handoff-workbench > .empty-session-panel {
+  opacity: 0;
+  filter: blur(2px);
+  pointer-events: none;
+  transform: translateX(-50%) translateY(-10px) scale(0.992);
+}
+
 .live-item {
   width: 100%;
 }
@@ -2084,6 +2110,16 @@ h1 {
 
 .workbench-run-status {
   margin-bottom: 6px;
+}
+
+.session-handoff-card {
+  position: absolute;
+  top: 76px;
+  right: max(44px, calc((100% - var(--content-max)) / 2));
+  left: max(44px, calc((100% - var(--content-max)) / 2));
+  z-index: 6;
+  width: auto;
+  margin: 0;
 }
 
 .run-status-orb {
@@ -2813,9 +2849,17 @@ h1 {
   bottom: 0;
   left: 0;
   height: 190px;
-  transition: bottom 180ms ease;
+  transition:
+    bottom 180ms ease,
+    opacity 220ms ease,
+    transform 220ms ease;
   pointer-events: none;
   background: linear-gradient(rgb(13 14 17 / 0), var(--bg) 62%);
+}
+
+.session-handoff .composer-fade {
+  opacity: 0;
+  transform: translateY(12px);
 }
 
 .composer.empty-session-composer {
@@ -2980,7 +3024,10 @@ h1 {
   z-index: 5;
   bottom: 22px;
   left: 50%;
-  transition: bottom 180ms ease;
+  transition:
+    bottom 180ms ease,
+    opacity 220ms ease,
+    transform 220ms ease;
   width: min(var(--content-max), calc(100% - 88px));
   min-width: min(760px, calc(100vw - 88px));
   transform: translateX(-50%);
@@ -2988,6 +3035,19 @@ h1 {
   border-radius: 22px;
   background: #15121d;
   box-shadow: 0 14px 48px rgb(0 0 0 / 46%);
+}
+
+.composer.session-handoff-composer {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.composer.session-handoff-composer:not(.empty-session-composer) {
+  transform: translate(-50%, 14px) scale(0.99);
+}
+
+.composer.session-handoff-composer.empty-session-composer {
+  transform: translate(-50%, calc(-50% + 14px)) scale(0.99);
 }
 
 .editing-banner {

@@ -78,6 +78,7 @@ const settingsOpen = ref(false)
 const fullscreenTool = ref(null)
 const promptSubmitting = ref(false)
 const startupRun = ref(null)
+const sessionHandoff = ref(null)
 const startupPhaseSlow = ref(false)
 const promptSubmitSlow = ref(false)
 const interrupting = ref(false)
@@ -410,6 +411,35 @@ const promptSubmitStatus = computed(() => {
     ],
   }
 })
+const sessionHandoffStatus = computed(() => {
+  const handoff = sessionHandoff.value
+  if (!handoff) return null
+
+  return {
+    title: `Starting a new session in ${handoff.project}`,
+    detail: 'Clearing this transcript while pi prepares a fresh runtime.',
+    steps: [
+      {
+        id: 'clearing',
+        label: 'Releasing current view',
+        done: true,
+        active: false,
+      },
+      {
+        id: 'creating',
+        label: 'Opening pi session',
+        done: false,
+        active: true,
+      },
+      {
+        id: 'loading',
+        label: 'Loading fresh transcript',
+        done: false,
+        active: false,
+      },
+    ],
+  }
+})
 const startFlowVisible = computed(() => {
   return !selectedSession.value || Boolean(startupRun.value)
 })
@@ -590,8 +620,13 @@ async function createSessionForCwd(cwd) {
   creatingSessionCwd.value = targetCwd
   sessionError.value = ''
 
+  const handoff = selectedSession.value && !startupRun.value
+    ? beginSessionHandoff(targetCwd)
+    : null
+
   try {
     const data = await createPiSession(targetCwd)
+    if (handoff) await finishSessionHandoffFloor(handoff)
 
     await loadSessions({ selectFirst: false, showLoading: false })
     activeRuntimeSession.value = data.active
@@ -615,6 +650,7 @@ async function createSessionForCwd(cwd) {
     sessionError.value = error.message
   } finally {
     creatingSessionCwd.value = ''
+    if (handoff) finishSessionHandoff(handoff)
   }
 }
 
@@ -690,6 +726,7 @@ function clearSelectedSession() {
   expandedSkills.value = new Set()
   localEntries.value = []
   editingEntry.value = null
+  sessionHandoff.value = null
   finishStartupRun()
   resetLiveState()
 }
@@ -717,6 +754,27 @@ function beginStartupRun(cwd, options = {}) {
     phase: 'accepted',
   }
   setStartupPhase('accepted')
+}
+
+function beginSessionHandoff(cwd) {
+  const handoff = {
+    id: `${Date.now()}-${Math.random()}`,
+    cwd,
+    project: projectName(cwd),
+    startedAt: Date.now(),
+  }
+  sessionHandoff.value = handoff
+  return handoff
+}
+
+async function finishSessionHandoffFloor(handoff) {
+  const elapsed = Date.now() - handoff.startedAt
+  const remaining = Math.max(0, 720 - elapsed)
+  if (remaining) await wait(remaining)
+}
+
+function finishSessionHandoff(handoff) {
+  if (sessionHandoff.value?.id === handoff.id) sessionHandoff.value = null
 }
 
 function setStartupPhase(phase) {
@@ -1968,6 +2026,7 @@ function closePickerMenus() {
       'sidebar-open': sidebarOpen,
       'sidebar-hidden': desktopSidebarHidden,
       'start-state': !initializing && startFlowVisible,
+      'session-handoff': sessionHandoff,
       'terminal-open': terminalOpen,
     }"
     :style="{ '--terminal-drawer-height': `${terminalDrawerHeight}px` }"
@@ -2119,12 +2178,40 @@ function closePickerMenus() {
         </div>
       </section>
 
+      <Transition name="run-status">
+        <section
+          v-if="sessionHandoffStatus"
+          class="run-status-card session-handoff-card"
+          aria-live="polite"
+        >
+          <div class="run-status-orb" aria-hidden="true"></div>
+          <div class="run-status-main">
+            <strong>{{ sessionHandoffStatus.title }}</strong>
+            <span>{{ sessionHandoffStatus.detail }}</span>
+            <div class="run-status-progress" aria-hidden="true">
+              <i></i>
+            </div>
+            <div class="run-status-steps">
+              <span
+                v-for="step in sessionHandoffStatus.steps"
+                :key="step.id"
+                :class="{
+                  done: step.done,
+                  active: step.active,
+                }"
+              >{{ step.label }}</span>
+            </div>
+          </div>
+        </section>
+      </Transition>
+
       <div
         ref="workbench"
         class="workbench"
         :class="{
           'init-workbench': initializing,
           'session-loading-workbench': sessionLoading,
+          'session-handoff-workbench': sessionHandoff,
           'start-workbench-shell': !initializing && startFlowVisible,
           'empty-selected-workbench': isEmptySelectedSession && !startupRun,
         }"
@@ -2389,7 +2476,10 @@ function closePickerMenus() {
         :editing-label="editingLabel"
         :error="promptError || eventStreamError || imageSupportWarning"
         :interrupting="interrupting"
-        :class="{ 'empty-session-composer': isEmptySelectedSession }"
+        :class="{
+          'empty-session-composer': isEmptySelectedSession,
+          'session-handoff-composer': sessionHandoff,
+        }"
         :model-key="modelKey"
         :model-picker-open="modelPickerOpen"
         :placeholder="isEmptySelectedSession
