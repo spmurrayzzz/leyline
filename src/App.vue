@@ -325,6 +325,11 @@ const topbarSubtitle = computed(() => {
   if (initializing.value) return 'Reading local pi state'
   return selectedSession.value?.cwd || 'Choose a session or start fresh'
 })
+const isEmptySelectedSession = computed(() => {
+  return Boolean(selectedSession.value)
+    && entries.value.length === 0
+    && !liveTurnActive.value
+})
 const initEventLabel = computed(() => {
   return eventStreamConnected.value
     ? 'Runtime events connected'
@@ -384,6 +389,7 @@ onMounted(async () => {
   window.addEventListener('keydown', closeMenusOnEscape)
   window.addEventListener('click', closeMenusOnOutsideClick)
   window.addEventListener('popstate', handleRouteChange)
+  window.addEventListener('leyline:new-session', handleNativeNewSession)
   openEventStream()
   await loadSessions({ routeSessionId: sessionIdFromRoute() })
 })
@@ -392,6 +398,7 @@ onUnmounted(() => {
   window.removeEventListener('keydown', closeMenusOnEscape)
   window.removeEventListener('click', closeMenusOnOutsideClick)
   window.removeEventListener('popstate', handleRouteChange)
+  window.removeEventListener('leyline:new-session', handleNativeNewSession)
   closeEventStream()
   closeTerminalPanel()
   clearTimeout(refreshTimer)
@@ -451,6 +458,17 @@ async function loadStartRuntimeState(cwd) {
 
 async function createSession(project) {
   await createSessionForCwd(project.cwd)
+}
+
+async function handleNativeNewSession() {
+  if (agentRunning.value || creatingSessionCwd.value) return
+
+  const cwd = selectedSession.value?.cwd
+    || newSessionCwd.value
+    || sessions.value[0]?.cwd
+
+  if (cwd) await createSessionForCwd(cwd)
+  else openProjectBrowser()
 }
 
 async function createSessionForCwd(cwd) {
@@ -903,6 +921,11 @@ async function activateSession(session) {
 }
 
 function sessionTitle(session) {
+  if (session?.messageCount === 0
+    || session?.name === '(no messages)'
+    || session?.firstMessage === '(no messages)') {
+    return 'New session'
+  }
   return session?.name || session?.firstMessage || 'Untitled session'
 }
 
@@ -1784,36 +1807,38 @@ function closePickerMenus() {
           </span>
           <span class="topbar-runtime-pill">{{ currentModelLabel }}</span>
           <span class="topbar-runtime-pill">{{ currentThinkingLabel }}</span>
-          <button
-            class="event-log-button"
-            type="button"
-            @click="eventLogOpen = !eventLogOpen"
-          >
-            Events {{ runtimeEvents.length }}
-          </button>
-          <a
-            class="event-log-button"
-            :href="selectedSessionExportUrl"
-          >Export</a>
-          <button
-            class="delete-session-button"
-            type="button"
-            title="Delete session"
-            aria-label="Delete session"
-            :disabled="deletingSessionId === selectedSession.id"
-            @click="requestDeleteSession(selectedSession)"
-          >
-            <span v-if="deletingSessionId === selectedSession.id">…</span>
-            <svg v-else viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M3.5 4.5h9"></path>
-              <path d="M6.5 4.5v-2h3v2"></path>
-              <path d="M5 6.5l.5 6h5l.5-6"></path>
-              <path d="M7 7.5v4"></path>
-              <path d="M9 7.5v4"></path>
-            </svg>
-          </button>
-          <span>{{ selectedSession.messageCount }} messages</span>
-          <span>modified {{ formatDate(selectedSession.modified) }}</span>
+          <template v-if="!isEmptySelectedSession">
+            <button
+              class="event-log-button"
+              type="button"
+              @click="eventLogOpen = !eventLogOpen"
+            >
+              Events {{ runtimeEvents.length }}
+            </button>
+            <a
+              class="event-log-button"
+              :href="selectedSessionExportUrl"
+            >Export</a>
+            <button
+              class="delete-session-button"
+              type="button"
+              title="Delete session"
+              aria-label="Delete session"
+              :disabled="deletingSessionId === selectedSession.id"
+              @click="requestDeleteSession(selectedSession)"
+            >
+              <span v-if="deletingSessionId === selectedSession.id">…</span>
+              <svg v-else viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M3.5 4.5h9"></path>
+                <path d="M6.5 4.5v-2h3v2"></path>
+                <path d="M5 6.5l.5 6h5l.5-6"></path>
+                <path d="M7 7.5v4"></path>
+                <path d="M9 7.5v4"></path>
+              </svg>
+            </button>
+            <span>{{ selectedSession.messageCount }} messages</span>
+            <span>modified {{ formatDate(selectedSession.modified) }}</span>
+          </template>
         </div>
         </header>
 
@@ -1865,6 +1890,7 @@ function closePickerMenus() {
           'init-workbench': initializing,
           'session-loading-workbench': sessionLoading,
           'start-workbench-shell': !initializing && !selectedSession,
+          'empty-selected-workbench': isEmptySelectedSession,
         }"
         @scroll="handleWorkbenchScroll"
       >
@@ -1939,10 +1965,10 @@ function closePickerMenus() {
           />
         </div>
         <div
-          v-if="selectedSession && entries.length === 0 && !liveTurnActive"
-          class="empty-workbench"
+          v-if="isEmptySelectedSession"
+          class="empty-session-panel"
         >
-          No transcript entries found.
+          <h2>What should we work on in {{ topbarTitle }}?</h2>
         </div>
 
         <template v-else-if="selectedSession && entries.length > 0">
@@ -2029,7 +2055,10 @@ function closePickerMenus() {
         <div ref="terminalEl" class="terminal-frame"></div>
       </section>
 
-      <div v-if="selectedSession && !initializing" class="composer-fade"></div>
+      <div
+        v-if="selectedSession && !initializing && !isEmptySelectedSession"
+        class="composer-fade"
+      ></div>
 
       <SessionComposer
         v-if="selectedSession && !initializing"
@@ -2048,8 +2077,12 @@ function closePickerMenus() {
         :editing-label="editingLabel"
         :error="promptError || eventStreamError || imageSupportWarning"
         :interrupting="interrupting"
+        :class="{ 'empty-session-composer': isEmptySelectedSession }"
         :model-key="modelKey"
         :model-picker-open="modelPickerOpen"
+        :placeholder="isEmptySelectedSession
+          ? 'Describe the first task or attach images'
+          : 'Ask for follow-up changes or attach images'"
         :prompt-submitting="promptSubmitting"
         :reloading-session="reloadingSession"
         :selected-model-key="selectedModelKey"

@@ -56,6 +56,10 @@ const props = defineProps({
   },
   modelPickerOpen: Boolean,
   promptSubmitting: Boolean,
+  placeholder: {
+    type: String,
+    default: 'Ask for follow-up changes or attach images',
+  },
   reloadingSession: Boolean,
   selectedModelKey: {
     type: String,
@@ -133,7 +137,7 @@ function updateDraft(event) {
       ref="textarea"
       :value="draft"
       :disabled="promptSubmitting || reloadingSession"
-      placeholder="Ask for follow-up changes or attach images"
+      :placeholder="placeholder"
       @keydown="emit('keydown', $event)"
       @input="updateDraft"
       @paste="emit('paste', $event)"

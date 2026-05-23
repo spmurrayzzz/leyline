@@ -31,7 +31,26 @@ async function createWindow() {
     void saveWindowState(mainWindow).catch(() => {})
   })
 
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    const isNewSession = input.type === 'keyDown'
+      && input.key?.toLowerCase() === 'n'
+      && (input.meta || input.control)
+
+    if (!isNewSession) return
+
+    event.preventDefault()
+    sendNewSessionCommand(mainWindow)
+  })
+
   await mainWindow.loadURL(url)
+}
+
+function sendNewSessionCommand(window) {
+  if (!window || window.isDestroyed()) return
+
+  window.webContents.executeJavaScript(
+    "window.dispatchEvent(new CustomEvent('leyline:new-session'))",
+  ).catch(() => {})
 }
 
 async function readWindowState() {

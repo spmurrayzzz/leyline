@@ -1269,19 +1269,50 @@ h1 {
   padding: 0 44px;
 }
 
+.empty-selected-workbench {
+  position: relative;
+  padding: 0 44px 220px;
+}
+
 .start-panel {
   display: grid;
   justify-items: center;
   width: min(900px, 100%);
 }
 
-.start-panel h2 {
+.start-panel h2,
+.empty-session-panel h2 {
   margin: 0 0 30px;
   color: #ececf3;
   font-size: 32px;
   font-weight: 680;
   letter-spacing: -0.04em;
   line-height: 1.1;
+}
+
+.empty-session-panel {
+  position: absolute;
+  top: calc(50% - 210px);
+  left: 50%;
+  display: grid;
+  justify-items: center;
+  width: min(900px, calc(100% - 88px));
+  text-align: center;
+  transform: translateX(-50%);
+}
+
+.empty-session-panel h2 {
+  margin-bottom: 10px;
+}
+
+.empty-session-panel p {
+  overflow: hidden;
+  max-width: min(720px, 100%);
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .start-composer {
@@ -2596,6 +2627,14 @@ h1 {
   height: 190px;
   pointer-events: none;
   background: linear-gradient(rgb(13 14 17 / 0), var(--bg) 62%);
+}
+
+.composer.empty-session-composer {
+  top: calc(50% - 40px);
+  bottom: auto;
+  width: min(900px, calc(100% - 88px));
+  min-width: min(760px, calc(100vw - 88px));
+  transform: translate(-50%, -50%);
 }
 
 .jump-latest-button {
