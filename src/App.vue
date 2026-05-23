@@ -107,8 +107,13 @@ const {
   terminalEl,
   terminalOpen,
   terminalStatus,
+  resizeTerminal,
   toggleTerminal,
 } = useTerminal()
+const terminalDrawerHeight = ref(310)
+let terminalResizeStartY = 0
+let terminalResizeStartHeight = 0
+let terminalResizeFrame = 0
 let refreshTimer
 let scrollFrame
 let liveAssistantFrame
@@ -399,6 +404,7 @@ onUnmounted(() => {
   window.removeEventListener('click', closeMenusOnOutsideClick)
   window.removeEventListener('popstate', handleRouteChange)
   window.removeEventListener('leyline:new-session', handleNativeNewSession)
+  stopTerminalResize()
   closeEventStream()
   closeTerminalPanel()
   clearTimeout(refreshTimer)
@@ -406,7 +412,41 @@ onUnmounted(() => {
   clearLiveToolSettleTimers()
   cancelAnimationFrame(scrollFrame)
   cancelAnimationFrame(liveAssistantFrame)
+  cancelAnimationFrame(terminalResizeFrame)
 })
+
+function startTerminalResize(event) {
+  terminalResizeStartY = event.clientY
+  terminalResizeStartHeight = terminalDrawerHeight.value
+  window.addEventListener('pointermove', resizeTerminalDrawer)
+  window.addEventListener('pointerup', stopTerminalResize)
+  window.addEventListener('pointercancel', stopTerminalResize)
+  document.body.style.userSelect = 'none'
+}
+
+function resizeTerminalDrawer(event) {
+  const nextHeight = terminalResizeStartHeight + terminalResizeStartY
+    - event.clientY
+  setTerminalDrawerHeight(nextHeight)
+}
+
+function stopTerminalResize() {
+  window.removeEventListener('pointermove', resizeTerminalDrawer)
+  window.removeEventListener('pointerup', stopTerminalResize)
+  window.removeEventListener('pointercancel', stopTerminalResize)
+  document.body.style.userSelect = ''
+}
+
+function nudgeTerminalHeight(amount) {
+  setTerminalDrawerHeight(terminalDrawerHeight.value + amount)
+}
+
+function setTerminalDrawerHeight(height) {
+  const max = Math.max(220, Math.round(window.innerHeight * 0.72))
+  terminalDrawerHeight.value = Math.min(max, Math.max(180, Math.round(height)))
+  cancelAnimationFrame(terminalResizeFrame)
+  terminalResizeFrame = requestAnimationFrame(resizeTerminal)
+}
 
 async function loadSessions({
   routeSessionId = '',
@@ -1730,7 +1770,9 @@ function closePickerMenus() {
       'sidebar-open': sidebarOpen,
       'sidebar-hidden': desktopSidebarHidden,
       'start-state': !initializing && !selectedSession,
+      'terminal-open': terminalOpen,
     }"
+    :style="{ '--terminal-drawer-height': `${terminalDrawerHeight}px` }"
   >
     <button
       v-if="sidebarOpen"
@@ -2041,7 +2083,20 @@ function closePickerMenus() {
         <span aria-hidden="true">↓</span>
       </button>
 
-      <section v-if="terminalOpen" class="terminal-panel">
+      <section
+        v-if="terminalOpen"
+        class="terminal-panel"
+      >
+        <div
+          class="terminal-resize-handle"
+          role="separator"
+          aria-label="Resize terminal"
+          aria-orientation="horizontal"
+          tabindex="0"
+          @keydown.down.prevent="nudgeTerminalHeight(-24)"
+          @keydown.up.prevent="nudgeTerminalHeight(24)"
+          @pointerdown.prevent="startTerminalResize"
+        ></div>
         <div class="terminal-header">
           <strong>Terminal</strong>
           <code>{{ terminalCwd || selectedSession?.cwd }}</code>

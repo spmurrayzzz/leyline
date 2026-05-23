@@ -136,6 +136,7 @@ export function useTerminal() {
     terminalEl,
     terminalOpen,
     terminalStatus,
+    resizeTerminal,
     toggleTerminal,
   }
 }
