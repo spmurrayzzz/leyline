@@ -461,14 +461,10 @@ async function createSession(project) {
 }
 
 async function handleNativeNewSession() {
+  if (!selectedSession.value) return
   if (agentRunning.value || creatingSessionCwd.value) return
 
-  const cwd = selectedSession.value?.cwd
-    || newSessionCwd.value
-    || sessions.value[0]?.cwd
-
-  if (cwd) await createSessionForCwd(cwd)
-  else openProjectBrowser()
+  await createSessionForCwd(selectedSession.value.cwd)
 }
 
 async function createSessionForCwd(cwd) {
