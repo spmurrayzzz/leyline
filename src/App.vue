@@ -90,6 +90,8 @@ const reloadingSession = ref(false)
 const goalCommandSubmitting = ref('')
 const deletingSessionId = ref('')
 const deleteConfirmSession = ref(null)
+const deleteSessionError = ref('')
+const deleteSessionPhase = ref('')
 const forkingEntryId = ref('')
 const editingEntry = ref(null)
 const composerRef = ref(null)
@@ -1909,11 +1911,37 @@ function imageSrcForComposer(image) {
 function requestDeleteSession(session) {
   if (!session || deletingSessionId.value) return
   deleteConfirmSession.value = session
+  deleteSessionError.value = ''
+  deleteSessionPhase.value = ''
 }
 
 function cancelDeleteSession() {
   if (deletingSessionId.value) return
   deleteConfirmSession.value = null
+  deleteSessionError.value = ''
+  deleteSessionPhase.value = ''
+}
+
+function deleteSessionButtonLabel() {
+  if (deleteSessionPhase.value === 'opening') return 'Opening next session…'
+  if (deleteSessionPhase.value === 'deleting') return 'Deleting…'
+  return 'Delete'
+}
+
+function nextSessionAfterDelete(session, remainingSessions) {
+  const projectSessions = sessions.value.filter((item) => {
+    return item.cwd === session.cwd
+  })
+  const index = projectSessions.findIndex((item) => item.id === session.id)
+  const nextProjectSession = projectSessions[index + 1]
+    || projectSessions[index - 1]
+
+  if (nextProjectSession) {
+    return remainingSessions.find((item) => item.id === nextProjectSession.id)
+      || null
+  }
+
+  return remainingSessions[0] || null
 }
 
 async function confirmDeleteSession() {
@@ -1921,22 +1949,33 @@ async function confirmDeleteSession() {
   if (!session || deletingSessionId.value) return
 
   deletingSessionId.value = session.id
+  deleteSessionPhase.value = 'deleting'
   sessionError.value = ''
   promptError.value = ''
+  deleteSessionError.value = ''
 
   try {
     await deletePiSession(session.id)
-    deleteConfirmSession.value = null
-    sessions.value = sessions.value.filter((item) => item.id !== session.id)
+    const remainingSessions = sessions.value.filter((item) => {
+      return item.id !== session.id
+    })
+    const replacementSession = nextSessionAfterDelete(session, remainingSessions)
+    sessions.value = remainingSessions
     if (selectedSessionId.value === session.id) {
-      clearSelectedSession()
-      updateSessionRoute('')
+      if (replacementSession) {
+        deleteSessionPhase.value = 'opening'
+        await selectSession(replacementSession)
+      } else {
+        clearSelectedSession()
+        updateSessionRoute('')
+      }
     }
+    deleteConfirmSession.value = null
   } catch (error) {
-    if (selectedSessionId.value === session.id) promptError.value = error.message
-    else sessionError.value = error.message
+    deleteSessionError.value = error.message
   } finally {
     deletingSessionId.value = ''
+    deleteSessionPhase.value = ''
   }
 }
 
@@ -2895,6 +2934,9 @@ function closePickerMenus() {
           <p>
             Move “{{ sessionTitle(deleteConfirmSession) }}” to Leyline trash.
           </p>
+          <p v-if="deleteSessionError" class="confirm-error">
+            {{ deleteSessionError }}
+          </p>
         </div>
         <div class="confirm-actions">
           <button
@@ -2908,7 +2950,7 @@ function closePickerMenus() {
             class="confirm-delete"
             :disabled="!!deletingSessionId"
             @click="confirmDeleteSession"
-          >{{ deletingSessionId ? 'Deleting…' : 'Delete' }}</button>
+          >{{ deleteSessionButtonLabel() }}</button>
         </div>
       </section>
     </div>

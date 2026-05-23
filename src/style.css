@@ -812,6 +812,10 @@ kbd {
   line-height: 1.45;
 }
 
+.confirm-copy .confirm-error {
+  color: #fca5a5;
+}
+
 .confirm-actions {
   display: flex;
   grid-column: 1 / -1;
