@@ -2601,16 +2601,30 @@ h1 {
 .jump-latest-button {
   position: absolute;
   right: max(52px, calc((100% - var(--content-max)) / 2 + 8px));
-  bottom: 152px;
+  bottom: 246px;
   z-index: 2;
-  border: 1px solid var(--accent-border);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid #51456f;
   border-radius: 999px;
-  background: var(--panel-strong);
+  background: #17131f;
   padding: 6px 10px;
   color: #bfb5ff;
   font-size: 12px;
   font-weight: 800;
-  box-shadow: 0 10px 30px rgb(0 0 0 / 38%);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 36%);
+}
+
+.jump-latest-button strong {
+  color: #d8d1ff;
+  font-weight: 850;
+}
+
+.jump-latest-button span {
+  color: #9a8cf0;
+  font-size: 13px;
+  line-height: 1;
 }
 
 .terminal-panel {
@@ -3177,7 +3191,7 @@ textarea::placeholder {
 
   .jump-latest-button {
     right: 16px;
-    bottom: 136px;
+    bottom: 214px;
   }
 
   .terminal-panel {

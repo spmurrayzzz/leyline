@@ -2015,7 +2015,8 @@ function closePickerMenus() {
         type="button"
         @click="jumpToLatest"
       >
-        Jump to latest
+        <strong>Jump to latest</strong>
+        <span aria-hidden="true">↓</span>
       </button>
 
       <section v-if="terminalOpen" class="terminal-panel">
