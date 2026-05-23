@@ -37,6 +37,22 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  contextUsageLabel: {
+    type: String,
+    default: '',
+  },
+  contextUsageLevel: {
+    type: String,
+    default: 'normal',
+  },
+  contextUsagePercent: {
+    type: Number,
+    default: 0,
+  },
+  contextUsageTitle: {
+    type: String,
+    default: '',
+  },
   draft: {
     type: String,
     default: '',
@@ -253,6 +269,17 @@ function updateDraft(event) {
       <div class="composer-context-row">
         <span v-for="chip in chips" :key="chip" class="composer-chip">
           {{ chip }}
+        </span>
+        <span
+          v-if="contextUsageLabel"
+          class="composer-chip context-usage-pill composer-context-usage"
+          :class="`is-${contextUsageLevel}`"
+          :title="contextUsageTitle"
+        >
+          <span>{{ contextUsageLabel }}</span>
+          <i>
+            <b :style="{ width: `${contextUsagePercent}%` }"></b>
+          </i>
         </span>
         <button
           class="terminal-toggle-button"

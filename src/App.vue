@@ -288,6 +288,38 @@ const composerChips = computed(() => {
       : '',
   ].filter(Boolean)
 })
+const contextUsage = computed(() => {
+  return selectedSession.value?.contextUsage
+    || composerRuntime.value?.state?.contextUsage
+    || null
+})
+const contextUsageLabel = computed(() => {
+  const usage = contextUsage.value
+  if (!usage?.contextWindow) return ''
+
+  const limit = compactNumber(usage.contextWindow)
+  if (usage.tokens === null) return `context — / ${limit}`
+
+  return `context ${compactNumber(usage.tokens)} / ${limit}`
+})
+const contextUsageTitle = computed(() => {
+  const usage = contextUsage.value
+  if (!usage?.contextWindow) return ''
+  if (usage.tokens === null) return 'Context usage unknown until next response'
+
+  return `${Math.round(usage.percent || 0)}% context used`
+})
+const contextUsagePercent = computed(() => {
+  const percent = contextUsage.value?.percent
+  if (!Number.isFinite(percent)) return 0
+  return Math.max(0, Math.min(100, percent))
+})
+const contextUsageLevel = computed(() => {
+  const percent = contextUsagePercent.value
+  if (percent >= 95) return 'danger'
+  if (percent >= 80) return 'warning'
+  return 'normal'
+})
 const activeGoal = computed(() => {
   return activeRuntimeSession.value?.state?.goal || null
 })
@@ -2561,6 +2593,10 @@ function closePickerMenus() {
         :current-mobile-thinking-label="currentMobileThinkingLabel"
         :current-model-label="currentModelLabel"
         :current-thinking-label="currentThinkingLabel"
+        :context-usage-label="contextUsageLabel"
+        :context-usage-level="contextUsageLevel"
+        :context-usage-percent="contextUsagePercent"
+        :context-usage-title="contextUsageTitle"
         :editing-label="editingLabel"
         :error="promptError || eventStreamError || imageSupportWarning"
         :interrupting="interrupting"
@@ -2676,6 +2712,10 @@ function closePickerMenus() {
           <div>
             <dt>Tools</dt>
             <dd>{{ composerChips[0] || 'Unknown' }}</dd>
+          </div>
+          <div>
+            <dt>Context</dt>
+            <dd>{{ contextUsageLabel || 'Unknown' }}</dd>
           </div>
           <div>
             <dt>Events</dt>

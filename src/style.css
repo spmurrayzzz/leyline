@@ -1137,6 +1137,43 @@ h1 {
   font-weight: 800;
 }
 
+.context-usage-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+}
+
+.context-usage-pill i {
+  overflow: hidden;
+  display: block;
+  width: 34px;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.context-usage-pill b {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #8b7cf6;
+}
+
+.context-usage-pill.is-warning b {
+  background: #f59e0b;
+}
+
+.context-usage-pill.is-danger b {
+  background: #f87171;
+}
+
+.context-usage-pill:hover {
+  border-color: var(--accent-border);
+  background: #201a32;
+  color: var(--text);
+}
+
 .event-log-button,
 .delete-session-button {
   border: 1px solid var(--border);

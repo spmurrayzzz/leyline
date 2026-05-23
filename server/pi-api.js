@@ -741,6 +741,7 @@ function sessionStateDto(session, services) {
     steeringMode: session.steeringMode,
     followUpMode: session.followUpMode,
     activeToolCount: session.getActiveToolNames().length,
+    contextUsage: session.getContextUsage?.(),
     slashCommands: slashCommandDtos(session),
     extensionUi: extensionUiState,
     goal: goalStateFromSession(session),
@@ -1161,10 +1162,11 @@ function toActiveSessionDetailDto() {
   return toSessionDetailFromManager(
     activeRuntime.session.sessionManager,
     activeSessionInfo(),
+    activeRuntime.session.getContextUsage?.(),
   )
 }
 
-function toSessionDetailFromManager(manager, session) {
+function toSessionDetailFromManager(manager, session, contextUsage) {
   const header = manager.getHeader()
   const entries = manager.getBranch()
   const toolCalls = collectToolCalls(entries)
@@ -1177,6 +1179,7 @@ function toSessionDetailFromManager(manager, session) {
       messageCount: session.messageCount,
       modified: session.modified,
       created: session.created,
+      contextUsage,
     },
     entries: entries.map((entry) => toEntryDto(entry, toolCalls)).filter(Boolean),
   }
