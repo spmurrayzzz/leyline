@@ -38,6 +38,7 @@ import {
   imageBlocksFor,
   imageSrc,
   messageBlocks,
+  skillSummaries,
   messageBlocksFor,
   renderedToolJson,
   textFromBlocks,
@@ -1161,6 +1162,7 @@ async function submitDraft() {
 
   const editing = editingEntry.value
   const previousDetail = sessionDetail.value
+  if (previousDetail) reconcileLocalEntries(previousDetail)
   liveAssistantMessages.value = []
   liveTools.value = []
   activeLiveAssistantId = ''
@@ -1385,12 +1387,14 @@ async function interruptAgent() {
 }
 
 function pendingUserEntry(text, images = []) {
+  const now = Date.now()
   const blocks = []
   if (text) blocks.push({ type: 'text', text })
   blocks.push(...images)
 
   return {
-    id: `local-${Date.now()}`,
+    id: `local-${now}`,
+    createdAt: now,
     type: 'message',
     role: 'user',
     label: 'You',
@@ -1401,13 +1405,33 @@ function pendingUserEntry(text, images = []) {
 
 function reconcileLocalEntries(detail) {
   localEntries.value = localEntries.value.filter((localEntry) => {
-    return !detail.entries.some((entry) => {
-      return entry.type === 'message'
-        && entry.role === localEntry.role
-        && entry.text === localEntry.text
-        && imageBlocksFor(entry).length === imageBlocksFor(localEntry).length
-    })
+    return !detail.entries.some((entry) => localEntryMatches(localEntry, entry))
   })
+}
+
+function localEntryMatches(localEntry, entry) {
+  if (entry.type !== 'message' || entry.role !== localEntry.role) return false
+  if (!entryIsAfterLocalEntry(entry, localEntry)) return false
+
+  if (entry.text === localEntry.text
+    && imageBlocksFor(entry).length === imageBlocksFor(localEntry).length) {
+    return true
+  }
+
+  const skillName = localSkillCommandName(localEntry.text)
+  if (!skillName) return false
+  return skillSummaries(entry).some((skill) => skill.name === skillName)
+}
+
+function entryIsAfterLocalEntry(entry, localEntry) {
+  if (!localEntry.createdAt) return true
+  const entryTime = new Date(entry.timestamp).getTime()
+  if (!Number.isFinite(entryTime)) return true
+  return entryTime >= localEntry.createdAt - 1000
+}
+
+function localSkillCommandName(text) {
+  return text?.trim().match(/^\/skill:([^\s]+)/)?.[1] || ''
 }
 
 function updateSelectedSessionSummary(session) {
