@@ -8,7 +8,11 @@ export function useRuntimeEvents({
   const runtimeEvents = ref([])
   const eventStreamError = ref('')
   const eventStreamConnected = ref(false)
-  const eventLog = computed(() => runtimeEvents.value.slice(-20).reverse())
+  const eventLog = computed(() =>
+    [...runtimeEvents.value]
+      .sort((a, b) => b.loggedAt.localeCompare(a.loggedAt))
+      .slice(0, 20),
+  )
   let eventSource
 
   function openEventStream() {

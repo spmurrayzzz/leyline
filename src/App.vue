@@ -2079,6 +2079,7 @@ async function submitStartDraft() {
 function closeMenusOnEscape(event) {
   if (event.key !== 'Escape') return
   settingsOpen.value = false
+  eventLogOpen.value = false
   closeToolFullscreen()
   closeProjectBrowser()
   cancelDeleteSession()
@@ -2110,6 +2111,7 @@ function closePickerMenus() {
       'start-state': !initializing && startFlowVisible,
       'session-handoff': sessionHandoff,
       'terminal-open': terminalOpen,
+      'event-log-open': eventLogOpen,
     }"
     :style="{ '--terminal-drawer-height': `${terminalDrawerHeight}px` }"
   >
@@ -2245,20 +2247,7 @@ function closePickerMenus() {
         </section>
       </div>
 
-      <section v-if="eventLogOpen" class="event-log-panel">
-        <div class="event-log-header">
-          <strong>Runtime events</strong>
-          <button type="button" @click="eventLogOpen = false">×</button>
-        </div>
-        <div v-if="eventLog.length === 0" class="event-log-empty">
-          No events yet
-        </div>
-        <div v-for="item in eventLog" :key="item.loggedAt" class="event-log-row">
-          <time>{{ eventTime(item) }}</time>
-          <code>{{ eventType(item) }}</code>
-          <span>{{ eventSummary(item) }}</span>
-        </div>
-      </section>
+
 
       <Transition name="run-status">
         <section
@@ -2639,13 +2628,13 @@ function closePickerMenus() {
 
     <button
       v-if="settingsOpen"
-      class="settings-backdrop"
+      class="side-drawer-backdrop"
       type="button"
       aria-label="Close settings"
       @click="settingsOpen = false"
     ></button>
-    <aside v-if="settingsOpen" class="settings-drawer" aria-label="Settings">
-      <header class="settings-drawer-header">
+    <aside v-if="settingsOpen" class="side-drawer" aria-label="Settings">
+      <header class="side-drawer-header">
         <div>
           <strong>Settings</strong>
           <span>Runtime and session state</span>
@@ -2699,6 +2688,34 @@ function closePickerMenus() {
         </dl>
       </section>
     </aside>
+
+    <Transition name="event-drawer">
+      <aside
+        v-if="eventLogOpen"
+        class="event-log-drawer"
+        aria-label="Runtime events"
+      >
+        <header class="event-log-drawer-header">
+          <div>
+            <strong>Runtime events</strong>
+            <span>{{ runtimeEvents.length }} total</span>
+          </div>
+          <button type="button" @click="eventLogOpen = false">×</button>
+        </header>
+        <div v-if="eventLog.length === 0" class="event-log-empty">
+          No events yet
+        </div>
+        <div
+          v-for="item in eventLog"
+          :key="item.loggedAt"
+          class="event-log-row"
+        >
+          <time>{{ eventTime(item) }}</time>
+          <code>{{ eventType(item) }}</code>
+          <span>{{ eventSummary(item) }}</span>
+        </div>
+      </aside>
+    </Transition>
 
     <div
       v-if="fullscreenTool"
