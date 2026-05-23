@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { formatMode, modelChip } from '../lib/format'
 
 const props = defineProps({
@@ -133,6 +133,11 @@ const emit = defineEmits([
 ])
 
 const textarea = ref(null)
+const shellMode = computed(() => props.draft.trimStart().startsWith('!'))
+const hiddenShellMode = computed(() => props.draft.trimStart().startsWith('!!'))
+const shellModeLabel = computed(() => {
+  return hiddenShellMode.value ? 'shell · hidden' : 'shell · context'
+})
 
 function focus() {
   if (props.promptSubmitting || props.reloadingSession) return
@@ -148,7 +153,14 @@ function updateDraft(event) {
 </script>
 
 <template>
-  <form class="composer" @submit.prevent="emit('submit')">
+  <form
+    class="composer"
+    :class="{
+      'shell-mode-composer': shellMode,
+      'hidden-shell-mode-composer': hiddenShellMode,
+    }"
+    @submit.prevent="emit('submit')"
+  >
     <div v-if="editingLabel" class="editing-banner">
       <span>{{ editingLabel }}</span>
       <button type="button" @click="emit('cancel-edit')">Cancel</button>
@@ -177,15 +189,18 @@ function updateDraft(event) {
         Enter queues steering · Option+Enter queues follow-up
       </div>
     </div>
-    <textarea
-      ref="textarea"
-      :value="draft"
-      :disabled="promptSubmitting || reloadingSession"
-      :placeholder="placeholder"
-      @keydown="emit('keydown', $event)"
-      @input="updateDraft"
-      @paste="emit('paste', $event)"
-    ></textarea>
+    <div class="composer-input-shell">
+      <span v-if="shellMode" class="shell-prompt-glyph">$</span>
+      <textarea
+        ref="textarea"
+        :value="draft"
+        :disabled="promptSubmitting || reloadingSession"
+        :placeholder="placeholder"
+        @keydown="emit('keydown', $event)"
+        @input="updateDraft"
+        @paste="emit('paste', $event)"
+      ></textarea>
+    </div>
     <div v-if="slashPickerOpen" class="slash-picker">
       <button
         v-for="(command, index) in slashCommandItems"
@@ -282,12 +297,17 @@ function updateDraft(event) {
           </div>
           <button
             class="send-button"
-            :class="{ 'stop-button': agentRunning }"
+            :class="{
+              'stop-button': agentRunning,
+              'shell-run-button': shellMode,
+            }"
             :type="agentRunning ? 'button' : 'submit'"
             :disabled="agentRunning
               ? interrupting
               : promptSubmitting || reloadingSession || !canSubmitDraft"
-            :title="agentRunning ? 'Stop generation' : 'Send message'"
+            :title="agentRunning
+              ? 'Stop generation'
+              : shellMode ? 'Run shell command' : 'Send message'"
             @click="agentRunning && emit('interrupt')"
           >
             {{ sendButtonLabel }}
@@ -295,6 +315,13 @@ function updateDraft(event) {
         </div>
       </div>
       <div class="composer-context-row">
+        <span
+          v-if="shellMode"
+          class="composer-chip shell-mode-chip"
+          :class="{ 'hidden-shell-mode-chip': hiddenShellMode }"
+        >
+          {{ shellModeLabel }}
+        </span>
         <span v-for="chip in chips" :key="chip" class="composer-chip">
           {{ chip }}
         </span>

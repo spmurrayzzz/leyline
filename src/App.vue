@@ -30,6 +30,7 @@ import {
   forkPiSession,
   interruptPiSession,
   reloadPiSession,
+  runShellCommand,
   submitPrompt,
   switchPiModel,
   switchPiThinkingLevel,
@@ -81,6 +82,7 @@ const startupRun = ref(null)
 const sessionHandoff = ref(null)
 const startupPhaseSlow = ref(false)
 const promptSubmitSlow = ref(false)
+const shellCommandSubmitting = ref(false)
 const interrupting = ref(false)
 const switchingModel = ref(false)
 const switchingThinking = ref(false)
@@ -363,13 +365,19 @@ const goalPrimaryAction = computed(() => {
   if (status === 'paused') return { label: 'Resume', command: 'resume' }
   return null
 })
+const shellModeDraft = computed(() => draft.value.trimStart().startsWith('!'))
+const shellDraft = computed(() => shellCommandFromText(draft.value.trim()))
 const imageSupportWarning = computed(() => {
+  if (shellModeDraft.value && attachedImages.value.length) {
+    return 'Shell commands cannot include image attachments.'
+  }
   const model = composerRuntime.value?.state?.model
   if (!attachedImages.value.length || !model || model.supportsImages) return ''
   return `${modelChip(model)} does not support images.`
 })
 const canSubmitDraft = computed(() => {
   if (imageSupportWarning.value) return false
+  if (shellModeDraft.value) return Boolean(shellDraft.value)
   return draft.value.trim() || attachedImages.value.length > 0
 })
 const eventStreamLabel = computed(() => {
@@ -429,6 +437,7 @@ const startProjectLabel = computed(() => {
 const sendButtonLabel = computed(() => {
   if (agentRunning.value) return '■'
   if (promptSubmitting.value || reloadingSession.value) return '…'
+  if (shellModeDraft.value) return 'Run'
   return '↑'
 })
 const composerPlaceholder = computed(() => {
@@ -474,16 +483,26 @@ const startupStatus = computed(() => {
 const promptSubmitStatus = computed(() => {
   if (!promptSubmitting.value || agentRunning.value) return null
 
+  const isShellCommand = shellCommandSubmitting.value
   return {
-    title: 'Submitting prompt',
-    detail: promptSubmitSlow.value
-      ? 'Still waiting for runtime preflight to finish.'
-      : 'Validating model, context, and tool state before the run starts.',
+    title: isShellCommand ? 'Running shell command' : 'Submitting prompt',
+    detail: isShellCommand
+      ? 'Executing in the active session working directory.'
+      : promptSubmitSlow.value
+        ? 'Still waiting for runtime preflight to finish.'
+        : 'Validating model, context, and tool state before the run starts.',
     steps: [
-      { id: 'accepted', label: 'Prompt accepted', done: true, active: false },
+      {
+        id: 'accepted',
+        label: isShellCommand ? 'Command accepted' : 'Prompt accepted',
+        done: true,
+        active: false,
+      },
       {
         id: 'submitting',
-        label: 'Submitting to pi runtime',
+        label: isShellCommand
+          ? 'Running shell command'
+          : 'Submitting to pi runtime',
         done: false,
         active: true,
       },
@@ -1623,8 +1642,14 @@ async function refocusComposer() {
 async function submitDraft(streamingBehavior) {
   const text = draft.value.trim()
   const images = attachedImages.value.map(({ preview, ...image }) => image)
+  const shellCommand = shellCommandFromText(text)
   if (!text && images.length === 0) return
   if (promptSubmitting.value || reloadingSession.value) return
+
+  if (shellCommand) {
+    await submitShellCommand(shellCommand, images)
+    return
+  }
 
   if (agentRunning.value && !editingEntry.value) {
     promptSubmitting.value = true
@@ -1690,6 +1715,51 @@ async function submitDraft(streamingBehavior) {
     resetLiveState()
   } finally {
     promptSubmitting.value = false
+    stopPromptSubmitTimer()
+    refocusComposer()
+  }
+}
+
+function shellCommandFromText(text) {
+  if (!text.startsWith('!')) return null
+  const excludeFromContext = text.startsWith('!!')
+  const command = text.slice(excludeFromContext ? 2 : 1).trim()
+  if (!command) return null
+  return { command, excludeFromContext }
+}
+
+async function submitShellCommand(shellCommand, images) {
+  if (editingEntry.value) {
+    promptError.value = 'Cancel editing before running a shell command.'
+    return
+  }
+  if (images.length) {
+    promptError.value = 'Shell commands cannot include image attachments.'
+    return
+  }
+
+  promptSubmitting.value = true
+  shellCommandSubmitting.value = true
+  startPromptSubmitTimer()
+  promptError.value = ''
+  liveActivity.value = 'Running shell command…'
+
+  try {
+    const data = await runShellCommand(
+      shellCommand.command,
+      shellCommand.excludeFromContext,
+    )
+    if (data.active) activeRuntimeSession.value = data.active
+    if (data.detail) sessionDetail.value = data.detail
+    draft.value = ''
+    await loadSessions({ selectFirst: false, showLoading: false })
+    await scrollToLatest()
+  } catch (error) {
+    promptError.value = error.message
+  } finally {
+    promptSubmitting.value = false
+    shellCommandSubmitting.value = false
+    liveActivity.value = ''
     stopPromptSubmitTimer()
     refocusComposer()
   }

@@ -1435,6 +1435,85 @@ h1 {
   border-color: #4a415f;
 }
 
+.start-composer.shell-mode-composer,
+.composer.shell-mode-composer {
+  border-color: rgba(74, 222, 128, 0.42);
+  background: #101813;
+  box-shadow:
+    0 0 0 1px rgba(74, 222, 128, 0.08) inset,
+    0 14px 48px rgb(0 0 0 / 46%);
+}
+
+.start-composer.shell-mode-composer:focus-within,
+.composer.shell-mode-composer:focus-within {
+  border-color: rgba(134, 239, 172, 0.62);
+}
+
+.start-composer.hidden-shell-mode-composer,
+.composer.hidden-shell-mode-composer {
+  border-color: rgba(148, 163, 184, 0.34);
+  background: #151619;
+  box-shadow:
+    0 0 0 1px rgba(148, 163, 184, 0.06) inset,
+    0 14px 48px rgb(0 0 0 / 46%);
+}
+
+.start-composer.hidden-shell-mode-composer:focus-within,
+.composer.hidden-shell-mode-composer:focus-within {
+  border-color: rgba(148, 163, 184, 0.5);
+}
+
+.composer-input-shell {
+  position: relative;
+}
+
+.shell-prompt-glyph {
+  position: absolute;
+  top: 17px;
+  left: 20px;
+  z-index: 1;
+  color: #86efac;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.start-composer.shell-mode-composer textarea,
+.composer.shell-mode-composer textarea {
+  padding-left: 56px;
+  color: #dcfce7;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.start-composer.shell-mode-composer textarea::placeholder,
+.composer.shell-mode-composer textarea::placeholder {
+  color: rgba(134, 239, 172, 0.38);
+}
+
+.hidden-shell-mode-composer .shell-prompt-glyph,
+.hidden-shell-mode-composer textarea {
+  color: #cbd5e1;
+}
+
+.hidden-shell-mode-composer textarea::placeholder {
+  color: rgba(203, 213, 225, 0.34);
+}
+
+.shell-mode-chip {
+  max-width: 260px;
+  border-color: rgba(74, 222, 128, 0.28) !important;
+  background: rgba(22, 101, 52, 0.22) !important;
+  color: #bbf7d0 !important;
+}
+
+.hidden-shell-mode-chip {
+  border-color: rgba(148, 163, 184, 0.24) !important;
+  background: rgba(51, 65, 85, 0.2) !important;
+  color: #cbd5e1 !important;
+}
+
 .start-composer textarea {
   height: 58px;
   padding: 18px 20px 0;
@@ -3377,6 +3456,22 @@ textarea::placeholder {
   opacity: 0.45;
 }
 
+.send-button.shell-run-button,
+.start-send-button.shell-run-button {
+  width: 54px;
+  border-radius: 999px !important;
+  background: #15803d !important;
+  color: #ecfdf5 !important;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.hidden-shell-mode-composer .send-button.shell-run-button,
+.hidden-shell-mode-composer .start-send-button.shell-run-button {
+  background: #475569 !important;
+  color: #f8fafc !important;
+}
+
 .stop-button {
   border-color: #ef4444 !important;
   background: #dc2626 !important;
@@ -3599,6 +3694,17 @@ textarea::placeholder {
     height: 86px;
     padding: 14px 14px 6px;
     font-size: 16px;
+  }
+
+  .shell-prompt-glyph {
+    top: 15px;
+    left: 14px;
+    font-size: 16px;
+  }
+
+  .start-composer.shell-mode-composer textarea,
+  .composer.shell-mode-composer textarea {
+    padding-left: 46px;
   }
 
   .composer-bar,

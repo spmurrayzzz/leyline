@@ -49,6 +49,13 @@ export function submitPrompt(text, images = [], streamingBehavior) {
   })
 }
 
+export function runShellCommand(command, excludeFromContext = false) {
+  return apiRequest('/api/pi/bash', 'Failed to run shell command', {
+    method: 'POST',
+    body: { command, excludeFromContext },
+  })
+}
+
 export function editPrompt(entryId, text, images = []) {
   return apiRequest('/api/pi/edit-prompt', 'Failed to edit prompt', {
     method: 'POST',

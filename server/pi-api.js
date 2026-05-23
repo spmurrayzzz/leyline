@@ -201,6 +201,20 @@ export async function piApiHandler(req, res) {
       return json(res, { ok: true, active: activeSessionDto() })
     }
 
+    if (url.pathname === '/bash') {
+      if (req.method !== 'POST') {
+        return json(res, { error: 'Method not allowed' }, 405)
+      }
+
+      const body = await readJson(req)
+      await bashActiveSession(body.command, body.excludeFromContext)
+      return json(res, {
+        ok: true,
+        active: activeSessionDto(),
+        detail: toActiveSessionDetailDto(),
+      })
+    }
+
     if (url.pathname === '/edit-prompt') {
       if (req.method !== 'POST') {
         return json(res, { error: 'Method not allowed' }, 405)
@@ -562,6 +576,34 @@ async function promptActiveSession(text, images = [], streamingBehavior) {
       .catch((error) => {
         if (!preflightSucceeded) reject(error)
       })
+  })
+}
+
+async function bashActiveSession(command, excludeFromContext = false) {
+  if (!activeRuntime) throw new Error('No active session')
+  const bashCommand = typeof command === 'string' ? command.trim() : ''
+  if (!bashCommand) throw new Error('shell command is required')
+  if (activeRuntime.session.isBashRunning) {
+    throw new Error('A shell command is already running')
+  }
+
+  const eventResult = await activeRuntime.session.extensionRunner.emitUserBash({
+    type: 'user_bash',
+    command: bashCommand,
+    excludeFromContext: excludeFromContext === true,
+    cwd: activeRuntime.session.sessionManager.getCwd(),
+  })
+
+  if (eventResult?.result) {
+    activeRuntime.session.recordBashResult(bashCommand, eventResult.result, {
+      excludeFromContext: excludeFromContext === true,
+    })
+    return eventResult.result
+  }
+
+  return activeRuntime.session.executeBash(bashCommand, undefined, {
+    excludeFromContext: excludeFromContext === true,
+    operations: eventResult?.operations,
   })
 }
 

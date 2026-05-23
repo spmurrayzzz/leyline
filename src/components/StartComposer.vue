@@ -1,4 +1,5 @@
 <script setup>
+import { computed } from 'vue'
 import { formatMode, modelChip } from '../lib/format'
 
 const props = defineProps({
@@ -103,6 +104,17 @@ const emit = defineEmits([
   'update:startProjectQuery',
 ])
 
+const shellMode = computed(() => props.draft.trimStart().startsWith('!'))
+const hiddenShellMode = computed(() => props.draft.trimStart().startsWith('!!'))
+const shellCommand = computed(() => {
+  const text = props.draft.trimStart()
+  if (!text.startsWith('!')) return ''
+  return text.slice(text.startsWith('!!') ? 2 : 1).trim()
+})
+const shellModeLabel = computed(() => {
+  return hiddenShellMode.value ? 'shell · hidden' : 'shell · context'
+})
+
 function updateDraft(event) {
   emit('update:draft', event.target.value)
   emit('show-slash-picker')
@@ -110,15 +122,25 @@ function updateDraft(event) {
 </script>
 
 <template>
-  <form class="start-composer" @submit.prevent="emit('submit')">
-    <textarea
-      :value="draft"
-      placeholder="Ask Leyline anything"
-      :disabled="!!creatingSessionCwd"
-      @keydown="emit('keydown', $event)"
-      @input="updateDraft"
-      @paste="emit('paste', $event)"
-    ></textarea>
+  <form
+    class="start-composer"
+    :class="{
+      'shell-mode-composer': shellMode,
+      'hidden-shell-mode-composer': hiddenShellMode,
+    }"
+    @submit.prevent="emit('submit')"
+  >
+    <div class="composer-input-shell">
+      <span v-if="shellMode" class="shell-prompt-glyph">$</span>
+      <textarea
+        :value="draft"
+        placeholder="Ask Leyline anything"
+        :disabled="!!creatingSessionCwd"
+        @keydown="emit('keydown', $event)"
+        @input="updateDraft"
+        @paste="emit('paste', $event)"
+      ></textarea>
+    </div>
     <div v-if="slashPickerOpen" class="slash-picker">
       <button
         v-for="(command, index) in slashCommandItems"
@@ -201,9 +223,13 @@ function updateDraft(event) {
           </div>
           <button
             class="start-send-button"
+            :class="{ 'shell-run-button': shellMode }"
             type="submit"
-            :disabled="!newSessionCwd.trim() || !!creatingSessionCwd"
-          >↑</button>
+            :title="shellMode ? 'Run shell command' : 'Send message'"
+            :disabled="!newSessionCwd.trim()
+              || !!creatingSessionCwd
+              || (shellMode && (!shellCommand || attachedImages.length))"
+          >{{ shellMode ? 'Run' : '↑' }}</button>
         </div>
       </div>
       <div class="composer-context-row">
@@ -216,6 +242,13 @@ function updateDraft(event) {
           <span class="start-project-label">{{ startProjectLabel }}</span>
           <span class="model-caret">▾</span>
         </button>
+        <span
+          v-if="shellMode"
+          class="composer-chip start-composer-chip shell-mode-chip"
+          :class="{ 'hidden-shell-mode-chip': hiddenShellMode }"
+        >
+          {{ shellModeLabel }}
+        </span>
         <span
           v-for="chip in chips"
           :key="chip"
