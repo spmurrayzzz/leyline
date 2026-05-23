@@ -6,7 +6,7 @@ import {
   skillSummaries,
   textFromBlocks,
   textFromContent,
-} from './transcript-projection'
+} from '../../lib/transcript-projection'
 
 const markdown = new MarkdownIt({
   html: false,

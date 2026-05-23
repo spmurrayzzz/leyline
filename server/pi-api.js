@@ -19,7 +19,7 @@ import {
   messageBlocksFor,
   projectTranscriptEntries,
   skillSummaries,
-} from '../src/lib/transcript-projection.js'
+} from '../lib/transcript-projection.js'
 import {
   createAgentSessionFromServices,
   createAgentSessionRuntime,
