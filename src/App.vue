@@ -135,6 +135,7 @@ const startupPhaseFloorMs = 650
 const startupAcceptedFloorMs = 420
 const sessionHandoffPhaseFloorMs = 320
 const sessionHandoffTotalFloorMs = 860
+const initPhaseFloorMs = 340
 
 const visibleProjects = computed(() => {
   const projects = new Map()
@@ -176,7 +177,11 @@ const selectedSessionExportUrl = computed(() => {
   if (!selectedSession.value?.id) return ''
   return `/api/pi/sessions/${encodeURIComponent(selectedSession.value.id)}/export`
 })
-const initializing = computed(() => sessionsLoading.value && !selectedSession.value)
+const initializing = computed(() => {
+  return sessionsLoading.value && !selectedSession.value
+})
+const initPhase = ref('sessions')
+let initPhaseTimer = null
 const rawEntries = computed(() => [
   ...(sessionDetail.value?.entries || []),
   ...localEntries.value,
@@ -345,10 +350,31 @@ const isEmptySelectedSession = computed(() => {
     && entries.value.length === 0
     && !liveTurnActive.value
 })
-const initEventLabel = computed(() => {
-  return eventStreamConnected.value
-    ? 'Runtime events connected'
-    : 'Connecting runtime events'
+const initSteps = computed(() => {
+  const phase = initPhase.value
+
+  return [
+    {
+      id: 'sessions',
+      label: 'Loading sessions',
+      done: phase !== 'sessions',
+      active: phase === 'sessions',
+    },
+    {
+      id: 'events',
+      label: eventStreamConnected.value
+        ? 'Runtime events connected'
+        : 'Connecting runtime events',
+      done: phase === 'workspace',
+      active: phase === 'events',
+    },
+    {
+      id: 'workspace',
+      label: 'Preparing transcript view',
+      done: false,
+      active: phase === 'workspace',
+    },
+  ]
 })
 const startProjectOptions = computed(() => {
   const query = startProjectQuery.value.trim().toLowerCase()
@@ -480,6 +506,8 @@ onMounted(async () => {
   window.addEventListener('leyline:new-session', handleNativeNewSession)
   window.addEventListener('leyline:toggle-terminal', handleNativeToggleTerminal)
   openEventStream()
+  initPhase.value = 'sessions'
+  await waitInitPhaseFloor()
   await loadSessions({ routeSessionId: sessionIdFromRoute() })
 })
 
@@ -500,7 +528,14 @@ onUnmounted(() => {
   cancelAnimationFrame(scrollFrame)
   cancelAnimationFrame(liveAssistantFrame)
   cancelAnimationFrame(terminalResizeFrame)
+  clearTimeout(initPhaseTimer)
 })
+
+async function waitInitPhaseFloor() {
+  return new Promise((resolve) => {
+    initPhaseTimer = setTimeout(resolve, initPhaseFloorMs)
+  })
+}
 
 function startTerminalResize(event) {
   terminalResizeStartY = event.clientY
@@ -541,6 +576,8 @@ async function loadSessions({
   showLoading = true,
 } = {}) {
   if (showLoading) sessionsLoading.value = true
+
+  initPhase.value = 'events'
   sessionsError.value = ''
 
   try {
@@ -564,7 +601,12 @@ async function loadSessions({
       sessionsError.value = error.message
     }
   } finally {
-    if (showLoading) sessionsLoading.value = false
+    if (showLoading) {
+      initPhase.value = 'workspace'
+      await waitInitPhaseFloor()
+      sessionsLoading.value = false
+      initPhase.value = 'sessions'
+    }
   }
 }
 
@@ -2261,17 +2303,14 @@ function closePickerMenus() {
           <div class="init-kicker">Starting Leyline</div>
           <h2>Loading workspace…</h2>
           <div class="init-steps">
-            <div class="init-step active">
+            <div
+              v-for="step in initSteps"
+              :key="step.id"
+              class="init-step"
+              :class="{ active: step.active, done: step.done }"
+            >
               <span></span>
-              <strong>Loading sessions</strong>
-            </div>
-            <div class="init-step" :class="{ done: eventStreamConnected }">
-              <span></span>
-              <strong>{{ initEventLabel }}</strong>
-            </div>
-            <div class="init-step">
-              <span></span>
-              <strong>Preparing transcript view</strong>
+              <strong>{{ step.label }}</strong>
             </div>
           </div>
         </div>
