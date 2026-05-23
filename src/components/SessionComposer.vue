@@ -17,6 +17,7 @@ const props = defineProps({
     default: () => [],
   },
   canSubmitDraft: Boolean,
+  compacting: Boolean,
   chips: {
     type: Array,
     default: () => [],
@@ -141,7 +142,9 @@ const shellModeLabel = computed(() => {
 })
 
 function focus() {
-  if (props.promptSubmitting || props.reloadingSession) return
+  if (props.promptSubmitting
+    || props.reloadingSession
+    || props.compacting) return
   textarea.value?.focus()
 }
 
@@ -196,7 +199,7 @@ function updateDraft(event) {
       <textarea
         ref="textarea"
         :value="draft"
-        :disabled="promptSubmitting || reloadingSession"
+        :disabled="promptSubmitting || reloadingSession || compacting"
         :placeholder="placeholder"
         @keydown="emit('keydown', $event)"
         @input="updateDraft"
@@ -240,6 +243,7 @@ function updateDraft(event) {
               class="composer-chip model-picker-button"
               type="button"
               :disabled="agentRunning
+                || compacting
                 || promptSubmitting
                 || reloadingSession
                 || switchingModel"
@@ -271,6 +275,7 @@ function updateDraft(event) {
               class="composer-chip model-picker-button"
               type="button"
               :disabled="agentRunning
+                || compacting
                 || promptSubmitting
                 || reloadingSession
                 || switchingThinking"
@@ -305,8 +310,11 @@ function updateDraft(event) {
             }"
             :type="agentRunning ? 'button' : 'submit'"
             :disabled="agentRunning
-              ? interrupting
-              : promptSubmitting || reloadingSession || !canSubmitDraft"
+              ? interrupting || compacting
+              : compacting
+                || promptSubmitting
+                || reloadingSession
+                || !canSubmitDraft"
             :title="agentRunning
               ? 'Stop generation'
               : shellMode ? 'Run shell command' : 'Send message'"

@@ -100,6 +100,7 @@ const slashActiveIndex = ref(0)
 const slashPickerDismissed = ref(false)
 const promptError = ref('')
 const agentRunning = ref(false)
+const compactingContext = ref(false)
 const liveActivity = ref('')
 const liveAssistantText = ref('')
 const liveAssistantBlocks = ref([])
@@ -200,6 +201,12 @@ const rawEntries = computed(() => [
 const liveItems = computed(() => [
   ...liveAssistantMessages.value,
   ...liveTools.value,
+  compactingContext.value ? {
+    id: 'live-compaction',
+    seq: Number.MAX_SAFE_INTEGER - 1,
+    type: 'activity',
+    text: 'Compacting context…',
+  } : null,
   liveActivity.value ? {
     id: 'live-activity',
     seq: Number.MAX_SAFE_INTEGER,
@@ -209,6 +216,7 @@ const liveItems = computed(() => [
 ].filter(Boolean).sort((a, b) => a.seq - b.seq))
 const liveTurnActive = computed(() => {
   return agentRunning.value
+    || compactingContext.value
     || liveTools.value.length > 0
     || liveAssistantMessages.value.length > 0
     || Boolean(liveActivity.value)
@@ -246,6 +254,7 @@ const {
     if (data.activeSessionId !== selectedSessionId.value) return
 
     markLiveTurnStart(data.event)
+    updateCompactionState(data.event)
     agentRunning.value = isRunningEvent(data.event)
     liveActivity.value = activityText(data.event)
     updateLiveTool(data.event)
@@ -295,7 +304,10 @@ const composerChips = computed(() => {
   const state = composerRuntime.value?.state || {}
 
   return [
-    agentRunning.value ? 'Enter queues steering' : '',
+    compactingContext.value ? 'Compacting context' : '',
+    agentRunning.value && !compactingContext.value
+      ? 'Enter queues steering'
+      : '',
     typeof state.activeToolCount === 'number'
       ? `${state.activeToolCount} tools`
       : '',
@@ -444,12 +456,14 @@ const startProjectLabel = computed(() => {
   return newSessionCwd.value ? projectName(newSessionCwd.value) : 'Choose project'
 })
 const sendButtonLabel = computed(() => {
+  if (compactingContext.value) return '…'
   if (agentRunning.value) return '■'
   if (promptSubmitting.value || reloadingSession.value) return '…'
   if (shellModeDraft.value) return 'Run'
   return '↑'
 })
 const composerPlaceholder = computed(() => {
+  if (compactingContext.value) return 'Compacting context before continuing…'
   if (agentRunning.value) {
     return 'Type to steer the current run; Option+Enter queues follow-up'
   }
@@ -866,6 +880,7 @@ function clearSelectedSession() {
 
 function resetLiveState() {
   liveTurnAnchorLength = null
+  compactingContext.value = false
   liveActivity.value = ''
   liveAssistantText.value = ''
   liveAssistantBlocks.value = []
@@ -1078,13 +1093,18 @@ function scheduleSessionRefresh(activeSessionId, event) {
     } catch (error) {
       sessionError.value = error.message
     }
-  }, 250)
+  }, event?.type === 'compaction_end' ? 0 : 250)
 }
 
 function markLiveTurnStart(event) {
   if (event?.type !== 'agent_start' && event?.type !== 'turn_start') return
   if (liveTurnAnchorLength !== null) return
   liveTurnAnchorLength = rawEntries.value.length
+}
+
+function updateCompactionState(event) {
+  if (event?.type === 'compaction_start') compactingContext.value = true
+  if (event?.type === 'compaction_end') compactingContext.value = false
 }
 
 function isRunningEvent(event) {
@@ -1118,6 +1138,9 @@ function eventSummary(item) {
 
 function activityText(event) {
   const type = event?.type || ''
+  if (type === 'compaction_start') return ''
+  if (type === 'compaction_end') return ''
+  if (compactingContext.value) return ''
   if (type === 'agent_start' || type === 'turn_start') return 'Thinking…'
   if (type === 'message_update' && !liveAssistantText.value) {
     return 'Writing response…'
@@ -1131,6 +1154,10 @@ function activityText(event) {
 }
 
 function surfaceRuntimeError(event) {
+  if (event?.type === 'compaction_end' && event.errorMessage) {
+    promptError.value = event.errorMessage
+    return
+  }
   if (event?.type !== 'error') return
   promptError.value = event.error?.message || event.message || 'Runtime error'
 }
@@ -1710,7 +1737,11 @@ async function submitDraft(streamingBehavior) {
   const images = attachedImages.value.map(({ preview, ...image }) => image)
   const shellCommand = shellCommandFromText(text)
   if (!text && images.length === 0) return
-  if (promptSubmitting.value || reloadingSession.value) return
+  if (promptSubmitting.value
+    || reloadingSession.value
+    || compactingContext.value) {
+    return
+  }
 
   if (shellCommand) {
     await submitShellCommand(shellCommand, images)
@@ -1840,7 +1871,10 @@ function slashCommandStartsTurn(text) {
 }
 
 function startEditingEntry(entry) {
-  if (agentRunning.value || promptSubmitting.value || !entry?.id) return
+  if (agentRunning.value
+    || compactingContext.value
+    || promptSubmitting.value
+    || !entry?.id) return
   if (entry.role !== 'user') return
 
   editingEntry.value = entry
@@ -1907,7 +1941,10 @@ async function confirmDeleteSession() {
 }
 
 async function forkSession(entry) {
-  if (!entry?.id || forkingEntryId.value || agentRunning.value) return
+  if (!entry?.id
+    || forkingEntryId.value
+    || agentRunning.value
+    || compactingContext.value) return
 
   forkingEntryId.value = entry.id
   sessionError.value = ''
@@ -2423,7 +2460,8 @@ function closePickerMenus() {
           <span>{{ topbarSubtitle }}</span>
         </div>
         <div v-if="selectedSession" class="topbar-meta">
-          <span v-if="agentRunning" class="running-pill">running</span>
+          <span v-if="compactingContext" class="running-pill">compacting</span>
+          <span v-else-if="agentRunning" class="running-pill">running</span>
           <span v-if="goalPillLabel" class="goal-pill">
             {{ goalPillLabel }}
           </span>
@@ -2778,6 +2816,7 @@ function closePickerMenus() {
         v-model:draft="draft"
         :agent-running="agentRunning"
         :attached-images="attachedImages"
+        :compacting="compactingContext"
         :available-models="availableModels"
         :available-thinking-levels="availableThinkingLevels"
         :can-submit-draft="canSubmitDraft"
