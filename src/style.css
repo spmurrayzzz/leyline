@@ -1106,6 +1106,15 @@ h1 {
   white-space: nowrap;
 }
 
+.running-pill,
+.topbar-runtime-pill,
+.goal-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  line-height: 1;
+}
+
 .running-pill {
   border: 1px solid var(--accent-border);
   border-radius: 999px;
