@@ -1325,16 +1325,16 @@ async function renderSessionExportHtml(detail) {
 <body>
 <main class="export-shell">
 <header class="export-header">
-<div>
-<p>Leyline transcript export</p>
-<h1>${escapeHtml(title)}</h1>
-</div>
+<div class="export-meta-row">
+${exportLogoSvg()}
 <dl>
 <div><dt>Project</dt><dd>${escapeHtml(projectLabel(session.cwd))}</dd></div>
 <div><dt>Path</dt><dd>${escapeHtml(session.cwd || '')}</dd></div>
 <div><dt>Messages</dt><dd>${escapeHtml(String(session.messageCount || 0))}</dd></div>
 <div><dt>Modified</dt><dd>${escapeHtml(formatExportDate(session.modified))}</dd></div>
 </dl>
+</div>
+<h1>${escapeHtml(title)}</h1>
 </header>
 <section class="transcript">
 ${body || '<div class="empty-workbench">No transcript entries found.</div>'}
@@ -1345,6 +1345,21 @@ ${body || '<div class="empty-workbench">No transcript entries found.</div>'}
 <script type="module">${exportJs()}</script>
 </body>
 </html>`
+}
+
+function exportLogoSvg() {
+  return `<svg class="export-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" aria-hidden="true">
+  <g transform="translate(12 12) scale(0.8125)">
+    <rect width="128" height="128" rx="28" fill="#111019"/>
+    <path d="M63 72c12 3 22 11 31 24" fill="none" stroke="#60a5fa" stroke-width="9" stroke-linecap="round"/>
+    <path d="M33 96c17-8 27-22 30-42 3-16 15-24 35-24" fill="none" stroke="#a78bfa" stroke-width="9" stroke-linecap="round"/>
+    <g fill="#f4f0ff">
+      <circle cx="33" cy="96" r="9"/>
+      <circle cx="98" cy="30" r="9"/>
+      <circle cx="94" cy="96" r="9"/>
+    </g>
+  </g>
+</svg>`
 }
 
 function isExportRenderableEntry(entry) {
@@ -1823,20 +1838,31 @@ button, input, textarea { color: inherit; font: inherit; }
   background: #14151a;
   padding: 18px 20px;
 }
-.export-header p {
-  margin: 0 0 6px;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+.export-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
-.export-header h1 { margin: 0; font-size: 20px; line-height: 1.25; }
+.export-logo {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 7%),
+    0 10px 26px rgb(0 0 0 / 24%);
+}
+.export-header h1 {
+  margin: 18px 0 0;
+  font-size: 20px;
+  line-height: 1.25;
+}
 .export-header dl {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  flex: 1 1 auto;
+  grid-template-columns: minmax(100px, 0.9fr) minmax(220px, 1.8fr)
+    minmax(90px, 0.7fr) minmax(150px, 1fr);
   gap: 12px;
-  margin: 18px 0 0;
+  margin: 0;
 }
 .export-header dt {
   color: var(--muted);
@@ -2131,6 +2157,11 @@ button, input, textarea { color: inherit; font: inherit; }
 }
 @media (max-width: 760px) {
   .export-shell { padding: 16px 12px 42px; }
+  .export-meta-row { align-items: flex-start; flex-wrap: wrap; }
+  .export-header dl {
+    flex-basis: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .assistant-message { padding-left: 4px; }
   .user-message { padding: 9px 10px; }
   .tool-card-header { gap: 7px; }
