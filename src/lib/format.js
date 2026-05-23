@@ -47,6 +47,7 @@ export function sessionTime(session) {
 export function toolLabel(toolName) {
   if (!toolName) return 'tool'
   if (toolName === 'bash') return 'bash'
+  if (toolName === 'compact') return 'Compact'
   return toolName
 }
 

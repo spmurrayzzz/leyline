@@ -51,7 +51,6 @@ const SESSION_DIR_ENV = 'PI_CODING_AGENT_SESSION_DIR'
 const HIDDEN_SLASH_COMMANDS = new Set([
   'changelog',
   'clone',
-  'compact',
   'copy',
   'export',
   'fork',
@@ -214,6 +213,20 @@ export async function piApiHandler(req, res) {
 
       const body = await readJson(req)
       await bashActiveSession(body.command, body.excludeFromContext)
+      return json(res, {
+        ok: true,
+        active: activeSessionDto(),
+        detail: toActiveSessionDetailDto(),
+      })
+    }
+
+    if (url.pathname === '/compact') {
+      if (req.method !== 'POST') {
+        return json(res, { error: 'Method not allowed' }, 405)
+      }
+
+      const body = await readJson(req)
+      await compactActiveSession(body.customInstructions)
       return json(res, {
         ok: true,
         active: activeSessionDto(),
@@ -613,6 +626,25 @@ async function bashActiveSession(command, excludeFromContext = false) {
   })
 }
 
+async function compactActiveSession(customInstructions) {
+  if (!activeRuntime) throw new Error('No active session')
+  if (activeRuntime.session.isStreaming) {
+    throw new Error('Wait for the current response to finish before compacting.')
+  }
+  if (activeRuntime.session.isCompacting) {
+    throw new Error('Compaction is already running.')
+  }
+
+  const entries = activeRuntime.session.sessionManager.getEntries()
+  const messageCount = entries.filter((entry) => entry.type === 'message').length
+  if (messageCount < 2) throw new Error('Nothing to compact (no messages yet)')
+
+  const instructions = typeof customInstructions === 'string'
+    ? customInstructions.trim()
+    : ''
+  await activeRuntime.session.compact(instructions || undefined)
+}
+
 function validateImages(images) {
   if (!images) return []
   if (!Array.isArray(images)) throw new Error('images must be an array')
@@ -811,6 +843,11 @@ function sessionStateDto(session, services) {
 
 function slashCommandDtos(session) {
   const commands = [
+    {
+      name: 'compact',
+      description: 'Manually compact context, optional custom instructions',
+      source: 'command',
+    },
     ...session.extensionRunner.getRegisteredCommands().map((command) => ({
       name: command.invocationName,
       description: command.description,

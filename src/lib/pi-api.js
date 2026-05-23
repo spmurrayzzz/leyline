@@ -56,6 +56,13 @@ export function runShellCommand(command, excludeFromContext = false) {
   })
 }
 
+export function compactPiSession(customInstructions = '') {
+  return apiRequest('/api/pi/compact', 'Failed to compact session', {
+    method: 'POST',
+    body: { customInstructions },
+  })
+}
+
 export function editPrompt(entryId, text, images = []) {
   return apiRequest('/api/pi/edit-prompt', 'Failed to edit prompt', {
     method: 'POST',

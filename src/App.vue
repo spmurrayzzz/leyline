@@ -21,6 +21,7 @@ import {
 } from './lib/format'
 import {
   activatePiSession,
+  compactPiSession,
   createPiSession,
   deletePiSession,
   editPrompt,
@@ -1231,7 +1232,7 @@ function liveToolKey(event) {
 
 function liveToolCode(event) {
   const args = event.args || event.input || {}
-  return args.command || args.path || ''
+  return args.command || args.path || args.customInstructions || ''
 }
 
 function liveToolStatus(tool) {
@@ -1699,10 +1700,16 @@ async function submitDraft(streamingBehavior) {
   const text = draft.value.trim()
   const images = attachedImages.value.map(({ preview, ...image }) => image)
   const shellCommand = shellCommandFromText(text)
+  const compactCommand = compactCommandFromText(text)
   if (!text && images.length === 0) return
   if (promptSubmitting.value
     || reloadingSession.value
     || compactingContext.value) {
+    return
+  }
+
+  if (compactCommand) {
+    await submitCompactCommand(compactCommand, images)
     return
   }
 
@@ -1788,6 +1795,53 @@ function shellCommandFromText(text) {
   return { command, excludeFromContext }
 }
 
+function compactCommandFromText(text) {
+  if (text !== '/compact' && !text.startsWith('/compact ')) return null
+  return { customInstructions: text.slice('/compact'.length).trim() }
+}
+
+async function submitCompactCommand(compactCommand, images) {
+  if (editingEntry.value) {
+    promptError.value = 'Cancel editing before compacting.'
+    return
+  }
+  if (agentRunning.value) {
+    promptError.value = 'Wait for the current response to finish before compacting.'
+    return
+  }
+  if (images.length) {
+    promptError.value = 'Compaction cannot include image attachments.'
+    return
+  }
+
+  promptSubmitting.value = true
+  startPromptSubmitTimer()
+  promptError.value = ''
+  resetLiveState()
+  draft.value = ''
+  upsertLiveTool({
+    type: 'tool_execution_start',
+    toolName: 'compact',
+    args: { customInstructions: compactCommand.customInstructions },
+  }, 'running')
+
+  try {
+    const data = await compactPiSession(compactCommand.customInstructions)
+    if (data.active) activeRuntimeSession.value = data.active
+    if (data.detail) sessionDetail.value = data.detail
+    finishLiveTools('completed')
+    await loadSessions({ selectFirst: false, showLoading: false })
+    await scrollToLatest()
+  } catch (error) {
+    finishLiveTools('error')
+    promptError.value = error.message
+  } finally {
+    promptSubmitting.value = false
+    stopPromptSubmitTimer()
+    refocusComposer()
+  }
+}
+
 async function submitShellCommand(shellCommand, images) {
   if (editingEntry.value) {
     promptError.value = 'Cancel editing before running a shell command.'
@@ -1835,7 +1889,7 @@ async function submitShellCommand(shellCommand, images) {
 }
 
 function isHandledSlashCommand(text) {
-  return /^\/(goal)(?:\s|$)/.test(text)
+  return /^\/(goal|compact)(?:\s|$)/.test(text)
 }
 
 function slashCommandStartsTurn(text) {
