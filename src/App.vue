@@ -1841,6 +1841,7 @@ async function submitShellCommand(shellCommand, images) {
   shellCommandSubmitting.value = true
   startPromptSubmitTimer()
   promptError.value = ''
+  if (!agentRunning.value) resetLiveState()
   liveActivity.value = 'Running shell command…'
 
   try {
