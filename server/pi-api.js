@@ -15,6 +15,12 @@ import MarkdownIt from 'markdown-it'
 import pty from 'node-pty'
 import { WebSocket, WebSocketServer } from 'ws'
 import {
+  imageBlocksFor,
+  messageBlocksFor,
+  projectTranscriptEntries,
+  skillSummaries,
+} from '../src/lib/transcript-projection.js'
+import {
   createAgentSessionFromServices,
   createAgentSessionRuntime,
   createAgentSessionServices,
@@ -1226,7 +1232,6 @@ function toActiveSessionDetailDto() {
 function toSessionDetailFromManager(manager, session, contextUsage) {
   const header = manager.getHeader()
   const entries = manager.getBranch()
-  const toolCalls = collectToolCalls(entries)
 
   return {
     session: {
@@ -1238,7 +1243,7 @@ function toSessionDetailFromManager(manager, session, contextUsage) {
       created: session.created,
       contextUsage,
     },
-    entries: entries.map((entry) => toEntryDto(entry, toolCalls)).filter(Boolean),
+    entries: projectTranscriptEntries(entries),
   }
 }
 
@@ -1270,252 +1275,6 @@ function activeSessionInfo() {
     modified: sessionModifiedDate(entries, header, created),
     messageCount,
   }
-}
-
-function collectToolCalls(entries) {
-  const calls = new Map()
-
-  for (const entry of entries) {
-    if (entry.type !== 'message') continue
-    if (entry.message.role !== 'assistant') continue
-    if (!Array.isArray(entry.message.content)) continue
-
-    for (const block of entry.message.content) {
-      if (block.type === 'toolCall') calls.set(block.id, block)
-    }
-  }
-
-  return calls
-}
-
-function toEntryDto(entry, toolCalls) {
-  if (entry.type === 'message') return toMessageEntryDto(entry, toolCalls)
-
-  if (entry.type === 'model_change') {
-    return {
-      id: entry.id,
-      type: 'event',
-      label: 'Model',
-      text: `${entry.provider}/${entry.modelId}`,
-      timestamp: entry.timestamp,
-    }
-  }
-
-  if (entry.type === 'thinking_level_change') {
-    return {
-      id: entry.id,
-      type: 'event',
-      label: 'Thinking',
-      text: entry.thinkingLevel,
-      timestamp: entry.timestamp,
-    }
-  }
-
-  if (entry.type === 'compaction') {
-    return {
-      id: entry.id,
-      type: 'summary',
-      label: 'Compaction',
-      text: entry.summary,
-      timestamp: entry.timestamp,
-    }
-  }
-
-  if (entry.type === 'branch_summary') {
-    return {
-      id: entry.id,
-      type: 'summary',
-      label: 'Branch summary',
-      text: entry.summary,
-      timestamp: entry.timestamp,
-    }
-  }
-
-  return undefined
-}
-
-function toMessageEntryDto(entry, toolCalls) {
-  const message = entry.message
-  const text = textFromContent(message.content || message.output || message.summary)
-
-  if (message.role === 'toolResult') {
-    const call = toolCalls.get(message.toolCallId)
-    const annotation = toolAnnotation(message.toolName, call)
-    const preview = toolPreview(message.toolName, call, message.content, text)
-
-    return {
-      id: entry.id,
-      type: 'tool',
-      label: annotation.label,
-      code: annotation.code,
-      toolCallId: message.toolCallId,
-      toolName: message.toolName,
-      text,
-      preview,
-      isError: message.isError,
-      timestamp: entry.timestamp,
-    }
-  }
-
-  if (message.role === 'bashExecution') {
-    const excludeFromContext = message.excludeFromContext === true
-
-    return {
-      id: entry.id,
-      type: 'tool',
-      label: 'Bash',
-      code: message.command,
-      toolName: 'bash',
-      text: bashPreview(message.output || '')
-        ? message.output || ''
-        : truncate(message.output || '', 900),
-      preview: bashPreview(message.output || ''),
-      isError: message.exitCode && message.exitCode !== 0,
-      excludeFromContext,
-      contextLabel: excludeFromContext ? 'not in context' : 'in context',
-      timestamp: entry.timestamp,
-    }
-  }
-
-  const blocks = messageBlocks(message.content)
-  if (message.role === 'assistant' && !blocks.length) return undefined
-
-  return {
-    id: entry.id,
-    type: 'message',
-    role: message.role,
-    label: labelForRole(message.role),
-    text,
-    blocks,
-    timestamp: entry.timestamp,
-  }
-}
-
-function messageBlocks(content) {
-  if (!Array.isArray(content)) return []
-
-  return content
-    .map((block) => {
-      if (block.type === 'text') return { type: 'text', text: block.text }
-      if (block.type === 'image') {
-        return {
-          type: 'image',
-          data: block.data,
-          mimeType: block.mimeType,
-        }
-      }
-      if (block.type === 'thinking') {
-        return { type: 'thinking', text: block.thinking }
-      }
-      return undefined
-    })
-    .filter((block) => block?.text || block?.data)
-}
-
-function toolPreview(toolName, call, content, text) {
-  const args = call?.arguments || {}
-
-  if (toolName === 'read' && args.path && !skillNameFromPath(args.path)) {
-    const image = imageBlockFromContent(content)
-    if (image) return { kind: 'image', path: args.path, ...image }
-    return { kind: 'file', path: args.path, content: text }
-  }
-
-  if (toolName === 'bash') return bashPreview(text)
-
-  if (toolName === 'edit' && args.path) {
-    const edit = args.edits?.[0]
-    const oldText = args.oldText ?? edit?.oldText
-    const newText = args.newText ?? edit?.newText
-    if (oldText !== undefined && newText !== undefined) {
-      return { kind: 'diff', path: args.path, oldText, newText }
-    }
-  }
-
-  if (toolName === 'write' && args.path && args.content !== undefined) {
-    return { kind: 'file', path: args.path, content: args.content }
-  }
-
-  return undefined
-}
-
-function bashPreview(text) {
-  if (!looksLikePatch(text)) return undefined
-  return { kind: 'patch', patch: text }
-}
-
-function imageBlockFromContent(content) {
-  if (!Array.isArray(content)) return undefined
-  const image = content.find((block) => block.type === 'image' && block.data)
-  if (!image) return undefined
-  return { data: image.data, mimeType: image.mimeType || 'image/png' }
-}
-
-function looksLikePatch(text) {
-  return /^diff --git /m.test(text) || /^--- .+\n\+\+\+ /m.test(text)
-}
-
-function toolAnnotation(toolName, call) {
-  const args = call?.arguments || {}
-
-  if (toolName === 'read' && args.path) {
-    const skill = skillNameFromPath(args.path)
-    if (skill) return { label: `Skill · ${skill}`, code: shortPath(args.path) }
-    return { label: 'Read', code: shortPath(args.path) }
-  }
-
-  if (toolName === 'bash' && args.command) {
-    return { label: 'Bash', code: truncate(args.command, 80) }
-  }
-
-  if ((toolName === 'edit' || toolName === 'write') && args.path) {
-    return { label: titleCase(toolName), code: shortPath(args.path) }
-  }
-
-  if ((toolName === 'grep' || toolName === 'find' || toolName === 'ls') && args.path) {
-    return { label: titleCase(toolName), code: shortPath(args.path) }
-  }
-
-  return { label: `Tool · ${toolName}` }
-}
-
-function skillNameFromPath(path) {
-  const match = path.match(/(?:^|\/)skills\/([^/]+)\/SKILL\.md$/)
-  return match?.[1]
-}
-
-function shortPath(path) {
-  return path.replace(`${process.env.HOME}/`, '~/')
-}
-
-function titleCase(value) {
-  return value.charAt(0).toUpperCase() + value.slice(1)
-}
-
-function textFromContent(content) {
-  if (!content) return ''
-  if (typeof content === 'string') return content
-  if (!Array.isArray(content)) return String(content)
-
-  return content
-    .map((block) => {
-      if (block.type === 'text') return block.text
-      if (block.type === 'thinking') return block.thinking
-      if (block.type === 'toolCall') return ''
-      if (block.type === 'image') return ''
-      return ''
-    })
-    .filter(Boolean)
-    .join('\n')
-}
-
-function labelForRole(role) {
-  if (role === 'user') return 'You'
-  if (role === 'assistant') return 'Agent'
-  if (role === 'custom') return 'Custom'
-  if (role === 'compactionSummary') return 'Compaction summary'
-  if (role === 'branchSummary') return 'Branch summary'
-  return role
 }
 
 function toSessionDto(session) {
@@ -1629,9 +1388,11 @@ function toExportEntry(entry) {
 
   const next = { ...entry, text: '' }
   if (entry.preview.kind === 'file') {
+    const content = clippedExportContent(entry.preview.content || '')
     next.preview = {
       ...entry.preview,
-      content: clippedExportContent(entry.preview.content || ''),
+      content,
+      fallbackText: content,
     }
   }
   return next
@@ -1663,43 +1424,16 @@ function renderToolContext(entry) {
 }
 
 function exportCodeLanguage(entry) {
-  const preview = entry.preview
-  if (preview?.kind === 'patch' || preview?.kind === 'diff') return 'diff'
-  if (preview?.kind !== 'file' && entry.toolName !== 'read') return ''
-
-  const path = preview?.path || entry.code || ''
-  const ext = path.split('.').pop()?.toLowerCase()
-  const languages = {
-    cjs: 'javascript',
-    css: 'css',
-    html: 'html',
-    js: 'javascript',
-    json: 'json',
-    jsonl: 'json',
-    jsx: 'javascript',
-    mjs: 'javascript',
-    md: 'markdown',
-    py: 'python',
-    rb: 'ruby',
-    sh: 'bash',
-    ts: 'typescript',
-    tsx: 'typescript',
-    vue: 'xml',
-    yaml: 'yaml',
-    yml: 'yaml',
-  }
-  return languages[ext] || ext || ''
+  return entry.preview?.language || ''
 }
 
 function toolPreviewText(entry) {
   const preview = entry.preview
   if (!preview) return entry.text || ''
-  if (preview.kind === 'patch') return preview.patch || entry.text || ''
   if (preview.kind === 'file') {
-    return clippedExportContent(preview.content || entry.text || '')
+    return clippedExportContent(preview.fallbackText || entry.text || '')
   }
-  if (preview.kind === 'diff') return previewDiffText(preview)
-  return entry.text || ''
+  return preview.fallbackText || entry.text || ''
 }
 
 function clippedExportContent(content) {
@@ -1712,26 +1446,6 @@ function clippedExportContent(content) {
   ].join('\n')
 }
 
-function previewDiffText(preview) {
-  const path = preview.path || 'tool-output.txt'
-  const oldLines = splitDiffLines(preview.oldText || '')
-  const newLines = splitDiffLines(preview.newText || '')
-  const oldCount = Math.max(oldLines.length, 1)
-  const newCount = Math.max(newLines.length, 1)
-
-  return [
-    `--- a/${path}`,
-    `+++ b/${path}`,
-    `@@ -1,${oldCount} +1,${newCount} @@`,
-    ...oldLines.map((line) => `-${line}`),
-    ...newLines.map((line) => `+${line}`),
-  ].join('\n')
-}
-
-function splitDiffLines(text) {
-  return text.replace(/\n$/, '').split('\n')
-}
-
 function renderedExportToolJson(text) {
   const trimmed = (text || '').trim()
   if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return ''
@@ -1741,6 +1455,14 @@ function renderedExportToolJson(text) {
   } catch {
     return ''
   }
+}
+
+function jsonTokenClass(token) {
+  if (token.endsWith(':')) return 'json-key'
+  if (token.startsWith('"')) return 'json-string'
+  if (token === 'true' || token === 'false') return 'json-boolean'
+  if (token === 'null') return 'json-null'
+  return 'json-number'
 }
 
 function highlightExportJson(json) {
@@ -1774,10 +1496,10 @@ ${renderMessageImages(entry)}
 
 function renderMessageBody(entry) {
   if (entry.role === 'assistant' && entry.blocks?.length) {
-    return messageBlocksForExport(entry).map(renderMessageBlock).join('\n')
+    return messageBlocksFor(entry).map(renderMessageBlock).join('\n')
   }
 
-  const skills = skillSummariesForExport(entry)
+  const skills = skillSummaries(entry)
   if (skills.length) return renderSkillSummaries(entry, skills)
 
   return `<div class="entry-text markdown-body">${renderMarkdown(entry.text)}</div>`
@@ -1809,7 +1531,7 @@ ${renderMarkdown(entry.text || '')}
 }
 
 function renderMessageImages(entry) {
-  const images = imageBlocksForExport(entry)
+  const images = imageBlocksFor(entry)
   if (!images.length) return ''
   const tags = images.map((image, index) => {
     const src = `data:${image.mimeType};base64,${image.data}`
@@ -1822,30 +1544,6 @@ function renderMarkdown(text) {
   return exportMarkdown.render(text || '')
 }
 
-function messageBlocksForExport(entry) {
-  if (entry.blocks?.length) return entry.blocks
-  return [{ type: 'text', text: entry.text }]
-}
-
-function imageBlocksForExport(entry) {
-  return (entry.blocks || []).filter((block) => block.type === 'image')
-}
-
-function skillSummariesForExport(entry) {
-  if (entry.role !== 'user' || !entry.text?.trimStart().startsWith('<skill ')) {
-    return []
-  }
-
-  return Array.from(entry.text.matchAll(/<skill\s+([^>]*)>/g))
-    .map((match) => ({
-      name: exportAttributeValue(match[1], 'name') || 'unknown',
-      location: exportAttributeValue(match[1], 'location'),
-    }))
-}
-
-function exportAttributeValue(source, name) {
-  return source.match(new RegExp(`${name}="([^"]+)"`))?.[1]
-}
 
 function projectLabel(cwd) {
   if (!cwd) return 'Unknown project'
@@ -2004,52 +1702,11 @@ function renderPlainTool(container, entry) {
 function toolPreviewText(entry) {
   const preview = entry.preview
   if (!preview) return entry.text || ''
-  if (preview.kind === 'patch') return preview.patch || entry.text || ''
-  if (preview.kind === 'file') return preview.content || entry.text || ''
-  if (preview.kind === 'diff') return previewDiffText(preview)
-  return entry.text || ''
-}
-
-function previewDiffText(preview) {
-  const path = preview.path || 'tool-output.txt'
-  const oldLines = (preview.oldText || '').replace(/\\n$/, '').split('\\n')
-  const newLines = (preview.newText || '').replace(/\\n$/, '').split('\\n')
-  return [
-    \`--- a/\${path}\`,
-    \`+++ b/\${path}\`,
-    \`@@ -1,\${Math.max(oldLines.length, 1)} +1,\${Math.max(newLines.length, 1)} @@\`,
-    ...oldLines.map((line) => \`-\${line}\`),
-    ...newLines.map((line) => \`+\${line}\`),
-  ].join('\\n')
+  return preview.fallbackText || entry.text || ''
 }
 
 function exportCodeLanguage(entry) {
-  const preview = entry.preview
-  if (preview?.kind === 'patch' || preview?.kind === 'diff') return 'diff'
-  if (preview?.kind !== 'file' && entry.toolName !== 'read') return ''
-
-  const path = preview?.path || entry.code || ''
-  const ext = path.split('.').pop()?.toLowerCase()
-  const languages = {
-    cjs: 'javascript',
-    css: 'css',
-    html: 'html',
-    js: 'javascript',
-    json: 'json',
-    jsonl: 'json',
-    jsx: 'javascript',
-    mjs: 'javascript',
-    md: 'markdown',
-    py: 'python',
-    rb: 'ruby',
-    sh: 'bash',
-    ts: 'typescript',
-    tsx: 'typescript',
-    vue: 'xml',
-    yaml: 'yaml',
-    yml: 'yaml',
-  }
-  return languages[ext] || ext || ''
+  return entry.preview?.language || ''
 }`
 }
 

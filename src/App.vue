@@ -43,7 +43,6 @@ import {
   messageBlocksFor,
   renderedToolJson,
   textFromBlocks,
-  textFromContent,
 } from './lib/transcript'
 
 const sessions = ref([])
@@ -1493,41 +1492,7 @@ function toggleSkill(entry) {
 }
 
 function entryCopyText(entry) {
-  if (entry.type === 'event') return `${entry.label} ${entry.text}`.trim()
-  if (entry.type === 'tool') return toolCopyText(entry)
-  if (entry.blocks?.length) {
-    return messageBlocksFor(entry).map((block) => block.text).join('\n\n')
-  }
-  return entry.text || ''
-}
-
-function toolCopyText(entry) {
-  const preview = entry.preview
-  if (!preview) return entry.text || ''
-  if (preview.kind === 'patch') return preview.patch || entry.text || ''
-  if (preview.kind === 'file') return preview.content || entry.text || ''
-  if (preview.kind === 'diff') return previewDiffText(preview)
-  return entry.text || ''
-}
-
-function previewDiffText(preview) {
-  const path = preview.path || 'tool-output.txt'
-  const oldLines = splitDiffLines(preview.oldText || '')
-  const newLines = splitDiffLines(preview.newText || '')
-  const oldCount = Math.max(oldLines.length, 1)
-  const newCount = Math.max(newLines.length, 1)
-
-  return [
-    `--- a/${path}`,
-    `+++ b/${path}`,
-    `@@ -1,${oldCount} +1,${newCount} @@`,
-    ...oldLines.map((line) => `-${line}`),
-    ...newLines.map((line) => `+${line}`),
-  ].join('\n')
-}
-
-function splitDiffLines(text) {
-  return text.replace(/\n$/, '').split('\n')
+  return entry.copyText || entry.preview?.fallbackText || entry.text || ''
 }
 
 function liveAssistantCopyText(blocks = liveAssistantBlocks.value) {
@@ -2099,6 +2064,7 @@ function pendingUserEntry(text, images = []) {
     label: 'You',
     text,
     blocks,
+    copyText: text,
   }
 }
 
