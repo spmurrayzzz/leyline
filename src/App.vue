@@ -2091,28 +2091,30 @@ function closePickerMenus() {
         <span aria-hidden="true">↓</span>
       </button>
 
-      <section
-        v-if="terminalOpen"
-        class="terminal-panel"
-      >
-        <div
-          class="terminal-resize-handle"
-          role="separator"
-          aria-label="Resize terminal"
-          aria-orientation="horizontal"
-          tabindex="0"
-          @keydown.down.prevent="nudgeTerminalHeight(-24)"
-          @keydown.up.prevent="nudgeTerminalHeight(24)"
-          @pointerdown.prevent="startTerminalResize"
-        ></div>
-        <div class="terminal-header">
-          <strong>Terminal</strong>
-          <code>{{ terminalCwd || selectedSession?.cwd }}</code>
-          <span>{{ terminalStatus }}</span>
-          <button type="button" @click="closeTerminalPanel">×</button>
-        </div>
-        <div ref="terminalEl" class="terminal-frame"></div>
-      </section>
+      <Transition name="terminal-drawer">
+        <section
+          v-if="terminalOpen"
+          class="terminal-panel"
+        >
+          <div
+            class="terminal-resize-handle"
+            role="separator"
+            aria-label="Resize terminal"
+            aria-orientation="horizontal"
+            tabindex="0"
+            @keydown.down.prevent="nudgeTerminalHeight(-24)"
+            @keydown.up.prevent="nudgeTerminalHeight(24)"
+            @pointerdown.prevent="startTerminalResize"
+          ></div>
+          <div class="terminal-header">
+            <strong>Terminal</strong>
+            <code>{{ terminalCwd || selectedSession?.cwd }}</code>
+            <span>{{ terminalStatus }}</span>
+            <button type="button" @click="closeTerminalPanel">×</button>
+          </div>
+          <div ref="terminalEl" class="terminal-frame"></div>
+        </section>
+      </Transition>
 
       <div
         v-if="selectedSession && !initializing && !isEmptySelectedSession"
