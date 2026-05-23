@@ -132,6 +132,7 @@ const emit = defineEmits([
   'update:draft',
 ])
 
+const form = ref(null)
 const textarea = ref(null)
 const shellMode = computed(() => props.draft.trimStart().startsWith('!'))
 const hiddenShellMode = computed(() => props.draft.trimStart().startsWith('!!'))
@@ -144,7 +145,7 @@ function focus() {
   textarea.value?.focus()
 }
 
-defineExpose({ focus })
+defineExpose({ focus, form })
 
 function updateDraft(event) {
   emit('update:draft', event.target.value)
@@ -154,6 +155,7 @@ function updateDraft(event) {
 
 <template>
   <form
+    ref="form"
     class="composer"
     :class="{
       'shell-mode-composer': shellMode,

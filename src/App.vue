@@ -93,6 +93,7 @@ const deleteConfirmSession = ref(null)
 const forkingEntryId = ref('')
 const editingEntry = ref(null)
 const composerRef = ref(null)
+const composerHeight = ref(0)
 const modelPickerOpen = ref(false)
 const thinkingPickerOpen = ref(false)
 const slashActiveIndex = ref(0)
@@ -105,6 +106,7 @@ const liveAssistantBlocks = ref([])
 const liveAssistantMessages = ref([])
 const liveTools = ref([])
 const stickToBottom = ref(true)
+const userScrollActive = ref(false)
 const hasNewOutput = ref(false)
 const {
   closeTerminalPanel,
@@ -124,6 +126,8 @@ let refreshTimer
 let startupPhaseTimer
 let promptSubmitTimer
 let scrollFrame
+let userScrollTimer
+let composerResizeObserver
 let liveAssistantFrame
 let liveToolSeq = 0
 let liveItemSeq = 0
@@ -133,11 +137,16 @@ let copiedTimer
 let liveTurnAnchorLength = null
 const liveToolSettleTimers = new Map()
 const liveToolVisualFloorMs = 450
+const bottomStickBufferPx = 160
+const userScrollIdleMs = 450
 const startupPhaseFloorMs = 650
 const startupAcceptedFloorMs = 420
 const sessionHandoffPhaseFloorMs = 320
 const sessionHandoffTotalFloorMs = 860
 const initPhaseFloorMs = 340
+const composerReservedHeight = computed(() => {
+  return `${Math.max(240, composerHeight.value + 78)}px`
+})
 
 const visibleProjects = computed(() => {
   const projects = new Map()
@@ -569,6 +578,10 @@ watch(slashCommandItems, () => {
   slashActiveIndex.value = 0
 })
 
+watch(() => composerRef.value?.form, (el) => {
+  observeComposer(el)
+}, { flush: 'post' })
+
 onMounted(async () => {
   window.addEventListener('keydown', closeMenusOnEscape)
   window.addEventListener('click', closeMenusOnOutsideClick)
@@ -594,6 +607,8 @@ onUnmounted(() => {
   clearTimeout(startupPhaseTimer)
   clearTimeout(promptSubmitTimer)
   clearTimeout(copiedTimer)
+  clearTimeout(userScrollTimer)
+  composerResizeObserver?.disconnect()
   clearLiveToolSettleTimers()
   cancelAnimationFrame(scrollFrame)
   cancelAnimationFrame(liveAssistantFrame)
@@ -1526,6 +1541,13 @@ function copyGlyph(id) {
   return copiedEntryId.value === id ? '✓' : '⧉'
 }
 
+function scheduleBottomScroll() {
+  cancelAnimationFrame(scrollFrame)
+  scrollFrame = requestAnimationFrame(() => {
+    scrollToLatest()
+  })
+}
+
 function scheduleLiveScroll(activeSessionId) {
   if (activeSessionId !== selectedSessionId.value) return
   if (!liveAssistantMessages.value.length
@@ -1534,24 +1556,68 @@ function scheduleLiveScroll(activeSessionId) {
     return
   }
 
-  if (!stickToBottom.value) {
+  if (!stickToBottom.value || userScrollActive.value) {
     hasNewOutput.value = true
     return
   }
 
-  cancelAnimationFrame(scrollFrame)
-  scrollFrame = requestAnimationFrame(() => {
-    scrollToLatest()
-  })
+  scheduleBottomScroll()
+}
+
+function observeComposer(el) {
+  composerResizeObserver?.disconnect()
+  composerResizeObserver = null
+  composerHeight.value = 0
+  if (!el) return
+
+  measureComposer()
+  composerResizeObserver = new ResizeObserver(measureComposer)
+  composerResizeObserver.observe(el)
+}
+
+function measureComposer() {
+  const el = composerRef.value?.form
+  const nextHeight = el ? Math.ceil(el.getBoundingClientRect().height) : 0
+  if (nextHeight === composerHeight.value) return
+  composerHeight.value = nextHeight
+  if (stickToBottom.value && !userScrollActive.value) scheduleBottomScroll()
 }
 
 function handleWorkbenchScroll() {
   if (!workbench.value) return
-  const distance = workbench.value.scrollHeight
+  const distance = distanceFromWorkbenchBottom()
+  if (distance >= bottomStickBufferPx) stickToBottom.value = false
+  else if (!userScrollActive.value) stickToBottom.value = true
+  if (stickToBottom.value) hasNewOutput.value = false
+}
+
+function handleWorkbenchWheel(event) {
+  markUserScrolling()
+  if (event.deltaY < 0) stickToBottom.value = false
+}
+
+function handleWorkbenchTouchMove() {
+  markUserScrolling()
+  stickToBottom.value = false
+}
+
+function markUserScrolling() {
+  userScrollActive.value = true
+  clearTimeout(userScrollTimer)
+  userScrollTimer = setTimeout(() => {
+    userScrollActive.value = false
+    if (distanceFromWorkbenchBottom() < bottomStickBufferPx) {
+      stickToBottom.value = true
+      hasNewOutput.value = false
+    }
+  }, userScrollIdleMs)
+}
+
+function distanceFromWorkbenchBottom() {
+  if (!workbench.value) return 0
+  return workbench.value.scrollHeight
     - workbench.value.scrollTop
     - workbench.value.clientHeight
-  stickToBottom.value = distance < 80
-  if (stickToBottom.value) hasNewOutput.value = false
 }
 
 async function jumpToLatest() {
@@ -2287,7 +2353,10 @@ function closePickerMenus() {
       'terminal-open': terminalOpen,
       'event-log-open': eventLogOpen,
     }"
-    :style="{ '--terminal-drawer-height': `${terminalDrawerHeight}px` }"
+    :style="{
+      '--composer-reserved-height': composerReservedHeight,
+      '--terminal-drawer-height': `${terminalDrawerHeight}px`,
+    }"
   >
     <button
       v-if="sidebarOpen"
@@ -2461,6 +2530,8 @@ function closePickerMenus() {
           'empty-selected-workbench': isEmptySelectedSession && !startupRun,
         }"
         @scroll="handleWorkbenchScroll"
+        @touchmove.passive="handleWorkbenchTouchMove"
+        @wheel.passive="handleWorkbenchWheel"
       >
         <div v-if="initializing" class="init-panel">
           <div class="init-kicker">Starting Leyline</div>

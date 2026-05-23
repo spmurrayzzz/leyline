@@ -1332,7 +1332,7 @@ h1 {
 .workbench {
   min-height: 0;
   overflow: auto;
-  padding: 20px 44px 240px;
+  padding: 20px 44px var(--composer-reserved-height, 240px);
   transition: padding-bottom 180ms ease;
   scrollbar-color: #4b4658 transparent;
   scrollbar-gutter: stable;
@@ -1340,7 +1340,9 @@ h1 {
 }
 
 .terminal-open .workbench {
-  padding-bottom: calc(var(--terminal-drawer-height) + 240px);
+  padding-bottom: calc(
+    var(--terminal-drawer-height) + var(--composer-reserved-height, 240px)
+  );
 }
 
 .workbench::-webkit-scrollbar {
@@ -3798,7 +3800,9 @@ textarea::placeholder {
   }
 
   .terminal-open .workbench {
-    padding-bottom: calc(var(--terminal-drawer-height) + 218px);
+    padding-bottom: calc(
+      var(--terminal-drawer-height) + var(--composer-reserved-height, 218px)
+    );
   }
 
   .terminal-open .composer-fade {
