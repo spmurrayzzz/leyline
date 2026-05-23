@@ -803,7 +803,16 @@ function stopPromptSubmitTimer() {
 }
 
 function navigateHome() {
+  const cwd = selectedSession.value?.cwd
+    || newSessionCwd.value
+    || sessions.value[0]?.cwd
+    || ''
+
   clearSelectedSession()
+  if (cwd) {
+    newSessionCwd.value = cwd
+    loadStartRuntimeState(cwd)
+  }
   updateSessionRoute('')
   sidebarOpen.value = false
 }
