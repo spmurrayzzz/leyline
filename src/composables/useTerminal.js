@@ -62,6 +62,7 @@ export function useTerminal() {
     const term = terminalInstance
     term.open(terminalEl.value)
     resizeTerminal()
+    focusTerminal()
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const socket = new WebSocket(
@@ -78,6 +79,7 @@ export function useTerminal() {
       if (runId !== terminalRunId) return
       terminalStatus.value = 'connected'
       resizeTerminal()
+      focusTerminal()
     })
 
     socket.addEventListener('message', (event) => {
@@ -105,6 +107,10 @@ export function useTerminal() {
     })
 
     window.addEventListener('resize', resizeTerminal)
+  }
+
+  function focusTerminal() {
+    requestAnimationFrame(() => terminalInstance?.focus())
   }
 
   function resizeTerminal() {

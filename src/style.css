@@ -1449,6 +1449,34 @@ h1 {
   gap: 8px;
 }
 
+.composer-bar .terminal-toggle-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 34px;
+  height: 28px;
+  margin-left: auto;
+  border: 1px solid #312d3d;
+  border-radius: 9px;
+  background: #1a1722;
+  padding: 0;
+  color: #c8c9d2;
+  line-height: 1;
+}
+
+.terminal-toggle-button svg {
+  width: 22px;
+  height: 22px;
+}
+
+.composer-bar .terminal-toggle-button:hover,
+.composer-bar .terminal-toggle-button.active {
+  border-color: var(--accent-border);
+  background: #211b32;
+  color: #d8d0ff;
+}
+
 .composer-context-row {
   overflow: hidden;
   gap: 8px;

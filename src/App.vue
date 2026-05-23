@@ -1763,13 +1763,6 @@ function closePickerMenus() {
           <button
             class="event-log-button"
             type="button"
-            @click="toggleTerminal"
-          >
-            Terminal {{ terminalStatus }}
-          </button>
-          <button
-            class="event-log-button"
-            type="button"
             @click="eventLogOpen = !eventLogOpen"
           >
             Events {{ runtimeEvents.length }}
@@ -2042,6 +2035,8 @@ function closePickerMenus() {
         :slash-picker-open="slashPickerOpen"
         :switching-model="switchingModel"
         :switching-thinking="switchingThinking"
+        :terminal-open="terminalOpen"
+        :terminal-status="terminalStatus"
         :thinking-level="composerRuntime?.state?.thinkingLevel"
         :thinking-picker-open="thinkingPickerOpen"
         @cancel-edit="cancelEditingEntry"
@@ -2055,6 +2050,7 @@ function closePickerMenus() {
         @show-slash-picker="showSlashPicker"
         @submit="submitDraft"
         @toggle-picker="togglePicker"
+        @toggle-terminal="toggleTerminal"
       />
     </section>
 
