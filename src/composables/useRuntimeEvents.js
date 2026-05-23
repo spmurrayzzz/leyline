@@ -1,6 +1,10 @@
 import { computed, ref } from 'vue'
 
-export function useRuntimeEvents({ onActiveSession, onRuntimeEvent } = {}) {
+export function useRuntimeEvents({
+  onActiveSession,
+  onRuntimeEvent,
+  onExtensionUi,
+} = {}) {
   const runtimeEvents = ref([])
   const eventStreamError = ref('')
   const eventStreamConnected = ref(false)
@@ -20,6 +24,12 @@ export function useRuntimeEvents({ onActiveSession, onRuntimeEvent } = {}) {
       const data = JSON.parse(event.data)
       appendRuntimeEvent(data)
       onRuntimeEvent?.(data)
+    })
+
+    eventSource.addEventListener('extension_ui', (event) => {
+      const data = JSON.parse(event.data)
+      appendRuntimeEvent({ ...data, type: 'extension_ui' })
+      onExtensionUi?.(data)
     })
 
     eventSource.onopen = () => {

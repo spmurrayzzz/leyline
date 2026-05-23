@@ -942,7 +942,7 @@ kbd {
 .main-pane {
   position: relative;
   display: grid;
-  grid-template-rows: 48px 1fr;
+  grid-template-rows: auto 1fr;
   min-width: 0;
   min-height: 0;
   background: #111217;
@@ -952,13 +952,20 @@ kbd {
   grid-template-rows: 1fr;
 }
 
+.runtime-chrome {
+  position: relative;
+  z-index: 3;
+  border-bottom: 1px solid var(--border-soft);
+  background: #0f1014;
+}
+
 .topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 18px;
   min-width: 0;
-  border-bottom: 1px solid var(--border-soft);
+  min-height: 48px;
   background: #0f1014;
   padding: 0 max(44px, calc((100% - var(--content-max)) / 2));
 }
@@ -1052,6 +1059,16 @@ h1 {
   text-overflow: ellipsis;
 }
 
+.goal-pill {
+  border: 1px solid rgba(125, 211, 252, 0.28);
+  border-radius: 999px;
+  background: rgba(14, 116, 144, 0.16);
+  padding: 3px 8px;
+  color: #9bdcf5;
+  font-size: 11px;
+  font-weight: 800;
+}
+
 .event-log-button,
 .delete-session-button {
   border: 1px solid var(--border);
@@ -1065,6 +1082,70 @@ h1 {
 
 .event-log-button {
   text-decoration: none;
+}
+
+.goal-control-plane {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-top: 1px solid rgba(125, 211, 252, 0.12);
+  background: rgba(14, 116, 144, 0.08);
+  padding: 9px max(44px, calc((100% - var(--content-max)) / 2));
+}
+
+.goal-control-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  color: #7fadb9;
+  font-size: 12px;
+}
+
+.goal-control-kicker {
+  border: 1px solid rgba(125, 211, 252, 0.24);
+  border-radius: 999px;
+  background: rgba(14, 116, 144, 0.16);
+  padding: 2px 7px;
+  color: #9bdcf5;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.goal-control-main strong {
+  overflow: hidden;
+  color: #d6f3ff;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.goal-control-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.goal-control-actions button {
+  border: 1px solid rgba(125, 211, 252, 0.24);
+  border-radius: 999px;
+  background: rgba(9, 25, 33, 0.82);
+  padding: 4px 9px;
+  color: #bfeeff;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.goal-control-actions button:hover:not(:disabled) {
+  border-color: rgba(125, 211, 252, 0.44);
+  background: rgba(14, 116, 144, 0.2);
+}
+
+.goal-control-actions button:disabled {
+  opacity: 0.55;
 }
 
 .delete-session-button {
@@ -1857,6 +1938,40 @@ h1 {
   color: #a3a3a3;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 11px;
+}
+
+.goal-banner {
+  width: min(var(--content-max), 100%);
+  margin: 14px auto 0;
+  border: 1px solid rgba(125, 211, 252, 0.2);
+  border-radius: 14px;
+  background: rgba(14, 116, 144, 0.08);
+  padding: 10px 12px;
+  color: #a8b5bd;
+  font-size: 12px;
+}
+
+.goal-banner div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.goal-banner strong {
+  overflow: hidden;
+  color: #d6f3ff;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.goal-banner span,
+.goal-banner p {
+  color: #7fadb9;
+}
+
+.goal-banner p {
+  margin: 6px 0 0;
 }
 
 .live-status-card {
@@ -2787,13 +2902,28 @@ textarea::placeholder {
   }
 
   .main-pane {
-    grid-template-rows: 56px 1fr;
+    grid-template-rows: auto 1fr;
     width: 100vw;
   }
 
   .topbar {
     gap: 10px;
+    min-height: 56px;
     padding: 0 12px;
+  }
+
+  .goal-control-plane {
+    align-items: flex-start;
+    padding: 8px 12px;
+  }
+
+  .goal-control-main {
+    display: grid;
+    gap: 5px;
+  }
+
+  .goal-control-actions {
+    padding-top: 1px;
   }
 
   .mobile-sidebar-button {

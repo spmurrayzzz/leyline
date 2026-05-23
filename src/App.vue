@@ -80,6 +80,7 @@ const interrupting = ref(false)
 const switchingModel = ref(false)
 const switchingThinking = ref(false)
 const reloadingSession = ref(false)
+const goalCommandSubmitting = ref('')
 const deletingSessionId = ref('')
 const deleteConfirmSession = ref(null)
 const forkingEntryId = ref('')
@@ -115,6 +116,7 @@ let liveItemSeq = 0
 let activeLiveAssistantId = ''
 let pendingAssistantEvent
 let copiedTimer
+let liveTurnAnchorLength = null
 const liveToolSettleTimers = new Map()
 const liveToolVisualFloorMs = 450
 
@@ -181,9 +183,8 @@ const liveTurnActive = computed(() => {
 })
 const entries = computed(() => {
   let list = rawEntries.value
-  if (liveTurnActive.value) {
-    const lastUser = list.findLastIndex((entry) => entry.role === 'user')
-    if (lastUser >= 0) list = list.slice(0, lastUser + 1)
+  if (liveTurnActive.value && liveTurnAnchorLength !== null) {
+    list = list.slice(0, liveTurnAnchorLength)
   }
 
   return list.filter((entry) => {
@@ -212,12 +213,18 @@ const {
 
     if (data.activeSessionId !== selectedSessionId.value) return
 
+    markLiveTurnStart(data.event)
     agentRunning.value = isRunningEvent(data.event)
     liveActivity.value = activityText(data.event)
     updateLiveTool(data.event)
     updateLiveAssistant(data.event)
     surfaceRuntimeError(data.event)
     scheduleLiveScroll(data.activeSessionId)
+  },
+  onExtensionUi(data) {
+    if (data.activeSessionId !== selectedSessionId.value) return
+    patchRuntimeExtensionUi(data.state, data.goal)
+    surfaceExtensionNotification(data.state)
   },
 })
 const composerRuntime = computed(() => {
@@ -259,6 +266,40 @@ const composerChips = computed(() => {
       ? `${state.activeToolCount} tools`
       : '',
   ].filter(Boolean)
+})
+const activeGoal = computed(() => {
+  return activeRuntimeSession.value?.state?.goal || null
+})
+const goalWidgetLines = computed(() => {
+  const ui = activeRuntimeSession.value?.state?.extensionUi
+  return ui?.widgets?.goal?.lines || []
+})
+const goalPillLabel = computed(() => {
+  const status = activeGoal.value?.status
+  if (!status) return ''
+  if (status === 'budget_limited') return 'goal: budget'
+  if (status === 'continuation_limited') return 'goal: limit'
+  return `goal: ${formatMode(status)}`
+})
+const goalBudgetLabel = computed(() => {
+  const goal = activeGoal.value
+  if (!goal) return ''
+  const parts = []
+  if (goal.tokenBudget) {
+    const used = compactNumber(goal.tokensUsed)
+    const budget = compactNumber(goal.tokenBudget)
+    parts.push(`${used}/${budget} tokens`)
+  }
+  if (goal.continuationLimit > 0) {
+    parts.push(`${goal.continuationsUsed}/${goal.continuationLimit} turns`)
+  }
+  return parts.join(' · ')
+})
+const goalPrimaryAction = computed(() => {
+  const status = activeGoal.value?.status
+  if (status === 'active') return { label: 'Pause', command: 'pause' }
+  if (status === 'paused') return { label: 'Resume', command: 'resume' }
+  return null
 })
 const imageSupportWarning = computed(() => {
   const model = composerRuntime.value?.state?.model
@@ -522,6 +563,7 @@ function clearSelectedSession() {
 }
 
 function resetLiveState() {
+  liveTurnAnchorLength = null
   liveActivity.value = ''
   liveAssistantText.value = ''
   liveAssistantBlocks.value = []
@@ -561,6 +603,12 @@ function scheduleSessionRefresh(activeSessionId, event) {
   }, 250)
 }
 
+function markLiveTurnStart(event) {
+  if (event?.type !== 'agent_start' && event?.type !== 'turn_start') return
+  if (liveTurnAnchorLength !== null) return
+  liveTurnAnchorLength = rawEntries.value.length
+}
+
 function isRunningEvent(event) {
   const type = event?.type || ''
   if (['agent_start', 'message_start', 'tool_call'].includes(type)) return true
@@ -575,6 +623,7 @@ function eventType(item) {
 
 function eventSummary(item) {
   if (item.summary) return item.summary
+  if (item.type === 'extension_ui') return 'extension UI'
   const event = item.event || item
   const type = event.type || item.type
 
@@ -1049,6 +1098,60 @@ async function scrollToLatest() {
   workbench.value.scrollTop = workbench.value.scrollHeight
 }
 
+function patchRuntimeExtensionUi(extensionUi, goal) {
+  if (!activeRuntimeSession.value) return
+  activeRuntimeSession.value = {
+    ...activeRuntimeSession.value,
+    state: {
+      ...activeRuntimeSession.value.state,
+      extensionUi,
+      goal,
+    },
+  }
+  if (goal?.objective) patchGoalSessionTitle(goal.objective)
+}
+
+function patchGoalSessionTitle(objective) {
+  const id = selectedSessionId.value
+  if (!id) return
+
+  sessions.value = sessions.value.map((session) => {
+    if (session.id !== id) return session
+    if (session.firstMessage && session.firstMessage !== '(no messages)') {
+      return session
+    }
+    return { ...session, firstMessage: objective }
+  })
+
+  const detail = sessionDetail.value
+  if (!detail || detail.session.id !== id) return
+  const firstMessage = detail.session.firstMessage
+  if (firstMessage && firstMessage !== '(no messages)') return
+  sessionDetail.value = {
+    ...detail,
+    session: { ...detail.session, firstMessage: objective },
+  }
+}
+
+function surfaceExtensionNotification(state) {
+  const notification = state?.notifications?.at?.(-1)
+  if (!notification) return
+  if (notification.type === 'error' || notification.type === 'warning') {
+    promptError.value = notification.message
+  }
+}
+
+function compactNumber(value) {
+  const number = Number(value || 0)
+  if (number >= 1_000_000) return `${trimNumber(number / 1_000_000)}M`
+  if (number >= 1_000) return `${trimNumber(number / 1_000)}K`
+  return String(number)
+}
+
+function trimNumber(value) {
+  return value.toFixed(1).replace(/\.0$/, '')
+}
+
 async function submitDraft() {
   const text = draft.value.trim()
   const images = attachedImages.value.map(({ preview, ...image }) => image)
@@ -1070,6 +1173,7 @@ async function submitDraft() {
     hasNewOutput.value = false
   }
   localEntries.value = [...localEntries.value, localEntry]
+  liveTurnAnchorLength = rawEntries.value.length
   promptSubmitting.value = true
   promptError.value = ''
   if (shouldFollowOutput) await scrollToLatest()
@@ -1078,11 +1182,19 @@ async function submitDraft() {
   try {
     if (editing) await editPrompt(editing.id, text, images)
     else await submitPrompt(text, images)
+    if (isHandledSlashCommand(text)) {
+      localEntries.value = localEntries.value.filter((entry) => {
+        return entry.id !== localEntry.id
+      })
+      liveTurnAnchorLength = rawEntries.value.length
+    }
     draft.value = ''
     attachedImages.value = []
     editingEntry.value = null
-    agentRunning.value = true
-    liveActivity.value = 'Thinking…'
+    if (!isHandledSlashCommand(text) || slashCommandStartsTurn(text)) {
+      agentRunning.value = true
+      liveActivity.value = 'Thinking…'
+    }
   } catch (error) {
     if (editing) sessionDetail.value = previousDetail
     localEntries.value = localEntries.value.filter((entry) => {
@@ -1093,6 +1205,14 @@ async function submitDraft() {
   } finally {
     promptSubmitting.value = false
   }
+}
+
+function isHandledSlashCommand(text) {
+  return /^\/(goal)(?:\s|$)/.test(text)
+}
+
+function slashCommandStartsTurn(text) {
+  return /^\/goal\s+/.test(text) && !/^\/goal\s+(clear|pause)\s*$/i.test(text)
 }
 
 function startEditingEntry(entry) {
@@ -1216,6 +1336,32 @@ async function reloadSession() {
     liveActivity.value = ''
   } finally {
     reloadingSession.value = false
+  }
+}
+
+async function runGoalCommand(command) {
+  if (!activeGoal.value || goalCommandSubmitting.value) return
+  if (!selectedSession.value) return
+
+  goalCommandSubmitting.value = command
+  promptError.value = ''
+
+  try {
+    if ((command === 'pause' || command === 'clear') && agentRunning.value) {
+      liveActivity.value = 'Stopping…'
+      await interruptPiSession()
+      agentRunning.value = false
+      liveActivity.value = ''
+    }
+    await submitPrompt(`/goal ${command}`)
+    if (command === 'resume') {
+      agentRunning.value = true
+      liveActivity.value = 'Thinking…'
+    }
+  } catch (error) {
+    promptError.value = error.message
+  } finally {
+    goalCommandSubmitting.value = ''
   }
 }
 
@@ -1595,7 +1741,8 @@ function closePickerMenus() {
     />
 
     <section class="main-pane">
-      <header v-if="initializing || selectedSession" class="topbar">
+      <div v-if="initializing || selectedSession" class="runtime-chrome">
+        <header class="topbar">
         <button
           class="mobile-sidebar-button"
           type="button"
@@ -1608,6 +1755,9 @@ function closePickerMenus() {
         </div>
         <div v-if="selectedSession" class="topbar-meta">
           <span v-if="agentRunning" class="running-pill">running</span>
+          <span v-if="goalPillLabel" class="goal-pill">
+            {{ goalPillLabel }}
+          </span>
           <span class="topbar-runtime-pill">{{ currentModelLabel }}</span>
           <span class="topbar-runtime-pill">{{ currentThinkingLabel }}</span>
           <button
@@ -1648,7 +1798,33 @@ function closePickerMenus() {
           <span>{{ selectedSession.messageCount }} messages</span>
           <span>modified {{ formatDate(selectedSession.modified) }}</span>
         </div>
-      </header>
+        </header>
+
+        <section v-if="activeGoal" class="goal-control-plane">
+          <div class="goal-control-main">
+            <span class="goal-control-kicker">Goal</span>
+            <strong>{{ activeGoal.objective }}</strong>
+            <span v-if="goalBudgetLabel">{{ goalBudgetLabel }}</span>
+          </div>
+          <div class="goal-control-actions">
+            <button
+              v-if="goalPrimaryAction"
+              type="button"
+              :disabled="!!goalCommandSubmitting"
+              @click="runGoalCommand(goalPrimaryAction.command)"
+            >
+              {{ goalCommandSubmitting === goalPrimaryAction.command
+                ? '…'
+                : goalPrimaryAction.label }}
+            </button>
+            <button
+              type="button"
+              :disabled="!!goalCommandSubmitting"
+              @click="runGoalCommand('clear')"
+            >{{ goalCommandSubmitting === 'clear' ? '…' : 'Clear' }}</button>
+          </div>
+        </section>
+      </div>
 
       <section v-if="eventLogOpen" class="event-log-panel">
         <div class="event-log-header">
@@ -1745,11 +1921,14 @@ function closePickerMenus() {
             @toggle-project-picker="startProjectPickerOpen = !startProjectPickerOpen"
           />
         </div>
-        <div v-else-if="entries.length === 0" class="empty-workbench">
+        <div
+          v-if="selectedSession && entries.length === 0 && !liveTurnActive"
+          class="empty-workbench"
+        >
           No transcript entries found.
         </div>
 
-        <template v-else>
+        <template v-else-if="selectedSession && entries.length > 0">
           <TranscriptEntry
             v-for="entry in entries"
             :key="entry.id"

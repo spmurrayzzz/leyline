@@ -24,12 +24,23 @@ import {
 } from '@earendil-works/pi-coding-agent'
 
 const require = createRequire(import.meta.url)
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const BUNDLED_GOAL_EXTENSION = resolve(
+  __dirname,
+  '..',
+  'agent',
+  'extensions',
+  'goal',
+  'index.ts',
+)
 
 let activeRuntime
 let activeSessionId
 let unsubscribeActiveSession
+let extensionUiState = emptyExtensionUiState()
 
 const sseClients = new Set()
+const GOAL_STATE_TYPE = 'goal-state'
 const SESSION_DIR_ENV = 'PI_CODING_AGENT_SESSION_DIR'
 const HIDDEN_SLASH_COMMANDS = new Set([
   'changelog',
@@ -64,8 +75,29 @@ const exportMarkdown = new MarkdownIt({
   breaks: false,
 })
 
+function preferBundledGoalExtension(result) {
+  const bundled = result.extensions.find((extension) => {
+    return extension.resolvedPath === BUNDLED_GOAL_EXTENSION
+  })
+  if (!bundled?.commands?.has('goal')) return result
+
+  return {
+    ...result,
+    extensions: result.extensions.filter((extension) => {
+      if (extension === bundled) return true
+      return !extension.commands?.has('goal')
+    }),
+  }
+}
+
 const createRuntime = async ({ cwd, sessionManager, sessionStartEvent }) => {
-  const services = await createAgentSessionServices({ cwd })
+  const services = await createAgentSessionServices({
+    cwd,
+    resourceLoaderOptions: {
+      additionalExtensionPaths: [BUNDLED_GOAL_EXTENSION],
+      extensionsOverride: preferBundledGoalExtension,
+    },
+  })
   const runtime = {
     ...(await createAgentSessionFromServices({
       services,
@@ -386,6 +418,7 @@ async function buildSessionInfo(filePath) {
     let firstMessage = ''
     let name
     const allMessages = []
+    const goal = goalStateFromEntries(entries)
 
     for (const entry of entries) {
       if (entry.type === 'session_info') {
@@ -413,7 +446,7 @@ async function buildSessionInfo(filePath) {
       created: new Date(header.timestamp),
       modified: sessionModifiedDate(entries, header, stats.mtime),
       messageCount,
-      firstMessage: firstMessage || '(no messages)',
+      firstMessage: firstMessage || goal?.objective || '(no messages)',
       allMessagesText: allMessages.join(' '),
     }
   } catch {
@@ -709,6 +742,8 @@ function sessionStateDto(session, services) {
     followUpMode: session.followUpMode,
     activeToolCount: session.getActiveToolNames().length,
     slashCommands: slashCommandDtos(session),
+    extensionUi: extensionUiState,
+    goal: goalStateFromSession(session),
   }
 }
 
@@ -909,14 +944,168 @@ function isDirectory(path) {
 
 async function bindActiveSession() {
   unsubscribeActiveSession?.()
-  await activeRuntime.session.bindExtensions({})
+  extensionUiState = emptyExtensionUiState()
+  await activeRuntime.session.bindExtensions({
+    uiContext: createExtensionUiContext(),
+    onError: (error) => {
+      broadcastEvent('extension_error', error)
+    },
+  })
+  syncGoalStateFromSession()
   unsubscribeActiveSession = activeRuntime.session.subscribe((event) => {
+    syncGoalStateFromSession()
     broadcastEvent('runtime_event', {
       activeSessionId,
       event,
     })
+    if (isGoalStateEvent(event)) broadcastActiveSession()
   })
-  broadcastEvent('active_session', activeSessionDto())
+  broadcastActiveSession()
+}
+
+function emptyExtensionUiState() {
+  return {
+    statuses: {},
+    widgets: {},
+    notifications: [],
+  }
+}
+
+function createExtensionUiContext() {
+  return {
+    select: async () => undefined,
+    confirm: async () => true,
+    input: async () => undefined,
+    notify(message, type = 'info') {
+      const notification = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        message,
+        type,
+        timestamp: new Date().toISOString(),
+      }
+      extensionUiState = {
+        ...extensionUiState,
+        notifications: [
+          ...extensionUiState.notifications.slice(-19),
+          notification,
+        ],
+      }
+      broadcastExtensionUi()
+    },
+    onTerminalInput: () => () => {},
+    setStatus(key, text) {
+      const statuses = { ...extensionUiState.statuses }
+      if (text === undefined) delete statuses[key]
+      else statuses[key] = text
+      extensionUiState = { ...extensionUiState, statuses }
+      broadcastExtensionUi()
+    },
+    setWorkingMessage: () => {},
+    setWorkingVisible: () => {},
+    setWorkingIndicator: () => {},
+    setHiddenThinkingLabel: () => {},
+    setWidget(key, content, options = {}) {
+      const widgets = { ...extensionUiState.widgets }
+      if (content === undefined) delete widgets[key]
+      else if (Array.isArray(content)) {
+        widgets[key] = {
+          lines: content.filter((line) => typeof line === 'string'),
+          placement: options.placement || 'aboveEditor',
+        }
+      }
+      extensionUiState = { ...extensionUiState, widgets }
+      broadcastExtensionUi()
+    },
+    setFooter: () => {},
+    setHeader: () => {},
+    setTitle: () => {},
+    custom: async () => undefined,
+    pasteToEditor: () => {},
+    setEditorText: () => {},
+    getEditorText: () => '',
+    editor: async () => undefined,
+    addAutocompleteProvider: () => {},
+    setEditorComponent: () => {},
+    getEditorComponent: () => undefined,
+    theme: {},
+    getAllThemes: () => [],
+    getTheme: () => undefined,
+    setTheme: () => ({ success: false, error: 'Theme switching unavailable' }),
+    getToolsExpanded: () => false,
+    setToolsExpanded: () => {},
+  }
+}
+
+function broadcastExtensionUi() {
+  broadcastEvent('extension_ui', {
+    activeSessionId,
+    state: extensionUiState,
+    goal: activeRuntime ? goalStateFromSession(activeRuntime.session) : null,
+  })
+  if (activeRuntime) broadcastActiveSession()
+}
+
+function syncGoalStateFromSession() {
+  const goal = activeRuntime
+    ? goalStateFromSession(activeRuntime.session)
+    : null
+  if (!goal) return
+  const status = goal.status === 'budget_limited'
+    ? 'limited by budget'
+    : goal.status === 'continuation_limited'
+      ? 'limited by continuations'
+      : goal.status
+  extensionUiState = {
+    ...extensionUiState,
+    statuses: {
+      ...extensionUiState.statuses,
+      goal: `goal: ${status}`,
+    },
+  }
+}
+
+function isGoalStateEvent(event) {
+  return event?.type === 'message_end'
+    && event.message?.role === 'custom'
+    && event.message?.customType === GOAL_STATE_TYPE
+}
+
+function goalStateFromSession(session) {
+  const entries = session?.sessionManager?.getEntries?.() || []
+  return goalStateFromEntries(entries)
+}
+
+function goalStateFromEntries(entries) {
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const entry = entries[i]
+    if (entry.type !== 'custom') continue
+    if (entry.customType !== GOAL_STATE_TYPE) continue
+    return normalizeGoalState(entry.data)
+  }
+  return null
+}
+
+function normalizeGoalState(data) {
+  const goal = data?.goal
+  if (!goal || typeof goal.objective !== 'string') return null
+  return {
+    objective: goal.objective,
+    status: typeof goal.status === 'string' ? goal.status : '',
+    tokenBudget: typeof goal.tokenBudget === 'number' ? goal.tokenBudget : null,
+    continuationLimit: Number(goal.continuationLimit || 0),
+    continuationsUsed: Number(goal.continuationsUsed || 0),
+    tokensUsed: Number(goal.tokensUsed || 0),
+    timeUsedSeconds: currentGoalSeconds(goal),
+    createdAt: Number(goal.createdAt || 0),
+    updatedAt: Number(goal.updatedAt || 0),
+  }
+}
+
+function currentGoalSeconds(goal) {
+  const base = Number(goal.timeUsedSeconds || 0)
+  if (goal.status !== 'active') return base
+  if (typeof goal.activeSince !== 'number') return base
+  return base + Math.max(0, Math.floor((Date.now() - goal.activeSince) / 1000))
 }
 
 function openEventStream(req, res) {
@@ -935,6 +1124,10 @@ function openEventStream(req, res) {
   req.on('close', () => {
     sseClients.delete(res)
   })
+}
+
+function broadcastActiveSession() {
+  broadcastEvent('active_session', activeSessionDto())
 }
 
 function broadcastEvent(type, data) {
@@ -996,6 +1189,7 @@ function activeSessionInfo() {
   const created = new Date(header.timestamp)
   let messageCount = 0
   let firstMessage = ''
+  const goal = goalStateFromEntries(entries)
 
   for (const entry of entries) {
     if (entry.type !== 'message') continue
@@ -1011,7 +1205,7 @@ function activeSessionInfo() {
     path: manager.getSessionFile(),
     cwd: header.cwd || activeRuntime.cwd,
     name: undefined,
-    firstMessage: firstMessage || '(no messages)',
+    firstMessage: firstMessage || goal?.objective || '(no messages)',
     created,
     modified: sessionModifiedDate(entries, header, created),
     messageCount,
