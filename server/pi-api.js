@@ -976,17 +976,27 @@ function activeSessionInfo() {
   const manager = activeRuntime.session.sessionManager
   const header = manager.getHeader()
   const entries = manager.getBranch()
-  const messageCount = entries.filter((entry) => entry.type === 'message').length
   const created = new Date(header.timestamp)
+  let messageCount = 0
+  let firstMessage = ''
+
+  for (const entry of entries) {
+    if (entry.type !== 'message') continue
+    messageCount++
+
+    const message = entry.message
+    if (firstMessage || message?.role !== 'user') continue
+    firstMessage = messageText(message.content || message.output || '')
+  }
 
   return {
     id: manager.getSessionId(),
     path: manager.getSessionFile(),
     cwd: header.cwd || activeRuntime.cwd,
     name: undefined,
-    firstMessage: '(no messages)',
+    firstMessage: firstMessage || '(no messages)',
     created,
-    modified: created,
+    modified: sessionModifiedDate(entries, header, created),
     messageCount,
   }
 }

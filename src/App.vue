@@ -1265,6 +1265,8 @@ function updateSelectedSessionSummary(session) {
     if (item.id !== session.id) return item
     return {
       ...item,
+      name: session.name,
+      firstMessage: session.firstMessage,
       messageCount: session.messageCount,
       modified: session.modified,
       timestamp: session.modified || item.timestamp,
