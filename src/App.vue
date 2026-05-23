@@ -154,6 +154,10 @@ const visibleProjects = computed(() => {
     .slice(0, 8)
 })
 const selectedSession = computed(() => sessionDetail.value?.session)
+const selectedSessionExportUrl = computed(() => {
+  if (!selectedSession.value?.id) return ''
+  return `/api/pi/sessions/${encodeURIComponent(selectedSession.value.id)}/export`
+})
 const initializing = computed(() => sessionsLoading.value && !selectedSession.value)
 const rawEntries = computed(() => [
   ...(sessionDetail.value?.entries || []),
@@ -1620,6 +1624,12 @@ function closePickerMenus() {
           >
             Events {{ runtimeEvents.length }}
           </button>
+          <a
+            class="event-log-button"
+            :href="selectedSessionExportUrl"
+            target="_blank"
+            rel="noreferrer"
+          >Export</a>
           <button
             class="delete-session-button"
             type="button"

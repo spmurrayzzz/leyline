@@ -1063,6 +1063,10 @@ h1 {
   font-weight: 800;
 }
 
+.event-log-button {
+  text-decoration: none;
+}
+
 .delete-session-button {
   display: grid;
   place-items: center;
