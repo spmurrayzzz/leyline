@@ -3044,11 +3044,17 @@ h1 {
 }
 
 .composer.empty-session-composer {
-  top: calc(50% - 40px);
+  top: calc(50% - 125px);
   bottom: auto;
   width: min(900px, calc(100% - 88px));
   min-width: min(760px, calc(100vw - 88px));
-  transform: translate(-50%, -50%);
+  transform: translateX(-50%);
+}
+
+.composer.empty-session-composer .slash-picker {
+  top: calc(100% + 10px);
+  bottom: auto;
+  max-height: min(360px, calc(100vh - 560px));
 }
 
 .jump-latest-button {
@@ -3228,7 +3234,7 @@ h1 {
 }
 
 .composer.session-handoff-composer.empty-session-composer {
-  transform: translate(-50%, calc(-50% + 14px)) scale(0.99);
+  transform: translate(-50%, 14px) scale(0.99);
 }
 
 .editing-banner {
