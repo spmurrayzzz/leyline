@@ -39,6 +39,7 @@ async function createWindow() {
     const isToggleTerminal = input.type === 'keyDown'
       && key === 't'
       && input.meta
+      && input.shift
 
     if (!isNewSession && !isToggleTerminal) return
 
