@@ -62,6 +62,7 @@ const sidebarOpen = ref(false)
 const desktopSidebarHidden = ref(false)
 const sessionDetail = ref(null)
 const sessionLoading = ref(false)
+const sessionActivating = ref(false)
 const sessionError = ref('')
 const expandedTools = ref(new Set())
 const expandedSkills = ref(new Set())
@@ -135,6 +136,8 @@ let liveAssistantFrame
 let liveToolSeq = 0
 let liveItemSeq = 0
 let activeLiveAssistantId = ''
+let sessionSelectionToken = 0
+let sessionActivationQueue = Promise.resolve()
 let pendingAssistantEvent
 let copiedTimer
 let liveTurnAnchorLength = null
@@ -307,6 +310,7 @@ const composerChips = computed(() => {
 
   return [
     compactingContext.value ? 'Compacting context' : '',
+    sessionActivating.value ? 'Activating runtime' : '',
     agentRunning.value && !compactingContext.value
       ? 'Enter queues steering'
       : '',
@@ -460,12 +464,15 @@ const startProjectLabel = computed(() => {
 const sendButtonLabel = computed(() => {
   if (compactingContext.value) return '…'
   if (agentRunning.value) return '■'
-  if (promptSubmitting.value || reloadingSession.value) return '…'
+  if (promptSubmitting.value || reloadingSession.value || sessionActivating.value) {
+    return '…'
+  }
   if (shellModeDraft.value) return 'Run'
   return '↑'
 })
 const composerPlaceholder = computed(() => {
   if (compactingContext.value) return 'Compacting context before continuing…'
+  if (sessionActivating.value) return 'Activating pi runtime…'
   if (agentRunning.value) {
     return 'Type to steer the current run; Option+Enter queues follow-up'
   }
@@ -800,15 +807,18 @@ async function createSessionForCwd(cwd) {
 }
 
 async function selectSession(session, options = {}) {
+  const token = ++sessionSelectionToken
   selectedSessionId.value = session.id
   sessionLoading.value = true
+  sessionActivating.value = false
   sessionError.value = ''
   promptError.value = ''
 
   try {
-    const data = await loadSessionDetail(session.id)
-    await activateSession(session)
+    const data = await loadSessionDetail(session)
+    if (!isCurrentSessionSelection(token, session.id)) return
     sessionDetail.value = data
+    activeRuntimeSession.value = null
     expandedTools.value = new Set()
     expandedSkills.value = new Set()
     localEntries.value = []
@@ -818,18 +828,31 @@ async function selectSession(session, options = {}) {
     stickToBottom.value = true
     hasNewOutput.value = false
     updateSessionRoute(session.id, options)
-  } catch (error) {
-    sessionError.value = error.message
-  } finally {
     sessionLoading.value = false
     await scrollToLatest()
     sidebarOpen.value = false
+
+    sessionActivating.value = true
+    await activateSelectedSession(token, session)
+    if (!isCurrentSessionSelection(token, session.id)) return
     if (terminalOpen.value && !sessionError.value) await connectTerminal()
+  } catch (error) {
+    if (isCurrentSessionSelection(token, session.id)) {
+      sessionError.value = error.message
+    }
+  } finally {
+    if (!isCurrentSessionSelection(token, session.id)) return
+    sessionLoading.value = false
+    sessionActivating.value = false
   }
 }
 
-async function loadSessionDetail(id) {
-  return fetchSessionDetail(id)
+function isCurrentSessionSelection(token, id) {
+  return token === sessionSelectionToken && selectedSessionId.value === id
+}
+
+async function loadSessionDetail(session) {
+  return fetchSessionDetail(session)
 }
 
 async function handleRouteChange() {
@@ -1400,8 +1423,18 @@ function clearLiveAssistant() {
   activeLiveAssistantId = ''
 }
 
-async function activateSession(session) {
-  activeRuntimeSession.value = await activatePiSession(session.id)
+async function activateSelectedSession(token, session) {
+  let active
+  sessionActivationQueue = sessionActivationQueue.catch(() => {}).then(
+    async () => {
+      if (!isCurrentSessionSelection(token, session.id)) return
+      active = await activatePiSession(session)
+    },
+  )
+  await sessionActivationQueue
+  if (active && isCurrentSessionSelection(token, session.id)) {
+    activeRuntimeSession.value = active
+  }
 }
 
 function sessionTitle(session) {
@@ -1704,6 +1737,7 @@ async function submitDraft(streamingBehavior) {
   if (!text && images.length === 0) return
   if (promptSubmitting.value
     || reloadingSession.value
+    || sessionActivating.value
     || compactingContext.value) {
     return
   }
@@ -2904,7 +2938,7 @@ function closePickerMenus() {
         :model-picker-open="modelPickerOpen"
         :placeholder="composerPlaceholder"
         :prompt-submitting="promptSubmitting"
-        :reloading-session="reloadingSession"
+        :reloading-session="reloadingSession || sessionActivating"
         :queued-messages="queuedMessages"
         :selected-model-key="selectedModelKey"
         :send-button-label="sendButtonLabel"

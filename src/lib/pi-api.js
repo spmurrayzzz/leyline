@@ -10,8 +10,14 @@ export function createPiSession(cwd) {
   })
 }
 
-export function fetchSessionDetail(id) {
-  return apiRequest(`/api/pi/sessions/${id}`, 'Failed to load session')
+export function fetchSessionDetail(session) {
+  const id = typeof session === 'string' ? session : session.id
+  const path = typeof session === 'string' ? '' : session.path
+  const query = path ? `?path=${encodeURIComponent(path)}` : ''
+  return apiRequest(
+    `/api/pi/sessions/${id}${query}`,
+    'Failed to load session',
+  )
 }
 
 export function fetchFsDirectory(path) {
@@ -25,10 +31,14 @@ export function deletePiSession(id) {
   })
 }
 
-export async function activatePiSession(id) {
+export async function activatePiSession(session) {
   const data = await apiRequest('/api/pi/active-session', 'Failed to activate session', {
     method: 'POST',
-    body: { id },
+    body: typeof session === 'string' ? { id: session } : {
+      id: session.id,
+      path: session.path,
+      cwd: session.cwd,
+    },
   })
   return data.active
 }

@@ -168,7 +168,7 @@ export async function piApiHandler(req, res) {
       }
 
       const body = await readJson(req)
-      const session = await findSession(body.id)
+      const session = await resolveSession(body.id, body.path, body.cwd)
       if (!session) return json(res, { error: 'Session not found' }, 404)
 
       const active = await switchActiveSession(session)
@@ -339,6 +339,9 @@ export async function piApiHandler(req, res) {
         return json(res, toActiveSessionDetailDto())
       }
 
+      const path = url.searchParams.get('path')
+      if (path) return json(res, toSessionDetailFromPath(match[1], path))
+
       const session = await findSession(match[1])
       if (!session) return json(res, { error: 'Session not found' }, 404)
       return json(res, toSessionDetailDto(session))
@@ -400,6 +403,12 @@ async function findSession(id) {
   if (isActiveSession(id)) return activeSessionInfo()
   const sessions = await listSessions()
   return sessions.find((session) => session.id === id)
+}
+
+async function resolveSession(id, path, cwd) {
+  if (isActiveSession(id)) return activeSessionInfo()
+  if (path) return { id, path, cwd: cwd || '' }
+  return findSession(id)
 }
 
 function configuredSessionDir(cwd) {
@@ -560,7 +569,10 @@ async function switchActiveSession(session) {
   }
 
   forceOneAtATime(activeRuntime.session)
-  activeSessionId = session.id
+  activeSessionId = activeRuntime.session.sessionManager.getSessionId()
+  if (session.id && activeSessionId !== session.id) {
+    throw new Error('Session path does not match session id')
+  }
   await bindActiveSession()
 
   return activeSessionDto()
@@ -1271,6 +1283,14 @@ function toSessionDetailDto(session) {
   return toSessionDetailFromManager(SessionManager.open(session.path), session)
 }
 
+function toSessionDetailFromPath(id, path) {
+  const manager = SessionManager.open(path)
+  if (manager.getSessionId() !== id) {
+    throw new Error('Session path does not match session id')
+  }
+  return toSessionDetailFromManager(manager, { id, path })
+}
+
 function toActiveSessionDetailDto() {
   return toSessionDetailFromManager(
     activeRuntime.session.sessionManager,
@@ -1282,15 +1302,44 @@ function toActiveSessionDetailDto() {
 function toSessionDetailFromManager(manager, session, contextUsage) {
   const header = manager.getHeader()
   const entries = manager.getBranch()
+  let messageCount = 0
+  let firstMessage = ''
+  let name = session.name
+  const goal = goalStateFromEntries(entries)
+
+  for (const entry of entries) {
+    if (entry.type === 'session_info') {
+      name = entry.name?.trim() || undefined
+    }
+    if (entry.type !== 'message') continue
+    messageCount++
+
+    const message = entry.message
+    if (firstMessage || message?.role !== 'user') continue
+    firstMessage = messageText(message.content || message.output || '')
+  }
+
+  const info = {
+    ...session,
+    id: manager.getSessionId(),
+    path: manager.getSessionFile(),
+    cwd: header.cwd || session.cwd,
+    name,
+    firstMessage: firstMessage || goal?.objective || '(no messages)',
+    created: session.created || new Date(header.timestamp),
+    modified: session.modified
+      || sessionModifiedDate(entries, header, new Date()),
+    messageCount: session.messageCount ?? messageCount,
+  }
 
   return {
     session: {
-      ...toSessionDto(session),
-      cwd: header.cwd || session.cwd,
-      sessionFile: manager.getSessionFile(),
-      messageCount: session.messageCount,
-      modified: session.modified,
-      created: session.created,
+      ...toSessionDto(info),
+      cwd: info.cwd,
+      sessionFile: info.path,
+      messageCount: info.messageCount,
+      modified: info.modified,
+      created: info.created,
       contextUsage,
     },
     entries: projectTranscriptEntries(entries),
