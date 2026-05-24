@@ -59,11 +59,11 @@ function copyGlyph(id) {
   <article
     v-else-if="entry.type === 'tool'"
     class="tool-card transcript-tool"
-    :class="{ 'error-card': entry.isError }"
+    :class="{ 'is-expanded': toolExpanded, 'error-card': entry.isError }"
     @click="emit('toggle-tool', entry)"
   >
     <div class="tool-card-header">
-      <span>{{ toolExpanded ? '⌄' : '›' }}</span>
+      <span class="chevron">›</span>
       <span>{{ entry.label }}</span>
       <code v-if="entry.code">{{ entry.code }}</code>
       <span

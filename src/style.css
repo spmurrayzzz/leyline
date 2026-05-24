@@ -2912,6 +2912,17 @@ h1 {
   transition: color var(--motion-base) var(--ease-standard);
 }
 
+.tool-card-header .chevron {
+  display: inline-block;
+  transition:
+    transform var(--motion-base) var(--ease-emphasized),
+    color var(--motion-base) var(--ease-standard);
+}
+
+.tool-card.is-expanded .chevron {
+  transform: rotate(90deg);
+}
+
 .tool-card-header .copy-button {
   flex: 0 0 auto;
   width: 20px;
@@ -2951,6 +2962,16 @@ h1 {
   padding: 8px 10px;
   background: #131419;
   cursor: pointer;
+}
+
+.transcript-tool.is-expanded {
+  border-color: #33353f;
+  background: #171820;
+}
+
+.transcript-tool.is-expanded:hover {
+  border-color: #3b3d49;
+  background: #1a1c25;
 }
 
 .transcript-tool:hover {
@@ -3014,6 +3035,12 @@ h1 {
 .tool-expand-inner {
   overflow: hidden;
   min-height: 0;
+  opacity: 0;
+  transition: opacity var(--motion-base) var(--ease-decelerate);
+}
+
+.tool-expand-wrapper.is-expanded .tool-expand-inner {
+  opacity: 1;
 }
 
 .skill-expand-wrapper {
@@ -3029,12 +3056,23 @@ h1 {
 .skill-expand-inner {
   overflow: hidden;
   min-height: 0;
+  opacity: 0;
+  transition: opacity var(--motion-base) var(--ease-decelerate);
+}
+
+.skill-expand-wrapper.is-expanded .skill-expand-inner {
+  opacity: 1;
 }
 
 .tool-expanded-body {
   margin-top: 9px;
-  border-top: 1px solid var(--border-soft);
+  border-top: 1px solid transparent;
   padding-top: 9px;
+  transition: border-top-color var(--motion-base) var(--ease-decelerate);
+}
+
+.tool-expand-wrapper.is-expanded .tool-expanded-body {
+  border-top-color: var(--border-soft);
 }
 
 .tool-output {
@@ -3986,11 +4024,14 @@ textarea::placeholder {
   .skill-summary,
   .tool-card,
   .tool-card-header > span:first-child,
+  .chevron,
   .tool-context-pill,
   .tool-preview-clip,
   .tool-preview-cta,
   .tool-expand-wrapper,
+  .tool-expand-inner,
   .skill-expand-wrapper,
+  .skill-expand-inner,
   .tool-fullscreen-enter-active,
   .tool-fullscreen-leave-active,
   .tool-fullscreen-enter-active .tool-fullscreen,
