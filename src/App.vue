@@ -7,6 +7,7 @@ import SessionComposer from './components/SessionComposer.vue'
 import StartComposer from './components/StartComposer.vue'
 import SessionSidebar from './components/SessionSidebar.vue'
 import TranscriptEntry from './components/TranscriptEntry.vue'
+import { useLiveTurnProjection } from './composables/useLiveTurnProjection'
 import { useRuntimeEvents } from './composables/useRuntimeEvents'
 import { useTerminal } from './composables/useTerminal'
 import { fuzzyScore, highlightedText as highlightFuzzyText } from './lib/fuzzy'
@@ -39,8 +40,6 @@ import {
 import {
   imageBlocksFor,
   imageSrc,
-  messageBlocks,
-  skillSummaries,
   messageBlocksFor,
   renderedToolJson,
   textFromBlocks,
@@ -68,7 +67,6 @@ const sessionError = ref('')
 const expandedTools = ref(new Set())
 const expandedSkills = ref(new Set())
 const copiedEntryId = ref('')
-const localEntries = ref([])
 const draft = ref('')
 const attachedImages = ref([])
 const workbench = ref(null)
@@ -103,13 +101,6 @@ const thinkingPickerOpen = ref(false)
 const slashActiveIndex = ref(0)
 const slashPickerDismissed = ref(false)
 const promptError = ref('')
-const agentRunning = ref(false)
-const compactingContext = ref(false)
-const liveActivity = ref('')
-const liveAssistantText = ref('')
-const liveAssistantBlocks = ref([])
-const liveAssistantMessages = ref([])
-const liveTools = ref([])
 const stickToBottom = ref(true)
 const userScrollActive = ref(false)
 const hasNewOutput = ref(false)
@@ -133,17 +124,9 @@ let promptSubmitTimer
 let scrollFrame
 let userScrollTimer
 let composerResizeObserver
-let liveAssistantFrame
-let liveToolSeq = 0
-let liveItemSeq = 0
-let activeLiveAssistantId = ''
 let sessionSelectionToken = 0
 let sessionActivationQueue = Promise.resolve()
-let pendingAssistantEvent
 let copiedTimer
-let liveTurnAnchorLength = null
-const liveToolSettleTimers = new Map()
-const liveToolVisualFloorMs = 450
 const bottomStickBufferPx = 160
 const userScrollIdleMs = 450
 const startupPhaseFloorMs = 650
@@ -200,43 +183,26 @@ const initializing = computed(() => {
 })
 const initPhase = ref('sessions')
 let initPhaseTimer = null
-const rawEntries = computed(() => [
-  ...(sessionDetail.value?.entries || []),
-  ...localEntries.value,
-])
-const liveItems = computed(() => [
-  ...liveAssistantMessages.value,
-  ...liveTools.value,
-  compactingContext.value ? {
-    id: 'live-compaction',
-    seq: Number.MAX_SAFE_INTEGER - 1,
-    type: 'activity',
-    text: 'Compacting context…',
-  } : null,
-  liveActivity.value ? {
-    id: 'live-activity',
-    seq: Number.MAX_SAFE_INTEGER,
-    type: 'activity',
-    text: liveActivity.value,
-  } : null,
-].filter(Boolean).sort((a, b) => a.seq - b.seq))
-const liveTurnActive = computed(() => {
-  return agentRunning.value
-    || compactingContext.value
-    || liveTools.value.length > 0
-    || liveAssistantMessages.value.length > 0
-    || Boolean(liveActivity.value)
-})
-const entries = computed(() => {
-  let list = rawEntries.value
-  if (liveTurnActive.value && liveTurnAnchorLength !== null) {
-    list = list.slice(0, liveTurnAnchorLength)
-  }
-
-  return list.filter((entry) => {
-    return isRenderableEntry(entry) && !isCoveredByLiveTool(entry)
-  })
-})
+const liveTurn = useLiveTurnProjection({ onIntent: handleLiveTurnIntent })
+const {
+  addTool: upsertLiveTool,
+  agentRunning,
+  beginUserTurn,
+  clearLiveOutput,
+  compactingContext,
+  dispose: disposeLiveTurn,
+  entries,
+  finishTools: finishLiveTools,
+  liveActivity,
+  liveAssistantBlocks,
+  liveItems,
+  liveTurnActive,
+  reconcileCurrentDetail,
+  removeOptimisticEntry,
+  reset: resetLiveState,
+  setActivity: setLiveActivity,
+  setAgentRunning,
+} = liveTurn
 const {
   appendRuntimeEvent,
   closeEventStream,
@@ -254,20 +220,8 @@ const {
     })
   },
   onRuntimeEvent(data) {
-    scheduleSessionRefresh(data.activeSessionId, data.event)
     console.log('pi runtime event', data)
-
-    if (data.activeSessionId !== selectedSessionId.value) return
-
-    markLiveTurnStart(data.event)
-    updateCompactionState(data.event)
-    agentRunning.value = isRunningEvent(data.event)
-    liveActivity.value = activityText(data.event)
-    updateLiveTool(data.event)
-    updateLiveAssistant(data.event)
-    updateRuntimeQueue(data.event)
-    surfaceRuntimeError(data.event)
-    scheduleLiveScroll(data.activeSessionId)
+    liveTurn.handle({ kind: 'runtime', ...data })
   },
   onExtensionUi(data) {
     if (data.activeSessionId !== selectedSessionId.value) return
@@ -598,6 +552,10 @@ watch(slashCommandItems, () => {
   slashActiveIndex.value = 0
 })
 
+watch(sessionDetail, (detail) => {
+  liveTurn.setPersistedDetail(detail)
+})
+
 watch(() => composerRef.value?.form, (el) => {
   observeComposer(el)
 }, { flush: 'post' })
@@ -629,12 +587,20 @@ onUnmounted(() => {
   clearTimeout(copiedTimer)
   clearTimeout(userScrollTimer)
   composerResizeObserver?.disconnect()
-  clearLiveToolSettleTimers()
+  disposeLiveTurn()
   cancelAnimationFrame(scrollFrame)
-  cancelAnimationFrame(liveAssistantFrame)
   cancelAnimationFrame(terminalResizeFrame)
   clearTimeout(initPhaseTimer)
 })
+
+function handleLiveTurnIntent(intent) {
+  if (intent.type === 'refresh-session') {
+    scheduleSessionRefresh(intent.activeSessionId, intent.event)
+  }
+  if (intent.type === 'runtime-queue') updateRuntimeQueue(intent.event)
+  if (intent.type === 'surface-error') promptError.value = intent.message
+  if (intent.type === 'scroll-live') scheduleLiveScroll(intent.activeSessionId)
+}
 
 async function waitInitPhaseFloor() {
   return new Promise((resolve) => {
@@ -784,10 +750,10 @@ async function createSessionForCwd(cwd) {
     activeRuntimeSession.value = data.active
     sessionDetail.value = data.detail
     selectedSessionId.value = data.detail.session.id
+    liveTurn.selectSession(data.detail.session.id)
     updateSessionRoute(data.detail.session.id)
     expandedTools.value = new Set()
     expandedSkills.value = new Set()
-    localEntries.value = []
     editingEntry.value = null
     resetLiveState()
     expandProject(targetCwd)
@@ -812,6 +778,7 @@ async function selectSession(session, options = {}) {
   sessionSwitching.value = true
   const switchStarted = Date.now()
   selectedSessionId.value = session.id
+  liveTurn.selectSession(session.id)
   sessionLoading.value = true
   sessionActivating.value = false
   sessionError.value = ''
@@ -824,7 +791,6 @@ async function selectSession(session, options = {}) {
     activeRuntimeSession.value = null
     expandedTools.value = new Set()
     expandedSkills.value = new Set()
-    localEntries.value = []
     editingEntry.value = null
     resetLiveState()
     expandProject(session.cwd)
@@ -897,30 +863,16 @@ function updateSessionRoute(id, { replaceRoute = false } = {}) {
 
 function clearSelectedSession() {
   selectedSessionId.value = ''
+  liveTurn.clearSession()
   sessionDetail.value = null
   sessionError.value = ''
   promptError.value = ''
   expandedTools.value = new Set()
   expandedSkills.value = new Set()
-  localEntries.value = []
   editingEntry.value = null
   sessionHandoff.value = null
   finishStartupRun()
   resetLiveState()
-}
-
-function resetLiveState() {
-  liveTurnAnchorLength = null
-  compactingContext.value = false
-  liveActivity.value = ''
-  liveAssistantText.value = ''
-  liveAssistantBlocks.value = []
-  liveAssistantMessages.value = []
-  liveTools.value = []
-  activeLiveAssistantId = ''
-  pendingAssistantEvent = undefined
-  clearLiveToolSettleTimers()
-  cancelAnimationFrame(liveAssistantFrame)
 }
 
 function beginStartupRun(cwd, options = {}) {
@@ -1118,34 +1070,13 @@ function scheduleSessionRefresh(activeSessionId, event) {
     try {
       const detail = await loadSessionDetail(selectedSessionId.value)
       sessionDetail.value = detail
-      reconcileLocalEntries(detail)
       updateSelectedSessionSummary(detail.session)
-      reconcileLiveTools(detail)
       if (wasStuck) await scrollToLatest()
       else hasNewOutput.value = true
     } catch (error) {
       sessionError.value = error.message
     }
   }, event?.type === 'compaction_end' ? 0 : 250)
-}
-
-function markLiveTurnStart(event) {
-  if (event?.type !== 'agent_start' && event?.type !== 'turn_start') return
-  if (liveTurnAnchorLength !== null) return
-  liveTurnAnchorLength = rawEntries.value.length
-}
-
-function updateCompactionState(event) {
-  if (event?.type === 'compaction_start') compactingContext.value = true
-  if (event?.type === 'compaction_end') compactingContext.value = false
-}
-
-function isRunningEvent(event) {
-  const type = event?.type || ''
-  if (['agent_start', 'message_start', 'tool_call'].includes(type)) return true
-  if (type === 'tool_execution_start') return true
-  if (['agent_end', 'error', 'aborted'].includes(type)) return false
-  return agentRunning.value
 }
 
 function eventType(item) {
@@ -1169,107 +1100,6 @@ function eventSummary(item) {
   return item.activeSessionId ? item.activeSessionId.slice(0, 8) : 'runtime'
 }
 
-function activityText(event) {
-  const type = event?.type || ''
-  if (type === 'compaction_start') return ''
-  if (type === 'compaction_end') return ''
-  if (compactingContext.value) return ''
-  if (type === 'agent_start' || type === 'turn_start') return 'Thinking…'
-  if (type === 'message_update' && !liveAssistantText.value) {
-    return 'Writing response…'
-  }
-  if (type === 'message_update') return ''
-  if (type === 'tool_call') return ''
-  if (type === 'tool_execution_start') return ''
-  if (type === 'tool_execution_end') return ''
-  if (type === 'agent_end' || type === 'error' || type === 'aborted') return ''
-  return liveActivity.value
-}
-
-function surfaceRuntimeError(event) {
-  if (event?.type === 'compaction_end' && event.errorMessage) {
-    promptError.value = event.errorMessage
-    return
-  }
-  if (event?.type !== 'error') return
-  promptError.value = event.error?.message || event.message || 'Runtime error'
-}
-
-function updateLiveTool(event) {
-  const type = event?.type || ''
-
-  if (type === 'tool_call') {
-    upsertLiveTool(event, 'preparing')
-    return
-  }
-
-  if (type === 'tool_execution_start') {
-    upsertLiveTool(event, 'running')
-    return
-  }
-
-  if (type === 'tool_execution_end') {
-    upsertLiveTool(event, event.error || event.isError ? 'error' : 'reading')
-    return
-  }
-
-  if (type === 'agent_end') finishLiveTools('completed')
-  if (type === 'error') finishLiveTools('error')
-  if (type === 'aborted') finishLiveTools('aborted')
-}
-
-function upsertLiveTool(event, status) {
-  const key = liveToolKey(event)
-  const existing = findLiveTool(event, key)
-  const id = existing?.id || key || `live-tool-${++liveToolSeq}`
-  const now = Date.now()
-  const next = {
-    id,
-    seq: existing?.seq || ++liveItemSeq,
-    type: 'tool',
-    toolCallId: event.toolCallId || event.id || event.callId || '',
-    toolName: event.toolName || 'tool',
-    label: toolLabel(event.toolName),
-    code: liveToolCode(event) || existing?.code || '',
-    status,
-    startedAt: existing?.startedAt || now,
-  }
-
-  if (existing) {
-    liveTools.value = liveTools.value.map((tool) => {
-      return tool.id === existing.id ? { ...tool, ...next } : tool
-    })
-    return
-  }
-
-  liveTools.value = [...liveTools.value, next]
-}
-
-function findLiveTool(event, key) {
-  if (key) {
-    const keyed = liveTools.value.find((tool) => tool.toolCallId === key)
-    if (keyed) return keyed
-  }
-
-  const toolName = event.toolName || 'tool'
-  const code = liveToolCode(event)
-  return [...liveTools.value].reverse().find((tool) => {
-    if (tool.toolName !== toolName) return false
-    if (tool.toolCallId) return false
-    if (code && tool.code && tool.code !== code) return false
-    return !['completed', 'error', 'aborted'].includes(tool.status)
-  })
-}
-
-function liveToolKey(event) {
-  return event.toolCallId || event.id || event.callId || ''
-}
-
-function liveToolCode(event) {
-  const args = event.args || event.input || {}
-  return args.command || args.path || args.customInstructions || ''
-}
-
 function liveToolStatus(tool) {
   if (tool.status === 'preparing') return 'preparing'
   if (tool.status === 'running') return 'running'
@@ -1277,162 +1107,6 @@ function liveToolStatus(tool) {
   if (tool.status === 'error') return 'error'
   if (tool.status === 'aborted') return 'aborted'
   return 'completed'
-}
-
-function finishLiveTools(status) {
-  liveTools.value = liveTools.value.map((tool) => {
-    if (tool.persistedEntry) return tool
-    return { ...tool, status }
-  })
-}
-
-function reconcileLiveTools(detail) {
-  const persisted = (detail.entries || []).filter((entry) => {
-    return entry.type === 'tool'
-  })
-
-  liveTools.value = liveTools.value.map((tool) => {
-    const entry = persisted.find((item) => liveToolMatchesEntry(tool, item))
-    if (!entry) return tool
-    if (!liveToolFloorElapsed(tool)) {
-      scheduleLiveToolSettle(tool.id)
-      return { ...tool, persistedEntry: entry }
-    }
-    return settledLiveTool(tool, entry)
-  })
-}
-
-function liveToolFloorElapsed(tool) {
-  return Date.now() - (tool.startedAt || 0) >= liveToolVisualFloorMs
-}
-
-function scheduleLiveToolSettle(id) {
-  if (liveToolSettleTimers.has(id)) return
-  const tool = liveTools.value.find((item) => item.id === id)
-  const remaining = Math.max(
-    0,
-    liveToolVisualFloorMs - (Date.now() - (tool?.startedAt || 0)),
-  )
-  const timer = setTimeout(() => {
-    liveToolSettleTimers.delete(id)
-    settleLiveTool(id)
-  }, remaining)
-  liveToolSettleTimers.set(id, timer)
-}
-
-function settleLiveTool(id) {
-  liveTools.value = liveTools.value.map((tool) => {
-    if (tool.id !== id || !tool.persistedEntry) return tool
-    return settledLiveTool(tool, tool.persistedEntry)
-  })
-}
-
-function settledLiveTool(tool, entry) {
-  return {
-    ...tool,
-    label: entry.label || tool.label,
-    code: entry.code || tool.code,
-    status: entry.isError ? 'error' : 'completed',
-    persistedEntry: entry,
-  }
-}
-
-function clearLiveToolSettleTimers() {
-  for (const timer of liveToolSettleTimers.values()) clearTimeout(timer)
-  liveToolSettleTimers.clear()
-}
-
-function isRenderableEntry(entry) {
-  if (entry.type === 'event') return false
-  if (entry.type !== 'message') return true
-  if (entry.role !== 'assistant') return true
-  return Boolean(entry.blocks?.length || entry.text?.trim())
-}
-
-function isCoveredByLiveTool(entry) {
-  if (entry.type !== 'tool') return false
-  return liveTools.value.some((tool) => liveToolMatchesEntry(tool, entry))
-}
-
-function liveToolMatchesEntry(tool, entry) {
-  if (tool.toolCallId && entry.toolCallId) {
-    return tool.toolCallId === entry.toolCallId
-  }
-
-  if (tool.toolName && entry.toolName && tool.toolName !== entry.toolName) {
-    return false
-  }
-
-  if (tool.code && entry.code) return tool.code === entry.code
-  return Boolean(tool.toolName && entry.toolName)
-}
-
-function updateLiveAssistant(event) {
-  if (event?.type === 'message_start') activeLiveAssistantId = ''
-
-  if (event?.type === 'message_update' && event.message?.role === 'assistant') {
-    pendingAssistantEvent = event
-    cancelAnimationFrame(liveAssistantFrame)
-    liveAssistantFrame = requestAnimationFrame(flushLiveAssistant)
-    return
-  }
-
-  if (event?.type === 'message_end' && event.message?.role === 'assistant') {
-    if (pendingAssistantEvent) flushLiveAssistant()
-    finishLiveAssistant()
-  }
-
-  if (['error', 'aborted'].includes(event?.type)) clearLiveAssistant()
-}
-
-function flushLiveAssistant() {
-  const event = pendingAssistantEvent
-  pendingAssistantEvent = undefined
-  if (!event) return
-  const blocks = messageBlocks(event.message.content)
-  if (!blocks.length) return
-  const text = textFromBlocks(blocks)
-  const id = activeLiveAssistantId || `live-assistant-${++liveItemSeq}`
-  activeLiveAssistantId = id
-  const existing = liveAssistantMessages.value.find((item) => item.id === id)
-  const next = {
-    id,
-    seq: existing?.seq || liveItemSeq,
-    type: 'assistant',
-    blocks,
-    text,
-    streaming: true,
-  }
-
-  if (existing) {
-    liveAssistantMessages.value = liveAssistantMessages.value.map((item) => {
-      return item.id === id ? next : item
-    })
-  } else {
-    liveAssistantMessages.value = [...liveAssistantMessages.value, next]
-  }
-
-  liveAssistantBlocks.value = blocks
-  liveAssistantText.value = text
-}
-
-function finishLiveAssistant() {
-  const id = activeLiveAssistantId
-  if (id) {
-    liveAssistantMessages.value = liveAssistantMessages.value.map((item) => {
-      return item.id === id ? { ...item, streaming: false } : item
-    })
-  }
-  activeLiveAssistantId = ''
-}
-
-function clearLiveAssistant() {
-  pendingAssistantEvent = undefined
-  cancelAnimationFrame(liveAssistantFrame)
-  liveAssistantText.value = ''
-  liveAssistantBlocks.value = []
-  liveAssistantMessages.value = []
-  activeLiveAssistantId = ''
 }
 
 async function activateSelectedSession(token, session) {
@@ -1586,11 +1260,7 @@ function scheduleBottomScroll() {
 
 function scheduleLiveScroll(activeSessionId) {
   if (activeSessionId !== selectedSessionId.value) return
-  if (!liveAssistantMessages.value.length
-    && !liveActivity.value
-    && !liveTools.value.length) {
-    return
-  }
+  if (!liveItems.value.length) return
 
   if (!stickToBottom.value || userScrollActive.value) {
     hasNewOutput.value = true
@@ -1783,20 +1453,14 @@ async function submitDraft(streamingBehavior) {
 
   const editing = editingEntry.value
   const previousDetail = sessionDetail.value
-  if (previousDetail) reconcileLocalEntries(previousDetail)
-  liveAssistantMessages.value = []
-  liveTools.value = []
-  activeLiveAssistantId = ''
-  clearLiveToolSettleTimers()
-  const localEntry = pendingUserEntry(text, images)
+  reconcileCurrentDetail()
   const shouldFollowOutput = editing || stickToBottom.value
   if (editing) {
     trimSessionToEntry(editing.id)
     stickToBottom.value = true
     hasNewOutput.value = false
   }
-  localEntries.value = [...localEntries.value, localEntry]
-  liveTurnAnchorLength = rawEntries.value.length
+  const localEntry = beginUserTurn(text, images)
   promptSubmitting.value = true
   startPromptSubmitTimer()
   promptError.value = ''
@@ -1806,24 +1470,16 @@ async function submitDraft(streamingBehavior) {
   try {
     if (editing) await editPrompt(editing.id, text, images)
     else await submitPrompt(text, images)
-    if (isHandledSlashCommand(text)) {
-      localEntries.value = localEntries.value.filter((entry) => {
-        return entry.id !== localEntry.id
-      })
-      liveTurnAnchorLength = rawEntries.value.length
-    }
+    if (isHandledSlashCommand(text)) removeOptimisticEntry(localEntry)
     draft.value = ''
     attachedImages.value = []
     editingEntry.value = null
     if (!isHandledSlashCommand(text) || slashCommandStartsTurn(text)) {
-      agentRunning.value = true
-      liveActivity.value = 'Thinking…'
+      setAgentRunning(true, 'Thinking…')
     }
   } catch (error) {
     if (editing) sessionDetail.value = previousDetail
-    localEntries.value = localEntries.value.filter((entry) => {
-      return entry.id !== localEntry.id
-    })
+    removeOptimisticEntry(localEntry)
     promptError.value = error.message
     resetLiveState()
   } finally {
@@ -1915,10 +1571,7 @@ async function submitShellCommand(shellCommand, images) {
       shellCommand.excludeFromContext,
     )
     if (data.active) activeRuntimeSession.value = data.active
-    if (data.detail) {
-      sessionDetail.value = data.detail
-      reconcileLiveTools(data.detail)
-    }
+    if (data.detail) sessionDetail.value = data.detail
     draft.value = ''
     await loadSessions({ selectFirst: false, showLoading: false })
     await scrollToLatest()
@@ -1928,7 +1581,7 @@ async function submitShellCommand(shellCommand, images) {
   } finally {
     promptSubmitting.value = false
     shellCommandSubmitting.value = false
-    liveActivity.value = ''
+    setLiveActivity('')
     stopPromptSubmitTimer()
     refocusComposer()
   }
@@ -2058,16 +1711,16 @@ async function forkSession(entry) {
   forkingEntryId.value = entry.id
   sessionError.value = ''
   promptError.value = ''
-  liveActivity.value = 'Forking session…'
+  setLiveActivity('Forking session…')
 
   try {
     const data = await forkPiSession(entry.id)
     activeRuntimeSession.value = data.active
     sessionDetail.value = data.detail
     selectedSessionId.value = data.detail.session.id
+    liveTurn.selectSession(data.detail.session.id)
     expandedTools.value = new Set()
     expandedSkills.value = new Set()
-    localEntries.value = []
     editingEntry.value = null
     resetLiveState()
     expandProject(data.detail.session.cwd)
@@ -2079,7 +1732,7 @@ async function forkSession(entry) {
     if (terminalOpen.value) await connectTerminal()
   } catch (error) {
     promptError.value = error.message
-    liveActivity.value = ''
+    setLiveActivity('')
   } finally {
     forkingEntryId.value = ''
   }
@@ -2090,20 +1743,20 @@ async function reloadSession() {
 
   reloadingSession.value = true
   promptError.value = ''
-  liveActivity.value = [
+  setLiveActivity([
     'Reloading keybindings, extensions, skills, prompts, themes…',
-  ].join('')
+  ].join(''))
 
   try {
     activeRuntimeSession.value = await reloadPiSession()
-    liveActivity.value = ''
+    setLiveActivity('')
     await loadSessions({ selectFirst: false, showLoading: false })
     if (selectedSessionId.value) {
       sessionDetail.value = await loadSessionDetail(selectedSessionId.value)
     }
   } catch (error) {
     promptError.value = error.message
-    liveActivity.value = ''
+    setLiveActivity('')
   } finally {
     reloadingSession.value = false
   }
@@ -2118,15 +1771,13 @@ async function runGoalCommand(command) {
 
   try {
     if ((command === 'pause' || command === 'clear') && agentRunning.value) {
-      liveActivity.value = 'Stopping…'
+      setLiveActivity('Stopping…')
       await interruptPiSession()
-      agentRunning.value = false
-      liveActivity.value = ''
+      setAgentRunning(false)
     }
     await submitPrompt(`/goal ${command}`)
     if (command === 'resume') {
-      agentRunning.value = true
-      liveActivity.value = 'Thinking…'
+      setAgentRunning(true, 'Thinking…')
     }
   } catch (error) {
     promptError.value = error.message
@@ -2140,67 +1791,17 @@ async function interruptAgent() {
 
   interrupting.value = true
   promptError.value = ''
-  liveActivity.value = 'Stopping…'
+  setLiveActivity('Stopping…')
 
   try {
     await interruptPiSession()
-    agentRunning.value = false
-    liveActivity.value = ''
+    setAgentRunning(false)
   } catch (error) {
     promptError.value = error.message
-    liveActivity.value = ''
+    setLiveActivity('')
   } finally {
     interrupting.value = false
   }
-}
-
-function pendingUserEntry(text, images = []) {
-  const now = Date.now()
-  const blocks = []
-  if (text) blocks.push({ type: 'text', text })
-  blocks.push(...images)
-
-  return {
-    id: `local-${now}`,
-    createdAt: now,
-    type: 'message',
-    role: 'user',
-    label: 'You',
-    text,
-    blocks,
-    copyText: text,
-  }
-}
-
-function reconcileLocalEntries(detail) {
-  localEntries.value = localEntries.value.filter((localEntry) => {
-    return !detail.entries.some((entry) => localEntryMatches(localEntry, entry))
-  })
-}
-
-function localEntryMatches(localEntry, entry) {
-  if (entry.type !== 'message' || entry.role !== localEntry.role) return false
-  if (!entryIsAfterLocalEntry(entry, localEntry)) return false
-
-  if (entry.text === localEntry.text
-    && imageBlocksFor(entry).length === imageBlocksFor(localEntry).length) {
-    return true
-  }
-
-  const skillName = localSkillCommandName(localEntry.text)
-  if (!skillName) return false
-  return skillSummaries(entry).some((skill) => skill.name === skillName)
-}
-
-function entryIsAfterLocalEntry(entry, localEntry) {
-  if (!localEntry.createdAt) return true
-  const entryTime = new Date(entry.timestamp).getTime()
-  if (!Number.isFinite(entryTime)) return true
-  return entryTime >= localEntry.createdAt - 1000
-}
-
-function localSkillCommandName(text) {
-  return text?.trim().match(/^\/skill:([^\s]+)/)?.[1] || ''
 }
 
 function updateSelectedSessionSummary(session) {
