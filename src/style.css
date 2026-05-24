@@ -1924,7 +1924,7 @@ h1 {
 }
 
 .composer-context-row {
-  overflow: hidden;
+  overflow: visible;
   gap: 8px;
   border-top: 1px solid rgb(255 255 255 / 4%);
   background: rgb(8 8 13 / 20%);
@@ -3552,7 +3552,6 @@ h1 {
   top: calc(50% - 125px);
   bottom: auto;
   width: min(900px, calc(100% - 88px));
-  min-width: min(760px, calc(100vw - 88px));
   transform: translateX(-50%);
 }
 
@@ -3727,7 +3726,7 @@ h1 {
     opacity var(--motion-slow) var(--ease-standard),
     transform var(--motion-slow) var(--ease-standard);
   width: min(var(--content-max), calc(100% - 88px));
-  min-width: min(760px, calc(100vw - 88px));
+  max-width: calc(100% - 88px);
   transform: translateX(-50%);
   border: 1px solid #3d3650;
   border-radius: 22px;
@@ -3964,6 +3963,57 @@ textarea::placeholder {
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.tool-picker {
+  flex: 0 0 auto;
+  max-width: 190px;
+}
+
+.tool-picker-button {
+  height: 26px;
+}
+
+.tool-menu {
+  bottom: 34px;
+  width: 260px;
+}
+
+.tool-menu .mode-menu-label {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  border-bottom: 1px solid rgb(255 255 255 / 4%);
+  background: #111018;
+}
+
+.start-tool-picker .tool-menu {
+  top: auto;
+  bottom: 36px;
+}
+
+.tool-menu-empty,
+.tool-menu-row {
+  padding: 10px 12px;
+  color: var(--muted-strong);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.tool-menu-empty {
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.tool-menu-row {
+  overflow: hidden;
+  border-top: 1px solid rgb(255 255 255 / 4%);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-menu-row span {
+  color: #d8d0ff;
 }
 
 .model-menu button {

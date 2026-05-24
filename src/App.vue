@@ -62,6 +62,7 @@ const composerRef = ref(null)
 const composerHeight = ref(0)
 const modelPickerOpen = ref(false)
 const thinkingPickerOpen = ref(false)
+const toolsPickerOpen = ref(false)
 const slashActiveIndex = ref(0)
 const slashPickerDismissed = ref(false)
 const promptError = ref('')
@@ -236,18 +237,29 @@ const currentMobileThinkingLabel = computed(() => {
   return `think ${level === 'medium' ? 'med' : formatMode(level)}`
 })
 const composerChips = computed(() => {
-  const state = composerRuntime.value?.state || {}
-
   return [
     compactingContext.value ? 'Compacting context' : '',
     sessionActivating.value ? 'Activating runtime' : '',
     agentRunning.value && !compactingContext.value
       ? 'Enter queues steering'
       : '',
-    typeof state.activeToolCount === 'number'
-      ? `${state.activeToolCount} tools`
-      : '',
   ].filter(Boolean)
+})
+const activeToolNames = computed(() => {
+  const state = composerRuntime.value?.state || {}
+  if (Array.isArray(state.activeToolNames)) return state.activeToolNames
+  if (typeof state.activeToolCount !== 'number') return []
+  return Array.from({ length: state.activeToolCount }, (_, index) => {
+    return `Tool ${index + 1}`
+  })
+})
+const toolsChipLabel = computed(() => {
+  const state = composerRuntime.value?.state || {}
+  const count = Array.isArray(state.activeToolNames)
+    ? state.activeToolNames.length
+    : state.activeToolCount
+  if (typeof count !== 'number') return 'tools unknown'
+  return `${count} tools`
 })
 const queuedMessages = computed(() => {
   const queue = activeRuntimeSession.value?.state?.queuedMessages || {}
@@ -1193,6 +1205,7 @@ async function selectThinkingLevel(level) {
 function togglePicker(name) {
   modelPickerOpen.value = name === 'model' && !modelPickerOpen.value
   thinkingPickerOpen.value = name === 'thinking' && !thinkingPickerOpen.value
+  toolsPickerOpen.value = name === 'tools' && !toolsPickerOpen.value
 }
 
 function modelKey(model) {
@@ -1364,6 +1377,7 @@ function closeMenusOnOutsideClick(event) {
 function closePickerMenus() {
   modelPickerOpen.value = false
   thinkingPickerOpen.value = false
+  toolsPickerOpen.value = false
   startProjectPickerOpen.value = false
 }
 
@@ -1615,6 +1629,9 @@ function closePickerMenus() {
             :switching-thinking="switchingThinking"
             :thinking-level="composerRuntime?.state?.thinkingLevel"
             :thinking-picker-open="thinkingPickerOpen"
+            :tool-names="activeToolNames"
+            :tools-chip-label="toolsChipLabel"
+            :tools-picker-open="toolsPickerOpen"
             @keydown="handleStartComposerKeydown"
             @open-project-browser="openProjectBrowser"
             @paste="handleComposerPaste"
@@ -1845,6 +1862,9 @@ function closePickerMenus() {
         :terminal-status="terminalStatus"
         :thinking-level="composerRuntime?.state?.thinkingLevel"
         :thinking-picker-open="thinkingPickerOpen"
+        :tool-names="activeToolNames"
+        :tools-chip-label="toolsChipLabel"
+        :tools-picker-open="toolsPickerOpen"
         @cancel-edit="cancelEditingEntry"
         @interrupt="interruptAgent"
         @keydown="handleComposerKeydown"
@@ -1936,7 +1956,7 @@ function closePickerMenus() {
           </div>
           <div>
             <dt>Tools</dt>
-            <dd>{{ composerChips[0] || 'Unknown' }}</dd>
+            <dd>{{ toolsChipLabel }}</dd>
           </div>
           <div>
             <dt>Context</dt>

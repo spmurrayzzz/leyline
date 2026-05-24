@@ -85,6 +85,15 @@ const props = defineProps({
     default: '',
   },
   thinkingPickerOpen: Boolean,
+  toolNames: {
+    type: Array,
+    default: () => [],
+  },
+  toolsChipLabel: {
+    type: String,
+    default: 'tools unknown',
+  },
+  toolsPickerOpen: Boolean,
 })
 
 const emit = defineEmits([
@@ -268,6 +277,32 @@ function updateDraft(event) {
         >
           {{ chip }}
         </span>
+        <div class="model-picker tool-picker start-tool-picker">
+          <button
+            class="composer-chip model-picker-button start-composer-chip
+              tool-picker-button"
+            type="button"
+            @click="emit('toggle-picker', 'tools')"
+          >
+            <span class="model-label">{{ toolsChipLabel }}</span>
+            <span class="model-caret">▾</span>
+          </button>
+          <Transition name="composer-popover">
+            <div v-if="toolsPickerOpen" class="model-menu tool-menu">
+              <div class="mode-menu-label">Enabled tools</div>
+              <div v-if="!toolNames.length" class="tool-menu-empty">
+                No tools are enabled for this session.
+              </div>
+              <div
+                v-for="tool in toolNames"
+                :key="tool"
+                class="tool-menu-row"
+              >
+                <span>{{ tool }}</span>
+              </div>
+            </div>
+          </Transition>
+        </div>
       </div>
     </div>
     <Transition name="composer-popover">

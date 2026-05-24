@@ -847,6 +847,8 @@ function activeSessionStateDto() {
 }
 
 function sessionStateDto(session, services) {
+  const activeToolNames = session.getActiveToolNames()
+
   return {
     model: modelDto(session.model),
     availableModels: services.modelRegistry.getAvailable().map(modelDto),
@@ -854,7 +856,8 @@ function sessionStateDto(session, services) {
     availableThinkingLevels: session.getAvailableThinkingLevels(),
     steeringMode: session.steeringMode,
     followUpMode: session.followUpMode,
-    activeToolCount: session.getActiveToolNames().length,
+    activeToolCount: activeToolNames.length,
+    activeToolNames,
     contextUsage: session.getContextUsage?.(),
     slashCommands: slashCommandDtos(session),
     queuedMessages: {
