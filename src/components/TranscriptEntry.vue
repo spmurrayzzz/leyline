@@ -1,4 +1,5 @@
 <script setup>
+import { ref } from 'vue'
 import PierrePreview from './PierrePreview.vue'
 import {
   entryClass,
@@ -32,6 +33,12 @@ const emit = defineEmits([
   'toggle-skill',
   'toggle-tool',
 ])
+
+const thinkingExpanded = ref(false)
+
+function toggleThinking() {
+  thinkingExpanded.value = !thinkingExpanded.value
+}
 
 function copyTitle(id) {
   return props.copiedEntryId === id ? 'Copied' : 'Copy'
@@ -187,9 +194,24 @@ function copyGlyph(id) {
         v-for="(block, index) in messageBlocksFor(entry)"
         :key="`${entry.id}-${index}`"
       >
-        <div v-if="block.type === 'thinking'" class="thinking-block">
-          <div class="thinking-label">Thinking</div>
-          <pre>{{ block.text }}</pre>
+        <div
+          v-if="block.type === 'thinking'"
+          class="thinking-block"
+          :class="{ 'is-expanded': thinkingExpanded }"
+        >
+          <button
+            class="thinking-trigger"
+            type="button"
+            @click="toggleThinking"
+          >
+            <span class="chevron">›</span>
+            <span class="thinking-label">Thought</span>
+          </button>
+          <div class="thinking-expand-wrapper" :class="{ 'is-expanded': thinkingExpanded }">
+            <div class="thinking-expand-inner">
+              <pre>{{ block.text }}</pre>
+            </div>
+          </div>
         </div>
         <div
           v-else

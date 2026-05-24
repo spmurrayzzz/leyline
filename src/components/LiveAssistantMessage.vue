@@ -1,4 +1,5 @@
 <script setup>
+import { ref, watch } from 'vue'
 import SmoothMarkdownBlock from './SmoothMarkdownBlock.vue'
 
 const props = defineProps({
@@ -21,6 +22,15 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['copy'])
+
+const thinkingExpanded = ref(true)
+
+watch(
+  () => props.streaming,
+  (streaming) => {
+    thinkingExpanded.value = true
+  },
+)
 
 function copyTitle(id) {
   return props.copiedEntryId === id ? 'Copied' : 'Copy'
@@ -48,9 +58,29 @@ function copyGlyph(id) {
       </button>
     </div>
     <template v-for="(block, index) in blocks" :key="`live-${index}`">
-      <div v-if="block.type === 'thinking'" class="thinking-block">
-        <div class="thinking-label">Thinking</div>
-        <pre>{{ block.text }}</pre>
+      <div
+        v-if="block.type === 'thinking'"
+        class="thinking-block"
+        :class="{
+          'is-expanded': thinkingExpanded,
+          'is-streaming': streaming,
+        }"
+      >
+        <button
+          class="thinking-trigger"
+          type="button"
+          @click="thinkingExpanded = !thinkingExpanded"
+        >
+          <span class="chevron">›</span>
+          <span class="thinking-label">
+            {{ streaming ? 'Thinking' : 'Thought' }}
+          </span>
+        </button>
+        <div class="thinking-expand-wrapper" :class="{ 'is-expanded': thinkingExpanded }">
+          <div class="thinking-expand-inner">
+            <pre>{{ block.text }}</pre>
+          </div>
+        </div>
       </div>
       <SmoothMarkdownBlock
         v-else
