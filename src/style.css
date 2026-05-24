@@ -3001,6 +3001,36 @@ h1 {
   background: #bfb5ff;
 }
 
+.tool-expand-wrapper {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--motion-base) var(--ease-emphasized);
+}
+
+.tool-expand-wrapper.is-expanded {
+  grid-template-rows: 1fr;
+}
+
+.tool-expand-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+.skill-expand-wrapper {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--motion-base) var(--ease-emphasized);
+}
+
+.skill-expand-wrapper.is-expanded {
+  grid-template-rows: 1fr;
+}
+
+.skill-expand-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
 .tool-expanded-body {
   margin-top: 9px;
   border-top: 1px solid var(--border-soft);
@@ -3959,6 +3989,8 @@ textarea::placeholder {
   .tool-context-pill,
   .tool-preview-clip,
   .tool-preview-cta,
+  .tool-expand-wrapper,
+  .skill-expand-wrapper,
   .tool-fullscreen-enter-active,
   .tool-fullscreen-leave-active,
   .tool-fullscreen-enter-active .tool-fullscreen,
@@ -4021,6 +4053,11 @@ textarea::placeholder {
   .session-switching > .start-panel {
     transform: none;
     filter: none;
+  }
+
+  .tool-expand-wrapper,
+  .skill-expand-wrapper {
+    transition-duration: 1ms;
   }
 
   .tool-fullscreen-enter-from .tool-fullscreen,

@@ -99,49 +99,53 @@ function copyGlyph(id) {
         {{ copyGlyph(entry.id) }}
       </button>
     </div>
-    <div v-if="toolExpanded" class="tool-expanded-body" @click.stop>
-      <div
-        v-if="entry.isError && entry.preview && entry.text"
-        class="tool-error-summary"
-      >
-        <strong>Error</strong>
-        <pre>{{ entry.text }}</pre>
+    <div class="tool-expand-wrapper" :class="{ 'is-expanded': toolExpanded }">
+      <div class="tool-expand-inner">
+        <div class="tool-expanded-body" @click.stop>
+          <div
+            v-if="entry.isError && entry.preview && entry.text"
+            class="tool-error-summary"
+          >
+            <strong>Error</strong>
+            <pre>{{ entry.text }}</pre>
+          </div>
+          <template v-if="entry.preview?.kind === 'image'">
+            <div class="tool-preview-clip tool-image-preview">
+              <img :src="imageSrc(entry.preview)" alt="Read image preview" />
+            </div>
+          </template>
+          <template v-else-if="entry.preview">
+            <div class="tool-preview-clip">
+              <PierrePreview :preview="entry.preview" clipped />
+              <div class="tool-preview-fade"></div>
+            </div>
+            <button
+              class="tool-preview-cta"
+              type="button"
+              @click="emit('open-tool-fullscreen', entry)"
+            >
+              Open full screen
+            </button>
+          </template>
+          <template v-else>
+            <div class="tool-preview-clip tool-plain-preview">
+              <pre
+                v-if="renderedToolJson(entry)"
+                class="tool-output json-output"
+                v-html="renderedToolJson(entry)"
+              ></pre>
+              <pre v-else class="tool-output">{{ entry.text }}</pre>
+            </div>
+            <button
+              class="tool-preview-cta"
+              type="button"
+              @click="emit('open-tool-fullscreen', entry)"
+            >
+              Open full screen
+            </button>
+          </template>
+        </div>
       </div>
-      <template v-if="entry.preview?.kind === 'image'">
-        <div class="tool-preview-clip tool-image-preview">
-          <img :src="imageSrc(entry.preview)" alt="Read image preview" />
-        </div>
-      </template>
-      <template v-else-if="entry.preview">
-        <div class="tool-preview-clip">
-          <PierrePreview :preview="entry.preview" clipped />
-          <div class="tool-preview-fade"></div>
-        </div>
-        <button
-          class="tool-preview-cta"
-          type="button"
-          @click="emit('open-tool-fullscreen', entry)"
-        >
-          Open full screen
-        </button>
-      </template>
-      <template v-else>
-        <div class="tool-preview-clip tool-plain-preview">
-          <pre
-            v-if="renderedToolJson(entry)"
-            class="tool-output json-output"
-            v-html="renderedToolJson(entry)"
-          ></pre>
-          <pre v-else class="tool-output">{{ entry.text }}</pre>
-        </div>
-        <button
-          class="tool-preview-cta"
-          type="button"
-          @click="emit('open-tool-fullscreen', entry)"
-        >
-          Open full screen
-        </button>
-      </template>
     </div>
   </article>
 
@@ -207,11 +211,14 @@ function copyGlyph(id) {
         <strong>{{ skill.name }}</strong>
         <em>{{ skillExpanded ? 'hide' : 'expand' }}</em>
       </button>
-      <div
-        v-if="skillExpanded"
-        class="skill-expanded entry-text markdown-body"
-        v-html="renderedMessage(entry)"
-      ></div>
+      <div class="skill-expand-wrapper" :class="{ 'is-expanded': skillExpanded }">
+        <div class="skill-expand-inner">
+          <div
+            class="skill-expanded entry-text markdown-body"
+            v-html="renderedMessage(entry)"
+          ></div>
+        </div>
+      </div>
     </div>
     <div v-else class="entry-text markdown-body" v-html="renderedMessage(entry)">
     </div>
