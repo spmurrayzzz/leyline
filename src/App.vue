@@ -3109,62 +3109,64 @@ function closePickerMenus() {
       </aside>
     </Transition>
 
-    <div
-      v-if="fullscreenTool"
-      class="tool-fullscreen-backdrop"
-      @click="closeToolFullscreen"
-    >
-      <section class="tool-fullscreen" @click.stop>
-        <header class="tool-fullscreen-header">
-          <div>
-            <span>{{ fullscreenTool.label }}</span>
-            <code v-if="fullscreenTool.code">{{ fullscreenTool.code }}</code>
-          </div>
-          <div>
-            <button
-              class="copy-button"
-              type="button"
-              :title="copyTitle(fullscreenTool.id)"
-              @click="copyTranscriptItem(fullscreenTool.id, entryCopyText(fullscreenTool))"
+    <Transition name="tool-fullscreen">
+      <div
+        v-if="fullscreenTool"
+        class="tool-fullscreen-backdrop"
+        @click="closeToolFullscreen"
+      >
+        <section class="tool-fullscreen" @click.stop>
+          <header class="tool-fullscreen-header">
+            <div>
+              <span>{{ fullscreenTool.label }}</span>
+              <code v-if="fullscreenTool.code">{{ fullscreenTool.code }}</code>
+            </div>
+            <div>
+              <button
+                class="copy-button"
+                type="button"
+                :title="copyTitle(fullscreenTool.id)"
+                @click="copyTranscriptItem(fullscreenTool.id, entryCopyText(fullscreenTool))"
+              >
+                {{ copyGlyph(fullscreenTool.id) }}
+              </button>
+              <button type="button" @click="closeToolFullscreen">×</button>
+            </div>
+          </header>
+          <div class="tool-fullscreen-body">
+            <div
+              v-if="
+                fullscreenTool.isError &&
+                fullscreenTool.preview &&
+                fullscreenTool.text
+              "
+              class="tool-error-summary"
             >
-              {{ copyGlyph(fullscreenTool.id) }}
-            </button>
-            <button type="button" @click="closeToolFullscreen">×</button>
+              <strong>Error</strong>
+              <pre>{{ fullscreenTool.text }}</pre>
+            </div>
+            <div
+              v-if="fullscreenTool.preview?.kind === 'image'"
+              class="tool-fullscreen-image"
+            >
+              <img :src="imageSrc(fullscreenTool.preview)" alt="Read image preview" />
+            </div>
+            <PierrePreview
+              v-else-if="fullscreenTool.preview"
+              :preview="fullscreenTool.preview"
+              :clipped="false"
+            />
+            <div v-else class="tool-fullscreen-plain">
+              <pre
+                v-if="renderedToolJson(fullscreenTool)"
+                class="tool-output json-output"
+                v-html="renderedToolJson(fullscreenTool)"
+              ></pre>
+              <pre v-else class="tool-output">{{ fullscreenTool.text }}</pre>
+            </div>
           </div>
-        </header>
-        <div class="tool-fullscreen-body">
-          <div
-            v-if="
-              fullscreenTool.isError &&
-              fullscreenTool.preview &&
-              fullscreenTool.text
-            "
-            class="tool-error-summary"
-          >
-            <strong>Error</strong>
-            <pre>{{ fullscreenTool.text }}</pre>
-          </div>
-          <div
-            v-if="fullscreenTool.preview?.kind === 'image'"
-            class="tool-fullscreen-image"
-          >
-            <img :src="imageSrc(fullscreenTool.preview)" alt="Read image preview" />
-          </div>
-          <PierrePreview
-            v-else-if="fullscreenTool.preview"
-            :preview="fullscreenTool.preview"
-            :clipped="false"
-          />
-          <div v-else class="tool-fullscreen-plain">
-            <pre
-              v-if="renderedToolJson(fullscreenTool)"
-              class="tool-output json-output"
-              v-html="renderedToolJson(fullscreenTool)"
-            ></pre>
-            <pre v-else class="tool-output">{{ fullscreenTool.text }}</pre>
-          </div>
-        </div>
-      </section>
-    </div>
+        </section>
+      </div>
+    </Transition>
   </main>
 </template>

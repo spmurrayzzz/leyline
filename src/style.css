@@ -17,6 +17,11 @@
   --accent-soft: rgb(124 92 255 / 13%);
   --accent-border: rgb(124 92 255 / 34%);
   --blue-accent: #9b8cff;
+  --motion-fast: 150ms;
+  --motion-base: 220ms;
+  --motion-slow: 300ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
   --content-max: 1080px;
   --terminal-drawer-height: 310px;
   font-family:
@@ -53,7 +58,7 @@ button {
   grid-template-columns: 276px minmax(0, 1fr) 0;
   height: 100vh;
   background: var(--bg);
-  transition: grid-template-columns 180ms ease;
+  transition: grid-template-columns var(--motion-base) var(--ease-standard);
 }
 
 .leyline-app.event-log-open {
@@ -79,6 +84,11 @@ button {
   background: transparent;
   color: var(--muted);
   font-size: 18px;
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
 }
 
 .sidebar-collapse-button:hover,
@@ -86,6 +96,7 @@ button {
   border-color: var(--border);
   background: var(--panel-soft);
   color: var(--muted-strong);
+  transform: translateY(-1px);
 }
 
 .sidebar-reveal-button {
@@ -94,7 +105,7 @@ button {
   left: 10px;
   z-index: 10;
   background: #15161b;
-  animation: reveal-fade 140ms ease;
+  animation: reveal-fade var(--motion-fast) var(--ease-standard);
 }
 
 .leyline-app.sidebar-hidden {
@@ -123,8 +134,8 @@ button {
   padding: 18px 14px 14px;
   transform: translateX(0);
   transition:
-    border-color 180ms ease,
-    transform 180ms ease;
+    border-color var(--motion-base) var(--ease-standard),
+    transform var(--motion-base) var(--ease-standard);
 }
 
 @keyframes reveal-fade {
@@ -202,6 +213,10 @@ button {
   background: #17181e;
   padding: 8px 10px;
   color: var(--muted);
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
 }
 
 .search-field:hover {
@@ -261,11 +276,16 @@ kbd {
   padding: 1px 5px;
   color: var(--muted);
   font: inherit;
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
 }
 
 .section-action:hover {
   background: var(--panel-soft);
   color: #cfc5ff;
+  transform: translateY(-1px);
 }
 
 .new-session-form {
@@ -313,6 +333,27 @@ kbd {
   margin-bottom: 12px;
 }
 
+.project-session-list {
+  overflow: hidden;
+  max-height: 180px;
+}
+
+.project-sessions-enter-active,
+.project-sessions-leave-active {
+  overflow: hidden;
+  transition:
+    max-height var(--motion-base) var(--ease-emphasized),
+    opacity var(--motion-base) var(--ease-standard),
+    transform var(--motion-base) var(--ease-emphasized);
+}
+
+.project-sessions-enter-from,
+.project-sessions-leave-to {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
 .project-title {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -337,6 +378,9 @@ kbd {
   letter-spacing: inherit;
   text-align: left;
   text-transform: inherit;
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
 }
 
 .project-title > button:first-child {
@@ -367,6 +411,7 @@ kbd {
   width: 10px;
   line-height: 1;
   transform-origin: center;
+  transition: transform var(--motion-base) var(--ease-emphasized);
 }
 
 .project-caret.expanded {
@@ -396,6 +441,10 @@ kbd {
   font-size: 14px !important;
   line-height: 1 !important;
   text-align: center !important;
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard),
+    opacity var(--motion-fast) var(--ease-standard);
 }
 
 .new-session-button:hover {
@@ -420,6 +469,11 @@ kbd {
   font-weight: 500;
   text-align: left;
   cursor: pointer;
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard),
+    opacity var(--motion-fast) var(--ease-standard);
 }
 
 .session span {
@@ -433,6 +487,7 @@ kbd {
 .session time {
   flex: none;
   color: var(--muted);
+  transition: opacity var(--motion-fast) var(--ease-standard);
 }
 
 .session-delete-button {
@@ -450,7 +505,11 @@ kbd {
   color: var(--muted);
   line-height: 1;
   opacity: 0;
-  transform: translateY(-50%);
+  transform: translateY(-50%) scale(0.92);
+  transition:
+    color var(--motion-fast) var(--ease-standard),
+    opacity var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
 }
 
 .session-delete-button svg,
@@ -467,6 +526,7 @@ kbd {
 .session:hover .session-delete-button,
 .session:focus-within .session-delete-button {
   opacity: 1;
+  transform: translateY(-50%) scale(1);
 }
 
 .session:hover time,
@@ -569,12 +629,18 @@ kbd {
   background: transparent;
   color: var(--muted);
   font-size: 13px;
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
 }
 
 .settings-button:hover:not(:disabled) {
   border-color: var(--border);
   background: var(--panel-soft);
   color: var(--muted-strong);
+  transform: translateY(-1px);
 }
 
 .settings-button:disabled {
@@ -1435,6 +1501,12 @@ h1 {
     0 2px 6px -3px rgb(0 0 0 / 45%),
     0 14px 34px -18px rgb(0 0 0 / 32%),
     0 28px 70px -42px rgb(20 16 32 / 34%);
+  transition:
+    border-color var(--motion-base) var(--ease-standard),
+    background-color var(--motion-base) var(--ease-standard),
+    box-shadow var(--motion-base) var(--ease-standard),
+    opacity var(--motion-base) var(--ease-standard),
+    transform var(--motion-base) var(--ease-standard);
 }
 
 .start-composer:focus-within {
@@ -1484,13 +1556,26 @@ h1 {
   font-weight: 900;
   line-height: 1;
   pointer-events: none;
+  transition: color var(--motion-base) var(--ease-standard);
+}
+
+.shell-glyph-enter-active,
+.shell-glyph-leave-active {
+  transition:
+    opacity var(--motion-base) var(--ease-standard),
+    transform var(--motion-base) var(--ease-emphasized);
+}
+
+.shell-glyph-enter-from,
+.shell-glyph-leave-to {
+  opacity: 0;
+  transform: translateX(-8px) scale(0.9);
 }
 
 .start-composer.shell-mode-composer textarea,
 .composer.shell-mode-composer textarea {
   padding-left: 56px;
   color: #dcfce7;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 .start-composer.shell-mode-composer textarea::placeholder,
@@ -1544,6 +1629,7 @@ h1 {
   border-radius: 16px;
   background: #111018;
   box-shadow: 0 20px 70px rgb(0 0 0 / 50%);
+  transform-origin: bottom center;
 }
 
 .slash-picker button {
@@ -1559,6 +1645,9 @@ h1 {
   color: var(--muted-strong);
   font-size: 12px;
   text-align: left;
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
 }
 
 .slash-picker button:hover,
@@ -1573,6 +1662,7 @@ h1 {
   font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
+  transition: color var(--motion-fast) var(--ease-standard);
 }
 
 .slash-command-description {
@@ -1580,6 +1670,7 @@ h1 {
   color: var(--muted-strong);
   text-overflow: ellipsis;
   white-space: nowrap;
+  transition: color var(--motion-fast) var(--ease-standard);
 }
 
 .slash-command-source {
@@ -1591,11 +1682,53 @@ h1 {
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
 }
 
 .start-composer .slash-picker {
   top: calc(100% + 10px);
   bottom: auto;
+  transform-origin: top center;
+}
+
+.composer-popover-enter-active,
+.composer-popover-leave-active {
+  transition:
+    opacity var(--motion-base) var(--ease-standard),
+    transform var(--motion-base) var(--ease-emphasized),
+    filter var(--motion-base) var(--ease-standard);
+}
+
+.composer-popover-enter-from,
+.composer-popover-leave-to {
+  opacity: 0;
+  filter: blur(2px);
+  transform: translateY(8px) scale(0.98);
+}
+
+.composer-popover-leave-active {
+  pointer-events: none;
+}
+
+.composer-reveal-enter-active,
+.composer-reveal-leave-active {
+  transition:
+    opacity var(--motion-base) var(--ease-standard),
+    transform var(--motion-base) var(--ease-emphasized),
+    filter var(--motion-base) var(--ease-standard);
+}
+
+.composer-reveal-enter-from,
+.composer-reveal-leave-to {
+  opacity: 0;
+  filter: blur(1px);
+  transform: translateY(-6px);
+}
+
+.composer-reveal-leave-active {
+  pointer-events: none;
 }
 
 .attachment-tray {
@@ -1613,12 +1746,25 @@ h1 {
   border: 1px solid #383241;
   border-radius: 10px;
   background: #0f1015;
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    opacity var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
 }
 
 .attachment-chip img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: opacity var(--motion-fast) var(--ease-standard);
+}
+
+.attachment-chip:hover {
+  border-color: var(--accent-border);
+}
+
+.attachment-chip:hover img {
+  opacity: 0.82;
 }
 
 .attachment-chip button {
@@ -1634,6 +1780,19 @@ h1 {
   color: #fff;
   font-size: 13px;
   line-height: 1;
+  opacity: 0.78;
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    opacity var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
+}
+
+.attachment-chip button:hover {
+  border-color: rgb(255 255 255 / 28%);
+  background: rgb(0 0 0 / 86%);
+  opacity: 1;
+  transform: scale(1.06);
 }
 
 .start-composer-bar {
@@ -1681,6 +1840,11 @@ h1 {
   padding: 0;
   color: #c8c9d2;
   line-height: 1;
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
 }
 
 .terminal-toggle-button svg {
@@ -1695,12 +1859,19 @@ h1 {
   color: #d8d0ff;
 }
 
+.composer-bar .terminal-toggle-button:hover {
+  transform: translateY(-1px);
+}
+
 .composer-context-row {
   overflow: hidden;
   gap: 8px;
   border-top: 1px solid rgb(255 255 255 / 4%);
   background: rgb(8 8 13 / 20%);
   padding: 9px 18px 10px;
+  transition:
+    border-color var(--motion-base) var(--ease-standard),
+    background-color var(--motion-base) var(--ease-standard);
 }
 
 .start-composer-chip {
@@ -1728,6 +1899,12 @@ h1 {
   border: 1px solid transparent;
   background: transparent;
   color: var(--muted-strong);
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard),
+    opacity var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
 }
 
 .start-project-button {
@@ -1764,6 +1941,7 @@ h1 {
   border-color: var(--accent-border);
   background: #201a32;
   color: var(--text);
+  transform: translateY(-1px);
 }
 
 .start-send-button {
@@ -1778,6 +1956,12 @@ h1 {
   color: white;
   font-size: 20px;
   font-weight: 800;
+  transition:
+    width var(--motion-base) var(--ease-emphasized),
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard),
+    opacity var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
 }
 
 .start-send-button:disabled {
@@ -1801,6 +1985,7 @@ h1 {
   box-shadow: 0 18px 60px rgb(0 0 0 / 45%);
   scrollbar-color: #4b4658 transparent;
   scrollbar-width: thin;
+  transform-origin: top left;
 }
 
 .start-project-menu label {
@@ -1899,6 +2084,12 @@ h1 {
   font-size: 13px;
   line-height: 1;
   opacity: 0.65;
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard),
+    opacity var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
 }
 
 .copy-button:hover {
@@ -1906,6 +2097,7 @@ h1 {
   background: var(--panel-soft);
   color: var(--muted-strong);
   opacity: 1;
+  transform: translateY(-1px);
 }
 
 .compact-message {
@@ -1915,6 +2107,11 @@ h1 {
 .transcript-message {
   border-radius: 10px;
   padding: 2px 0;
+  transition:
+    background-color var(--motion-base) var(--ease-standard),
+    border-color var(--motion-base) var(--ease-standard),
+    opacity var(--motion-base) var(--ease-standard),
+    transform var(--motion-base) var(--ease-standard);
 }
 
 .assistant-message {
@@ -1936,9 +2133,9 @@ h1 {
 .workbench > .live-stack,
 .workbench > .empty-session-panel {
   transition:
-    opacity 260ms ease,
-    transform 260ms ease,
-    filter 260ms ease;
+    opacity var(--motion-slow) var(--ease-standard),
+    transform var(--motion-slow) var(--ease-standard),
+    filter var(--motion-slow) var(--ease-standard);
 }
 
 .session-handoff-workbench > .message,
@@ -1968,7 +2165,9 @@ h1 {
 
 .live-row-enter-active,
 .live-row-leave-active {
-  transition: opacity 150ms ease, transform 150ms ease;
+  transition:
+    opacity var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
 }
 
 .live-row-enter-from,
@@ -2060,11 +2259,16 @@ h1 {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 13px;
   cursor: pointer;
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
 }
 
 .skill-summary:hover {
   border-color: rgb(124 92 255 / 40%);
   background: rgb(124 92 255 / 14%);
+  transform: translateY(-1px);
 }
 
 .skill-summary span {
@@ -2588,6 +2792,11 @@ h1 {
   padding: 11px 13px;
   color: #bdbdbd;
   font-size: 13px;
+  transition:
+    border-color var(--motion-base) var(--ease-standard),
+    background-color var(--motion-base) var(--ease-standard),
+    opacity var(--motion-base) var(--ease-standard),
+    transform var(--motion-base) var(--ease-standard);
 }
 
 .tool-card p {
@@ -2601,6 +2810,10 @@ h1 {
   color: #777;
   font-size: 12px;
   font-weight: 700;
+}
+
+.tool-card-header > span:first-child {
+  transition: color var(--motion-base) var(--ease-standard);
 }
 
 .tool-card-header .copy-button {
@@ -2626,6 +2839,10 @@ h1 {
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard),
+    opacity var(--motion-fast) var(--ease-standard);
 }
 
 .tool-context-pill.is-excluded {
@@ -2643,6 +2860,7 @@ h1 {
 .transcript-tool:hover {
   border-color: var(--border);
   background: #181a21;
+  transform: translateY(-1px);
 }
 
 .live-tool-card {
@@ -2763,6 +2981,9 @@ h1 {
   border: 1px solid var(--border-soft);
   border-radius: 10px;
   background: #0f1014;
+  transition:
+    border-color var(--motion-base) var(--ease-standard),
+    opacity var(--motion-base) var(--ease-standard);
 }
 
 .pierre-preview {
@@ -2807,11 +3028,17 @@ h1 {
   color: #d7d7dc;
   font-size: 12px;
   font-weight: 700;
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
 }
 
 .tool-preview-cta:hover {
   border-color: #5b5f75;
   background: #20232c;
+  transform: translateY(-1px);
 }
 
 .tool-fullscreen-backdrop {
@@ -2823,6 +3050,26 @@ h1 {
   justify-content: center;
   background: rgb(0 0 0 / 72%);
   padding: 28px;
+}
+
+.tool-fullscreen-enter-active,
+.tool-fullscreen-leave-active {
+  transition: opacity var(--motion-slow) var(--ease-standard);
+}
+
+.tool-fullscreen-enter-active .tool-fullscreen,
+.tool-fullscreen-leave-active .tool-fullscreen {
+  transition: transform var(--motion-slow) var(--ease-emphasized);
+}
+
+.tool-fullscreen-enter-from,
+.tool-fullscreen-leave-to {
+  opacity: 0;
+}
+
+.tool-fullscreen-enter-from .tool-fullscreen,
+.tool-fullscreen-leave-to .tool-fullscreen {
+  transform: translateY(8px) scale(0.99);
 }
 
 .tool-fullscreen {
@@ -2876,6 +3123,16 @@ h1 {
   border-radius: 8px;
   background: #181a21;
   color: var(--text);
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
+}
+
+.tool-fullscreen-header button:hover {
+  border-color: #5b5f75;
+  background: #20232c;
+  transform: translateY(-1px);
 }
 
 .tool-fullscreen-body {
@@ -3212,9 +3469,12 @@ h1 {
   bottom: 22px;
   left: 50%;
   transition:
-    bottom 180ms ease,
-    opacity 220ms ease,
-    transform 220ms ease;
+    bottom var(--motion-base) var(--ease-standard),
+    border-color var(--motion-base) var(--ease-standard),
+    background-color var(--motion-base) var(--ease-standard),
+    box-shadow var(--motion-base) var(--ease-standard),
+    opacity var(--motion-slow) var(--ease-standard),
+    transform var(--motion-slow) var(--ease-standard);
   width: min(var(--content-max), calc(100% - 88px));
   min-width: min(760px, calc(100vw - 88px));
   transform: translateX(-50%);
@@ -3260,11 +3520,17 @@ h1 {
   font-size: 11px;
   font-weight: 800;
   line-height: 1;
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
 }
 
 .editing-banner button:hover {
   border-color: var(--accent-border);
   color: var(--text);
+  transform: translateY(-1px);
 }
 
 .queued-message-drawer {
@@ -3320,6 +3586,10 @@ textarea {
   padding: 17px 20px 4px;
   color: #e5e6ec;
   font-size: 15px;
+  transition:
+    color var(--motion-base) var(--ease-standard),
+    opacity var(--motion-base) var(--ease-standard),
+    padding-left var(--motion-base) var(--ease-emphasized);
 }
 
 textarea:disabled {
@@ -3355,6 +3625,12 @@ textarea::placeholder {
   line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard),
+    opacity var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
 }
 
 .model-picker {
@@ -3393,6 +3669,13 @@ textarea::placeholder {
   font-size: 14px;
   line-height: 1;
   transform: translateY(-1px);
+  transition:
+    color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
+}
+
+.model-picker-button:hover .model-caret {
+  transform: translateY(0);
 }
 
 .model-menu {
@@ -3408,6 +3691,7 @@ textarea::placeholder {
   border-radius: 14px;
   background: #111018;
   box-shadow: 0 18px 60px rgb(0 0 0 / 45%);
+  transform-origin: bottom left;
 }
 
 .small-menu {
@@ -3441,6 +3725,9 @@ textarea::placeholder {
   font-size: 12px;
   font-weight: 750;
   text-align: left;
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
 }
 
 .model-menu button:hover,
@@ -3462,6 +3749,18 @@ textarea::placeholder {
   background: #684cd6 !important;
   color: white !important;
   font-size: 20px;
+  transition:
+    width var(--motion-base) var(--ease-emphasized),
+    background-color var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard),
+    opacity var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
+}
+
+.send-button:hover:not(:disabled),
+.start-send-button:hover:not(:disabled) {
+  transform: translateY(-1px);
 }
 
 .send-button:disabled {
@@ -3500,6 +3799,104 @@ textarea::placeholder {
   .live-row-enter-active,
   .live-row-leave-active {
     transition: none;
+  }
+
+  .leyline-app,
+  .sidebar,
+  .sidebar-collapse-button,
+  .sidebar-reveal-button,
+  .section-action,
+  .search-field,
+  .project-title button,
+  .project-caret,
+  .new-session-button,
+  .session,
+  .session time,
+  .session-delete-button,
+  .settings-button,
+  .project-sessions-enter-active,
+  .project-sessions-leave-active,
+  .copy-button,
+  .transcript-message,
+  .workbench > .message,
+  .workbench > .tool-card,
+  .workbench > .live-stack,
+  .workbench > .empty-session-panel,
+  .live-row-enter-active,
+  .live-row-leave-active,
+  .skill-summary,
+  .tool-card,
+  .tool-card-header > span:first-child,
+  .tool-context-pill,
+  .tool-preview-clip,
+  .tool-preview-cta,
+  .tool-fullscreen-enter-active,
+  .tool-fullscreen-leave-active,
+  .tool-fullscreen-enter-active .tool-fullscreen,
+  .tool-fullscreen-leave-active .tool-fullscreen,
+  .tool-fullscreen-header button,
+  .start-composer,
+  .composer,
+  .shell-prompt-glyph,
+  .shell-glyph-enter-active,
+  .shell-glyph-leave-active,
+  textarea,
+  .slash-picker button,
+  .slash-command-name,
+  .slash-command-description,
+  .slash-command-source,
+  .attachment-chip,
+  .attachment-chip img,
+  .attachment-chip button,
+  .composer-bar .terminal-toggle-button,
+  .composer-context-row,
+  .start-project-button,
+  .start-send-button,
+  .start-project-menu button,
+  .editing-banner button,
+  .composer-chip,
+  .model-caret,
+  .model-menu button,
+  .send-button,
+  .composer-popover-enter-active,
+  .composer-popover-leave-active,
+  .composer-reveal-enter-active,
+  .composer-reveal-leave-active {
+    transition-duration: 1ms;
+  }
+
+  .sidebar-collapse-button:hover,
+  .sidebar-reveal-button:hover,
+  .section-action:hover,
+  .settings-button:hover:not(:disabled),
+  .copy-button:hover,
+  .skill-summary:hover,
+  .transcript-tool:hover,
+  .tool-preview-cta:hover,
+  .tool-fullscreen-header button:hover,
+  .attachment-chip button:hover,
+  .composer-bar .terminal-toggle-button:hover,
+  .start-project-button:hover,
+  .start-composer-chip:hover,
+  .editing-banner button:hover,
+  .model-picker-button:hover .model-caret,
+  .send-button:hover:not(:disabled),
+  .start-send-button:hover:not(:disabled) {
+    transform: none;
+  }
+
+  .tool-fullscreen-enter-from .tool-fullscreen,
+  .tool-fullscreen-leave-to .tool-fullscreen,
+  .composer-popover-enter-from,
+  .composer-popover-leave-to,
+  .composer-reveal-enter-from,
+  .composer-reveal-leave-to,
+  .project-sessions-enter-from,
+  .project-sessions-leave-to,
+  .shell-glyph-enter-from,
+  .shell-glyph-leave-to {
+    transform: none;
+    filter: none;
   }
 
   .live-row-enter-from,

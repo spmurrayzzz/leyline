@@ -131,7 +131,9 @@ function updateDraft(event) {
     @submit.prevent="emit('submit')"
   >
     <div class="composer-input-shell">
-      <span v-if="shellMode" class="shell-prompt-glyph">$</span>
+      <Transition name="shell-glyph">
+        <span v-if="shellMode" class="shell-prompt-glyph">$</span>
+      </Transition>
       <textarea
         :value="draft"
         placeholder="Ask Leyline anything"
@@ -141,24 +143,27 @@ function updateDraft(event) {
         @paste="emit('paste', $event)"
       ></textarea>
     </div>
-    <div v-if="slashPickerOpen" class="slash-picker">
-      <button
-        v-for="(command, index) in slashCommandItems"
-        :key="`${command.source}-${command.name}`"
-        type="button"
-        :class="{ active: index === slashActiveIndex }"
-        @mousedown.prevent="emit('select-slash-command', command)"
-      >
-        <span class="slash-command-name">/{{ command.name }}</span>
-        <span class="slash-command-description">
-          {{ command.description || 'No description' }}
-        </span>
-        <span class="slash-command-source">
-          {{ slashCommandSourceLabel(command.source) }}
-        </span>
-      </button>
-    </div>
-    <div v-if="attachedImages.length" class="attachment-tray">
+    <Transition name="composer-popover">
+      <div v-if="slashPickerOpen" class="slash-picker">
+        <button
+          v-for="(command, index) in slashCommandItems"
+          :key="`${command.source}-${command.name}`"
+          type="button"
+          :class="{ active: index === slashActiveIndex }"
+          @mousedown.prevent="emit('select-slash-command', command)"
+        >
+          <span class="slash-command-name">/{{ command.name }}</span>
+          <span class="slash-command-description">
+            {{ command.description || 'No description' }}
+          </span>
+          <span class="slash-command-source">
+            {{ slashCommandSourceLabel(command.source) }}
+          </span>
+        </button>
+      </div>
+    </Transition>
+    <Transition name="composer-reveal">
+      <div v-if="attachedImages.length" class="attachment-tray">
       <div
         v-for="(image, index) in attachedImages"
         :key="`${image.mimeType}-${index}`"
@@ -168,9 +173,12 @@ function updateDraft(event) {
         <button type="button" @click="emit('remove-image', index)">×</button>
       </div>
     </div>
-    <div v-if="imageSupportWarning" class="composer-error">
-      {{ imageSupportWarning }}
-    </div>
+    </Transition>
+    <Transition name="composer-reveal">
+      <div v-if="imageSupportWarning" class="composer-error">
+        {{ imageSupportWarning }}
+      </div>
+    </Transition>
     <div class="start-composer-bar">
       <div class="composer-primary-row">
         <div class="composer-row-spacer"></div>
@@ -185,18 +193,20 @@ function updateDraft(event) {
               <span class="model-label">{{ currentModelLabel }}</span>
               <span class="model-caret">▾</span>
             </button>
-            <div v-if="modelPickerOpen" class="model-menu">
-              <button
-                v-for="model in availableModels"
-                :key="modelKey(model)"
-                type="button"
-                :class="{ active: modelKey(model) === selectedModelKey }"
-                @click="emit('select-model', model)"
-              >
-                <span>{{ modelChip(model) }}</span>
-                <span v-if="modelKey(model) === selectedModelKey">✓</span>
-              </button>
-            </div>
+            <Transition name="composer-popover">
+              <div v-if="modelPickerOpen" class="model-menu">
+                <button
+                  v-for="model in availableModels"
+                  :key="modelKey(model)"
+                  type="button"
+                  :class="{ active: modelKey(model) === selectedModelKey }"
+                  @click="emit('select-model', model)"
+                >
+                  <span>{{ modelChip(model) }}</span>
+                  <span v-if="modelKey(model) === selectedModelKey">✓</span>
+                </button>
+              </div>
+            </Transition>
           </div>
           <div class="model-picker small-picker start-picker">
             <button
@@ -208,18 +218,20 @@ function updateDraft(event) {
               <span class="model-label">{{ currentThinkingLabel }}</span>
               <span class="model-caret">▾</span>
             </button>
-            <div v-if="thinkingPickerOpen" class="model-menu small-menu">
-              <button
-                v-for="level in availableThinkingLevels"
-                :key="level"
-                type="button"
-                :class="{ active: level === thinkingLevel }"
-                @click="emit('select-thinking', level)"
-              >
-                <span>{{ formatMode(level) }}</span>
-                <span v-if="level === thinkingLevel">✓</span>
-              </button>
-            </div>
+            <Transition name="composer-popover">
+              <div v-if="thinkingPickerOpen" class="model-menu small-menu">
+                <button
+                  v-for="level in availableThinkingLevels"
+                  :key="level"
+                  type="button"
+                  :class="{ active: level === thinkingLevel }"
+                  @click="emit('select-thinking', level)"
+                >
+                  <span>{{ formatMode(level) }}</span>
+                  <span v-if="level === thinkingLevel">✓</span>
+                </button>
+              </div>
+            </Transition>
           </div>
           <button
             class="start-send-button"
@@ -258,30 +270,32 @@ function updateDraft(event) {
         </span>
       </div>
     </div>
-    <div v-if="startProjectPickerOpen" class="start-project-menu">
-      <label>
-        <span>⌕</span>
-        <input
-          :value="startProjectQuery"
-          placeholder="Search projects"
-          @input="emit('update:startProjectQuery', $event.target.value)"
-        />
-      </label>
-      <button
-        v-for="project in startProjectOptions"
-        :key="project.cwd"
-        type="button"
-        @click="emit('select-project', project.cwd)"
-      >
-        <span>▱</span>
-        <strong>{{ project.name }}</strong>
-        <em v-if="project.cwd === newSessionCwd">✓</em>
-      </button>
-      <div class="start-project-divider"></div>
-      <button type="button" @click="emit('open-project-browser')">
-        <span>＋</span>
-        <strong>Add new project</strong>
-      </button>
-    </div>
+    <Transition name="composer-popover">
+      <div v-if="startProjectPickerOpen" class="start-project-menu">
+        <label>
+          <span>⌕</span>
+          <input
+            :value="startProjectQuery"
+            placeholder="Search projects"
+            @input="emit('update:startProjectQuery', $event.target.value)"
+          />
+        </label>
+        <button
+          v-for="project in startProjectOptions"
+          :key="project.cwd"
+          type="button"
+          @click="emit('select-project', project.cwd)"
+        >
+          <span>▱</span>
+          <strong>{{ project.name }}</strong>
+          <em v-if="project.cwd === newSessionCwd">✓</em>
+        </button>
+        <div class="start-project-divider"></div>
+        <button type="button" @click="emit('open-project-browser')">
+          <span>＋</span>
+          <strong>Add new project</strong>
+        </button>
+      </div>
+    </Transition>
   </form>
 </template>

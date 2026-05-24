@@ -146,39 +146,41 @@ const emit = defineEmits([
           </button>
         </div>
 
-        <template v-if="expandedProject(project)">
-          <div
-            v-for="session in project.sessions.slice(0, 5)"
-            :key="session.path || session.id"
-            class="session"
-            :class="{ active: session.id === selectedSessionId }"
-            role="button"
-            tabindex="0"
-            @click="emit('select-session', session)"
-            @keydown.enter="emit('select-session', session)"
-            @keydown.space.prevent="emit('select-session', session)"
-          >
-            <span v-html="highlightedText(sessionTitle(session))"></span>
-            <time>{{ sessionTime(session) }}</time>
-            <button
-              class="session-delete-button"
-              type="button"
-              title="Delete session"
-              aria-label="Delete session"
-              :disabled="deletingSessionId === session.id"
-              @click.stop="emit('request-delete-session', session)"
+        <Transition name="project-sessions">
+          <div v-if="expandedProject(project)" class="project-session-list">
+            <div
+              v-for="session in project.sessions.slice(0, 5)"
+              :key="session.path || session.id"
+              class="session"
+              :class="{ active: session.id === selectedSessionId }"
+              role="button"
+              tabindex="0"
+              @click="emit('select-session', session)"
+              @keydown.enter="emit('select-session', session)"
+              @keydown.space.prevent="emit('select-session', session)"
             >
-              <span v-if="deletingSessionId === session.id">…</span>
-              <svg v-else viewBox="0 0 16 16" aria-hidden="true">
-                <path d="M3.5 4.5h9"></path>
-                <path d="M6.5 4.5v-2h3v2"></path>
-                <path d="M5 6.5l.5 6h5l.5-6"></path>
-                <path d="M7 7.5v4"></path>
-                <path d="M9 7.5v4"></path>
-              </svg>
-            </button>
+              <span v-html="highlightedText(sessionTitle(session))"></span>
+              <time>{{ sessionTime(session) }}</time>
+              <button
+                class="session-delete-button"
+                type="button"
+                title="Delete session"
+                aria-label="Delete session"
+                :disabled="deletingSessionId === session.id"
+                @click.stop="emit('request-delete-session', session)"
+              >
+                <span v-if="deletingSessionId === session.id">…</span>
+                <svg v-else viewBox="0 0 16 16" aria-hidden="true">
+                  <path d="M3.5 4.5h9"></path>
+                  <path d="M6.5 4.5v-2h3v2"></path>
+                  <path d="M5 6.5l.5 6h5l.5-6"></path>
+                  <path d="M7 7.5v4"></path>
+                  <path d="M9 7.5v4"></path>
+                </svg>
+              </button>
+            </div>
           </div>
-        </template>
+        </Transition>
       </div>
     </section>
 
