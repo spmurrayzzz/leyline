@@ -9,8 +9,9 @@ import SessionSidebar from './components/SessionSidebar.vue'
 import TranscriptEntry from './components/TranscriptEntry.vue'
 import { useLiveTurnProjection } from './composables/useLiveTurnProjection'
 import { useRuntimeEvents } from './composables/useRuntimeEvents'
+import { useSessionWorkspace } from './composables/useSessionWorkspace'
 import { useTerminal } from './composables/useTerminal'
-import { fuzzyScore, highlightedText as highlightFuzzyText } from './lib/fuzzy'
+import { fuzzyScore } from './lib/fuzzy'
 import {
   eventTime,
   formatDate,
@@ -21,21 +22,11 @@ import {
   toolTarget,
 } from './lib/format'
 import {
-  activatePiSession,
   compactPiSession,
-  createPiSession,
-  deletePiSession,
   editPrompt,
-  fetchPiRuntimeState,
-  fetchSessionDetail,
-  fetchSessions,
-  forkPiSession,
   interruptPiSession,
-  reloadPiSession,
   runShellCommand,
   submitPrompt,
-  switchPiModel,
-  switchPiThinkingLevel,
 } from './lib/pi-api'
 import {
   imageBlocksFor,
@@ -45,54 +36,27 @@ import {
   textFromBlocks,
 } from './lib/transcript'
 
-const sessions = ref([])
-const sessionsError = ref('')
-const sessionsLoading = ref(true)
-const creatingSessionCwd = ref('')
-const newSessionCwd = ref('')
 const projectBrowserOpen = ref(false)
 const projectBrowserInitialPath = ref('')
 const startProjectPickerOpen = ref(false)
 const startProjectQuery = ref('')
-const sessionQuery = ref('')
-const selectedSessionId = ref('')
 const expandedProjects = ref(new Set())
 const sidebarOpen = ref(false)
 const desktopSidebarHidden = ref(false)
-const sessionDetail = ref(null)
-const sessionLoading = ref(false)
-const sessionSwitching = ref(false)
-const sessionActivating = ref(false)
-const sessionError = ref('')
 const expandedTools = ref(new Set())
 const expandedSkills = ref(new Set())
 const copiedEntryId = ref('')
 const draft = ref('')
 const attachedImages = ref([])
 const workbench = ref(null)
-const activeRuntimeSession = ref(null)
-const startRuntimeState = ref(null)
-const startSelectedModel = ref(null)
-const startSelectedThinkingLevel = ref(null)
 const eventLogOpen = ref(false)
 const settingsOpen = ref(false)
 const fullscreenTool = ref(null)
 const promptSubmitting = ref(false)
-const startupRun = ref(null)
-const sessionHandoff = ref(null)
-const startupPhaseSlow = ref(false)
 const promptSubmitSlow = ref(false)
 const shellCommandSubmitting = ref(false)
 const interrupting = ref(false)
-const switchingModel = ref(false)
-const switchingThinking = ref(false)
-const reloadingSession = ref(false)
 const goalCommandSubmitting = ref('')
-const deletingSessionId = ref('')
-const deleteConfirmSession = ref(null)
-const deleteSessionError = ref('')
-const deleteSessionPhase = ref('')
-const forkingEntryId = ref('')
 const editingEntry = ref(null)
 const composerRef = ref(null)
 const composerHeight = ref(0)
@@ -118,14 +82,10 @@ const terminalDrawerHeight = ref(310)
 let terminalResizeStartY = 0
 let terminalResizeStartHeight = 0
 let terminalResizeFrame = 0
-let refreshTimer
-let startupPhaseTimer
 let promptSubmitTimer
 let scrollFrame
 let userScrollTimer
 let composerResizeObserver
-let sessionSelectionToken = 0
-let sessionActivationQueue = Promise.resolve()
 let copiedTimer
 const bottomStickBufferPx = 160
 const userScrollIdleMs = 450
@@ -138,50 +98,10 @@ const composerReservedHeight = computed(() => {
   return `${Math.max(240, composerHeight.value + 78)}px`
 })
 
-const visibleProjects = computed(() => {
-  const projects = new Map()
-  const query = sessionQuery.value.trim().toLowerCase()
-
-  for (const session of sessions.value) {
-    const key = session.cwd || 'unknown'
-    const name = projectName(key)
-    const projectScore = query ? fuzzyScore(name, query) : 1
-    const sessionScoreValue = query ? sessionScore(session, query) : 1
-
-    if (query && projectScore === 0 && sessionScoreValue === 0) continue
-
-    if (!projects.has(key)) {
-      projects.set(key, {
-        cwd: key,
-        name,
-        score: projectScore,
-        sessions: [],
-      })
-    }
-
-    if (!query || projectScore > 0 || sessionScoreValue > 0) {
-      projects.get(key).sessions.push(session)
-      projects.get(key).score = Math.max(
-        projects.get(key).score,
-        projectScore,
-        sessionScoreValue,
-      )
-    }
-  }
-
-  return Array.from(projects.values())
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 8)
-})
-const selectedSession = computed(() => sessionDetail.value?.session)
 const selectedSessionExportUrl = computed(() => {
   if (!selectedSession.value?.id) return ''
   return `/api/pi/sessions/${encodeURIComponent(selectedSession.value.id)}/export`
 })
-const initializing = computed(() => {
-  return sessionsLoading.value && !selectedSession.value
-})
-const initPhase = ref('sessions')
 let initPhaseTimer = null
 const liveTurn = useLiveTurnProjection({ onIntent: handleLiveTurnIntent })
 const {
@@ -203,6 +123,84 @@ const {
   setActivity: setLiveActivity,
   setAgentRunning,
 } = liveTurn
+const sessionWorkspace = useSessionWorkspace({
+  liveTurn,
+  terminal: {
+    isOpen: () => terminalOpen.value,
+    reconnect: connectTerminal,
+  },
+  scrollToLatest,
+  shouldFollowOutput: () => stickToBottom.value,
+  markNewOutput: () => { hasNewOutput.value = true },
+})
+const {
+  activeGoal,
+  activeRuntimeSession,
+  availableModels,
+  availableThinkingLevels,
+  beginStartupRun,
+  cancelDeleteSession,
+  composerRuntime,
+  confirmDeleteSession,
+  contextUsage,
+  createSession: workspaceCreateSession,
+  createSessionForCwd: workspaceCreateSessionForCwd,
+  creatingSessionCwd,
+  currentModelLabel,
+  currentThinkingLabel,
+  deleteConfirmSession,
+  deleteSessionButtonLabel,
+  deleteSessionError,
+  deleteSessionPhase,
+  deletingSessionId,
+  finishStartupRun,
+  forkSession,
+  handleNativeNewSession,
+  handleRouteChange,
+  highlightedText,
+  initPhase,
+  initializing,
+  loadSessions,
+  loadStartRuntimeState,
+  navigateHome: workspaceNavigateHome,
+  newSessionCwd,
+  patchRuntimeExtensionUi,
+  reloadSession,
+  reloadingSession,
+  requestDeleteSession,
+  runStartupPhase,
+  scheduleSessionRefresh,
+  selectModel: selectWorkspaceModel,
+  selectedModelKey,
+  selectedSession,
+  selectedSessionId,
+  selectSession: workspaceSelectSession,
+  selectThinkingLevel: selectWorkspaceThinkingLevel,
+  sessionActivating,
+  sessionDetail,
+  sessionError,
+  sessionHandoff,
+  sessionIdFromRoute,
+  sessionHandoffDetail,
+  sessionHandoffStep,
+  sessionLoading,
+  sessionQuery,
+  sessions,
+  sessionsError,
+  sessionsLoading,
+  sessionSwitching,
+  sessionTitle,
+  startSelectedModel,
+  startSelectedThinkingLevel,
+  startupPhaseSlow,
+  startupStatusDetail,
+  startupStep,
+  startupRun,
+  switchingModel,
+  switchingThinking,
+  updateRuntimeQueue,
+  visibleProjects,
+} = sessionWorkspace
 const {
   appendRuntimeEvent,
   closeEventStream,
@@ -229,31 +227,8 @@ const {
     surfaceExtensionNotification(data.state)
   },
 })
-const composerRuntime = computed(() => {
-  return selectedSession.value
-    ? activeRuntimeSession.value
-    : startRuntimeState.value
-})
-const availableModels = computed(() => {
-  return composerRuntime.value?.state?.availableModels || []
-})
-const selectedModelKey = computed(() => {
-  const model = composerRuntime.value?.state?.model
-  if (!model) return ''
-  return modelKey(model)
-})
-const currentModelLabel = computed(() => {
-  return modelChip(composerRuntime.value?.state?.model)
-})
 const currentMobileModelLabel = computed(() => {
   return modelChip(composerRuntime.value?.state?.model)
-})
-const availableThinkingLevels = computed(() => {
-  return composerRuntime.value?.state?.availableThinkingLevels || []
-})
-const currentThinkingLabel = computed(() => {
-  const level = composerRuntime.value?.state?.thinkingLevel
-  return level ? `thinking · ${formatMode(level)}` : 'thinking'
 })
 const currentMobileThinkingLabel = computed(() => {
   const level = composerRuntime.value?.state?.thinkingLevel
@@ -281,11 +256,6 @@ const queuedMessages = computed(() => {
     followUp: queue.followUp || [],
   }
 })
-const contextUsage = computed(() => {
-  return selectedSession.value?.contextUsage
-    || composerRuntime.value?.state?.contextUsage
-    || null
-})
 const contextUsageLabel = computed(() => {
   const usage = contextUsage.value
   if (!usage?.contextWindow) return ''
@@ -312,9 +282,6 @@ const contextUsageLevel = computed(() => {
   if (percent >= 95) return 'danger'
   if (percent >= 80) return 'warning'
   return 'normal'
-})
-const activeGoal = computed(() => {
-  return activeRuntimeSession.value?.state?.goal || null
 })
 const goalWidgetLines = computed(() => {
   const ui = activeRuntimeSession.value?.state?.extensionUi
@@ -554,6 +521,16 @@ watch(slashCommandItems, () => {
 
 watch(sessionDetail, (detail) => {
   liveTurn.setPersistedDetail(detail)
+  if (detail?.session?.cwd) expandProject(detail.session.cwd)
+})
+
+watch(selectedSessionId, () => {
+  expandedTools.value = new Set()
+  expandedSkills.value = new Set()
+  editingEntry.value = null
+  promptError.value = ''
+  stickToBottom.value = true
+  hasNewOutput.value = false
 })
 
 watch(() => composerRef.value?.form, (el) => {
@@ -580,9 +557,8 @@ onUnmounted(() => {
   window.removeEventListener('leyline:toggle-terminal', handleNativeToggleTerminal)
   stopTerminalResize()
   closeEventStream()
+  sessionWorkspace.dispose()
   closeTerminalPanel()
-  clearTimeout(refreshTimer)
-  clearTimeout(startupPhaseTimer)
   clearTimeout(promptSubmitTimer)
   clearTimeout(copiedTimer)
   clearTimeout(userScrollTimer)
@@ -641,83 +617,21 @@ function setTerminalDrawerHeight(height) {
   terminalResizeFrame = requestAnimationFrame(resizeTerminal)
 }
 
-async function loadSessions({
-  routeSessionId = '',
-  selectFirst = false,
-  showLoading = true,
-} = {}) {
-  if (showLoading) sessionsLoading.value = true
-
-  initPhase.value = 'events'
-  sessionsError.value = ''
-
-  try {
-    const nextSessions = await fetchSessions()
-    sessions.value = nextSessions
-    if (!newSessionCwd.value && sessions.value[0]?.cwd) {
-      newSessionCwd.value = sessions.value[0].cwd
-      await loadStartRuntimeState(newSessionCwd.value)
-    }
-    const routedSession = routeSessionId
-      ? sessions.value.find((session) => session.id === routeSessionId)
-      : null
-
-    if (routedSession) await selectSession(routedSession, { replaceRoute: true })
-    else if (routeSessionId) sessionError.value = 'Session not found'
-    else if (selectFirst && sessions.value[0]) {
-      await selectSession(sessions.value[0])
-    }
-  } catch (error) {
-    if (showLoading || sessions.value.length === 0) {
-      sessionsError.value = error.message
-    }
-  } finally {
-    if (showLoading) {
-      initPhase.value = 'workspace'
-      await waitInitPhaseFloor()
-      sessionsLoading.value = false
-      initPhase.value = 'sessions'
-    }
-  }
-}
-
-async function loadStartRuntimeState(cwd) {
-  const targetCwd = cwd?.trim()
-  if (!targetCwd || selectedSession.value) return
-
-  try {
-    const state = await fetchPiRuntimeState(targetCwd)
-    if (newSessionCwd.value !== targetCwd || selectedSession.value) return
-    startRuntimeState.value = state
-    startSelectedModel.value = null
-    startSelectedThinkingLevel.value = null
-  } catch (error) {
-    if (!startRuntimeState.value) promptError.value = error.message
-  }
-}
-
 async function createSession(project) {
-  if (selectedSession.value || startupRun.value) {
-    await createSessionForCwd(project.cwd)
-    return
-  }
-
-  beginStartupRun(project.cwd, { hasPrompt: false })
-
-  try {
-    await wait(startupAcceptedFloorMs)
-    await runStartupPhase('creating', () => createSessionForCwd(project.cwd))
-  } finally {
-    await wait(260)
-    finishStartupRun()
-  }
+  await workspaceCreateSession(project)
+  projectBrowserOpen.value = false
+  sidebarOpen.value = false
 }
 
-async function handleNativeNewSession() {
-  if (!selectedSession.value) return
-  if (agentRunning.value || creatingSessionCwd.value) return
+async function createSessionForCwd(cwd) {
+  await workspaceCreateSessionForCwd(cwd)
+  projectBrowserOpen.value = false
+  sidebarOpen.value = false
+}
 
-  await createSessionForCwd(selectedSession.value.cwd)
+async function selectSession(session, options) {
+  await workspaceSelectSession(session, options)
+  sidebarOpen.value = false
 }
 
 async function handleNativeToggleTerminal() {
@@ -726,305 +640,8 @@ async function handleNativeToggleTerminal() {
   await toggleTerminal()
 }
 
-async function createSessionForCwd(cwd) {
-  const targetCwd = cwd?.trim() || ''
-  if (!targetCwd) return
-
-  creatingSessionCwd.value = targetCwd
-  sessionError.value = ''
-
-  const handoff = selectedSession.value && !startupRun.value
-    ? beginSessionHandoff(targetCwd)
-    : null
-
-  try {
-    if (handoff) await waitSessionHandoffPhaseFloor(handoff)
-    const data = handoff
-      ? await runSessionHandoffPhase(handoff, 'creating', () => {
-        return createPiSession(targetCwd)
-      })
-      : await createPiSession(targetCwd)
-
-    if (handoff) setSessionHandoffPhase(handoff, 'loading')
-    await loadSessions({ selectFirst: false, showLoading: false })
-    activeRuntimeSession.value = data.active
-    sessionDetail.value = data.detail
-    selectedSessionId.value = data.detail.session.id
-    liveTurn.selectSession(data.detail.session.id)
-    updateSessionRoute(data.detail.session.id)
-    expandedTools.value = new Set()
-    expandedSkills.value = new Set()
-    editingEntry.value = null
-    resetLiveState()
-    expandProject(targetCwd)
-    newSessionCwd.value = ''
-    projectBrowserOpen.value = false
-    stickToBottom.value = true
-    hasNewOutput.value = false
-    await scrollToLatest()
-    if (handoff) await finishSessionHandoffFloor(handoff)
-    sidebarOpen.value = false
-    if (terminalOpen.value) await connectTerminal()
-  } catch (error) {
-    sessionError.value = error.message
-  } finally {
-    creatingSessionCwd.value = ''
-    if (handoff) finishSessionHandoff(handoff)
-  }
-}
-
-async function selectSession(session, options = {}) {
-  const token = ++sessionSelectionToken
-  sessionSwitching.value = true
-  const switchStarted = Date.now()
-  selectedSessionId.value = session.id
-  liveTurn.selectSession(session.id)
-  sessionLoading.value = true
-  sessionActivating.value = false
-  sessionError.value = ''
-  promptError.value = ''
-
-  try {
-    const data = await loadSessionDetail(session)
-    if (!isCurrentSessionSelection(token, session.id)) return
-    sessionDetail.value = data
-    activeRuntimeSession.value = null
-    expandedTools.value = new Set()
-    expandedSkills.value = new Set()
-    editingEntry.value = null
-    resetLiveState()
-    expandProject(session.cwd)
-    stickToBottom.value = true
-    hasNewOutput.value = false
-    updateSessionRoute(session.id, options)
-    const elapsed = Date.now() - switchStarted
-    const minSwitchMs = 150
-    if (elapsed < minSwitchMs) await wait(minSwitchMs - elapsed)
-    sessionLoading.value = false
-    sessionSwitching.value = false
-    await scrollToLatest()
-    sidebarOpen.value = false
-
-    sessionActivating.value = true
-    await activateSelectedSession(token, session)
-    if (!isCurrentSessionSelection(token, session.id)) return
-    if (terminalOpen.value && !sessionError.value) await connectTerminal()
-  } catch (error) {
-    if (isCurrentSessionSelection(token, session.id)) {
-      sessionError.value = error.message
-    }
-  } finally {
-    if (!isCurrentSessionSelection(token, session.id)) return
-    sessionLoading.value = false
-    if (isCurrentSessionSelection(token, session.id)) {
-      sessionSwitching.value = false
-    }
-    sessionActivating.value = false
-  }
-}
-
-function isCurrentSessionSelection(token, id) {
-  return token === sessionSelectionToken && selectedSessionId.value === id
-}
-
-async function loadSessionDetail(session) {
-  return fetchSessionDetail(session)
-}
-
-async function handleRouteChange() {
-  const id = sessionIdFromRoute()
-  if (!id) {
-    clearSelectedSession()
-    return
-  }
-
-  const session = sessions.value.find((item) => item.id === id)
-  if (session) await selectSession(session, { replaceRoute: true })
-  else await loadSessions({ routeSessionId: id })
-}
-
-function sessionIdFromRoute() {
-  const url = new URL(window.location.href)
-  const match = url.pathname.match(/^\/sessions\/([^/]+)\/?$/)
-  if (match) return decodeURIComponent(match[1])
-  return url.searchParams.get('session') || ''
-}
-
-function updateSessionRoute(id, { replaceRoute = false } = {}) {
-  const hash = window.location.hash
-  const next = id ? `/sessions/${encodeURIComponent(id)}${hash}` : `/${hash}`
-  const current = window.location.pathname
-    + window.location.search
-    + window.location.hash
-  if (next === current) return
-  const method = replaceRoute ? 'replaceState' : 'pushState'
-  window.history[method]({}, '', next)
-}
-
-function clearSelectedSession() {
-  selectedSessionId.value = ''
-  liveTurn.clearSession()
-  sessionDetail.value = null
-  sessionError.value = ''
-  promptError.value = ''
-  expandedTools.value = new Set()
-  expandedSkills.value = new Set()
-  editingEntry.value = null
-  sessionHandoff.value = null
-  finishStartupRun()
-  resetLiveState()
-}
-
-function beginStartupRun(cwd, options = {}) {
-  startupRun.value = {
-    cwd,
-    project: projectName(cwd),
-    hasPrompt: options.hasPrompt,
-    model: options.model ? modelChip(options.model) : '',
-    thinking: options.thinkingLevel ? formatMode(options.thinkingLevel) : '',
-    phase: 'accepted',
-  }
-  setStartupPhase('accepted')
-}
-
-function beginSessionHandoff(cwd) {
-  const handoff = {
-    id: `${Date.now()}-${Math.random()}`,
-    cwd,
-    project: projectName(cwd),
-    startedAt: Date.now(),
-    phase: 'clearing',
-    phaseStartedAt: Date.now(),
-  }
-  sessionHandoff.value = handoff
-  return handoff
-}
-
-function sessionHandoffStep(handoff, id, label) {
-  const phases = ['clearing', 'creating', 'loading']
-  const activeIndex = Math.max(0, phases.indexOf(handoff.phase))
-  const index = phases.indexOf(id)
-
-  return {
-    id,
-    label,
-    active: index === activeIndex,
-    done: index < activeIndex,
-  }
-}
-
-function sessionHandoffDetail(phase) {
-  if (phase === 'clearing') return 'Clearing the current transcript view.'
-  if (phase === 'creating') return 'Opening a fresh pi session.'
-  if (phase === 'loading') return 'Loading the fresh transcript shell.'
-  return 'Preparing a fresh runtime.'
-}
-
-function setSessionHandoffPhase(handoff, phase) {
-  if (sessionHandoff.value?.id !== handoff.id) return
-  sessionHandoff.value = {
-    ...sessionHandoff.value,
-    phase,
-    phaseStartedAt: Date.now(),
-  }
-}
-
-async function runSessionHandoffPhase(handoff, phase, task) {
-  setSessionHandoffPhase(handoff, phase)
-  const result = await task()
-  await waitSessionHandoffPhaseFloor(handoff)
-  return result
-}
-
-async function waitSessionHandoffPhaseFloor(handoff) {
-  const current = sessionHandoff.value
-  if (current?.id !== handoff.id) return
-  const elapsed = Date.now() - current.phaseStartedAt
-  const remaining = Math.max(0, sessionHandoffPhaseFloorMs - elapsed)
-  if (remaining) await wait(remaining)
-}
-
-async function finishSessionHandoffFloor(handoff) {
-  await waitSessionHandoffPhaseFloor(handoff)
-  const elapsed = Date.now() - handoff.startedAt
-  const remaining = Math.max(0, sessionHandoffTotalFloorMs - elapsed)
-  if (remaining) await wait(remaining)
-}
-
-function finishSessionHandoff(handoff) {
-  if (sessionHandoff.value?.id === handoff.id) sessionHandoff.value = null
-}
-
-function setStartupPhase(phase) {
-  if (!startupRun.value) return
-
-  startupRun.value = { ...startupRun.value, phase }
-  startupPhaseSlow.value = false
-  clearTimeout(startupPhaseTimer)
-  startupPhaseTimer = setTimeout(() => {
-    if (startupRun.value?.phase === phase) startupPhaseSlow.value = true
-  }, 4500)
-}
-
-async function runStartupPhase(phase, task) {
-  setStartupPhase(phase)
-  const started = Date.now()
-  const result = await task()
-  const elapsed = Date.now() - started
-  const remaining = Math.max(0, startupPhaseFloorMs - elapsed)
-  if (remaining) await wait(remaining)
-  return result
-}
-
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-function finishStartupRun() {
-  startupRun.value = null
-  startupPhaseSlow.value = false
-  clearTimeout(startupPhaseTimer)
-}
-
-function startupStep(id, label) {
-  const phases = startupStepsForRun(startupRun.value)
-  const activeIndex = Math.max(0, phases.indexOf(startupRun.value?.phase))
-  const index = phases.indexOf(id)
-
-  return {
-    id,
-    label,
-    active: index === activeIndex,
-    done: index < activeIndex,
-  }
-}
-
-function startupStepsForRun(run) {
-  if (!run) return []
-  return [
-    'accepted',
-    'creating',
-    run.model ? 'model' : '',
-    run.thinking ? 'thinking' : '',
-    run.hasPrompt ? 'submitting' : '',
-  ].filter(Boolean)
-}
-
-function startupStatusDetail(phase) {
-  if (phase === 'accepted') {
-    return startupRun.value?.hasPrompt
-      ? 'Request received; preparing the run.'
-      : 'Request received; preparing a fresh session.'
-  }
-  if (phase === 'creating') {
-    return 'Opening a fresh pi session for this project.'
-  }
-  if (phase === 'model') {
-    return 'Syncing the selected model before the first turn.'
-  }
-  if (phase === 'thinking') return 'Applying the selected reasoning level.'
-  if (phase === 'submitting') return 'Handing the prompt to the active runtime.'
-  return 'Preparing run.'
 }
 
 function startPromptSubmitTimer() {
@@ -1043,40 +660,8 @@ function stopPromptSubmitTimer() {
 }
 
 function navigateHome() {
-  sessionSwitching.value = true
-  const cwd = selectedSession.value?.cwd
-    || newSessionCwd.value
-    || sessions.value[0]?.cwd
-    || ''
-
-  clearSelectedSession()
-  if (cwd) {
-    newSessionCwd.value = cwd
-    loadStartRuntimeState(cwd)
-  }
-  updateSessionRoute('')
+  workspaceNavigateHome()
   sidebarOpen.value = false
-  setTimeout(() => { sessionSwitching.value = false }, 150)
-}
-
-function scheduleSessionRefresh(activeSessionId, event) {
-  if (activeSessionId !== selectedSessionId.value) return
-  if (event?.type === 'message_update') return
-
-  clearTimeout(refreshTimer)
-  refreshTimer = setTimeout(async () => {
-    const wasStuck = stickToBottom.value
-
-    try {
-      const detail = await loadSessionDetail(selectedSessionId.value)
-      sessionDetail.value = detail
-      updateSelectedSessionSummary(detail.session)
-      if (wasStuck) await scrollToLatest()
-      else hasNewOutput.value = true
-    } catch (error) {
-      sessionError.value = error.message
-    }
-  }, event?.type === 'compaction_end' ? 0 : 250)
 }
 
 function eventType(item) {
@@ -1107,37 +692,6 @@ function liveToolStatus(tool) {
   if (tool.status === 'error') return 'error'
   if (tool.status === 'aborted') return 'aborted'
   return 'completed'
-}
-
-async function activateSelectedSession(token, session) {
-  let active
-  sessionActivationQueue = sessionActivationQueue.catch(() => {}).then(
-    async () => {
-      if (!isCurrentSessionSelection(token, session.id)) return
-      active = await activatePiSession(session)
-    },
-  )
-  await sessionActivationQueue
-  if (active && isCurrentSessionSelection(token, session.id)) {
-    activeRuntimeSession.value = active
-  }
-}
-
-function sessionTitle(session) {
-  if (session?.messageCount === 0
-    || session?.name === '(no messages)'
-    || session?.firstMessage === '(no messages)') {
-    return 'New session'
-  }
-  return session?.name || session?.firstMessage || 'Untitled session'
-}
-
-function sessionScore(session, query) {
-  return fuzzyScore(sessionTitle(session), query)
-}
-
-function highlightedText(value) {
-  return highlightFuzzyText(value, sessionQuery.value)
 }
 
 function isProjectExpanded(project) {
@@ -1336,55 +890,6 @@ async function scrollToLatest() {
   await nextTick()
   if (!workbench.value) return
   workbench.value.scrollTop = workbench.value.scrollHeight
-}
-
-function updateRuntimeQueue(event) {
-  if (event.type !== 'queue_update' || !activeRuntimeSession.value) return
-  activeRuntimeSession.value = {
-    ...activeRuntimeSession.value,
-    state: {
-      ...activeRuntimeSession.value.state,
-      queuedMessages: {
-        steering: event.steering || [],
-        followUp: event.followUp || [],
-      },
-    },
-  }
-}
-
-function patchRuntimeExtensionUi(extensionUi, goal) {
-  if (!activeRuntimeSession.value) return
-  activeRuntimeSession.value = {
-    ...activeRuntimeSession.value,
-    state: {
-      ...activeRuntimeSession.value.state,
-      extensionUi,
-      goal,
-    },
-  }
-  if (goal?.objective) patchGoalSessionTitle(goal.objective)
-}
-
-function patchGoalSessionTitle(objective) {
-  const id = selectedSessionId.value
-  if (!id) return
-
-  sessions.value = sessions.value.map((session) => {
-    if (session.id !== id) return session
-    if (session.firstMessage && session.firstMessage !== '(no messages)') {
-      return session
-    }
-    return { ...session, firstMessage: objective }
-  })
-
-  const detail = sessionDetail.value
-  if (!detail || detail.session.id !== id) return
-  const firstMessage = detail.session.firstMessage
-  if (firstMessage && firstMessage !== '(no messages)') return
-  sessionDetail.value = {
-    ...detail,
-    session: { ...detail.session, firstMessage: objective },
-  }
 }
 
 function surfaceExtensionNotification(state) {
@@ -1631,137 +1136,6 @@ function imageSrcForComposer(image) {
   return `data:${image.mimeType};base64,${image.data}`
 }
 
-function requestDeleteSession(session) {
-  if (!session || deletingSessionId.value) return
-  deleteConfirmSession.value = session
-  deleteSessionError.value = ''
-  deleteSessionPhase.value = ''
-}
-
-function cancelDeleteSession() {
-  if (deletingSessionId.value) return
-  deleteConfirmSession.value = null
-  deleteSessionError.value = ''
-  deleteSessionPhase.value = ''
-}
-
-function deleteSessionButtonLabel() {
-  if (deleteSessionPhase.value === 'opening') return 'Opening next session…'
-  if (deleteSessionPhase.value === 'deleting') return 'Deleting…'
-  return 'Delete'
-}
-
-function nextSessionAfterDelete(session, remainingSessions) {
-  const projectSessions = sessions.value.filter((item) => {
-    return item.cwd === session.cwd
-  })
-  const index = projectSessions.findIndex((item) => item.id === session.id)
-  const nextProjectSession = projectSessions[index + 1]
-    || projectSessions[index - 1]
-
-  if (nextProjectSession) {
-    return remainingSessions.find((item) => item.id === nextProjectSession.id)
-      || null
-  }
-
-  return remainingSessions[0] || null
-}
-
-async function confirmDeleteSession() {
-  const session = deleteConfirmSession.value
-  if (!session || deletingSessionId.value) return
-
-  deletingSessionId.value = session.id
-  deleteSessionPhase.value = 'deleting'
-  sessionError.value = ''
-  promptError.value = ''
-  deleteSessionError.value = ''
-
-  try {
-    await deletePiSession(session.id)
-    const remainingSessions = sessions.value.filter((item) => {
-      return item.id !== session.id
-    })
-    const replacementSession = nextSessionAfterDelete(session, remainingSessions)
-    sessions.value = remainingSessions
-    if (selectedSessionId.value === session.id) {
-      if (replacementSession) {
-        deleteSessionPhase.value = 'opening'
-        await selectSession(replacementSession)
-      } else {
-        clearSelectedSession()
-        updateSessionRoute('')
-      }
-    }
-    deleteConfirmSession.value = null
-  } catch (error) {
-    deleteSessionError.value = error.message
-  } finally {
-    deletingSessionId.value = ''
-    deleteSessionPhase.value = ''
-  }
-}
-
-async function forkSession(entry) {
-  if (!entry?.id
-    || forkingEntryId.value
-    || agentRunning.value
-    || compactingContext.value) return
-
-  forkingEntryId.value = entry.id
-  sessionError.value = ''
-  promptError.value = ''
-  setLiveActivity('Forking session…')
-
-  try {
-    const data = await forkPiSession(entry.id)
-    activeRuntimeSession.value = data.active
-    sessionDetail.value = data.detail
-    selectedSessionId.value = data.detail.session.id
-    liveTurn.selectSession(data.detail.session.id)
-    expandedTools.value = new Set()
-    expandedSkills.value = new Set()
-    editingEntry.value = null
-    resetLiveState()
-    expandProject(data.detail.session.cwd)
-    updateSessionRoute(data.detail.session.id)
-    stickToBottom.value = true
-    hasNewOutput.value = false
-    await loadSessions({ selectFirst: false, showLoading: false })
-    await scrollToLatest()
-    if (terminalOpen.value) await connectTerminal()
-  } catch (error) {
-    promptError.value = error.message
-    setLiveActivity('')
-  } finally {
-    forkingEntryId.value = ''
-  }
-}
-
-async function reloadSession() {
-  if (reloadingSession.value) return
-
-  reloadingSession.value = true
-  promptError.value = ''
-  setLiveActivity([
-    'Reloading keybindings, extensions, skills, prompts, themes…',
-  ].join(''))
-
-  try {
-    activeRuntimeSession.value = await reloadPiSession()
-    setLiveActivity('')
-    await loadSessions({ selectFirst: false, showLoading: false })
-    if (selectedSessionId.value) {
-      sessionDetail.value = await loadSessionDetail(selectedSessionId.value)
-    }
-  } catch (error) {
-    promptError.value = error.message
-    setLiveActivity('')
-  } finally {
-    reloadingSession.value = false
-  }
-}
-
 async function runGoalCommand(command) {
   if (!activeGoal.value || goalCommandSubmitting.value) return
   if (!selectedSession.value) return
@@ -1804,92 +1178,16 @@ async function interruptAgent() {
   }
 }
 
-function updateSelectedSessionSummary(session) {
-  sessions.value = sessions.value.map((item) => {
-    if (item.id !== session.id) return item
-    return {
-      ...item,
-      name: session.name,
-      firstMessage: session.firstMessage,
-      messageCount: session.messageCount,
-      modified: session.modified,
-      timestamp: session.modified || item.timestamp,
-    }
-  })
-}
-
 async function selectModel(model) {
-  if (!model || modelKey(model) === selectedModelKey.value) {
-    modelPickerOpen.value = false
-    return
-  }
-
-  switchingModel.value = true
   modelPickerOpen.value = false
   promptError.value = ''
-
-  if (!selectedSession.value) {
-    const state = startRuntimeState.value?.state || {}
-    const levels = model.availableThinkingLevels || []
-    const selectedThinking = startSelectedThinkingLevel.value
-    const thinkingLevel = clampThinkingLevel(
-      selectedThinking || state.thinkingLevel,
-      levels,
-    )
-
-    if (selectedThinking !== null) {
-      startSelectedThinkingLevel.value = thinkingLevel
-    }
-    startSelectedModel.value = model
-    startRuntimeState.value = {
-      ...startRuntimeState.value,
-      state: {
-        ...state,
-        model,
-        availableThinkingLevels: levels,
-        thinkingLevel,
-      },
-    }
-    switchingModel.value = false
-    return
-  }
-
-  try {
-    activeRuntimeSession.value = await switchPiModel(model.provider, model.id)
-  } catch (error) {
-    promptError.value = error.message
-  } finally {
-    switchingModel.value = false
-  }
+  await selectWorkspaceModel(model)
 }
 
 async function selectThinkingLevel(level) {
-  if (!level || level === composerRuntime.value?.state?.thinkingLevel) {
-    thinkingPickerOpen.value = false
-    return
-  }
-
-  switchingThinking.value = true
   thinkingPickerOpen.value = false
   promptError.value = ''
-
-  if (!selectedSession.value) {
-    startSelectedThinkingLevel.value = level
-    startRuntimeState.value = {
-      ...startRuntimeState.value,
-      state: { ...startRuntimeState.value?.state, thinkingLevel: level },
-    }
-    switchingThinking.value = false
-    return
-  }
-
-  try {
-    activeRuntimeSession.value = await switchPiThinkingLevel(level)
-  } catch (error) {
-    promptError.value = error.message
-  } finally {
-    switchingThinking.value = false
-  }
+  await selectWorkspaceThinkingLevel(level)
 }
 
 function togglePicker(name) {
@@ -1962,23 +1260,6 @@ function handleSlashPickerKeydown(event) {
   return false
 }
 
-function clampThinkingLevel(level, levels) {
-  if (!levels.length) return 'off'
-  if (levels.includes(level)) return level
-
-  const order = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh']
-  const index = order.indexOf(level)
-  if (index === -1) return levels[0]
-
-  for (let i = index; i < order.length; i++) {
-    if (levels.includes(order[i])) return order[i]
-  }
-  for (let i = index - 1; i >= 0; i--) {
-    if (levels.includes(order[i])) return order[i]
-  }
-  return levels[0]
-}
-
 function handleComposerKeydown(event) {
   if (handleSlashPickerKeydown(event)) return
   if (event.key !== 'Enter' || event.shiftKey) return
@@ -2048,13 +1329,11 @@ async function submitStartDraft() {
     await wait(startupAcceptedFloorMs)
     await runStartupPhase('creating', () => createSessionForCwd(targetCwd))
     if (model && selectedSession.value) {
-      activeRuntimeSession.value = await runStartupPhase('model', () => {
-        return switchPiModel(model.provider, model.id)
-      })
+      await runStartupPhase('model', () => selectWorkspaceModel(model))
     }
     if (thinkingLevel && selectedSession.value) {
-      activeRuntimeSession.value = await runStartupPhase('thinking', () => {
-        return switchPiThinkingLevel(thinkingLevel)
+      await runStartupPhase('thinking', () => {
+        return selectWorkspaceThinkingLevel(thinkingLevel)
       })
     }
     if (hasPrompt) await runStartupPhase('submitting', submitDraft)
