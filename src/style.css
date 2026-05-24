@@ -17,7 +17,7 @@
   --accent-soft: rgb(124 92 255 / 13%);
   --accent-border: rgb(124 92 255 / 34%);
   --blue-accent: #9b8cff;
-  --motion-fast: 150ms;
+  --motion-fast: 180ms;
   --motion-base: 220ms;
   --motion-slow: 300ms;
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
@@ -96,7 +96,7 @@ button {
   border-color: var(--border);
   background: var(--panel-soft);
   color: var(--muted-strong);
-  transform: translateY(-1px);
+  transform: translateY(-0.5px);
 }
 
 .sidebar-reveal-button {
@@ -141,7 +141,7 @@ button {
 @keyframes reveal-fade {
   from {
     opacity: 0;
-    transform: translateX(-4px);
+    transform: translateX(-6px);
   }
 
   to {
@@ -285,7 +285,7 @@ kbd {
 .section-action:hover {
   background: var(--panel-soft);
   color: #cfc5ff;
-  transform: translateY(-1px);
+  transform: translateY(-0.5px);
 }
 
 .new-session-form {
@@ -640,7 +640,7 @@ kbd {
   border-color: var(--border);
   background: var(--panel-soft);
   color: var(--muted-strong);
-  transform: translateY(-1px);
+  transform: translateY(-0.5px);
 }
 
 .settings-button:disabled {
@@ -987,7 +987,7 @@ kbd {
 
 .event-drawer-enter-active,
 .event-drawer-leave-active {
-  transition: opacity 180ms ease;
+  transition: opacity var(--motion-fast) var(--ease-standard);
 }
 
 .event-drawer-enter-from,
@@ -1403,7 +1403,7 @@ h1 {
   min-height: 0;
   overflow: auto;
   padding: 20px 44px var(--composer-reserved-height, 240px);
-  transition: padding-bottom 180ms ease;
+  transition: padding-bottom var(--motion-fast) var(--ease-standard);
   scrollbar-color: #4b4658 transparent;
   scrollbar-gutter: stable;
   scrollbar-width: thin;
@@ -1860,7 +1860,7 @@ h1 {
 }
 
 .composer-bar .terminal-toggle-button:hover {
-  transform: translateY(-1px);
+  transform: translateY(-0.5px);
 }
 
 .composer-context-row {
@@ -1941,7 +1941,7 @@ h1 {
   border-color: var(--accent-border);
   background: #201a32;
   color: var(--text);
-  transform: translateY(-1px);
+  transform: translateY(-0.5px);
 }
 
 .start-send-button {
@@ -2097,7 +2097,7 @@ h1 {
   background: var(--panel-soft);
   color: var(--muted-strong);
   opacity: 1;
-  transform: translateY(-1px);
+  transform: translateY(-0.5px);
 }
 
 .compact-message {
@@ -2268,7 +2268,7 @@ h1 {
 .skill-summary:hover {
   border-color: rgb(124 92 255 / 40%);
   background: rgb(124 92 255 / 14%);
-  transform: translateY(-1px);
+  transform: translateY(-0.5px);
 }
 
 .skill-summary span {
@@ -2631,7 +2631,7 @@ h1 {
 
 .run-status-enter-active,
 .run-status-leave-active {
-  transition: opacity 170ms ease, transform 170ms ease;
+  transition: opacity var(--motion-fast) var(--ease-standard), transform var(--motion-fast) var(--ease-standard);
 }
 
 .run-status-enter-from,
@@ -2860,7 +2860,7 @@ h1 {
 .transcript-tool:hover {
   border-color: var(--border);
   background: #181a21;
-  transform: translateY(-1px);
+  transform: translateY(-0.5px);
 }
 
 .live-tool-card {
@@ -3038,7 +3038,7 @@ h1 {
 .tool-preview-cta:hover {
   border-color: #5b5f75;
   background: #20232c;
-  transform: translateY(-1px);
+  transform: translateY(-0.5px);
 }
 
 .tool-fullscreen-backdrop {
@@ -3132,7 +3132,7 @@ h1 {
 .tool-fullscreen-header button:hover {
   border-color: #5b5f75;
   background: #20232c;
-  transform: translateY(-1px);
+  transform: translateY(-0.5px);
 }
 
 .tool-fullscreen-body {
@@ -3288,9 +3288,9 @@ h1 {
   left: 0;
   height: 190px;
   transition:
-    bottom 180ms ease,
-    opacity 220ms ease,
-    transform 220ms ease;
+    bottom var(--motion-fast) var(--ease-standard),
+    opacity var(--motion-base) var(--ease-standard),
+    transform var(--motion-base) var(--ease-emphasized);
   pointer-events: none;
   background: linear-gradient(rgb(13 14 17 / 0), var(--bg) 62%);
 }
@@ -3320,7 +3320,7 @@ h1 {
   bottom: 246px;
   z-index: 2;
   display: inline-flex;
-  transition: bottom 180ms ease;
+  transition: bottom var(--motion-fast) var(--ease-standard);
   align-items: center;
   gap: 7px;
   border: 1px solid #51456f;
@@ -3375,7 +3375,7 @@ h1 {
 
 .terminal-drawer-enter-active,
 .terminal-drawer-leave-active {
-  transition: transform 180ms ease, opacity 180ms ease;
+  transition: transform var(--motion-fast) var(--ease-standard), opacity var(--motion-fast) var(--ease-standard);
 }
 
 .terminal-drawer-enter-from,
@@ -3530,7 +3530,7 @@ h1 {
 .editing-banner button:hover {
   border-color: var(--accent-border);
   color: var(--text);
-  transform: translateY(-1px);
+  transform: translateY(-0.5px);
 }
 
 .queued-message-drawer {
@@ -3668,7 +3668,7 @@ textarea::placeholder {
   color: var(--muted-strong);
   font-size: 14px;
   line-height: 1;
-  transform: translateY(-1px);
+  transform: translateY(-0.5px);
   transition:
     color var(--motion-fast) var(--ease-standard),
     transform var(--motion-fast) var(--ease-standard);
@@ -3760,7 +3760,7 @@ textarea::placeholder {
 
 .send-button:hover:not(:disabled),
 .start-send-button:hover:not(:disabled) {
-  transform: translateY(-1px);
+  transform: translateY(-0.5px);
 }
 
 .send-button:disabled {
@@ -3944,7 +3944,7 @@ textarea::placeholder {
     z-index: 30;
     width: min(86vw, 320px);
     transform: translateX(-100%);
-    transition: transform 160ms ease;
+    transition: transform var(--motion-base) var(--ease-emphasized);
     box-shadow: 18px 0 50px rgb(0 0 0 / 46%);
   }
 
