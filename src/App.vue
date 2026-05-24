@@ -62,6 +62,7 @@ const sidebarOpen = ref(false)
 const desktopSidebarHidden = ref(false)
 const sessionDetail = ref(null)
 const sessionLoading = ref(false)
+const sessionSwitching = ref(false)
 const sessionActivating = ref(false)
 const sessionError = ref('')
 const expandedTools = ref(new Set())
@@ -808,6 +809,8 @@ async function createSessionForCwd(cwd) {
 
 async function selectSession(session, options = {}) {
   const token = ++sessionSelectionToken
+  sessionSwitching.value = true
+  const switchStarted = Date.now()
   selectedSessionId.value = session.id
   sessionLoading.value = true
   sessionActivating.value = false
@@ -828,7 +831,11 @@ async function selectSession(session, options = {}) {
     stickToBottom.value = true
     hasNewOutput.value = false
     updateSessionRoute(session.id, options)
+    const elapsed = Date.now() - switchStarted
+    const minSwitchMs = 150
+    if (elapsed < minSwitchMs) await wait(minSwitchMs - elapsed)
     sessionLoading.value = false
+    sessionSwitching.value = false
     await scrollToLatest()
     sidebarOpen.value = false
 
@@ -843,6 +850,9 @@ async function selectSession(session, options = {}) {
   } finally {
     if (!isCurrentSessionSelection(token, session.id)) return
     sessionLoading.value = false
+    if (isCurrentSessionSelection(token, session.id)) {
+      sessionSwitching.value = false
+    }
     sessionActivating.value = false
   }
 }
@@ -1081,6 +1091,7 @@ function stopPromptSubmitTimer() {
 }
 
 function navigateHome() {
+  sessionSwitching.value = true
   const cwd = selectedSession.value?.cwd
     || newSessionCwd.value
     || sessions.value[0]?.cwd
@@ -1093,6 +1104,7 @@ function navigateHome() {
   }
   updateSessionRoute('')
   sidebarOpen.value = false
+  setTimeout(() => { sessionSwitching.value = false }, 150)
 }
 
 function scheduleSessionRefresh(activeSessionId, event) {
@@ -2662,6 +2674,7 @@ function closePickerMenus() {
           'init-workbench': initializing,
           'session-loading-workbench': sessionLoading,
           'session-handoff-workbench': sessionHandoff,
+          'session-switching': sessionSwitching,
           'start-workbench-shell': !initializing && startFlowVisible,
           'empty-selected-workbench': isEmptySelectedSession && !startupRun,
         }"

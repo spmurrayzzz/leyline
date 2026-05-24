@@ -2197,11 +2197,31 @@ h1 {
 .workbench > .message,
 .workbench > .tool-card,
 .workbench > .live-stack,
-.workbench > .empty-session-panel {
+.workbench > .empty-session-panel,
+.workbench > .session-loading-panel,
+.workbench > .init-panel,
+.workbench > .start-panel,
+.workbench > .run-status-card,
+.workbench > .error-note {
   transition:
-    opacity var(--motion-slow) var(--ease-standard),
-    transform var(--motion-slow) var(--ease-standard),
-    filter var(--motion-slow) var(--ease-standard);
+    opacity var(--motion-base) var(--ease-decelerate),
+    transform var(--motion-base) var(--ease-decelerate),
+    filter var(--motion-base) var(--ease-decelerate);
+}
+
+.session-switching > .message,
+.session-switching > .tool-card,
+.session-switching > .live-stack,
+.session-switching > .empty-session-panel,
+.session-switching > .start-panel {
+  transition:
+    opacity var(--motion-fast) var(--ease-accelerate),
+    transform var(--motion-fast) var(--ease-accelerate),
+    filter var(--motion-fast) var(--ease-accelerate);
+  opacity: 0;
+  transform: translateY(6px) scale(0.985);
+  filter: blur(2px);
+  pointer-events: none;
 }
 
 .session-handoff-workbench > .message,
@@ -3917,10 +3937,20 @@ textarea::placeholder {
   .project-sessions-leave-active,
   .copy-button,
   .transcript-message,
+  .session-switching > .message,
+  .session-switching > .tool-card,
+  .session-switching > .live-stack,
+  .session-switching > .empty-session-panel,
+  .session-switching > .start-panel,
   .workbench > .message,
   .workbench > .tool-card,
   .workbench > .live-stack,
   .workbench > .empty-session-panel,
+  .workbench > .session-loading-panel,
+  .workbench > .init-panel,
+  .workbench > .start-panel,
+  .workbench > .run-status-card,
+  .workbench > .error-note,
   .live-row-enter-active,
   .live-row-leave-active,
   .skill-summary,
@@ -3982,6 +4012,15 @@ textarea::placeholder {
   .send-button:hover:not(:disabled),
   .start-send-button:hover:not(:disabled) {
     transform: none;
+  }
+
+  .session-switching > .message,
+  .session-switching > .tool-card,
+  .session-switching > .live-stack,
+  .session-switching > .empty-session-panel,
+  .session-switching > .start-panel {
+    transform: none;
+    filter: none;
   }
 
   .tool-fullscreen-enter-from .tool-fullscreen,
