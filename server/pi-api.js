@@ -1505,7 +1505,7 @@ function renderExportEntry(entry, index) {
 function renderExportTool(entry, index) {
   return `<details class="tool-card transcript-tool${entry.isError ? ' error-card' : ''}">
 <summary class="tool-card-header">
-<span class="tool-chevron">›</span>
+<span class="chevron tool-chevron">›</span>
 <span>${escapeHtml(entry.label)}</span>
 ${entry.code ? `<code>${escapeHtml(entry.code)}</code>` : ''}
 ${entry.contextLabel ? renderToolContext(entry) : ''}
@@ -1606,9 +1606,16 @@ function renderMessageBody(entry) {
 
 function renderMessageBlock(block) {
   if (block.type === 'thinking') {
-    return `<div class="thinking-block">
-<div class="thinking-label">Thinking</div>
+    return `<div class="thinking-block is-expanded">
+<button class="thinking-trigger" type="button">
+<span class="chevron">›</span>
+<span class="thinking-label">Thinking</span>
+</button>
+<div class="thinking-expand-wrapper is-expanded">
+<div class="thinking-expand-inner">
 <pre>${escapeHtml(block.text || '')}</pre>
+</div>
+</div>
 </div>`
   }
 
@@ -1715,6 +1722,7 @@ document.querySelectorAll('details').forEach((item) => {
   item.addEventListener('toggle', () => {
     const icon = item.querySelector('.tool-chevron')
     if (icon) icon.textContent = item.open ? '⌄' : '›'
+    item.classList.toggle('is-expanded', item.open)
     if (item.open) renderTool(item.querySelector('[data-tool-index]'))
   })
 })
@@ -1832,6 +1840,14 @@ function exportCss() {
   --syntax-variable: #fca5a5;
   --syntax-operator: #d8dbe3;
   --syntax-punctuation: #9ca3af;
+  --motion-quick: 100ms;
+  --motion-fast: 180ms;
+  --motion-base: 220ms;
+  --motion-slow: 300ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
+  --ease-accelerate: cubic-bezier(0.4, 0, 1, 1);
   --content-max: 1080px;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system,
     BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -1906,27 +1922,72 @@ button, input, textarea { color: inherit; font: inherit; }
 }
 .message-meta-row { display: flex; align-items: center; gap: 7px; }
 .compact-message { margin-top: 14px; }
-.transcript-message { border-radius: 10px; padding: 2px 0; }
+.transcript-message {
+  border-radius: 10px;
+  padding: 2px 0;
+  transition:
+    background-color var(--motion-base) var(--ease-standard),
+    border-color var(--motion-base) var(--ease-standard),
+    opacity var(--motion-base) var(--ease-standard),
+    transform var(--motion-base) var(--ease-standard);
+}
 .assistant-message { padding-left: 16px; color: #d8dbe3; }
 .assistant-message .message-meta { color: var(--muted); }
 .thinking-block {
-  max-height: 180px;
-  overflow: auto;
-  margin: 0 0 12px;
+  margin: 0 0 8px;
   border: 1px solid #2b2d36;
   border-radius: 9px;
   background: #15161b;
-  padding: 9px 11px;
+  transition:
+    border-color var(--motion-base) var(--ease-standard),
+    background-color var(--motion-base) var(--ease-standard);
 }
-.thinking-label {
-  margin-bottom: 5px;
+.thinking-block.is-expanded {
+  border-color: #353740;
+  background: #181a20;
+}
+.thinking-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 7px 11px;
   color: var(--muted);
-  font-size: 11px;
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 700;
   letter-spacing: 0.02em;
+  text-align: left;
+  cursor: pointer;
+  border: none;
+  background: transparent;
 }
-.thinking-block pre {
+.thinking-trigger:hover { color: #c9c9c9; }
+.thinking-trigger .thinking-label {
+  color: var(--muted);
+}
+.thinking-trigger .chevron {
+  display: inline-block;
+  font-size: 14px;
+  line-height: 1;
+  transition:
+    transform var(--motion-base) var(--ease-emphasized),
+    color var(--motion-base) var(--ease-standard);
+}
+.thinking-block.is-expanded .thinking-trigger .chevron {
+  transform: rotate(90deg);
+}
+.thinking-expand-wrapper {
+  display: grid;
+  grid-template-rows: 1fr;
+}
+.thinking-expand-inner {
+  overflow: auto;
+  max-height: 180px;
+  min-height: 0;
+}
+.thinking-expand-inner pre {
   margin: 0;
+  padding: 0 11px 9px;
   color: #a3a3a3;
   white-space: pre-wrap;
   font-family: inherit;
@@ -1934,7 +1995,7 @@ button, input, textarea { color: inherit; font: inherit; }
   line-height: 1.45;
 }
 .assistant-text-block + .thinking-block,
-.thinking-block + .assistant-text-block { margin-top: 12px; }
+.thinking-block + .assistant-text-block { margin-top: 8px; }
 .user-message {
   margin-top: 22px;
   border: 1px solid var(--accent-border);
@@ -2022,6 +2083,12 @@ button, input, textarea { color: inherit; font: inherit; }
   padding: 8px 10px;
   color: #bdbdbd;
   font-size: 13px;
+  cursor: pointer;
+  transition:
+    border-color var(--motion-base) var(--ease-standard),
+    background-color var(--motion-base) var(--ease-standard),
+    opacity var(--motion-base) var(--ease-standard),
+    transform var(--motion-base) var(--ease-standard);
 }
 .tool-card summary { list-style: none; cursor: pointer; }
 .tool-card summary::-webkit-details-marker { display: none; }
@@ -2032,6 +2099,35 @@ button, input, textarea { color: inherit; font: inherit; }
   color: #777;
   font-size: 12px;
   font-weight: 700;
+}
+.tool-card-header > span:first-child {
+  transition: color var(--motion-base) var(--ease-standard);
+}
+.tool-card-header .chevron,
+.tool-card-header .tool-chevron {
+  display: inline-block;
+  transition:
+    transform var(--motion-base) var(--ease-emphasized),
+    color var(--motion-base) var(--ease-standard);
+}
+.tool-card[open] .chevron,
+.tool-card[open] .tool-chevron {
+  transform: rotate(90deg);
+}
+.transcript-tool.is-expanded {
+  border-color: #33353f;
+  background: #171820;
+}
+.transcript-tool.is-expanded:hover {
+  border-color: #3b3d49;
+  background: #1a1c25;
+}
+.transcript-tool:hover {
+  border-color: var(--border);
+  background: #181a21;
+  transform: translateY(-0.5px);
+  transition-duration: var(--motion-quick);
+  transition-timing-function: var(--ease-accelerate);
 }
 .tool-card-header em {
   margin-left: auto;
@@ -2060,12 +2156,17 @@ button, input, textarea { color: inherit; font: inherit; }
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
+  transition:
+    border-color var(--motion-base) var(--ease-decelerate),
+    color var(--motion-base) var(--ease-decelerate),
+    opacity var(--motion-base) var(--ease-decelerate);
 }
 .tool-context-pill.is-excluded { border-color: var(--border); color: var(--muted); }
 .tool-expanded-body {
   margin-top: 9px;
   border-top: 1px solid var(--border-soft);
   padding-top: 9px;
+  transition: border-top-color var(--motion-base) var(--ease-decelerate);
 }
 .tool-output {
   overflow: auto;
@@ -2147,6 +2248,17 @@ button, input, textarea { color: inherit; font: inherit; }
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 13px;
   cursor: pointer;
+  transition:
+    border-color var(--motion-base) var(--ease-decelerate),
+    background-color var(--motion-base) var(--ease-decelerate),
+    transform var(--motion-base) var(--ease-decelerate);
+}
+.skill-summary:hover {
+  border-color: rgb(124 92 255 / 40%);
+  background: rgb(124 92 255 / 14%);
+  transform: translateY(-0.5px);
+  transition-duration: var(--motion-quick);
+  transition-timing-function: var(--ease-accelerate);
 }
 .skill-summary span { color: #9d7dff; font-weight: 800; }
 .skill-summary strong { color: #e4e2ec; font-weight: 700; }
@@ -2159,6 +2271,9 @@ button, input, textarea { color: inherit; font: inherit; }
   border-radius: 10px;
   background: #111217;
   padding: 10px 12px;
+  transition:
+    border-color var(--motion-base) var(--ease-decelerate),
+    opacity var(--motion-base) var(--ease-decelerate);
 }
 .empty-workbench {
   width: min(var(--content-max), 100%);
@@ -2175,6 +2290,29 @@ button, input, textarea { color: inherit; font: inherit; }
   .assistant-message { padding-left: 4px; }
   .user-message { padding: 9px 10px; }
   .tool-card-header { gap: 7px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .transcript-message,
+  .tool-card,
+  .skill-summary,
+  .thinking-block,
+  .thinking-trigger .chevron,
+  .tool-chevron,
+  .tool-expanded-body,
+  .tool-context-pill,
+  .skill-expanded {
+    transition-duration: 1ms;
+  }
+  .tool-card:hover {
+    transform: none;
+  }
+  .skill-summary:hover {
+    transform: none;
+  }
+  .tool-card[open] .chevron,
+  .tool-card[open] .tool-chevron {
+    transform: rotate(90deg);
+  }
 }`
 }
 
