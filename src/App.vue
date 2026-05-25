@@ -553,6 +553,7 @@ onMounted(async () => {
   window.addEventListener('popstate', handleRouteChange)
   window.addEventListener('leyline:new-session', handleNativeNewSession)
   window.addEventListener('leyline:toggle-terminal', handleNativeToggleTerminal)
+  window.addEventListener('leyline:open-settings', handleNativeOpenSettings)
   window.addEventListener('leyline:toggle-sidebar', handleNativeToggleSidebar)
   openEventStream()
   initPhase.value = 'sessions'
@@ -566,6 +567,7 @@ onUnmounted(() => {
   window.removeEventListener('popstate', handleRouteChange)
   window.removeEventListener('leyline:new-session', handleNativeNewSession)
   window.removeEventListener('leyline:toggle-terminal', handleNativeToggleTerminal)
+  window.removeEventListener('leyline:open-settings', handleNativeOpenSettings)
   window.removeEventListener('leyline:toggle-sidebar', handleNativeToggleSidebar)
   stopTerminalResize()
   closeEventStream()
@@ -652,6 +654,10 @@ async function handleNativeToggleTerminal() {
   if (!selectedSession.value || initializing.value) return
 
   await toggleTerminal()
+}
+
+function handleNativeOpenSettings() {
+  toggleSettingsDrawer()
 }
 
 function handleNativeToggleSidebar() {

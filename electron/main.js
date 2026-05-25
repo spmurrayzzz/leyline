@@ -40,15 +40,26 @@ async function createWindow() {
       && key === 't'
       && input.meta
       && input.shift
+    const isOpenSettings = input.type === 'keyDown'
+      && key === 'e'
+      && input.meta
+      && input.shift
     const isToggleSidebar = input.type === 'keyDown'
       && key === 'e'
       && input.meta
+      && !input.shift
 
-    if (!isNewSession && !isToggleTerminal && !isToggleSidebar) return
+    if (
+      !isNewSession
+      && !isToggleTerminal
+      && !isOpenSettings
+      && !isToggleSidebar
+    ) return
 
     event.preventDefault()
     if (isNewSession) sendNewSessionCommand(mainWindow)
     if (isToggleTerminal) sendToggleTerminalCommand(mainWindow)
+    if (isOpenSettings) sendOpenSettingsCommand(mainWindow)
     if (isToggleSidebar) sendToggleSidebarCommand(mainWindow)
   })
 
@@ -61,6 +72,10 @@ function sendNewSessionCommand(window) {
 
 function sendToggleTerminalCommand(window) {
   sendWindowCommand(window, 'leyline:toggle-terminal')
+}
+
+function sendOpenSettingsCommand(window) {
+  sendWindowCommand(window, 'leyline:open-settings')
 }
 
 function sendToggleSidebarCommand(window) {
