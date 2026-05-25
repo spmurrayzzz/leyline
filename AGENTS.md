@@ -8,6 +8,10 @@
 - Use Vue 3, Vite, Node.js, and JavaScript. Do not introduce TypeScript.
 - Prefer simple CSS and small focused changes. No component library unless the
   user asks.
+- Keep in-app transcript styles in `src/style.css` and export transcript styles
+  in `server/pi-api.js` visually in sync. When changing message/tool/thinking
+  transcript CSS in one place, compare and update the other unless the user
+  explicitly wants them to differ.
 - The UI should rely on pi SDK/state instead of reinventing pi state management.
 - Current backend integration uses Vite middleware in `server/pi-api.js`.
 - Current pi SDK usage:
