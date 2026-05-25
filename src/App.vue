@@ -754,6 +754,16 @@ function closeProjectBrowser() {
   projectBrowserOpen.value = false
 }
 
+function toggleSettingsDrawer() {
+  settingsOpen.value = !settingsOpen.value
+  eventLogOpen.value = false
+}
+
+function toggleEventDrawer() {
+  eventLogOpen.value = !eventLogOpen.value
+  settingsOpen.value = false
+}
+
 function isToolExpanded(entry) {
   return expandedTools.value.has(entry.id)
 }
@@ -1549,7 +1559,7 @@ function closePickerMenus() {
       @hide="desktopSidebarHidden = true"
       @navigate-home="navigateHome"
       @open-project-browser="openProjectBrowser"
-      @open-settings="settingsOpen = true"
+      @open-settings="toggleSettingsDrawer"
       @reload-session="reloadSession"
       @request-delete-session="requestDeleteSession"
       @retry-sessions="loadSessions"
@@ -1582,7 +1592,7 @@ function closePickerMenus() {
             <button
               class="event-log-button"
               type="button"
-              @click="eventLogOpen = !eventLogOpen"
+              @click="toggleEventDrawer"
             >
               Events {{ runtimeEvents.length }}
             </button>
@@ -1981,104 +1991,101 @@ function closePickerMenus() {
       </section>
     </div>
 
-    <button
-      v-if="settingsOpen"
-      class="side-drawer-backdrop"
-      type="button"
-      aria-label="Close settings"
-      @click="settingsOpen = false"
-    ></button>
-    <aside v-if="settingsOpen" class="side-drawer" aria-label="Settings">
-      <header class="side-drawer-header">
-        <div>
-          <strong>Settings</strong>
-          <span>Runtime and session state</span>
-        </div>
-        <button type="button" @click="settingsOpen = false">×</button>
-      </header>
+    <Transition name="event-drawer">
+      <div v-if="settingsOpen" class="settings-drawer-slot">
+        <aside class="settings-drawer" aria-label="Settings">
+          <header class="settings-drawer-header">
+            <div>
+              <strong>Settings</strong>
+              <span>Runtime and session state</span>
+            </div>
+            <button type="button" @click="settingsOpen = false">×</button>
+          </header>
 
-      <section class="settings-group">
-        <h2>Runtime</h2>
-        <dl>
-          <div>
-            <dt>Model</dt>
-            <dd>{{ currentModelLabel }}</dd>
-          </div>
-          <div>
-            <dt>Thinking</dt>
-            <dd>{{ currentThinkingLabel }}</dd>
-          </div>
-          <div>
-            <dt>Tools</dt>
-            <dd>{{ toolsChipLabel }}</dd>
-          </div>
-          <div>
-            <dt>Context</dt>
-            <dd>{{ contextUsageLabel || 'Unknown' }}</dd>
-          </div>
-          <div>
-            <dt>Events</dt>
-            <dd>{{ eventStreamLabel }}</dd>
-          </div>
-        </dl>
-      </section>
+          <section class="settings-group">
+            <h2>Runtime</h2>
+            <dl>
+              <div>
+                <dt>Model</dt>
+                <dd>{{ currentModelLabel }}</dd>
+              </div>
+              <div>
+                <dt>Thinking</dt>
+                <dd>{{ currentThinkingLabel }}</dd>
+              </div>
+              <div>
+                <dt>Tools</dt>
+                <dd>{{ toolsChipLabel }}</dd>
+              </div>
+              <div>
+                <dt>Context</dt>
+                <dd>{{ contextUsageLabel || 'Unknown' }}</dd>
+              </div>
+              <div>
+                <dt>Events</dt>
+                <dd>{{ eventStreamLabel }}</dd>
+              </div>
+            </dl>
+          </section>
 
-      <section class="settings-group">
-        <h2>Session</h2>
-        <dl>
-          <div>
-            <dt>Project</dt>
-            <dd>{{ projectName(selectedSession?.cwd) }}</dd>
-          </div>
-          <div>
-            <dt>Session ID</dt>
-            <dd class="settings-copy-row">
-              <span>{{ settingsSessionId || '—' }}</span>
-              <button
-                v-if="settingsSessionId"
-                type="button"
-                class="copy-button"
-                :title="copyTitle('settings-session-id')"
-                aria-label="Copy session ID"
-                @click="copyTranscriptItem('settings-session-id', settingsSessionId)"
-              >{{ copyGlyph('settings-session-id') }}</button>
-            </dd>
-          </div>
-          <div>
-            <dt>CWD</dt>
-            <dd class="settings-copy-row">
-              <span>{{ settingsCwd || 'No session selected' }}</span>
-              <button
-                v-if="settingsCwd"
-                type="button"
-                class="copy-button"
-                :title="copyTitle('settings-cwd')"
-                aria-label="Copy CWD"
-                @click="copyTranscriptItem('settings-cwd', settingsCwd)"
-              >{{ copyGlyph('settings-cwd') }}</button>
-            </dd>
-          </div>
-          <div>
-            <dt>Path</dt>
-            <dd class="settings-copy-row">
-              <span>{{ settingsPath || '—' }}</span>
-              <button
-                v-if="settingsPath"
-                type="button"
-                class="copy-button"
-                :title="copyTitle('settings-path')"
-                aria-label="Copy path"
-                @click="copyTranscriptItem('settings-path', settingsPath)"
-              >{{ copyGlyph('settings-path') }}</button>
-            </dd>
-          </div>
-          <div>
-            <dt>Messages</dt>
-            <dd>{{ selectedSession?.messageCount ?? '—' }}</dd>
-          </div>
-        </dl>
-      </section>
-    </aside>
+          <section class="settings-group">
+            <h2>Session</h2>
+            <dl>
+              <div>
+                <dt>Project</dt>
+                <dd>{{ projectName(selectedSession?.cwd) }}</dd>
+              </div>
+              <div>
+                <dt>Session ID</dt>
+                <dd class="settings-copy-row">
+                  <span>{{ settingsSessionId || '—' }}</span>
+                  <button
+                    v-if="settingsSessionId"
+                    type="button"
+                    class="copy-button"
+                    :title="copyTitle('settings-session-id')"
+                    aria-label="Copy session ID"
+                    @click="copyTranscriptItem('settings-session-id', settingsSessionId)"
+                  >{{ copyGlyph('settings-session-id') }}</button>
+                </dd>
+              </div>
+              <div>
+                <dt>CWD</dt>
+                <dd class="settings-copy-row">
+                  <span>{{ settingsCwd || 'No session selected' }}</span>
+                  <button
+                    v-if="settingsCwd"
+                    type="button"
+                    class="copy-button"
+                    :title="copyTitle('settings-cwd')"
+                    aria-label="Copy CWD"
+                    @click="copyTranscriptItem('settings-cwd', settingsCwd)"
+                  >{{ copyGlyph('settings-cwd') }}</button>
+                </dd>
+              </div>
+              <div>
+                <dt>Path</dt>
+                <dd class="settings-copy-row">
+                  <span>{{ settingsPath || '—' }}</span>
+                  <button
+                    v-if="settingsPath"
+                    type="button"
+                    class="copy-button"
+                    :title="copyTitle('settings-path')"
+                    aria-label="Copy path"
+                    @click="copyTranscriptItem('settings-path', settingsPath)"
+                  >{{ copyGlyph('settings-path') }}</button>
+                </dd>
+              </div>
+              <div>
+                <dt>Messages</dt>
+                <dd>{{ selectedSession?.messageCount ?? '—' }}</dd>
+              </div>
+            </dl>
+          </section>
+        </aside>
+      </div>
+    </Transition>
 
     <Transition name="event-drawer">
       <div v-if="eventLogOpen" class="event-log-slot">

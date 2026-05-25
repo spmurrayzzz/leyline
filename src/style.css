@@ -994,53 +994,7 @@ kbd {
   opacity: 0.6;
 }
 
-.side-drawer {
-  position: fixed;
-  top: 0;
-  right: 0;
-  z-index: 31;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  width: min(420px, 100vw);
-  height: 100vh;
-  border-left: 1px solid var(--border);
-  background: #131419;
-  padding: 18px;
-  box-shadow: -20px 0 60px rgb(0 0 0 / 45%);
-  overflow-y: auto;
-}
-
-.side-drawer-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  border-bottom: 1px solid var(--border-soft);
-  padding-bottom: 16px;
-}
-
-.side-drawer-header strong {
-  display: block;
-  color: var(--text);
-  font-size: 15px;
-}
-
-.side-drawer-header span {
-  display: block;
-  margin-top: 4px;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.side-drawer-header button {
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  font-size: 22px;
-  line-height: 1;
-}
-
+.settings-drawer-slot,
 .event-log-slot {
   position: fixed;
   inset: 0 0 0 auto;
@@ -1052,6 +1006,7 @@ kbd {
   transform: translateX(0);
 }
 
+.settings-drawer,
 .event-log-drawer {
   display: flex;
   overflow-y: auto;
@@ -1068,6 +1023,10 @@ kbd {
   scrollbar-width: thin;
 }
 
+.settings-drawer {
+  gap: 14px;
+}
+
 .event-drawer-enter-active,
 .event-drawer-leave-active {
   transition: transform var(--motion-base) var(--ease-standard);
@@ -1078,6 +1037,7 @@ kbd {
   transform: translateX(100%);
 }
 
+.settings-drawer-header,
 .event-log-drawer-header {
   display: flex;
   align-items: center;
@@ -1087,12 +1047,14 @@ kbd {
   padding-bottom: 8px;
 }
 
+.settings-drawer-header strong,
 .event-log-drawer-header strong {
   display: block;
   color: var(--text);
   font-size: 12px;
 }
 
+.settings-drawer-header span,
 .event-log-drawer-header span {
   display: block;
   margin-top: 1px;
@@ -1100,6 +1062,7 @@ kbd {
   font-size: 10px;
 }
 
+.settings-drawer-header button,
 .event-log-drawer-header button {
   display: grid;
   place-items: center;
@@ -1113,6 +1076,7 @@ kbd {
   line-height: 1;
 }
 
+.settings-drawer-header button:hover,
 .event-log-drawer-header button:hover {
   border-color: var(--border-soft);
   background: var(--panel-soft);
@@ -4452,14 +4416,12 @@ textarea::placeholder {
     padding: 4px 8px;
   }
 
-  .side-drawer {
-    width: 100vw;
-  }
-
+  .settings-drawer-slot,
   .event-log-slot {
     width: min(360px, 100vw);
   }
 
+  .settings-drawer,
   .event-log-drawer {
     width: min(360px, 100vw);
     min-width: 0;
