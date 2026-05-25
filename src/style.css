@@ -2651,73 +2651,38 @@ h1 {
   margin: 6px 0 0;
 }
 
-.live-status-dock {
-  position: absolute;
-  right: max(44px, calc((100% - var(--content-max)) / 2));
-  bottom: calc(var(--composer-reserved-height, 240px) - 44px);
-  left: max(44px, calc((100% - var(--content-max)) / 2));
-  z-index: 4;
-  display: flex;
+.live-message-status {
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  width: fit-content;
-  max-width: min(var(--content-max), calc(100% - 88px));
-  border: 1px solid rgb(124 92 255 / 24%);
-  border-radius: 999px;
-  background: rgb(21 18 29 / 88%);
-  padding: 6px 10px;
-  color: #bfb5ff;
-  font-size: 12px;
-  box-shadow: 0 10px 32px rgb(0 0 0 / 28%);
-  pointer-events: none;
-  transform: translateY(0);
-  backdrop-filter: blur(10px);
-}
-
-.terminal-open .live-status-dock {
-  bottom: calc(
-    var(--terminal-drawer-height)
-    + var(--composer-reserved-height, 240px)
-    - 44px
-  );
-}
-
-.live-status-dock span {
-  flex: none;
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: var(--accent);
-  box-shadow: 0 0 0 5px var(--accent-soft);
-}
-
-.live-status-dock strong {
-  overflow: hidden;
-  color: #bfb5ff;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  gap: 7px;
+  margin-left: auto;
+  color: #aaa2db;
   font-size: 11px;
   font-weight: 800;
-  line-height: 1.2;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  letter-spacing: 0.02em;
+  line-height: 1;
 }
 
-.live-status-dock-enter-active {
-  transition:
-    opacity var(--motion-base) var(--ease-decelerate),
-    transform var(--motion-base) var(--ease-decelerate);
+.live-message-status i {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #9182ff;
+  box-shadow: 0 0 0 4px rgb(124 92 255 / 10%);
+  animation: live-status-pulse 1400ms ease-in-out infinite;
 }
 
-.live-status-dock-leave-active {
-  transition:
-    opacity var(--motion-fast) var(--ease-accelerate),
-    transform var(--motion-fast) var(--ease-accelerate);
-}
+@keyframes live-status-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.86);
+  }
 
-.live-status-dock-enter-from,
-.live-status-dock-leave-to {
-  opacity: 0;
-  transform: translateY(4px);
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .run-status-card {
@@ -4213,8 +4178,6 @@ textarea::placeholder {
   .workbench > .error-note,
   .live-row-enter-active,
   .live-row-leave-active,
-  .live-status-dock-enter-active,
-  .live-status-dock-leave-active,
   .skill-summary,
   .tool-card,
   .tool-card-header > span:first-child,
@@ -4321,13 +4284,12 @@ textarea::placeholder {
   }
 
   .live-row-enter-from,
-  .live-row-leave-to,
-  .live-status-dock-enter-from,
-  .live-status-dock-leave-to {
+  .live-row-leave-to {
     opacity: 1;
     transform: none;
   }
 
+  .live-message-status i,
   .live-tool-spinner,
   .session-loading-mark {
     animation: none;
@@ -4520,21 +4482,6 @@ textarea::placeholder {
     width: auto;
     transform: none;
     border-radius: 18px;
-  }
-
-  .live-status-dock {
-    right: 12px;
-    bottom: calc(var(--composer-reserved-height, 218px) - 36px);
-    left: 12px;
-    max-width: calc(100% - 24px);
-  }
-
-  .terminal-open .live-status-dock {
-    bottom: calc(
-      var(--terminal-drawer-height)
-      + var(--composer-reserved-height, 218px)
-      - 36px
-    );
   }
 
   textarea {

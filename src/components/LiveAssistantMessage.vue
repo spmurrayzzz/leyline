@@ -48,6 +48,10 @@ function copyGlyph(id) {
   >
     <div class="message-meta message-meta-row">
       <span>Agent</span>
+      <span v-if="streaming" class="live-message-status">
+        <i aria-hidden="true"></i>
+        Working
+      </span>
       <button
         class="copy-button"
         type="button"

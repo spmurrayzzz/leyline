@@ -127,15 +127,6 @@ const {
 const liveFlowItems = computed(() => {
   return liveItems.value.filter((item) => item.type !== 'activity')
 })
-const liveStatusText = computed(() => {
-  const active = agentRunning.value
-    || compactingContext.value
-    || promptSubmitting.value
-    || shellCommandSubmitting.value
-    || interrupting.value
-    || Boolean(goalCommandSubmitting.value)
-  return active ? 'Working…' : ''
-})
 const sessionWorkspace = useSessionWorkspace({
   liveTurn,
   terminal: {
@@ -260,9 +251,6 @@ const composerChips = computed(() => {
   return [
     compactingContext.value ? 'Compacting context' : '',
     sessionActivating.value ? 'Activating runtime' : '',
-    agentRunning.value && !compactingContext.value
-      ? 'Enter queues steering'
-      : '',
   ].filter(Boolean)
 })
 const activeToolNames = computed(() => {
@@ -1760,18 +1748,6 @@ function closePickerMenus() {
           </div>
         </TransitionGroup>
       </div>
-
-      <Transition name="live-status-dock">
-        <div
-          v-if="!startupRun && liveStatusText"
-          class="live-status-dock"
-          role="status"
-          aria-live="polite"
-        >
-          <span aria-hidden="true"></span>
-          <strong>{{ liveStatusText }}</strong>
-        </div>
-      </Transition>
 
       <button
         v-if="hasNewOutput"
