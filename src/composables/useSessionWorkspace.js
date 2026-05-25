@@ -902,13 +902,25 @@ export function useSessionWorkspace({
       }
     }
 
-    return Array.from(projects.values())
+    const projectList = Array.from(projects.values())
+    for (const project of projectList) {
+      project.sessions.sort((a, b) => {
+        return sessionTimestamp(b) - sessionTimestamp(a)
+      })
+    }
+
+    return projectList
       .sort((a, b) => b.score - a.score)
       .slice(0, 8)
   }
 
   function sessionScore(session, query) {
     return fuzzyScore(sessionTitle(session), query)
+  }
+
+  function sessionTimestamp(session) {
+    const time = new Date(session?.timestamp || 0).getTime()
+    return Number.isNaN(time) ? 0 : time
   }
 
   async function reconnectTerminalIfOpen() {
