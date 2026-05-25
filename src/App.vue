@@ -1608,34 +1608,6 @@ function closePickerMenus() {
       </div>
 
 
-
-      <Transition name="run-status">
-        <section
-          v-if="sessionHandoffStatus"
-          class="run-status-card session-handoff-card"
-          aria-live="polite"
-        >
-          <div class="run-status-orb" aria-hidden="true"></div>
-          <div class="run-status-main">
-            <strong>{{ sessionHandoffStatus.title }}</strong>
-            <span>{{ sessionHandoffStatus.detail }}</span>
-            <div class="run-status-progress" aria-hidden="true">
-              <i></i>
-            </div>
-            <div class="run-status-steps">
-              <span
-                v-for="step in sessionHandoffStatus.steps"
-                :key="step.id"
-                :class="{
-                  done: step.done,
-                  active: step.active,
-                }"
-              >{{ step.label }}</span>
-            </div>
-          </div>
-        </section>
-      </Transition>
-
       <div
         ref="workbench"
         class="workbench"
@@ -1680,6 +1652,7 @@ function closePickerMenus() {
           <h2>What should we work on?</h2>
           <StartComposer
             v-model:draft="draft"
+            :class="{ 'activity-scanning-composer': startupRun }"
             v-model:start-project-query="startProjectQuery"
             :attached-images="attachedImages"
             :available-models="availableModels"
@@ -1720,32 +1693,6 @@ function closePickerMenus() {
             @toggle-picker="togglePicker"
             @toggle-project-picker="startProjectPickerOpen = !startProjectPickerOpen"
           />
-          <Transition name="run-status">
-            <section
-              v-if="startupStatus"
-              class="run-status-card start-run-status"
-              aria-live="polite"
-            >
-              <div class="run-status-orb" aria-hidden="true"></div>
-              <div class="run-status-main">
-                <strong>{{ startupStatus.title }}</strong>
-                <span>{{ startupStatus.detail }}</span>
-                <div class="run-status-progress" aria-hidden="true">
-                  <i></i>
-                </div>
-                <div class="run-status-steps">
-                  <span
-                    v-for="step in startupStatus.steps"
-                    :key="step.id"
-                    :class="{
-                      done: step.done,
-                      active: step.active,
-                    }"
-                  >{{ step.label }}</span>
-                </div>
-              </div>
-            </section>
-          </Transition>
         </div>
         <div
           v-if="isEmptySelectedSession && !startupRun"
@@ -1926,6 +1873,7 @@ function closePickerMenus() {
         :class="{
           'empty-session-composer': isEmptySelectedSession,
           'session-handoff-composer': sessionHandoff,
+          'activity-scanning-composer': promptSubmitting || sessionHandoff,
         }"
         :model-key="modelKey"
         :model-picker-open="modelPickerOpen"

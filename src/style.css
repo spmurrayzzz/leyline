@@ -2748,23 +2748,80 @@ h1 {
     0 18px 46px rgb(0 0 0 / 18%);
 }
 
-.start-run-status {
-  width: min(760px, 100%);
-  margin-top: 16px;
-}
-
 .workbench-run-status {
   margin-bottom: 6px;
 }
 
-.session-handoff-card {
+.activity-scanning-composer {
+  overflow: hidden;
+}
+
+.activity-scanning-composer::after {
   position: absolute;
-  top: 76px;
-  right: max(44px, calc((100% - var(--content-max)) / 2));
-  left: max(44px, calc((100% - var(--content-max)) / 2));
-  z-index: 6;
-  width: auto;
-  margin: 0;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  overflow: hidden;
+  background: rgb(124 92 255 / 10%);
+  content: '';
+  pointer-events: none;
+}
+
+.activity-scanning-composer::before {
+  position: absolute;
+  bottom: -1px;
+  left: -14%;
+  z-index: 1;
+  width: 28%;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    rgb(124 92 255 / 0%),
+    rgb(191 181 255 / 72%),
+    rgb(124 92 255 / 0%)
+  );
+  content: '';
+  pointer-events: none;
+  animation: composer-scanner-rail 1450ms ease-in-out infinite;
+}
+
+.activity-scanner,
+.run-status-progress {
+  position: relative;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgb(124 92 255 / 10%);
+}
+
+.activity-scanner i,
+.run-status-progress i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -38%;
+  width: 38%;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    rgb(124 92 255 / 0%),
+    rgb(191 181 255 / 72%),
+    rgb(124 92 255 / 0%)
+  );
+  animation: run-status-rail 1450ms ease-in-out infinite;
+}
+
+@keyframes composer-scanner-rail {
+  0%,
+  100% {
+    left: -14%;
+  }
+
+  50% {
+    left: 86%;
+  }
 }
 
 .run-status-orb {
@@ -2813,28 +2870,7 @@ h1 {
 }
 
 .run-status-progress {
-  position: relative;
-  height: 2px;
-  overflow: hidden;
   margin-top: 10px;
-  border-radius: 999px;
-  background: rgb(124 92 255 / 10%);
-}
-
-.run-status-progress i {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: -38%;
-  width: 38%;
-  border-radius: inherit;
-  background: linear-gradient(
-    90deg,
-    rgb(124 92 255 / 0%),
-    rgb(191 181 255 / 72%),
-    rgb(124 92 255 / 0%)
-  );
-  animation: run-status-rail 1450ms ease-in-out infinite;
 }
 
 .run-status-steps {
