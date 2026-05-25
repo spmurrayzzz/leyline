@@ -40,10 +40,11 @@ const BUNDLED_GOAL_EXTENSION = resolve(
   'index.ts',
 )
 
+let activeHandle
 let activeRuntime
 let activeSessionId
-let unsubscribeActiveSession
-let extensionUiState = emptyExtensionUiState()
+const runtimeHandles = new Map()
+const runtimeHandlePromises = new Map()
 
 const sseClients = new Set()
 const GOAL_STATE_TYPE = 'goal-state'
@@ -335,9 +336,8 @@ export async function piApiHandler(req, res) {
         return json(res, { error: 'Method not allowed' }, 405)
       }
 
-      if (isActiveSession(match[1])) {
-        return json(res, toActiveSessionDetailDto())
-      }
+      const handle = runtimeHandles.get(match[1])
+      if (handle) return json(res, toActiveSessionDetailDto(handle))
 
       const path = url.searchParams.get('path')
       if (path) return json(res, toSessionDetailFromPath(match[1], path))
@@ -392,21 +392,22 @@ async function listSessions() {
     ? await listSessionsFromConfiguredDir(sessionDir)
     : await SessionManager.listAll()
 
-  if (!activeRuntime) return sessions
-  if (sessions.some((session) => session.id === activeSessionId)) {
-    return sessions
-  }
-  return [activeSessionInfo(), ...sessions]
+  const missing = [...runtimeHandles.values()]
+    .map((handle) => sessionInfo(handle))
+    .filter((session) => !sessions.some((item) => item.id === session.id))
+  return [...missing, ...sessions]
 }
 
 async function findSession(id) {
-  if (isActiveSession(id)) return activeSessionInfo()
+  const handle = runtimeHandles.get(id)
+  if (handle) return sessionInfo(handle)
   const sessions = await listSessions()
   return sessions.find((session) => session.id === id)
 }
 
 async function resolveSession(id, path, cwd) {
-  if (isActiveSession(id)) return activeSessionInfo()
+  const handle = runtimeHandles.get(id)
+  if (handle) return sessionInfo(handle)
   if (path) return { id, path, cwd: cwd || '' }
   return findSession(id)
 }
@@ -552,30 +553,58 @@ function sessionModifiedDate(entries, header, statsMtime) {
 }
 
 function isActiveSession(id) {
-  return activeRuntime && id === activeSessionId
+  return activeHandle && id === activeSessionId
 }
 
 async function switchActiveSession(session) {
-  if (isActiveSession(session.id)) return activeSessionDto()
+  const handle = await ensureRuntimeForSession(session)
+  setActiveHandle(handle)
+  return activeSessionDto(handle)
+}
 
-  if (!activeRuntime) {
-    activeRuntime = await createAgentSessionRuntime(createRuntime, {
+async function ensureRuntimeForSession(session) {
+  const key = session.id || session.path
+  const existing = runtimeHandles.get(session.id)
+  if (existing) return existing
+  const pending = runtimeHandlePromises.get(key)
+  if (pending) return pending
+
+  const promise = (async () => {
+    const runtime = await createAgentSessionRuntime(createRuntime, {
       cwd: session.cwd,
       agentDir: getAgentDir(),
       sessionManager: SessionManager.open(session.path),
     })
-  } else if (activeRuntime.session.sessionFile !== session.path) {
-    await activeRuntime.switchSession(session.path)
-  }
+    const sessionId = runtime.session.sessionManager.getSessionId()
+    if (session.id && sessionId !== session.id) {
+      runtime.session.dispose()
+      throw new Error('Session path does not match session id')
+    }
 
-  forceOneAtATime(activeRuntime.session)
-  activeSessionId = activeRuntime.session.sessionManager.getSessionId()
-  if (session.id && activeSessionId !== session.id) {
-    throw new Error('Session path does not match session id')
-  }
-  await bindActiveSession()
+    const handle = {
+      runtime,
+      sessionId,
+      unsubscribe: undefined,
+      extensionUiState: emptyExtensionUiState(),
+    }
+    runtimeHandles.set(sessionId, handle)
+    forceOneAtATime(runtime.session)
+    await bindRuntimeHandle(handle)
+    return handle
+  })()
+  runtimeHandlePromises.set(key, promise)
 
-  return activeSessionDto()
+  try {
+    return await promise
+  } finally {
+    runtimeHandlePromises.delete(key)
+  }
+}
+
+function setActiveHandle(handle) {
+  activeHandle = handle
+  activeRuntime = handle?.runtime
+  activeSessionId = handle?.sessionId
 }
 
 async function promptActiveSession(text, images = [], streamingBehavior) {
@@ -710,10 +739,14 @@ async function forkActiveSession(entryId) {
     throw new Error('Wait for compaction to finish before forking.')
   }
 
+  const previousId = activeHandle.sessionId
   const result = await activeRuntime.fork(entryId, { position: 'at' })
   if (result.cancelled) throw new Error('Fork cancelled')
   forceOneAtATime(activeRuntime.session)
-  activeSessionId = activeRuntime.session.sessionManager.getSessionId()
+  runtimeHandles.delete(previousId)
+  activeHandle.sessionId = activeRuntime.session.sessionManager.getSessionId()
+  runtimeHandles.set(activeHandle.sessionId, activeHandle)
+  setActiveHandle(activeHandle)
   await bindActiveSession()
   return activeSessionDto()
 }
@@ -721,17 +754,18 @@ async function forkActiveSession(entryId) {
 async function trashSession(id) {
   const session = await findSession(id)
   if (!session) throw new Error('Session not found')
-  if (isActiveSession(id)) {
-    if (activeRuntime.session.isStreaming) {
+  const handle = runtimeHandles.get(id)
+  if (handle) {
+    if (handle.runtime.session.isStreaming) {
       throw new Error('Wait for the current response to finish before deleting.')
     }
-    if (activeRuntime.session.isCompacting) {
+    if (handle.runtime.session.isCompacting) {
       throw new Error('Wait for compaction to finish before deleting.')
     }
   }
 
-  if (isActiveSession(id) && !existsSync(session.path)) {
-    discardActiveSession()
+  if (handle && !existsSync(session.path)) {
+    discardRuntimeHandle(handle)
     return { path: null }
   }
 
@@ -745,17 +779,21 @@ async function trashSession(id) {
     return { path: null }
   }
 
-  if (isActiveSession(id)) discardActiveSession()
+  if (handle) discardRuntimeHandle(handle)
 
   return { path: trashPath }
 }
 
 function discardActiveSession() {
-  unsubscribeActiveSession?.()
-  unsubscribeActiveSession = undefined
-  activeRuntime.session.dispose()
-  activeRuntime = undefined
-  activeSessionId = undefined
+  if (!activeHandle) return
+  discardRuntimeHandle(activeHandle)
+}
+
+function discardRuntimeHandle(handle) {
+  handle.unsubscribe?.()
+  handle.runtime.session.dispose()
+  runtimeHandles.delete(handle.sessionId)
+  if (activeHandle === handle) setActiveHandle(undefined)
 }
 
 function trashSessionPath(session) {
@@ -813,40 +851,47 @@ function forceOneAtATime(session) {
 async function createNewSession(cwd) {
   if (!cwd) throw new Error('cwd is required')
 
-  if (activeRuntime && activeRuntime.cwd === cwd) {
-    const result = await activeRuntime.newSession()
-    if (result.cancelled) throw new Error('New session cancelled')
-  } else {
-    unsubscribeActiveSession?.()
-    activeRuntime?.session.dispose()
-    activeRuntime = await createAgentSessionRuntime(createRuntime, {
-      cwd,
-      agentDir: getAgentDir(),
-      sessionManager: SessionManager.create(cwd, configuredSessionDir(cwd)),
-    })
+  const runtime = await createAgentSessionRuntime(createRuntime, {
+    cwd,
+    agentDir: getAgentDir(),
+    sessionManager: SessionManager.create(cwd, configuredSessionDir(cwd)),
+  })
+  const handle = {
+    runtime,
+    sessionId: runtime.session.sessionManager.getSessionId(),
+    unsubscribe: undefined,
+    extensionUiState: emptyExtensionUiState(),
   }
-
-  forceOneAtATime(activeRuntime.session)
-  activeSessionId = activeRuntime.session.sessionManager.getSessionId()
-  await bindActiveSession()
-  return activeSessionDto()
+  runtimeHandles.set(handle.sessionId, handle)
+  forceOneAtATime(runtime.session)
+  await bindRuntimeHandle(handle)
+  setActiveHandle(handle)
+  return activeSessionDto(handle)
 }
 
-function activeSessionDto() {
+function activeSessionDto(handle = activeHandle) {
+  return runtimeSessionDto(handle)
+}
+
+function runtimeSessionDto(handle) {
   return {
-    id: activeSessionId,
-    path: activeRuntime.session.sessionFile,
-    cwd: activeRuntime.cwd,
-    diagnostics: activeRuntime.diagnostics,
-    state: activeSessionStateDto(),
+    id: handle.sessionId,
+    path: handle.runtime.session.sessionFile,
+    cwd: handle.runtime.cwd,
+    diagnostics: handle.runtime.diagnostics,
+    state: activeSessionStateDto(handle),
   }
 }
 
-function activeSessionStateDto() {
-  return sessionStateDto(activeRuntime.session, activeRuntime.services)
+function activeSessionStateDto(handle = activeHandle) {
+  return sessionStateDto(
+    handle.runtime.session,
+    handle.runtime.services,
+    handle.extensionUiState,
+  )
 }
 
-function sessionStateDto(session, services) {
+function sessionStateDto(session, services, extensionUiState = emptyExtensionUiState()) {
   const activeToolNames = session.getActiveToolNames()
 
   return {
@@ -1070,26 +1115,34 @@ function isDirectory(path) {
 }
 
 async function bindActiveSession() {
-  unsubscribeActiveSession?.()
-  extensionUiState = emptyExtensionUiState()
-  await activeRuntime.session.bindExtensions({
-    uiContext: createExtensionUiContext(),
+  if (!activeHandle) throw new Error('No active session')
+  await bindRuntimeHandle(activeHandle)
+}
+
+async function bindRuntimeHandle(handle) {
+  handle.unsubscribe?.()
+  handle.extensionUiState = emptyExtensionUiState()
+  await handle.runtime.session.bindExtensions({
+    uiContext: createExtensionUiContext(handle),
     onError: (error) => {
-      broadcastEvent('extension_error', error)
+      broadcastEvent('extension_error', {
+        activeSessionId: handle.sessionId,
+        error,
+      })
     },
   })
-  syncGoalStateFromSession()
-  unsubscribeActiveSession = activeRuntime.session.subscribe((event) => {
-    syncGoalStateFromSession()
+  syncGoalStateFromSession(handle)
+  handle.unsubscribe = handle.runtime.session.subscribe((event) => {
+    syncGoalStateFromSession(handle)
     broadcastEvent('runtime_event', {
-      activeSessionId,
+      activeSessionId: handle.sessionId,
       event,
     })
     if (event.type === 'queue_update' || isGoalStateEvent(event)) {
-      broadcastActiveSession()
+      broadcastActiveSession(handle)
     }
   })
-  broadcastActiveSession()
+  broadcastActiveSession(handle)
 }
 
 function emptyExtensionUiState() {
@@ -1100,7 +1153,7 @@ function emptyExtensionUiState() {
   }
 }
 
-function createExtensionUiContext() {
+function createExtensionUiContext(handle) {
   return {
     select: async () => undefined,
     confirm: async () => true,
@@ -1112,29 +1165,29 @@ function createExtensionUiContext() {
         type,
         timestamp: new Date().toISOString(),
       }
-      extensionUiState = {
-        ...extensionUiState,
+      handle.extensionUiState = {
+        ...handle.extensionUiState,
         notifications: [
-          ...extensionUiState.notifications.slice(-19),
+          ...handle.extensionUiState.notifications.slice(-19),
           notification,
         ],
       }
-      broadcastExtensionUi()
+      broadcastExtensionUi(handle)
     },
     onTerminalInput: () => () => {},
     setStatus(key, text) {
-      const statuses = { ...extensionUiState.statuses }
+      const statuses = { ...handle.extensionUiState.statuses }
       if (text === undefined) delete statuses[key]
       else statuses[key] = text
-      extensionUiState = { ...extensionUiState, statuses }
-      broadcastExtensionUi()
+      handle.extensionUiState = { ...handle.extensionUiState, statuses }
+      broadcastExtensionUi(handle)
     },
     setWorkingMessage: () => {},
     setWorkingVisible: () => {},
     setWorkingIndicator: () => {},
     setHiddenThinkingLabel: () => {},
     setWidget(key, content, options = {}) {
-      const widgets = { ...extensionUiState.widgets }
+      const widgets = { ...handle.extensionUiState.widgets }
       if (content === undefined) delete widgets[key]
       else if (Array.isArray(content)) {
         widgets[key] = {
@@ -1142,8 +1195,8 @@ function createExtensionUiContext() {
           placement: options.placement || 'aboveEditor',
         }
       }
-      extensionUiState = { ...extensionUiState, widgets }
-      broadcastExtensionUi()
+      handle.extensionUiState = { ...handle.extensionUiState, widgets }
+      broadcastExtensionUi(handle)
     },
     setFooter: () => {},
     setHeader: () => {},
@@ -1165,29 +1218,29 @@ function createExtensionUiContext() {
   }
 }
 
-function broadcastExtensionUi() {
+function broadcastExtensionUi(handle = activeHandle) {
+  if (!handle) return
   broadcastEvent('extension_ui', {
-    activeSessionId,
-    state: extensionUiState,
-    goal: activeRuntime ? goalStateFromSession(activeRuntime.session) : null,
+    activeSessionId: handle.sessionId,
+    state: handle.extensionUiState,
+    goal: goalStateFromSession(handle.runtime.session),
   })
-  if (activeRuntime) broadcastActiveSession()
+  broadcastActiveSession(handle)
 }
 
-function syncGoalStateFromSession() {
-  const goal = activeRuntime
-    ? goalStateFromSession(activeRuntime.session)
-    : null
+function syncGoalStateFromSession(handle = activeHandle) {
+  if (!handle) return
+  const goal = goalStateFromSession(handle.runtime.session)
   if (!goal) return
   const status = goal.status === 'budget_limited'
     ? 'limited by budget'
     : goal.status === 'continuation_limited'
       ? 'limited by continuations'
       : goal.status
-  extensionUiState = {
-    ...extensionUiState,
+  handle.extensionUiState = {
+    ...handle.extensionUiState,
     statuses: {
-      ...extensionUiState.statuses,
+      ...handle.extensionUiState.statuses,
       goal: `goal: ${status}`,
     },
   }
@@ -1246,8 +1299,8 @@ function openEventStream(req, res) {
 
   sseClients.add(res)
 
-  if (activeRuntime) {
-    sendEvent(res, 'active_session', activeSessionDto())
+  for (const handle of runtimeHandles.values()) {
+    sendEvent(res, 'active_session', activeSessionDto(handle))
   }
 
   req.on('close', () => {
@@ -1255,8 +1308,9 @@ function openEventStream(req, res) {
   })
 }
 
-function broadcastActiveSession() {
-  broadcastEvent('active_session', activeSessionDto())
+function broadcastActiveSession(handle = activeHandle) {
+  if (!handle) return
+  broadcastEvent('active_session', activeSessionDto(handle))
 }
 
 function broadcastEvent(type, data) {
@@ -1294,11 +1348,11 @@ function toSessionDetailFromPath(id, path) {
   return toSessionDetailFromManager(manager, { id, path })
 }
 
-function toActiveSessionDetailDto() {
+function toActiveSessionDetailDto(handle = activeHandle) {
   return toSessionDetailFromManager(
-    activeRuntime.session.sessionManager,
-    activeSessionInfo(),
-    activeRuntime.session.getContextUsage?.(),
+    handle.runtime.session.sessionManager,
+    sessionInfo(handle),
+    handle.runtime.session.getContextUsage?.(),
   )
 }
 
@@ -1349,8 +1403,8 @@ function toSessionDetailFromManager(manager, session, contextUsage) {
   }
 }
 
-function activeSessionInfo() {
-  const manager = activeRuntime.session.sessionManager
+function sessionInfo(handle) {
+  const manager = handle.runtime.session.sessionManager
   const header = manager.getHeader()
   const entries = manager.getBranch()
   const created = new Date(header.timestamp)
@@ -1370,7 +1424,7 @@ function activeSessionInfo() {
   return {
     id: manager.getSessionId(),
     path: manager.getSessionFile(),
-    cwd: header.cwd || activeRuntime.cwd,
+    cwd: header.cwd || handle.runtime.cwd,
     name: undefined,
     firstMessage: firstMessage || goal?.objective || '(no messages)',
     created,
@@ -1402,7 +1456,8 @@ function timestampFromPath(path) {
 }
 
 async function exportSessionDetail(id) {
-  if (isActiveSession(id)) return toActiveSessionDetailDto()
+  const handle = runtimeHandles.get(id)
+  if (handle) return toActiveSessionDetailDto(handle)
 
   const session = await findSession(id)
   if (!session) throw new Error('Session not found')

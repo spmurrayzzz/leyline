@@ -212,7 +212,9 @@ const {
   runtimeEvents,
 } = useRuntimeEvents({
   onActiveSession(activeSession) {
-    activeRuntimeSession.value = activeSession
+    if (activeSession.id === selectedSessionId.value) {
+      activeRuntimeSession.value = activeSession
+    }
     appendRuntimeEvent({
       type: 'active_session',
       summary: projectName(activeSession.cwd),
