@@ -22,10 +22,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: curl -fsSL https://raw.githubusercontent.com/safedep/pmg/main/install.sh | sh
-      - run: pmg npm install
-        env:
-          PMG_DISABLE_TELEMETRY: true
+      - uses: safedep/pmg@v0.12.1
+        with:
+          disable-telemetry: "true"
+      - run: npm install
       - run: npm run docs:build
         env:
           VITEPRESS_BASE: /leyline/
