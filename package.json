@@ -6,8 +6,11 @@
   "main": "electron/main.js",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && vitepress build docs",
     "preview": "vite preview",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs",
     "local-publish": "./scripts/local-publish.sh",
     "electron:dev": "LEYLINE_DEV_SERVER_URL=http://localhost:5173 electron .",
     "electron:build": "./scripts/electron-build.sh",
@@ -30,6 +33,7 @@
   "devDependencies": {
     "@electron/packager": "latest",
     "electron": "^42.1.0",
-    "playwright": "1.60.0"
+    "playwright": "1.60.0",
+    "vitepress": "1.6.4"
   }
 }

@@ -50,14 +50,18 @@ async function serveStatic(req, res, distDir) {
     return res.end('Method not allowed')
   }
 
-  const pathname = decodeURIComponent(new URL(req.url, 'http://localhost').pathname)
+  const requestUrl = new URL(req.url, 'http://localhost')
+  const pathname = decodeURIComponent(requestUrl.pathname)
   const requested = pathname === '/' ? '/index.html' : pathname
   const filePath = safePath(distDir, requested)
 
   if (!filePath) return notFound(res)
 
-  const found = await existingFile(filePath)
-  const resolved = found || join(distDir, 'index.html')
+  const found = await existingStaticFile(filePath)
+  const fallback = pathname.startsWith('/docs/')
+    ? join(distDir, 'docs', 'index.html')
+    : join(distDir, 'index.html')
+  const resolved = found || fallback
   const file = await existingFile(resolved)
 
   if (!file) return notFound(res)
@@ -73,6 +77,17 @@ function safePath(rootDir, pathname) {
   const pathDiff = relative(rootDir, filePath)
   if (pathDiff.startsWith('..') || pathDiff === '..') return undefined
   return filePath
+}
+
+async function existingStaticFile(filePath) {
+  try {
+    const stats = await stat(filePath)
+    if (stats.isFile()) return filePath
+    if (stats.isDirectory()) return existingFile(join(filePath, 'index.html'))
+  } catch {
+    if (!extname(filePath)) return existingFile(`${filePath}.html`)
+    return undefined
+  }
 }
 
 async function existingFile(filePath) {
@@ -99,6 +114,7 @@ function contentType(filePath) {
     '.png': 'image/png',
     '.svg': 'image/svg+xml',
     '.webp': 'image/webp',
+    '.woff2': 'font/woff2',
   }
   return types[extname(filePath)] || 'application/octet-stream'
 }
