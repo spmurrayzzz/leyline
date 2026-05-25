@@ -2984,62 +2984,23 @@ h1 {
 }
 
 .init-panel {
-  width: min(480px, 100%);
-  border: 1px solid var(--border-soft);
-  border-radius: 18px;
-  background: var(--panel);
-  padding: 22px 24px 24px;
-  box-shadow: 0 18px 55px rgb(0 0 0 / 32%);
-}
-
-.init-kicker {
-  margin-bottom: 10px;
-  color: #6f6f6f;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.init-panel h2 {
-  margin: 0 0 18px;
-  color: #f0f0f0;
-  font-size: 18px;
-  line-height: 1.2;
-}
-
-.init-steps {
   display: grid;
   gap: 10px;
+  width: min(340px, 100%);
+  opacity: 0.82;
 }
 
-.init-step {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: #858585;
-  font-size: 13px;
+.init-skeleton-line {
+  height: 18px;
 }
 
-.init-step span {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #474b58;
+.init-skeleton-line.skeleton-title {
+  width: 54%;
+  height: 10px;
 }
 
-.init-step.active span {
-  background: var(--accent);
-  box-shadow: 0 0 0 5px var(--accent-soft);
-}
-
-.init-step.done span {
-  background: #7bc995;
-  box-shadow: none;
-}
-
-.init-step strong {
-  font-weight: 700;
+.init-skeleton-line.short {
+  width: 72%;
 }
 
 @keyframes skeleton-pulse {

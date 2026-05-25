@@ -380,32 +380,6 @@ const isEmptySelectedSession = computed(() => {
     && entries.value.length === 0
     && !liveTurnActive.value
 })
-const initSteps = computed(() => {
-  const phase = initPhase.value
-
-  return [
-    {
-      id: 'sessions',
-      label: 'Loading sessions',
-      done: phase !== 'sessions',
-      active: phase === 'sessions',
-    },
-    {
-      id: 'events',
-      label: eventStreamConnected.value
-        ? 'Runtime events connected'
-        : 'Connecting runtime events',
-      done: phase === 'workspace',
-      active: phase === 'events',
-    },
-    {
-      id: 'workspace',
-      label: 'Preparing transcript view',
-      done: false,
-      active: phase === 'workspace',
-    },
-  ]
-})
 const startProjectOptions = computed(() => {
   const query = startProjectQuery.value.trim().toLowerCase()
   return visibleProjects.value.filter((project) => {
@@ -1623,20 +1597,14 @@ function closePickerMenus() {
         @touchmove.passive="handleWorkbenchTouchMove"
         @wheel.passive="handleWorkbenchWheel"
       >
-        <div v-if="initializing" class="init-panel">
-          <div class="init-kicker">Starting Leyline</div>
-          <h2>Loading workspace…</h2>
-          <div class="init-steps">
-            <div
-              v-for="step in initSteps"
-              :key="step.id"
-              class="init-step"
-              :class="{ active: step.active, done: step.done }"
-            >
-              <span></span>
-              <strong>{{ step.label }}</strong>
-            </div>
-          </div>
+        <div
+          v-if="initializing"
+          class="init-panel"
+          aria-label="Loading workspace"
+        >
+          <div class="init-skeleton-line skeleton-line skeleton-title"></div>
+          <div class="init-skeleton-line skeleton-line"></div>
+          <div class="init-skeleton-line skeleton-line short"></div>
         </div>
         <div v-else-if="sessionLoading" class="session-loading-panel">
           <div class="session-loading-mark" aria-hidden="true"></div>
