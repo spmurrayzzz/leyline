@@ -396,13 +396,13 @@ export async function piApiHandler(req, res) {
         return json(res, { error: 'Method not allowed' }, 405)
       }
 
-      const detail = await exportSessionDetail(
-        decodeURIComponent(exportMatch[1]),
-      )
+      const id = decodeURIComponent(exportMatch[1])
+      const detail = await exportSessionDetail(id)
       return html(
         res,
-        await renderSessionExportHtml(detail),
+        await renderSessionExportHtml(detail, exportShareMeta(id)),
         exportFilename(detail),
+        url.searchParams.get('disposition') === 'inline',
       )
     }
 
@@ -1568,7 +1568,18 @@ function exportFilename(detail) {
   return `leyline-${slug}.html`
 }
 
-async function renderSessionExportHtml(detail) {
+function exportShareMeta(id) {
+  const publicUrl = process.env.LEYLINE_PUBLIC_URL?.replace(/\/$/, '')
+  if (!publicUrl) return {}
+
+  const path = `/api/pi/sessions/${encodeURIComponent(id)}/export`
+  return {
+    imageUrl: `${publicUrl}/og-image.png`,
+    pageUrl: `${publicUrl}${path}?disposition=inline`,
+  }
+}
+
+async function renderSessionExportHtml(detail, shareMeta = {}) {
   const session = detail.session
   const title = session.name || session.firstMessage || 'Untitled session'
   const entries = detail.entries
@@ -1583,6 +1594,7 @@ async function renderSessionExportHtml(detail) {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${escapeHtml(title)}</title>
+${exportMetaTags(session, title, shareMeta)}
 <style>${exportCss()}</style>
 </head>
 <body>
@@ -1608,6 +1620,47 @@ ${body || '<div class="empty-workbench">No transcript entries found.</div>'}
 <script type="module">${exportJs()}</script>
 </body>
 </html>`
+}
+
+function exportMetaTags(session, title, shareMeta) {
+  const messageCount = session.messageCount || 0
+  const description = truncate(
+    `Leyline transcript export · ${projectLabel(session.cwd)}`
+      + ` · ${messageCount} messages`,
+    180,
+  )
+  const tags = [
+    ['meta', 'name="description"', description],
+    ['meta', 'property="og:type"', 'article'],
+    ['meta', 'property="og:title"', title],
+    ['meta', 'property="og:description"', description],
+    ['meta', 'property="og:site_name"', 'Leyline'],
+    ['meta', 'name="twitter:card"', 'summary_large_image'],
+    ['meta', 'name="twitter:title"', title],
+    ['meta', 'name="twitter:description"', description],
+  ]
+
+  if (shareMeta.pageUrl) {
+    tags.push(['meta', 'property="og:url"', shareMeta.pageUrl])
+    tags.push(['link', 'rel="canonical"', shareMeta.pageUrl])
+  }
+  if (shareMeta.imageUrl) {
+    tags.push(['meta', 'property="og:image"', shareMeta.imageUrl])
+    tags.push(['meta', 'property="og:image:width"', '1024'])
+    tags.push(['meta', 'property="og:image:height"', '1024'])
+    tags.push(['meta', 'property="og:image:alt"', 'Leyline transcript export'])
+    tags.push(['meta', 'name="twitter:image"', shareMeta.imageUrl])
+  }
+
+  return tags.map(renderMetaTag).join('\n')
+}
+
+function renderMetaTag(tag) {
+  const [type, attribute, content] = tag
+  if (type === 'link') {
+    return `<link ${attribute} href="${escapeHtml(content)}">`
+  }
+  return `<meta ${attribute} content="${escapeHtml(content)}">`
 }
 
 function exportLogoSvg() {
@@ -2492,12 +2545,13 @@ function json(res, data, status = 200) {
   res.end(JSON.stringify(data))
 }
 
-function html(res, content, filename) {
+function html(res, content, filename, inline = false) {
   res.statusCode = 200
   res.setHeader('Content-Type', 'text/html; charset=utf-8')
   res.setHeader(
     'Content-Disposition',
-    `attachment; filename="${filename.replace(/"/g, '')}"`,
+    `${inline ? 'inline' : 'attachment'}; `
+      + `filename="${filename.replace(/"/g, '')}"`,
   )
   res.end(content)
 }
