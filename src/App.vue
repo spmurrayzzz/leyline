@@ -85,10 +85,15 @@ let terminalResizeStartHeight = 0
 let terminalResizeFrame = 0
 let promptSubmitTimer
 let scrollFrame
+let scrollAnimationFrame
+let scrollSettleFrame
 let userScrollTimer
 let composerResizeObserver
 let copiedTimer
 const bottomStickBufferPx = 160
+const maxScrollTravelPx = 480
+const scrollAnimationMs = 220
+const scrollSettleMs = 900
 const userScrollIdleMs = 450
 const startupPhaseFloorMs = 650
 const startupAcceptedFloorMs = 420
@@ -528,8 +533,7 @@ watch(selectedSessionId, () => {
   expandedSkills.value = new Set()
   editingEntry.value = null
   promptError.value = ''
-  stickToBottom.value = true
-  hasNewOutput.value = false
+  resetWorkbenchScrollState()
 })
 
 watch(() => composerRef.value?.form, (el) => {
@@ -566,6 +570,8 @@ onUnmounted(() => {
   composerResizeObserver?.disconnect()
   disposeLiveTurn()
   cancelAnimationFrame(scrollFrame)
+  cancelAnimationFrame(scrollAnimationFrame)
+  cancelAnimationFrame(scrollSettleFrame)
   cancelAnimationFrame(terminalResizeFrame)
   clearTimeout(initPhaseTimer)
 })
@@ -891,15 +897,70 @@ function distanceFromWorkbenchBottom() {
 }
 
 async function jumpToLatest() {
-  stickToBottom.value = true
-  hasNewOutput.value = false
   await scrollToLatest()
 }
 
-async function scrollToLatest() {
-  await nextTick()
+function resetWorkbenchScrollState() {
+  clearTimeout(userScrollTimer)
+  userScrollActive.value = false
+  stickToBottom.value = true
+  hasNewOutput.value = false
+}
+
+function workbenchBottom() {
+  if (!workbench.value) return 0
+  return Math.max(0, workbench.value.scrollHeight - workbench.value.clientHeight)
+}
+
+function setWorkbenchScrollToBottom() {
   if (!workbench.value) return
-  workbench.value.scrollTop = workbench.value.scrollHeight
+  cancelAnimationFrame(scrollAnimationFrame)
+  const bottom = workbenchBottom()
+  const minStart = Math.max(0, bottom - maxScrollTravelPx)
+  const start = Math.min(Math.max(workbench.value.scrollTop, minStart), bottom)
+  const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')
+    ?.matches
+  workbench.value.scrollTop = start
+  if (reduceMotion || bottom === start) {
+    workbench.value.scrollTop = bottom
+    settleWorkbenchAtBottom()
+    return
+  }
+  const startedAt = performance.now()
+  const tick = (now) => {
+    if (!workbench.value) return
+    const target = workbenchBottom()
+    const progress = Math.min(1, (now - startedAt) / scrollAnimationMs)
+    const eased = 1 - Math.pow(1 - progress, 3)
+    workbench.value.scrollTop = start + (target - start) * eased
+    if (progress < 1) {
+      scrollAnimationFrame = requestAnimationFrame(tick)
+    } else {
+      workbench.value.scrollTop = target
+      settleWorkbenchAtBottom()
+    }
+  }
+  scrollAnimationFrame = requestAnimationFrame(tick)
+}
+
+function settleWorkbenchAtBottom() {
+  cancelAnimationFrame(scrollSettleFrame)
+  const startedAt = performance.now()
+  const settle = (now) => {
+    if (!workbench.value || !stickToBottom.value) return
+    workbench.value.scrollTop = workbenchBottom()
+    if (now - startedAt < scrollSettleMs) {
+      scrollSettleFrame = requestAnimationFrame(settle)
+    }
+  }
+  scrollSettleFrame = requestAnimationFrame(settle)
+}
+
+async function scrollToLatest() {
+  resetWorkbenchScrollState()
+  await nextTick()
+  await new Promise(requestAnimationFrame)
+  setWorkbenchScrollToBottom()
 }
 
 function surfaceExtensionNotification(state) {
