@@ -37,6 +37,7 @@ export function useSessionWorkspace({
   const sessionActivating = ref(false)
   const sessionError = ref('')
   const activeRuntimeSession = ref(null)
+  const runtimeSessionsById = ref({})
   const startupRun = ref(null)
   const sessionHandoff = ref(null)
   const startupPhaseSlow = ref(false)
@@ -84,6 +85,19 @@ export function useSessionWorkspace({
   })
   const activeGoal = computed(() => {
     return activeRuntimeSession.value?.state?.goal || null
+  })
+  const sidebarRuntimeSummary = computed(() => {
+    const states = Object.values(runtimeSessionsById.value)
+    const running = states.filter((state) => state.isStreaming).length
+    const compacting = states.filter((state) => state.isCompacting).length
+    const unread = states.filter((state) => state.unread).length
+    const parts = [
+      running ? `${running} running` : '',
+      compacting ? `${compacting} compacting` : '',
+      unread ? `${unread} unread` : '',
+    ].filter(Boolean)
+
+    return { label: parts.join(' · ') }
   })
   let sessionSelectionToken = 0
   let sessionActivationQueue = Promise.resolve()
@@ -201,6 +215,7 @@ export function useSessionWorkspace({
     sessionSwitching.value = true
     const switchStarted = Date.now()
     selectedSessionId.value = session.id
+    markRuntimeSessionRead(session.id)
     liveTurn?.selectSession?.(session.id)
     sessionLoading.value = true
     sessionActivating.value = false
@@ -329,6 +344,107 @@ export function useSessionWorkspace({
         },
       },
     }
+  }
+
+  function updateRuntimeSessionSnapshot(runtimeSession) {
+    if (!runtimeSession?.id) return
+    const state = runtimeSession.state || {}
+    patchRuntimeSessionState(runtimeSession.id, {
+      isStreaming: state.isStreaming === true,
+      isCompacting: state.isCompacting === true,
+      queuedCount: queuedCount(state.queuedMessages),
+      pendingToolCount: Array.isArray(state.pendingToolCalls)
+        ? state.pendingToolCalls.length
+        : 0,
+    }, { preserveUnread: true })
+  }
+
+  function updateRuntimeEventState(data) {
+    const id = data?.activeSessionId
+    const event = data?.event
+    if (!id || !event?.type) return
+
+    const previous = runtimeSessionsById.value[id] || {}
+    const patch = runtimePatchFromEvent(event, previous)
+    if (!patch) return
+
+    const next = { ...previous, ...patch }
+    const wasBusy = previous.isStreaming || previous.isCompacting
+    const willBeBusy = next.isStreaming || next.isCompacting
+    const finished = wasBusy && !willBeBusy
+    const unread = id !== selectedSessionId.value && (
+      finished || event.type === 'error' || event.type === 'aborted'
+    )
+
+    patchRuntimeSessionState(id, patch, { unread })
+  }
+
+  function sessionRuntimeStatus(id) {
+    const state = runtimeSessionsById.value[id] || {}
+    if (state.error) return { label: 'error', tone: 'error' }
+    if (state.isCompacting) return { label: 'compacting', tone: 'compacting' }
+    if (state.isStreaming) return { label: 'running', tone: 'running' }
+    if (state.unread) return { label: 'unread', tone: 'unread' }
+    if (state.queuedCount) {
+      return { label: `+${state.queuedCount} queued`, tone: 'queued' }
+    }
+    return { label: '', tone: '' }
+  }
+
+  function patchRuntimeSessionState(id, patch, options = {}) {
+    const previous = runtimeSessionsById.value[id] || {}
+    runtimeSessionsById.value = {
+      ...runtimeSessionsById.value,
+      [id]: {
+        ...previous,
+        ...patch,
+        unread: options.preserveUnread
+          ? previous.unread === true
+          : options.unread === true || previous.unread === true,
+        updatedAt: Date.now(),
+      },
+    }
+  }
+
+  function markRuntimeSessionRead(id) {
+    const previous = runtimeSessionsById.value[id]
+    if (!previous?.unread) return
+    runtimeSessionsById.value = {
+      ...runtimeSessionsById.value,
+      [id]: { ...previous, unread: false },
+    }
+  }
+
+  function runtimePatchFromEvent(event, previous) {
+    if (['agent_start', 'turn_start', 'message_start'].includes(event.type)) {
+      return { isStreaming: true, isCompacting: false, error: '' }
+    }
+    if (['tool_call', 'tool_execution_start'].includes(event.type)) {
+      return { isStreaming: true, error: '' }
+    }
+    if (event.type === 'agent_end') return { isStreaming: false, error: '' }
+    if (event.type === 'error') {
+      return { isStreaming: false, isCompacting: false, error: 'error' }
+    }
+    if (event.type === 'aborted') {
+      return { isStreaming: false, isCompacting: false, error: '' }
+    }
+    if (event.type === 'compaction_start') {
+      return { isCompacting: true, error: '' }
+    }
+    if (event.type === 'compaction_end') {
+      return { isCompacting: false, error: event.errorMessage ? 'error' : '' }
+    }
+    if (event.type === 'queue_update') {
+      return { queuedCount: queuedCount(event) }
+    }
+    return previous ? {} : null
+  }
+
+  function queuedCount(queue) {
+    const steering = Array.isArray(queue?.steering) ? queue.steering.length : 0
+    const followUp = Array.isArray(queue?.followUp) ? queue.followUp.length : 0
+    return steering + followUp
   }
 
   function patchRuntimeExtensionUi(extensionUi, goal) {
@@ -906,12 +1022,16 @@ export function useSessionWorkspace({
     sessionHandoffStep,
     sessionLoading,
     sessionQuery,
+    sessionRuntimeStatus,
     sessions,
     sessionsError,
     sessionsLoading,
     sessionSwitching,
     sessionTitle,
+    sidebarRuntimeSummary,
     setActiveRuntimeSession: (value) => { activeRuntimeSession.value = value },
+    updateRuntimeEventState,
+    updateRuntimeSessionSnapshot,
     setSessionDetail: (value) => { sessionDetail.value = value },
     startRuntimeState,
     startSelectedModel,

@@ -32,6 +32,10 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  sessionStatus: {
+    type: Function,
+    default: () => ({ label: '', tone: '' }),
+  },
   sessionTitle: {
     type: Function,
     required: true,
@@ -41,6 +45,10 @@ const props = defineProps({
     default: '',
   },
   sessionsLoading: Boolean,
+  summary: {
+    type: Object,
+    default: () => ({ label: '' }),
+  },
   visibleProjects: {
     type: Array,
     default: () => [],
@@ -96,6 +104,9 @@ const emit = defineEmits([
     <section class="sidebar-section">
       <div class="section-header">
         <span>Sessions</span>
+        <span v-if="summary.label" class="section-runtime-summary">
+          {{ summary.label }}
+        </span>
         <button
           type="button"
           class="section-action"
@@ -159,8 +170,19 @@ const emit = defineEmits([
               @keydown.enter="emit('select-session', session)"
               @keydown.space.prevent="emit('select-session', session)"
             >
-              <span v-html="highlightedText(sessionTitle(session))"></span>
-              <time>{{ sessionTime(session) }}</time>
+              <span
+                class="session-title"
+                v-html="highlightedText(sessionTitle(session))"
+              ></span>
+              <span
+                v-if="sessionStatus(session.id).label"
+                class="session-status"
+                :class="`status-${sessionStatus(session.id).tone}`"
+              >
+                <span class="session-status-dot"></span>
+                {{ sessionStatus(session.id).label }}
+              </span>
+              <time v-else>{{ sessionTime(session) }}</time>
               <button
                 class="session-delete-button"
                 type="button"

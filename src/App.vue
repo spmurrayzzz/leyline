@@ -186,11 +186,13 @@ const {
   sessionHandoffStep,
   sessionLoading,
   sessionQuery,
+  sessionRuntimeStatus,
   sessions,
   sessionsError,
   sessionsLoading,
   sessionSwitching,
   sessionTitle,
+  sidebarRuntimeSummary,
   startSelectedModel,
   startSelectedThinkingLevel,
   startupPhaseSlow,
@@ -199,7 +201,9 @@ const {
   startupRun,
   switchingModel,
   switchingThinking,
+  updateRuntimeEventState,
   updateRuntimeQueue,
+  updateRuntimeSessionSnapshot,
   visibleProjects,
 } = sessionWorkspace
 const {
@@ -212,6 +216,7 @@ const {
   runtimeEvents,
 } = useRuntimeEvents({
   onActiveSession(activeSession) {
+    updateRuntimeSessionSnapshot(activeSession)
     if (activeSession.id === selectedSessionId.value) {
       activeRuntimeSession.value = activeSession
     }
@@ -222,6 +227,7 @@ const {
   },
   onRuntimeEvent(data) {
     console.log('pi runtime event', data)
+    updateRuntimeEventState(data)
     liveTurn.handle({ kind: 'runtime', ...data })
   },
   onExtensionUi(data) {
@@ -1489,9 +1495,11 @@ function closePickerMenus() {
       :reloading-session="reloadingSession"
       :selected-session="selectedSession"
       :selected-session-id="selectedSessionId"
+      :session-status="sessionRuntimeStatus"
       :session-title="sessionTitle"
       :sessions-error="sessionsError"
       :sessions-loading="sessionsLoading"
+      :summary="sidebarRuntimeSummary"
       :visible-projects="visibleProjects"
       @create-session="createSession"
       @hide="desktopSidebarHidden = true"

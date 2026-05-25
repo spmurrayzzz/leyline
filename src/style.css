@@ -268,12 +268,24 @@ kbd {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   margin-bottom: 14px;
   color: var(--muted);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.section-runtime-summary {
+  overflow: hidden;
+  margin-left: auto;
+  color: #8d92a0;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .section-action {
@@ -496,12 +508,54 @@ kbd {
     opacity var(--motion-base) var(--ease-decelerate);
 }
 
-.session span {
+.session-title {
   overflow: hidden;
   min-width: 0;
   flex: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.session-status {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.session-status-dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.status-running {
+  color: #8ea7ff;
+}
+
+.status-running .session-status-dot {
+  animation: pulse-dot 1.4s ease-in-out infinite;
+}
+
+.status-compacting {
+  color: #f6c177;
+}
+
+.status-unread {
+  color: #c6d2ff;
+}
+
+.status-error {
+  color: #f87171;
+}
+
+.status-queued {
+  color: #9aa0ad;
 }
 
 .session time {
@@ -2941,6 +2995,19 @@ h1 {
   font-weight: 700;
 }
 
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.85);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
 @keyframes skeleton-pulse {
   0% {
     background-position: 100% 0;
@@ -4121,6 +4188,7 @@ textarea::placeholder {
   .new-session-button,
   .session,
   .session time,
+  .session-status-dot,
   .session-delete-button,
   .settings-button,
   .project-sessions-enter-active,
@@ -4255,6 +4323,7 @@ textarea::placeholder {
   }
 
   .live-tool-spinner,
+  .session-status-dot,
   .session-loading-mark {
     animation: none;
   }
