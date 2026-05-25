@@ -179,7 +179,6 @@ const emit = defineEmits([
                 class="session-status"
                 :class="`status-${sessionStatus(session.id).tone}`"
               >
-                <span class="session-status-dot"></span>
                 {{ sessionStatus(session.id).label }}
               </span>
               <time v-else>{{ sessionTime(session) }}</time>

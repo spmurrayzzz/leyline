@@ -520,26 +520,13 @@ kbd {
   display: inline-flex;
   align-items: center;
   flex: none;
-  gap: 5px;
   color: var(--muted);
   font-size: 11px;
   font-weight: 800;
 }
 
-.session-status-dot {
-  width: 6px;
-  height: 6px;
-  flex: none;
-  border-radius: 999px;
-  background: currentColor;
-}
-
 .status-running {
   color: #8ea7ff;
-}
-
-.status-running .session-status-dot {
-  animation: pulse-dot 1.4s ease-in-out infinite;
 }
 
 .status-compacting {
@@ -669,9 +656,8 @@ kbd {
 }
 
 .session.active {
-  border-left: 2px solid var(--accent);
   background: rgb(124 92 255 / 20%);
-  padding-left: 7px;
+  box-shadow: inset 0 0 0 1px rgb(124 92 255 / 18%);
   color: var(--text);
   font-weight: 800;
 }
@@ -2322,8 +2308,8 @@ h1 {
 }
 
 .live-message {
-  border-left: 2px solid var(--accent-border);
-  padding-left: 12px;
+  background: rgb(124 92 255 / 5%);
+  padding: 8px 12px;
 }
 
 .thinking-block {
@@ -2433,7 +2419,6 @@ h1 {
 .user-message {
   margin-top: 22px;
   border: 1px solid var(--accent-border);
-  border-left: 2px solid var(--accent);
   border-radius: 12px;
   background: rgb(124 92 255 / 9%);
   padding: 10px 12px;
@@ -2515,8 +2500,10 @@ h1 {
 }
 
 .summary-message {
-  border-left: 2px solid #4f5360;
-  padding-left: 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: #15161b;
+  padding: 8px 12px;
   color: #aeb2bd;
 }
 
@@ -2588,8 +2575,10 @@ h1 {
 }
 
 .markdown-body blockquote {
-  border-left: 2px solid #4f5360;
-  padding-left: 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: #15161b;
+  padding: 9px 12px;
   color: #adb1bc;
 }
 
@@ -2883,7 +2872,6 @@ h1 {
 .run-status-steps span {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
   max-width: 100%;
   border: 1px solid #2c2e37;
   border-radius: 999px;
@@ -2896,33 +2884,15 @@ h1 {
   white-space: nowrap;
 }
 
-.run-status-steps span::before {
-  width: 6px;
-  height: 6px;
-  flex: none;
-  border-radius: 999px;
-  background: #4b4f5d;
-  content: '';
-}
-
 .run-status-steps span.done {
   border-color: rgb(130 214 154 / 18%);
   color: #7fae8b;
-}
-
-.run-status-steps span.done::before {
-  background: #82d69a;
 }
 
 .run-status-steps span.active {
   border-color: rgb(124 92 255 / 34%);
   background: rgb(124 92 255 / 11%);
   color: #c8c0ff;
-}
-
-.run-status-steps span.active::before {
-  background: #bfb5ff;
-  box-shadow: 0 0 0 4px rgb(124 92 255 / 13%);
 }
 
 .run-status-enter-active {
@@ -3070,19 +3040,6 @@ h1 {
 
 .init-step strong {
   font-weight: 700;
-}
-
-@keyframes pulse-dot {
-  0%,
-  100% {
-    opacity: 0.55;
-    transform: scale(0.85);
-  }
-
-  50% {
-    opacity: 1;
-    transform: scale(1.15);
-  }
 }
 
 @keyframes skeleton-pulse {
@@ -4273,7 +4230,6 @@ textarea::placeholder {
   .new-session-button,
   .session,
   .session time,
-  .session-status-dot,
   .session-delete-button,
   .settings-button,
   .project-sessions-enter-active,
@@ -4412,7 +4368,6 @@ textarea::placeholder {
   }
 
   .live-tool-spinner,
-  .session-status-dot,
   .session-loading-mark {
     animation: none;
   }
