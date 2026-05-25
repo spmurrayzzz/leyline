@@ -1094,10 +1094,12 @@ async function submitShellCommand(shellCommand, images) {
     return
   }
 
+  const submittedDraft = draft.value
   promptSubmitting.value = true
   shellCommandSubmitting.value = true
   startPromptSubmitTimer()
   promptError.value = ''
+  draft.value = ''
   if (!agentRunning.value) resetLiveState()
   upsertLiveTool({
     type: 'tool_execution_start',
@@ -1118,12 +1120,12 @@ async function submitShellCommand(shellCommand, images) {
     if (data.detail && selectedSessionId.value === sessionId) {
       sessionDetail.value = data.detail
     }
-    draft.value = ''
     await loadSessions({ selectFirst: false, showLoading: false })
     if (selectedSessionId.value === sessionId) await scrollToLatest()
   } catch (error) {
     if (selectedSessionId.value === sessionId) {
       finishLiveTools('error')
+      draft.value = submittedDraft
       promptError.value = error.message
     }
   } finally {
