@@ -1016,12 +1016,14 @@ async function submitDraft(streamingBehavior) {
   try {
     if (editing) await editPrompt(editing.id, text, images)
     else await submitPrompt(sessionId, text, images)
-    if (isHandledSlashCommand(text)) removeOptimisticEntry(localEntry)
-    draft.value = ''
-    attachedImages.value = []
-    editingEntry.value = null
-    if (!isHandledSlashCommand(text) || slashCommandStartsTurn(text)) {
-      setAgentRunning(true, 'Thinking…')
+    if (selectedSessionId.value === sessionId) {
+      if (isHandledSlashCommand(text)) removeOptimisticEntry(localEntry)
+      draft.value = ''
+      attachedImages.value = []
+      editingEntry.value = null
+      if (!isHandledSlashCommand(text) || slashCommandStartsTurn(text)) {
+        setAgentRunning(true, 'Thinking…')
+      }
     }
   } catch (error) {
     if (selectedSessionId.value === sessionId) {
