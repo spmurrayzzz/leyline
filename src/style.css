@@ -1624,16 +1624,16 @@ h1 {
 
 .start-composer.hidden-shell-mode-composer,
 .composer.hidden-shell-mode-composer {
-  border-color: rgba(148, 163, 184, 0.34);
-  background: #151619;
+  border-color: rgba(125, 160, 202, 0.42);
+  background: #101722;
   box-shadow:
-    0 0 0 1px rgba(148, 163, 184, 0.06) inset,
+    0 0 0 1px rgba(125, 160, 202, 0.08) inset,
     0 14px 48px rgb(0 0 0 / 46%);
 }
 
 .start-composer.hidden-shell-mode-composer:focus-within,
 .composer.hidden-shell-mode-composer:focus-within {
-  border-color: rgba(148, 163, 184, 0.5);
+  border-color: rgba(147, 197, 253, 0.58);
 }
 
 .composer-input-shell {
@@ -1685,11 +1685,11 @@ h1 {
 
 .hidden-shell-mode-composer .shell-prompt-glyph,
 .hidden-shell-mode-composer textarea {
-  color: #cbd5e1;
+  color: #dbeafe;
 }
 
 .hidden-shell-mode-composer textarea::placeholder {
-  color: rgba(203, 213, 225, 0.34);
+  color: rgba(191, 219, 254, 0.38);
 }
 
 .shell-mode-chip {
@@ -1700,9 +1700,9 @@ h1 {
 }
 
 .hidden-shell-mode-chip {
-  border-color: rgba(148, 163, 184, 0.24) !important;
-  background: rgba(51, 65, 85, 0.2) !important;
-  color: #cbd5e1 !important;
+  border-color: rgba(125, 160, 202, 0.3) !important;
+  background: rgba(30, 64, 100, 0.24) !important;
+  color: #dbeafe !important;
 }
 
 .start-composer textarea {
@@ -3872,10 +3872,18 @@ h1 {
   width: min(var(--content-max), calc(100% - 88px));
   max-width: calc(100% - 88px);
   transform: translateX(-50%);
-  border: 1px solid #3d3650;
+  border: 1px solid #35323f;
   border-radius: 22px;
-  background: #15121d;
-  box-shadow: 0 14px 48px rgb(0 0 0 / 46%);
+  background: #17161d;
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 3%) inset,
+    0 2px 6px -3px rgb(0 0 0 / 45%),
+    0 14px 34px -18px rgb(0 0 0 / 32%),
+    0 28px 70px -42px rgb(20 16 32 / 34%);
+}
+
+.composer:focus-within {
+  border-color: #4a415f;
 }
 
 .composer.session-handoff-composer {
@@ -3993,7 +4001,7 @@ textarea:disabled {
 }
 
 textarea::placeholder {
-  color: #555;
+  color: #605b6c;
 }
 
 .composer-error {
