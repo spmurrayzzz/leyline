@@ -2221,7 +2221,8 @@ h1 {
 }
 
 .assistant-message {
-  padding-left: 16px;
+  background: rgb(124 92 255 / 5%);
+  padding: 8px 12px;
   color: #d8dbe3;
 }
 
