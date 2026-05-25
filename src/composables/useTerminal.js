@@ -1,3 +1,4 @@
+import { FitAddon } from '@xterm/addon-fit'
 import { Terminal } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
 import { nextTick, ref } from 'vue'
@@ -8,6 +9,7 @@ export function useTerminal() {
   const terminalStatus = ref('closed')
   const terminalCwd = ref('')
   let terminalInstance
+  let terminalFitAddon
   let terminalSocket
   let terminalInputDisposable
   let terminalRunId = 0
@@ -32,6 +34,7 @@ export function useTerminal() {
     terminalSocket = undefined
     terminalInstance?.dispose()
     terminalInstance = undefined
+    terminalFitAddon = undefined
     window.removeEventListener('resize', resizeTerminal)
   }
 
@@ -45,6 +48,7 @@ export function useTerminal() {
     terminalInputDisposable?.dispose()
     terminalSocket?.close()
     terminalInstance?.dispose()
+    terminalFitAddon = undefined
     window.removeEventListener('resize', resizeTerminal)
 
     terminalInstance = new Terminal({
@@ -52,6 +56,7 @@ export function useTerminal() {
       fontFamily: 'SFMono-Regular, Menlo, Monaco, Consolas, monospace',
       fontSize: 12,
       lineHeight: 1.25,
+      scrollback: 10000,
       theme: {
         background: '#0b0c0f',
         foreground: '#d8dbe3',
@@ -60,6 +65,8 @@ export function useTerminal() {
       },
     })
     const term = terminalInstance
+    terminalFitAddon = new FitAddon()
+    term.loadAddon(terminalFitAddon)
     term.open(terminalEl.value)
     resizeTerminal()
     focusTerminal()
@@ -114,18 +121,15 @@ export function useTerminal() {
   }
 
   function resizeTerminal() {
-    if (!terminalInstance || !terminalEl.value) return
-    const style = window.getComputedStyle(terminalEl.value)
-    const width = terminalEl.value.clientWidth - cssPixels(style.paddingLeft)
-      - cssPixels(style.paddingRight)
-    const height = terminalEl.value.clientHeight - cssPixels(style.paddingTop)
-      - cssPixels(style.paddingBottom)
-    const cols = Math.max(40, Math.floor(width / 7.4))
-    const rows = Math.max(8, Math.floor(height / 15) - 1)
-    terminalInstance.resize(cols, rows)
+    if (!terminalInstance || !terminalEl.value || !terminalFitAddon) return
+    terminalFitAddon.fit()
     terminalInstance.scrollToBottom()
     if (terminalSocket?.readyState === WebSocket.OPEN) {
-      terminalSocket.send(JSON.stringify({ type: 'resize', cols, rows }))
+      terminalSocket.send(JSON.stringify({
+        type: 'resize',
+        cols: terminalInstance.cols,
+        rows: terminalInstance.rows,
+      }))
     }
   }
 
@@ -139,10 +143,6 @@ export function useTerminal() {
     resizeTerminal,
     toggleTerminal,
   }
-}
-
-function cssPixels(value) {
-  return Number.parseFloat(value) || 0
 }
 
 function parseTerminalMessage(data) {
