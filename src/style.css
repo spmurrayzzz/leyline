@@ -1207,9 +1207,12 @@ h1 {
 }
 
 .topbar-project strong {
+  overflow: hidden;
   color: var(--text);
   font-size: 14px;
   line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .topbar-project span {
@@ -4439,7 +4442,7 @@ textarea::placeholder {
   }
 
   .workbench {
-    padding: 14px 12px 218px;
+    padding: 14px 12px var(--composer-reserved-height, 270px);
   }
 
   .init-workbench,
@@ -4454,9 +4457,6 @@ textarea::placeholder {
     width: 100%;
   }
 
-  .assistant-message {
-    padding-left: 0;
-  }
 
   .user-message {
     margin-top: 16px;
@@ -4488,6 +4488,7 @@ textarea::placeholder {
     bottom: 10px;
     left: 10px;
     width: auto;
+    max-width: none;
     transform: none;
     border-radius: 18px;
   }
@@ -4601,7 +4602,7 @@ textarea::placeholder {
 
   .terminal-open .workbench {
     padding-bottom: calc(
-      var(--terminal-drawer-height) + var(--composer-reserved-height, 218px)
+      var(--terminal-drawer-height) + var(--composer-reserved-height, 270px)
     );
   }
 
