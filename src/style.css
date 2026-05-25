@@ -2707,6 +2707,13 @@ h1 {
   margin-bottom: 6px;
 }
 
+.session-handoff-init-panel {
+  position: sticky;
+  top: calc(50% - 42px);
+  z-index: 3;
+  margin: 0 auto;
+}
+
 .activity-scanning-composer {
   overflow: hidden;
 }

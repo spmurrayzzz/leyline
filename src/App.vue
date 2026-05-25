@@ -1596,6 +1596,15 @@ function closePickerMenus() {
           <div class="init-skeleton-line skeleton-line"></div>
           <div class="init-skeleton-line skeleton-line short"></div>
         </div>
+        <div
+          v-else-if="sessionHandoff"
+          class="init-panel session-handoff-init-panel"
+          aria-label="Starting new session"
+        >
+          <div class="init-skeleton-line skeleton-line skeleton-title"></div>
+          <div class="init-skeleton-line skeleton-line"></div>
+          <div class="init-skeleton-line skeleton-line short"></div>
+        </div>
         <div v-else-if="sessionLoading" class="session-loading-panel">
           <div class="session-loading-mark" aria-hidden="true"></div>
           <div>
