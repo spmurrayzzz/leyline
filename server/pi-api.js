@@ -2207,7 +2207,6 @@ button, input, textarea { color: inherit; font: inherit; }
 .user-message {
   margin-top: 22px;
   border: 1px solid var(--accent-border);
-  border-left: 2px solid var(--accent);
   border-radius: 12px;
   background: rgb(124 92 255 / 9%);
   padding: 10px 12px;
