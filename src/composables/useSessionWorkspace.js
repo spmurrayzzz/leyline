@@ -497,7 +497,6 @@ export function useSessionWorkspace({
   }
 
   function deleteSessionButtonLabel() {
-    if (deleteSessionPhase.value === 'opening') return 'Opening next session…'
     if (deleteSessionPhase.value === 'deleting') return 'Deleting…'
     return 'Delete'
   }
@@ -513,21 +512,19 @@ export function useSessionWorkspace({
 
     try {
       await deletePiSession(session.id)
-      const remainingSessions = sessions.value.filter((item) => {
+      sessions.value = sessions.value.filter((item) => {
         return item.id !== session.id
       })
-      const replacementSession = nextSessionAfterDelete(session, remainingSessions)
-      sessions.value = remainingSessions
-      if (selectedSessionId.value === session.id) {
-        if (replacementSession) {
-          deleteSessionPhase.value = 'opening'
-          await selectSession(replacementSession)
-        } else {
-          clearSelectedSession()
-          updateSessionRoute('')
-        }
-      }
       deleteConfirmSession.value = null
+      if (selectedSessionId.value === session.id) {
+        const cwd = session.cwd || newSessionCwd.value
+        clearSelectedSession()
+        if (cwd) {
+          newSessionCwd.value = cwd
+          loadStartRuntimeState(cwd)
+        }
+        updateSessionRoute('')
+      }
     } catch (error) {
       deleteSessionError.value = error.message
     } finally {
@@ -912,23 +909,6 @@ export function useSessionWorkspace({
 
   function sessionScore(session, query) {
     return fuzzyScore(sessionTitle(session), query)
-  }
-
-  function nextSessionAfterDelete(session, remainingSessions) {
-    const projectSessions = sessions.value.filter((item) => {
-      return item.cwd === session.cwd
-    })
-    const index = projectSessions.findIndex((item) => item.id === session.id)
-    const nextProjectSession = projectSessions[index + 1]
-      || projectSessions[index - 1]
-
-    if (nextProjectSession) {
-      return remainingSessions.find((item) => {
-        return item.id === nextProjectSession.id
-      }) || null
-    }
-
-    return remainingSessions[0] || null
   }
 
   async function reconnectTerminalIfOpen() {
