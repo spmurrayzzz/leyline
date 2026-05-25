@@ -124,6 +124,14 @@ const {
   setActivity: setLiveActivity,
   setAgentRunning,
 } = liveTurn
+const liveFlowItems = computed(() => {
+  return liveItems.value.filter((item) => item.type !== 'activity')
+})
+const liveStatusText = computed(() => {
+  return liveItems.value
+    .filter((item) => item.type === 'activity')
+    .at(-1)?.text || ''
+})
 const sessionWorkspace = useSessionWorkspace({
   liveTurn,
   terminal: {
@@ -1792,7 +1800,7 @@ function closePickerMenus() {
           tag="div"
           class="live-stack"
         >
-          <div v-for="item in liveItems" :key="item.id" class="live-item">
+          <div v-for="item in liveFlowItems" :key="item.id" class="live-item">
             <TranscriptEntry
               v-if="item.type === 'tool' && item.persistedEntry"
               :copied-entry-id="copiedEntryId"
@@ -1830,13 +1838,21 @@ function closePickerMenus() {
               @copy="copyTranscriptItem(item.id, liveAssistantCopyText(item.blocks))"
             />
 
-            <div v-else class="live-status-card">
-              <span></span>
-              <strong>{{ item.text }}</strong>
-            </div>
           </div>
         </TransitionGroup>
       </div>
+
+      <Transition name="live-status-dock">
+        <div
+          v-if="!startupRun && liveStatusText"
+          class="live-status-dock"
+          role="status"
+          aria-live="polite"
+        >
+          <span aria-hidden="true"></span>
+          <strong>{{ liveStatusText }}</strong>
+        </div>
+      </Transition>
 
       <button
         v-if="hasNewOutput"

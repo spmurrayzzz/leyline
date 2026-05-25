@@ -203,7 +203,7 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     if (compactingContext.value) return ''
     if (type === 'agent_start' || type === 'turn_start') return 'Thinking…'
     if (type === 'message_update' && !liveAssistantText.value) {
-      return 'Writing response…'
+      return 'Working…'
     }
     if (type === 'message_update') return ''
     if (type === 'tool_call') return ''
