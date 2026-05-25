@@ -547,11 +547,11 @@ kbd {
 }
 
 .status-unread {
-  color: #c6d2ff;
+  color: #5eead4;
 }
 
 .status-error {
-  color: #f87171;
+  color: #fb7185;
 }
 
 .status-queued {
