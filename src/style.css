@@ -1162,6 +1162,22 @@ kbd {
   line-height: 1.45;
 }
 
+.settings-copy-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.settings-copy-row span {
+  min-width: 0;
+}
+
+.settings-copy-row .copy-button {
+  flex: 0 0 auto;
+  margin-top: -2px;
+}
+
 .main-pane {
   position: relative;
   display: grid;

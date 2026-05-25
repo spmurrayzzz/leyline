@@ -108,6 +108,13 @@ const selectedSessionExportUrl = computed(() => {
   if (!selectedSession.value?.id) return ''
   return `/api/pi/sessions/${encodeURIComponent(selectedSession.value.id)}/export`
 })
+const settingsSessionId = computed(() => {
+  return selectedSession.value?.id || activeRuntimeSession.value?.id || ''
+})
+const settingsCwd = computed(() => selectedSession.value?.cwd || '')
+const settingsPath = computed(() => {
+  return selectedSession.value?.path || activeRuntimeSession.value?.path || ''
+})
 let initPhaseTimer = null
 const liveTurn = useLiveTurnProjection({ onIntent: handleLiveTurnIntent })
 const {
@@ -2024,13 +2031,45 @@ function closePickerMenus() {
             <dd>{{ projectName(selectedSession?.cwd) }}</dd>
           </div>
           <div>
+            <dt>Session ID</dt>
+            <dd class="settings-copy-row">
+              <span>{{ settingsSessionId || '—' }}</span>
+              <button
+                v-if="settingsSessionId"
+                type="button"
+                class="copy-button"
+                :title="copyTitle('settings-session-id')"
+                aria-label="Copy session ID"
+                @click="copyTranscriptItem('settings-session-id', settingsSessionId)"
+              >{{ copyGlyph('settings-session-id') }}</button>
+            </dd>
+          </div>
+          <div>
             <dt>CWD</dt>
-            <dd>{{ selectedSession?.cwd || 'No session selected' }}</dd>
+            <dd class="settings-copy-row">
+              <span>{{ settingsCwd || 'No session selected' }}</span>
+              <button
+                v-if="settingsCwd"
+                type="button"
+                class="copy-button"
+                :title="copyTitle('settings-cwd')"
+                aria-label="Copy CWD"
+                @click="copyTranscriptItem('settings-cwd', settingsCwd)"
+              >{{ copyGlyph('settings-cwd') }}</button>
+            </dd>
           </div>
           <div>
             <dt>Path</dt>
-            <dd>
-              {{ selectedSession?.path || activeRuntimeSession?.path || '—' }}
+            <dd class="settings-copy-row">
+              <span>{{ settingsPath || '—' }}</span>
+              <button
+                v-if="settingsPath"
+                type="button"
+                class="copy-button"
+                :title="copyTitle('settings-path')"
+                aria-label="Copy path"
+                @click="copyTranscriptItem('settings-path', settingsPath)"
+              >{{ copyGlyph('settings-path') }}</button>
             </dd>
           </div>
           <div>
