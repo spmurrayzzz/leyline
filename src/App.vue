@@ -2042,31 +2042,29 @@ function closePickerMenus() {
     </aside>
 
     <Transition name="event-drawer">
-      <aside
-        v-if="eventLogOpen"
-        class="event-log-drawer"
-        aria-label="Runtime events"
-      >
-        <header class="event-log-drawer-header">
-          <div>
-            <strong>Runtime events</strong>
-            <span>{{ runtimeEvents.length }} total</span>
+      <div v-if="eventLogOpen" class="event-log-slot">
+        <aside class="event-log-drawer" aria-label="Runtime events">
+          <header class="event-log-drawer-header">
+            <div>
+              <strong>Runtime events</strong>
+              <span>{{ runtimeEvents.length }} total</span>
+            </div>
+            <button type="button" @click="eventLogOpen = false">×</button>
+          </header>
+          <div v-if="eventLog.length === 0" class="event-log-empty">
+            No events yet
           </div>
-          <button type="button" @click="eventLogOpen = false">×</button>
-        </header>
-        <div v-if="eventLog.length === 0" class="event-log-empty">
-          No events yet
-        </div>
-        <div
-          v-for="item in eventLog"
-          :key="item.loggedAt"
-          class="event-log-row"
-        >
-          <time>{{ eventTime(item) }}</time>
-          <code>{{ eventType(item) }}</code>
-          <span>{{ eventSummary(item) }}</span>
-        </div>
-      </aside>
+          <div
+            v-for="item in eventLog"
+            :key="item.loggedAt"
+            class="event-log-row"
+          >
+            <time>{{ eventTime(item) }}</time>
+            <code>{{ eventType(item) }}</code>
+            <span>{{ eventSummary(item) }}</span>
+          </div>
+        </aside>
+      </div>
     </Transition>
 
     <Transition name="tool-fullscreen">
