@@ -1,7 +1,7 @@
 import { defineConfig } from 'vitepress'
 
 export default defineConfig({
-  base: '/docs/',
+  base: process.env.VITEPRESS_BASE || '/docs/',
   outDir: '../dist/docs',
   cacheDir: '../node_modules/.vitepress-cache',
   title: 'Leyline',
