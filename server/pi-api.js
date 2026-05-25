@@ -2135,7 +2135,11 @@ button, input, textarea { color: inherit; font: inherit; }
     opacity var(--motion-base) var(--ease-standard),
     transform var(--motion-base) var(--ease-standard);
 }
-.assistant-message { padding-left: 16px; color: #d8dbe3; }
+.assistant-message {
+  background: rgb(124 92 255 / 5%);
+  padding: 8px 12px;
+  color: #d8dbe3;
+}
 .assistant-message .message-meta { color: var(--muted); }
 .thinking-block {
   margin: 0 0 8px;
@@ -2491,7 +2495,7 @@ button, input, textarea { color: inherit; font: inherit; }
     flex-basis: 100%;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .assistant-message { padding-left: 4px; }
+  .assistant-message { padding-left: 0; }
   .user-message { padding: 9px 10px; }
   .tool-card-header { gap: 7px; }
 }
