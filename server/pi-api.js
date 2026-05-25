@@ -1665,11 +1665,23 @@ function renderMetaTag(tag) {
 
 function exportLogoSvg() {
   return `<svg class="export-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" aria-hidden="true">
-  <g transform="translate(12 12) scale(0.8125)">
-    <rect width="128" height="128" rx="28" fill="#111019"/>
+  <defs>
+    <linearGradient id="export-logo-bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#201f34"/>
+      <stop offset="100%" stop-color="#10101c"/>
+    </linearGradient>
+    <radialGradient id="export-logo-glow" cx="38%" cy="28%" r="70%">
+      <stop offset="0%" stop-color="#4f46e5" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="url(#export-logo-bg)"/>
+  <rect width="128" height="128" rx="28" fill="url(#export-logo-glow)"/>
+  <rect x="0.75" y="0.75" width="126.5" height="126.5" rx="27.25" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1.5"/>
+  <g transform="translate(5 7.3) scale(0.9)">
     <path d="M63 72c12 3 22 11 31 24" fill="none" stroke="#60a5fa" stroke-width="9" stroke-linecap="round"/>
     <path d="M33 96c17-8 27-22 30-42 3-16 15-24 35-24" fill="none" stroke="#a78bfa" stroke-width="9" stroke-linecap="round"/>
-    <g fill="#f4f0ff">
+    <g fill="#f8f4ff">
       <circle cx="33" cy="96" r="9"/>
       <circle cx="98" cy="30" r="9"/>
       <circle cx="94" cy="96" r="9"/>

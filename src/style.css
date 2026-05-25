@@ -182,7 +182,6 @@ button {
   display: block;
   width: 30px;
   height: 30px;
-  filter: drop-shadow(0.5px 1px 0.5px rgba(167, 139, 250, 0.16));
 }
 
 .brand-name {
