@@ -128,9 +128,13 @@ const liveFlowItems = computed(() => {
   return liveItems.value.filter((item) => item.type !== 'activity')
 })
 const liveStatusText = computed(() => {
-  return liveItems.value
-    .filter((item) => item.type === 'activity')
-    .at(-1)?.text || ''
+  const active = agentRunning.value
+    || compactingContext.value
+    || promptSubmitting.value
+    || shellCommandSubmitting.value
+    || interrupting.value
+    || Boolean(goalCommandSubmitting.value)
+  return active ? 'Working…' : ''
 })
 const sessionWorkspace = useSessionWorkspace({
   liveTurn,
@@ -1036,7 +1040,7 @@ async function submitDraft(streamingBehavior) {
       attachedImages.value = []
       editingEntry.value = null
       if (!isHandledSlashCommand(text) || slashCommandStartsTurn(text)) {
-        setAgentRunning(true, 'Thinking…')
+        setAgentRunning(true, 'Working…')
       }
     }
   } catch (error) {
@@ -1229,7 +1233,7 @@ async function runGoalCommand(command) {
     }
     await submitPrompt(sessionId, `/goal ${command}`)
     if (command === 'resume') {
-      setAgentRunning(true, 'Thinking…')
+      setAgentRunning(true, 'Working…')
     }
   } catch (error) {
     if (selectedSessionId.value === sessionId) promptError.value = error.message
