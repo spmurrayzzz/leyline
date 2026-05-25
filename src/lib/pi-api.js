@@ -15,7 +15,7 @@ export function fetchSessionDetail(session) {
   const path = typeof session === 'string' ? '' : session.path
   const query = path ? `?path=${encodeURIComponent(path)}` : ''
   return apiRequest(
-    `/api/pi/sessions/${id}${query}`,
+    `/api/pi/sessions/${encodeURIComponent(id)}${query}`,
     'Failed to load session',
   )
 }
@@ -26,9 +26,11 @@ export function fetchFsDirectory(path) {
 }
 
 export function deletePiSession(id) {
-  return apiRequest(`/api/pi/sessions/${id}`, 'Failed to delete session', {
-    method: 'DELETE',
-  })
+  return apiRequest(
+    `/api/pi/sessions/${encodeURIComponent(id)}`,
+    'Failed to delete session',
+    { method: 'DELETE' },
+  )
 }
 
 export async function activatePiSession(session) {
@@ -52,25 +54,41 @@ export async function fetchPiRuntimeState(cwd) {
   return data.active
 }
 
-export function submitPrompt(text, images = [], streamingBehavior) {
-  return apiRequest('/api/pi/prompt', 'Failed to submit prompt', {
-    method: 'POST',
-    body: { text, images, streamingBehavior },
-  })
+export function submitPrompt(sessionId, text, images = [], streamingBehavior) {
+  return apiRequest(
+    sessionActionUrl(sessionId, 'prompt'),
+    'Failed to submit prompt',
+    {
+      method: 'POST',
+      body: { text, images, streamingBehavior },
+    },
+  )
 }
 
-export function runShellCommand(command, excludeFromContext = false) {
-  return apiRequest('/api/pi/bash', 'Failed to run shell command', {
-    method: 'POST',
-    body: { command, excludeFromContext },
-  })
+export function runShellCommand(
+  sessionId,
+  command,
+  excludeFromContext = false,
+) {
+  return apiRequest(
+    sessionActionUrl(sessionId, 'bash'),
+    'Failed to run shell command',
+    {
+      method: 'POST',
+      body: { command, excludeFromContext },
+    },
+  )
 }
 
-export function compactPiSession(customInstructions = '') {
-  return apiRequest('/api/pi/compact', 'Failed to compact session', {
-    method: 'POST',
-    body: { customInstructions },
-  })
+export function compactPiSession(sessionId, customInstructions = '') {
+  return apiRequest(
+    sessionActionUrl(sessionId, 'compact'),
+    'Failed to compact session',
+    {
+      method: 'POST',
+      body: { customInstructions },
+    },
+  )
 }
 
 export function editPrompt(entryId, text, images = []) {
@@ -80,10 +98,12 @@ export function editPrompt(entryId, text, images = []) {
   })
 }
 
-export function interruptPiSession() {
-  return apiRequest('/api/pi/interrupt', 'Failed to stop run', {
-    method: 'POST',
-  })
+export function interruptPiSession(sessionId) {
+  return apiRequest(
+    sessionActionUrl(sessionId, 'interrupt'),
+    'Failed to stop run',
+    { method: 'POST' },
+  )
 }
 
 export function forkPiSession(entryId) {
@@ -93,24 +113,30 @@ export function forkPiSession(entryId) {
   })
 }
 
-export async function reloadPiSession() {
-  const data = await apiRequest('/api/pi/reload', 'Failed to reload', {
-    method: 'POST',
-  })
-  return data.active
-}
-
-export async function switchPiModel(provider, id) {
-  const data = await apiRequest('/api/pi/model', 'Failed to switch model', {
-    method: 'POST',
-    body: { provider, id },
-  })
-  return data.active
-}
-
-export async function switchPiThinkingLevel(level) {
+export async function reloadPiSession(sessionId) {
   const data = await apiRequest(
-    '/api/pi/thinking',
+    sessionActionUrl(sessionId, 'reload'),
+    'Failed to reload',
+    { method: 'POST' },
+  )
+  return data.active
+}
+
+export async function switchPiModel(sessionId, provider, id) {
+  const data = await apiRequest(
+    sessionActionUrl(sessionId, 'model'),
+    'Failed to switch model',
+    {
+      method: 'POST',
+      body: { provider, id },
+    },
+  )
+  return data.active
+}
+
+export async function switchPiThinkingLevel(sessionId, level) {
+  const data = await apiRequest(
+    sessionActionUrl(sessionId, 'thinking'),
     'Failed to switch thinking',
     {
       method: 'POST',
@@ -118,6 +144,11 @@ export async function switchPiThinkingLevel(level) {
     },
   )
   return data.active
+}
+
+function sessionActionUrl(sessionId, action) {
+  if (!sessionId) return `/api/pi/${action}`
+  return `/api/pi/sessions/${encodeURIComponent(sessionId)}/${action}`
 }
 
 async function apiRequest(url, fallbackError, options = {}) {

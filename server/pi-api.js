@@ -199,12 +199,14 @@ export async function piApiHandler(req, res) {
       }
 
       const body = await readJson(req)
-      await promptActiveSession(
+      const handle = requireActiveHandle()
+      await promptSession(
+        handle,
         body.text,
         body.images,
         body.streamingBehavior,
       )
-      return json(res, { ok: true, active: activeSessionDto() })
+      return json(res, { ok: true, active: activeSessionDto(handle) })
     }
 
     if (url.pathname === '/bash') {
@@ -213,11 +215,12 @@ export async function piApiHandler(req, res) {
       }
 
       const body = await readJson(req)
-      await bashActiveSession(body.command, body.excludeFromContext)
+      const handle = requireActiveHandle()
+      await bashSession(handle, body.command, body.excludeFromContext)
       return json(res, {
         ok: true,
-        active: activeSessionDto(),
-        detail: toActiveSessionDetailDto(),
+        active: activeSessionDto(handle),
+        detail: toActiveSessionDetailDto(handle),
       })
     }
 
@@ -227,11 +230,12 @@ export async function piApiHandler(req, res) {
       }
 
       const body = await readJson(req)
-      await compactActiveSession(body.customInstructions)
+      const handle = requireActiveHandle()
+      await compactSession(handle, body.customInstructions)
       return json(res, {
         ok: true,
-        active: activeSessionDto(),
-        detail: toActiveSessionDetailDto(),
+        active: activeSessionDto(handle),
+        detail: toActiveSessionDetailDto(handle),
       })
     }
 
@@ -264,8 +268,9 @@ export async function piApiHandler(req, res) {
         return json(res, { error: 'Method not allowed' }, 405)
       }
 
-      await reloadActiveSession()
-      return json(res, { ok: true, active: activeSessionDto() })
+      const handle = requireActiveHandle()
+      await reloadSession(handle)
+      return json(res, { ok: true, active: activeSessionDto(handle) })
     }
 
     if (url.pathname === '/model') {
@@ -274,8 +279,9 @@ export async function piApiHandler(req, res) {
       }
 
       const body = await readJson(req)
-      await setActiveModel(body.provider, body.id)
-      return json(res, { ok: true, active: activeSessionDto() })
+      const handle = requireActiveHandle()
+      await setSessionModel(handle, body.provider, body.id)
+      return json(res, { ok: true, active: activeSessionDto(handle) })
     }
 
     if (url.pathname === '/thinking') {
@@ -284,8 +290,9 @@ export async function piApiHandler(req, res) {
       }
 
       const body = await readJson(req)
-      setActiveThinkingLevel(body.level)
-      return json(res, { ok: true, active: activeSessionDto() })
+      const handle = requireActiveHandle()
+      setSessionThinkingLevel(handle, body.level)
+      return json(res, { ok: true, active: activeSessionDto(handle) })
     }
 
     if (url.pathname === '/mode') {
@@ -294,8 +301,9 @@ export async function piApiHandler(req, res) {
       }
 
       await readJson(req)
-      setActiveMode()
-      return json(res, { ok: true, active: activeSessionDto() })
+      const handle = requireActiveHandle()
+      setSessionMode(handle)
+      return json(res, { ok: true, active: activeSessionDto(handle) })
     }
 
     if (url.pathname === '/interrupt') {
@@ -303,8 +311,9 @@ export async function piApiHandler(req, res) {
         return json(res, { error: 'Method not allowed' }, 405)
       }
 
-      await interruptActiveSession()
-      return json(res, { ok: true, active: activeSessionDto() })
+      const handle = requireActiveHandle()
+      await interruptSession(handle)
+      return json(res, { ok: true, active: activeSessionDto(handle) })
     }
 
     if (url.pathname === '/events') {
@@ -315,20 +324,93 @@ export async function piApiHandler(req, res) {
       return openEventStream(req, res)
     }
 
+    const scopedActions = [
+      'prompt',
+      'bash',
+      'compact',
+      'interrupt',
+      'reload',
+      'model',
+      'thinking',
+    ].join('|')
+    const scopedActionMatch = url.pathname.match(
+      new RegExp(`^/sessions/([^/]+)/(${scopedActions})$`),
+    )
+    if (scopedActionMatch) {
+      if (req.method !== 'POST') {
+        return json(res, { error: 'Method not allowed' }, 405)
+      }
+
+      const handle = await runtimeHandleForId(
+        decodeURIComponent(scopedActionMatch[1]),
+      )
+      if (!handle) return json(res, { error: 'Session not found' }, 404)
+
+      const body = await readJson(req)
+      const action = scopedActionMatch[2]
+      if (action === 'prompt') {
+        await promptSession(
+          handle,
+          body.text,
+          body.images,
+          body.streamingBehavior,
+        )
+        return json(res, { ok: true, active: activeSessionDto(handle) })
+      }
+      if (action === 'bash') {
+        await bashSession(handle, body.command, body.excludeFromContext)
+        return json(res, {
+          ok: true,
+          active: activeSessionDto(handle),
+          detail: toActiveSessionDetailDto(handle),
+        })
+      }
+      if (action === 'compact') {
+        await compactSession(handle, body.customInstructions)
+        return json(res, {
+          ok: true,
+          active: activeSessionDto(handle),
+          detail: toActiveSessionDetailDto(handle),
+        })
+      }
+      if (action === 'interrupt') {
+        await interruptSession(handle)
+        return json(res, { ok: true, active: activeSessionDto(handle) })
+      }
+      if (action === 'reload') {
+        await reloadSession(handle)
+        return json(res, { ok: true, active: activeSessionDto(handle) })
+      }
+      if (action === 'model') {
+        await setSessionModel(handle, body.provider, body.id)
+        return json(res, { ok: true, active: activeSessionDto(handle) })
+      }
+
+      setSessionThinkingLevel(handle, body.level)
+      return json(res, { ok: true, active: activeSessionDto(handle) })
+    }
+
     const exportMatch = url.pathname.match(/^\/sessions\/([^/]+)\/export$/)
     if (exportMatch) {
       if (req.method !== 'GET') {
         return json(res, { error: 'Method not allowed' }, 405)
       }
 
-      const detail = await exportSessionDetail(exportMatch[1])
-      return html(res, await renderSessionExportHtml(detail), exportFilename(detail))
+      const detail = await exportSessionDetail(
+        decodeURIComponent(exportMatch[1]),
+      )
+      return html(
+        res,
+        await renderSessionExportHtml(detail),
+        exportFilename(detail),
+      )
     }
 
     const match = url.pathname.match(/^\/sessions\/([^/]+)$/)
     if (match) {
+      const id = decodeURIComponent(match[1])
       if (req.method === 'DELETE') {
-        const trashed = await trashSession(match[1])
+        const trashed = await trashSession(id)
         return json(res, { ok: true, trashed })
       }
 
@@ -336,13 +418,13 @@ export async function piApiHandler(req, res) {
         return json(res, { error: 'Method not allowed' }, 405)
       }
 
-      const handle = runtimeHandles.get(match[1])
+      const handle = runtimeHandles.get(id)
       if (handle) return json(res, toActiveSessionDetailDto(handle))
 
       const path = url.searchParams.get('path')
-      if (path) return json(res, toSessionDetailFromPath(match[1], path))
+      if (path) return json(res, toSessionDetailFromPath(id, path))
 
-      const session = await findSession(match[1])
+      const session = await findSession(id)
       if (!session) return json(res, { error: 'Session not found' }, 404)
       return json(res, toSessionDetailDto(session))
     }
@@ -562,6 +644,19 @@ async function switchActiveSession(session) {
   return activeSessionDto(handle)
 }
 
+async function runtimeHandleForId(id) {
+  const existing = runtimeHandles.get(id)
+  if (existing) return existing
+  const session = await findSession(id)
+  if (!session) return null
+  return ensureRuntimeForSession(session)
+}
+
+function requireActiveHandle() {
+  if (!activeHandle) throw new Error('No active session')
+  return activeHandle
+}
+
 async function ensureRuntimeForSession(session) {
   const key = session.id || session.path
   const existing = runtimeHandles.get(session.id)
@@ -607,9 +702,8 @@ function setActiveHandle(handle) {
   activeSessionId = handle?.sessionId
 }
 
-async function promptActiveSession(text, images = [], streamingBehavior) {
-  if (!activeRuntime) throw new Error('No active session')
-  forceOneAtATime(activeRuntime.session)
+async function promptSession(handle, text, images = [], streamingBehavior) {
+  forceOneAtATime(handle.runtime.session)
   const promptText = typeof text === 'string' ? text : ''
   const promptImages = validateImages(images)
   if (!promptText.trim() && promptImages.length === 0) {
@@ -622,7 +716,7 @@ async function promptActiveSession(text, images = [], streamingBehavior) {
 
   let preflightSucceeded = false
   await new Promise((resolve, reject) => {
-    activeRuntime.session
+    handle.runtime.session
       .prompt(promptText, {
         images: promptImages,
         streamingBehavior,
@@ -639,51 +733,51 @@ async function promptActiveSession(text, images = [], streamingBehavior) {
   })
 }
 
-async function bashActiveSession(command, excludeFromContext = false) {
-  if (!activeRuntime) throw new Error('No active session')
+async function bashSession(handle, command, excludeFromContext = false) {
+  const session = handle.runtime.session
   const bashCommand = typeof command === 'string' ? command.trim() : ''
   if (!bashCommand) throw new Error('shell command is required')
-  if (activeRuntime.session.isBashRunning) {
+  if (session.isBashRunning) {
     throw new Error('A shell command is already running')
   }
 
-  const eventResult = await activeRuntime.session.extensionRunner.emitUserBash({
+  const eventResult = await session.extensionRunner.emitUserBash({
     type: 'user_bash',
     command: bashCommand,
     excludeFromContext: excludeFromContext === true,
-    cwd: activeRuntime.session.sessionManager.getCwd(),
+    cwd: session.sessionManager.getCwd(),
   })
 
   if (eventResult?.result) {
-    activeRuntime.session.recordBashResult(bashCommand, eventResult.result, {
+    session.recordBashResult(bashCommand, eventResult.result, {
       excludeFromContext: excludeFromContext === true,
     })
     return eventResult.result
   }
 
-  return activeRuntime.session.executeBash(bashCommand, undefined, {
+  return session.executeBash(bashCommand, undefined, {
     excludeFromContext: excludeFromContext === true,
     operations: eventResult?.operations,
   })
 }
 
-async function compactActiveSession(customInstructions) {
-  if (!activeRuntime) throw new Error('No active session')
-  if (activeRuntime.session.isStreaming) {
+async function compactSession(handle, customInstructions) {
+  const session = handle.runtime.session
+  if (session.isStreaming) {
     throw new Error('Wait for the current response to finish before compacting.')
   }
-  if (activeRuntime.session.isCompacting) {
+  if (session.isCompacting) {
     throw new Error('Compaction is already running.')
   }
 
-  const entries = activeRuntime.session.sessionManager.getEntries()
+  const entries = session.sessionManager.getEntries()
   const messageCount = entries.filter((entry) => entry.type === 'message').length
   if (messageCount < 2) throw new Error('Nothing to compact (no messages yet)')
 
   const instructions = typeof customInstructions === 'string'
     ? customInstructions.trim()
     : ''
-  await activeRuntime.session.compact(instructions || undefined)
+  await session.compact(instructions || undefined)
 }
 
 function validateImages(images) {
@@ -704,9 +798,8 @@ function validateImages(images) {
   })
 }
 
-async function interruptActiveSession() {
-  if (!activeRuntime) throw new Error('No active session')
-  await activeRuntime.session.abort()
+async function interruptSession(handle) {
+  await handle.runtime.session.abort()
 }
 
 async function editActivePrompt(entryId, text, images = []) {
@@ -726,7 +819,7 @@ async function editActivePrompt(entryId, text, images = []) {
 
   const result = await activeRuntime.session.navigateTree(entryId)
   if (result.cancelled) throw new Error('Edit cancelled')
-  await promptActiveSession(text, images)
+  await promptSession(activeHandle, text, images)
 }
 
 async function forkActiveSession(entryId) {
@@ -806,41 +899,38 @@ function trashSessionPath(session) {
   return join(dirname(sessionDir), 'leyline-trash', stamp, safeRel)
 }
 
-async function reloadActiveSession() {
-  if (!activeRuntime) throw new Error('No active session')
-  if (activeRuntime.session.isStreaming) {
+async function reloadSession(handle) {
+  const session = handle.runtime.session
+  if (session.isStreaming) {
     throw new Error('Wait for the current response to finish before reloading.')
   }
-  if (activeRuntime.session.isCompacting) {
+  if (session.isCompacting) {
     throw new Error('Wait for compaction to finish before reloading.')
   }
 
-  await activeRuntime.session.reload()
-  forceOneAtATime(activeRuntime.session)
-  await bindActiveSession()
+  await session.reload()
+  forceOneAtATime(session)
+  await bindRuntimeHandle(handle)
 }
 
-async function setActiveModel(provider, id) {
-  if (!activeRuntime) throw new Error('No active session')
+async function setSessionModel(handle, provider, id) {
   if (!provider || !id) throw new Error('provider and id are required')
 
-  const model = activeRuntime.services.modelRegistry.find(provider, id)
+  const model = handle.runtime.services.modelRegistry.find(provider, id)
   if (!model) throw new Error('Model not found')
-  await activeRuntime.session.setModel(model)
+  await handle.runtime.session.setModel(model)
 }
 
-function setActiveThinkingLevel(level) {
-  if (!activeRuntime) throw new Error('No active session')
+function setSessionThinkingLevel(handle, level) {
   if (!level) throw new Error('level is required')
 
-  const levels = activeRuntime.session.getAvailableThinkingLevels()
+  const levels = handle.runtime.session.getAvailableThinkingLevels()
   if (!levels.includes(level)) throw new Error('Thinking level not available')
-  activeRuntime.session.setThinkingLevel(level)
+  handle.runtime.session.setThinkingLevel(level)
 }
 
-function setActiveMode() {
-  if (!activeRuntime) throw new Error('No active session')
-  forceOneAtATime(activeRuntime.session)
+function setSessionMode(handle) {
+  forceOneAtATime(handle.runtime.session)
 }
 
 function forceOneAtATime(session) {
@@ -899,6 +989,9 @@ function sessionStateDto(session, services, extensionUiState = emptyExtensionUiS
     availableModels: services.modelRegistry.getAvailable().map(modelDto),
     thinkingLevel: session.thinkingLevel,
     availableThinkingLevels: session.getAvailableThinkingLevels(),
+    isStreaming: session.isStreaming,
+    isCompacting: session.isCompacting,
+    pendingToolCalls: [...(session.agent?.state?.pendingToolCalls || [])],
     steeringMode: session.steeringMode,
     followUpMode: session.followUpMode,
     activeToolCount: activeToolNames.length,

@@ -453,16 +453,22 @@ export function useSessionWorkspace({
       'Reloading keybindings, extensions, skills, prompts, themes…',
     ].join(''))
 
+    const sessionId = selectedSessionId.value
     try {
-      activeRuntimeSession.value = await reloadPiSession()
-      liveTurn?.setActivity?.('')
+      const active = await reloadPiSession(sessionId)
+      if (selectedSessionId.value === sessionId) {
+        activeRuntimeSession.value = active
+      }
+      if (selectedSessionId.value === sessionId) liveTurn?.setActivity?.('')
       await loadSessions({ selectFirst: false, showLoading: false })
-      if (selectedSessionId.value) {
-        sessionDetail.value = await fetchSessionDetail(selectedSessionId.value)
+      if (selectedSessionId.value === sessionId) {
+        sessionDetail.value = await fetchSessionDetail(sessionId)
       }
     } catch (error) {
-      sessionError.value = error.message
-      liveTurn?.setActivity?.('')
+      if (selectedSessionId.value === sessionId) {
+        sessionError.value = error.message
+        liveTurn?.setActivity?.('')
+      }
     } finally {
       reloadingSession.value = false
     }
@@ -500,10 +506,16 @@ export function useSessionWorkspace({
       return true
     }
 
+    const sessionId = selectedSessionId.value
     try {
-      activeRuntimeSession.value = await switchPiModel(model.provider, model.id)
+      const active = await switchPiModel(sessionId, model.provider, model.id)
+      if (selectedSessionId.value === sessionId) {
+        activeRuntimeSession.value = active
+      }
     } catch (error) {
-      sessionError.value = error.message
+      if (selectedSessionId.value === sessionId) {
+        sessionError.value = error.message
+      }
     } finally {
       switchingModel.value = false
     }
@@ -528,10 +540,16 @@ export function useSessionWorkspace({
       return true
     }
 
+    const sessionId = selectedSessionId.value
     try {
-      activeRuntimeSession.value = await switchPiThinkingLevel(level)
+      const active = await switchPiThinkingLevel(sessionId, level)
+      if (selectedSessionId.value === sessionId) {
+        activeRuntimeSession.value = active
+      }
     } catch (error) {
-      sessionError.value = error.message
+      if (selectedSessionId.value === sessionId) {
+        sessionError.value = error.message
+      }
     } finally {
       switchingThinking.value = false
     }

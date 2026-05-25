@@ -538,6 +538,11 @@ watch(sessionDetail, (detail) => {
   if (detail?.session?.cwd) expandProject(detail.session.cwd)
 })
 
+watch(activeRuntimeSession, (session) => {
+  if (session?.id !== selectedSessionId.value) return
+  liveTurn.setRuntimeState(session.state)
+})
+
 watch(selectedSessionId, () => {
   expandedTools.value = new Set()
   expandedSkills.value = new Set()
@@ -965,15 +970,25 @@ async function submitDraft(streamingBehavior) {
   }
 
   if (agentRunning.value && !editingEntry.value) {
+    const sessionId = selectedSessionId.value
     promptSubmitting.value = true
     promptError.value = ''
     try {
-      const data = await submitPrompt(text, images, streamingBehavior || 'steer')
-      if (data.active) activeRuntimeSession.value = data.active
+      const data = await submitPrompt(
+        sessionId,
+        text,
+        images,
+        streamingBehavior || 'steer',
+      )
+      if (data.active && selectedSessionId.value === sessionId) {
+        activeRuntimeSession.value = data.active
+      }
       draft.value = ''
       attachedImages.value = []
     } catch (error) {
-      promptError.value = error.message
+      if (selectedSessionId.value === sessionId) {
+        promptError.value = error.message
+      }
     } finally {
       promptSubmitting.value = false
       refocusComposer()
@@ -982,6 +997,7 @@ async function submitDraft(streamingBehavior) {
   }
 
   const editing = editingEntry.value
+  const sessionId = selectedSessionId.value
   const previousDetail = sessionDetail.value
   reconcileCurrentDetail()
   const shouldFollowOutput = editing || stickToBottom.value
@@ -999,7 +1015,7 @@ async function submitDraft(streamingBehavior) {
 
   try {
     if (editing) await editPrompt(editing.id, text, images)
-    else await submitPrompt(text, images)
+    else await submitPrompt(sessionId, text, images)
     if (isHandledSlashCommand(text)) removeOptimisticEntry(localEntry)
     draft.value = ''
     attachedImages.value = []
@@ -1008,10 +1024,12 @@ async function submitDraft(streamingBehavior) {
       setAgentRunning(true, 'Thinking…')
     }
   } catch (error) {
-    if (editing) sessionDetail.value = previousDetail
-    removeOptimisticEntry(localEntry)
-    promptError.value = error.message
-    resetLiveState()
+    if (selectedSessionId.value === sessionId) {
+      if (editing) sessionDetail.value = previousDetail
+      removeOptimisticEntry(localEntry)
+      promptError.value = error.message
+      resetLiveState()
+    }
   } finally {
     promptSubmitting.value = false
     stopPromptSubmitTimer()
@@ -1057,16 +1075,26 @@ async function submitCompactCommand(compactCommand, images) {
     args: { customInstructions: compactCommand.customInstructions },
   }, 'running')
 
+  const sessionId = selectedSessionId.value
   try {
-    const data = await compactPiSession(compactCommand.customInstructions)
-    if (data.active) activeRuntimeSession.value = data.active
-    if (data.detail) sessionDetail.value = data.detail
-    finishLiveTools('completed')
+    const data = await compactPiSession(
+      sessionId,
+      compactCommand.customInstructions,
+    )
+    if (data.active && selectedSessionId.value === sessionId) {
+      activeRuntimeSession.value = data.active
+    }
+    if (data.detail && selectedSessionId.value === sessionId) {
+      sessionDetail.value = data.detail
+    }
+    if (selectedSessionId.value === sessionId) finishLiveTools('completed')
     await loadSessions({ selectFirst: false, showLoading: false })
-    await scrollToLatest()
+    if (selectedSessionId.value === sessionId) await scrollToLatest()
   } catch (error) {
-    finishLiveTools('error')
-    promptError.value = error.message
+    if (selectedSessionId.value === sessionId) {
+      finishLiveTools('error')
+      promptError.value = error.message
+    }
   } finally {
     promptSubmitting.value = false
     stopPromptSubmitTimer()
@@ -1095,23 +1123,31 @@ async function submitShellCommand(shellCommand, images) {
     args: { command: shellCommand.command },
   }, 'running')
 
+  const sessionId = selectedSessionId.value
   try {
     const data = await runShellCommand(
+      sessionId,
       shellCommand.command,
       shellCommand.excludeFromContext,
     )
-    if (data.active) activeRuntimeSession.value = data.active
-    if (data.detail) sessionDetail.value = data.detail
+    if (data.active && selectedSessionId.value === sessionId) {
+      activeRuntimeSession.value = data.active
+    }
+    if (data.detail && selectedSessionId.value === sessionId) {
+      sessionDetail.value = data.detail
+    }
     draft.value = ''
     await loadSessions({ selectFirst: false, showLoading: false })
-    await scrollToLatest()
+    if (selectedSessionId.value === sessionId) await scrollToLatest()
   } catch (error) {
-    finishLiveTools('error')
-    promptError.value = error.message
+    if (selectedSessionId.value === sessionId) {
+      finishLiveTools('error')
+      promptError.value = error.message
+    }
   } finally {
     promptSubmitting.value = false
     shellCommandSubmitting.value = false
-    setLiveActivity('')
+    if (selectedSessionId.value === sessionId) setLiveActivity('')
     stopPromptSubmitTimer()
     refocusComposer()
   }
@@ -1168,18 +1204,19 @@ async function runGoalCommand(command) {
   goalCommandSubmitting.value = command
   promptError.value = ''
 
+  const sessionId = selectedSessionId.value
   try {
     if ((command === 'pause' || command === 'clear') && agentRunning.value) {
       setLiveActivity('Stopping…')
-      await interruptPiSession()
+      await interruptPiSession(sessionId)
       setAgentRunning(false)
     }
-    await submitPrompt(`/goal ${command}`)
+    await submitPrompt(sessionId, `/goal ${command}`)
     if (command === 'resume') {
       setAgentRunning(true, 'Thinking…')
     }
   } catch (error) {
-    promptError.value = error.message
+    if (selectedSessionId.value === sessionId) promptError.value = error.message
   } finally {
     goalCommandSubmitting.value = ''
   }
@@ -1192,12 +1229,15 @@ async function interruptAgent() {
   promptError.value = ''
   setLiveActivity('Stopping…')
 
+  const sessionId = selectedSessionId.value
   try {
-    await interruptPiSession()
-    setAgentRunning(false)
+    await interruptPiSession(sessionId)
+    if (selectedSessionId.value === sessionId) setAgentRunning(false)
   } catch (error) {
-    promptError.value = error.message
-    setLiveActivity('')
+    if (selectedSessionId.value === sessionId) {
+      promptError.value = error.message
+      setLiveActivity('')
+    }
   } finally {
     interrupting.value = false
   }

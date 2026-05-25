@@ -138,6 +138,17 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     liveActivity.value = text || ''
   }
 
+  function setRuntimeState(state) {
+    if (!state) return
+    compactingContext.value = state.isCompacting === true
+    agentRunning.value = state.isStreaming === true
+    if (!agentRunning.value && !compactingContext.value) return
+    if (liveActivity.value || liveAssistantMessages.value.length) return
+    liveActivity.value = compactingContext.value
+      ? 'Compacting context…'
+      : 'Running…'
+  }
+
   function addTool(event, status) {
     upsertLiveTool(event, status)
   }
@@ -526,5 +537,6 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     setActivity,
     setAgentRunning,
     setPersistedDetail,
+    setRuntimeState,
   }
 }
