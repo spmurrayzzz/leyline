@@ -1051,21 +1051,30 @@ kbd {
   border-left: 1px solid var(--border-soft);
   background: #101116;
   padding: 10px;
+  transform: translateX(0);
   scrollbar-color: #4b4658 transparent;
   scrollbar-width: thin;
 }
 
 .event-drawer-enter-active {
-  transition: opacity var(--motion-base) var(--ease-decelerate);
+  transition:
+    opacity var(--motion-base) var(--ease-decelerate),
+    transform var(--motion-base) var(--ease-standard),
+    border-color var(--motion-base) var(--ease-standard);
 }
 
 .event-drawer-leave-active {
-  transition: opacity var(--motion-fast) var(--ease-accelerate);
+  transition:
+    opacity var(--motion-fast) var(--ease-accelerate),
+    transform var(--motion-base) var(--ease-standard),
+    border-color var(--motion-base) var(--ease-standard);
 }
 
 .event-drawer-enter-from,
 .event-drawer-leave-to {
+  border-left-color: transparent;
   opacity: 0;
+  transform: translateX(100%);
 }
 
 .event-log-drawer-header {
@@ -4233,6 +4242,8 @@ textarea::placeholder {
   .model-caret,
   .model-menu button,
   .send-button,
+  .event-drawer-enter-active,
+  .event-drawer-leave-active,
   .composer-popover-enter-active,
   .composer-popover-leave-active,
   .composer-reveal-enter-active,
