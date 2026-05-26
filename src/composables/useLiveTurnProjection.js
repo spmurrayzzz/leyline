@@ -52,7 +52,9 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     }
 
     return list.filter((entry) => {
-      return isRenderableEntry(entry) && !isCoveredByLiveTool(entry)
+      return isRenderableEntry(entry)
+        && !isCoveredByLiveTool(entry)
+        && !isCoveredByLiveAssistant(entry)
     })
   })
   const liveToolSettleTimers = new Map()
@@ -364,6 +366,13 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     return liveTools.value.some((tool) => liveToolMatchesEntry(tool, entry))
   }
 
+  function isCoveredByLiveAssistant(entry) {
+    if (entry.type !== 'message' || entry.role !== 'assistant') return false
+    return liveAssistantMessages.value.some((message) => {
+      return blocksSignature(message.blocks) === blocksSignature(entry.blocks)
+    })
+  }
+
   function liveToolMatchesEntry(tool, entry) {
     if (tool.toolCallId && entry.toolCallId) {
       return tool.toolCallId === entry.toolCallId
@@ -378,7 +387,9 @@ export function useLiveTurnProjection({ onIntent } = {}) {
   }
 
   function updateLiveAssistant(event) {
-    if (event?.type === 'message_start') activeLiveAssistantId = ''
+    if (event?.type === 'message_start' && event.message?.role === 'assistant') {
+      activeLiveAssistantId = messageEventId(event)
+    }
 
     if (event?.type === 'message_update' && event.message?.role === 'assistant') {
       pendingAssistantEvent = event
@@ -402,12 +413,14 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     const blocks = messageBlocks(event.message.content)
     if (!blocks.length) return
     const text = textFromBlocks(blocks)
-    const id = activeLiveAssistantId || `live-assistant-${++liveItemSeq}`
+    const requestedId = activeLiveAssistantId || messageEventId(event)
+    const existing = findLiveAssistant(requestedId, blocks)
+    const seq = existing?.seq || ++liveItemSeq
+    const id = existing?.id || requestedId || `live-assistant-${seq}`
     activeLiveAssistantId = id
-    const existing = liveAssistantMessages.value.find((item) => item.id === id)
     const next = {
       id,
-      seq: existing?.seq || liveItemSeq,
+      seq,
       type: 'assistant',
       blocks,
       text,
@@ -434,6 +447,33 @@ export function useLiveTurnProjection({ onIntent } = {}) {
       })
     }
     activeLiveAssistantId = ''
+  }
+
+  function findLiveAssistant(id, blocks) {
+    if (id) {
+      const byId = liveAssistantMessages.value.find((item) => item.id === id)
+      if (byId) return byId
+    }
+
+    const streaming = [...liveAssistantMessages.value].reverse().find((item) => {
+      return item.streaming
+    })
+    if (streaming) return streaming
+
+    const signature = blocksSignature(blocks)
+    return [...liveAssistantMessages.value].reverse().find((item) => {
+      return blocksSignature(item.blocks) === signature
+    })
+  }
+
+  function messageEventId(event) {
+    return event?.message?.id || event?.message?.entryId || event?.id || ''
+  }
+
+  function blocksSignature(blocks = []) {
+    return blocks.map((block) => {
+      return `${block.type}:${block.text || block.data || ''}`
+    }).join('\n')
   }
 
   function clearLiveAssistant() {
