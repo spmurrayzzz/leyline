@@ -48,13 +48,20 @@ async function createWindow() {
       && key === 'e'
       && input.meta
       && !input.shift
+    const isEscape = input.type === 'keyDown' && key === 'escape'
 
     if (
       !isNewSession
       && !isToggleTerminal
       && !isOpenSettings
       && !isToggleSidebar
+      && !isEscape
     ) return
+
+    if (isEscape) {
+      sendEscapeCommand(mainWindow)
+      return
+    }
 
     event.preventDefault()
     if (isNewSession) sendNewSessionCommand(mainWindow)
@@ -64,6 +71,10 @@ async function createWindow() {
   })
 
   await mainWindow.loadURL(url)
+}
+
+function sendEscapeCommand(window) {
+  sendWindowCommand(window, 'leyline:escape')
 }
 
 function sendNewSessionCommand(window) {

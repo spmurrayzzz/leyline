@@ -550,13 +550,14 @@ watch(() => composerRef.value?.form, (el) => {
 }, { flush: 'post' })
 
 onMounted(async () => {
-  window.addEventListener('keydown', closeMenusOnEscape)
+  window.addEventListener('keydown', closeMenusOnEscape, true)
   window.addEventListener('click', closeMenusOnOutsideClick)
   window.addEventListener('popstate', handleRouteChange)
   window.addEventListener('leyline:new-session', handleNativeNewSession)
   window.addEventListener('leyline:toggle-terminal', handleNativeToggleTerminal)
   window.addEventListener('leyline:open-settings', handleNativeOpenSettings)
   window.addEventListener('leyline:toggle-sidebar', handleNativeToggleSidebar)
+  window.addEventListener('leyline:escape', handleNativeEscape)
   openEventStream()
   initPhase.value = 'sessions'
   await waitInitPhaseFloor()
@@ -564,13 +565,14 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  window.removeEventListener('keydown', closeMenusOnEscape)
+  window.removeEventListener('keydown', closeMenusOnEscape, true)
   window.removeEventListener('click', closeMenusOnOutsideClick)
   window.removeEventListener('popstate', handleRouteChange)
   window.removeEventListener('leyline:new-session', handleNativeNewSession)
   window.removeEventListener('leyline:toggle-terminal', handleNativeToggleTerminal)
   window.removeEventListener('leyline:open-settings', handleNativeOpenSettings)
   window.removeEventListener('leyline:toggle-sidebar', handleNativeToggleSidebar)
+  window.removeEventListener('leyline:escape', handleNativeEscape)
   stopTerminalResize()
   closeEventStream()
   sessionWorkspace.dispose()
@@ -669,6 +671,10 @@ function handleNativeToggleSidebar() {
   }
 
   desktopSidebarHidden.value = !desktopSidebarHidden.value
+}
+
+function handleNativeEscape() {
+  handleEscape()
 }
 
 function wait(ms) {
@@ -1483,6 +1489,14 @@ async function submitStartDraft() {
 
 function closeMenusOnEscape(event) {
   if (event.key !== 'Escape') return
+  handleEscape(event)
+}
+
+function handleEscape(event) {
+  if (agentRunning.value) {
+    event?.preventDefault?.()
+    void interruptAgent()
+  }
   settingsOpen.value = false
   eventLogOpen.value = false
   closeToolFullscreen()
