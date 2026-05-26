@@ -521,6 +521,7 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     return {
       id: `local-${now}`,
       createdAt: now,
+      persisted: false,
       type: 'message',
       role: 'user',
       label: 'You',

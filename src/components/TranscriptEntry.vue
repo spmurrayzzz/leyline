@@ -47,6 +47,15 @@ function copyTitle(id) {
 function copyGlyph(id) {
   return props.copiedEntryId === id ? '✓' : '⧉'
 }
+
+function isLocalEntry(entry) {
+  return entry?.persisted === false
+    || String(entry?.id || '').startsWith('local-')
+}
+
+function canEditEntry(entry) {
+  return entry.role === 'user' && !isLocalEntry(entry)
+}
 </script>
 
 <template>
@@ -164,7 +173,7 @@ function copyGlyph(id) {
     <div class="message-meta message-meta-row">
       <span>{{ entry.label }}</span>
       <button
-        v-if="entry.role === 'user'"
+        v-if="canEditEntry(entry)"
         class="copy-button"
         type="button"
         title="Edit message"

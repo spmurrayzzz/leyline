@@ -245,8 +245,9 @@ export async function piApiHandler(req, res) {
       }
 
       const body = await readJson(req)
-      await editActivePrompt(body.entryId, body.text, body.images)
-      return json(res, { ok: true, active: activeSessionDto() })
+      const handle = requireActiveHandle()
+      await editSessionPrompt(handle, body.entryId, body.text, body.images)
+      return json(res, { ok: true, active: activeSessionDto(handle) })
     }
 
     if (url.pathname === '/fork') {
@@ -328,6 +329,7 @@ export async function piApiHandler(req, res) {
       'prompt',
       'bash',
       'compact',
+      'edit-prompt',
       'interrupt',
       'reload',
       'model',
@@ -372,6 +374,10 @@ export async function piApiHandler(req, res) {
           active: activeSessionDto(handle),
           detail: toActiveSessionDetailDto(handle),
         })
+      }
+      if (action === 'edit-prompt') {
+        await editSessionPrompt(handle, body.entryId, body.text, body.images)
+        return json(res, { ok: true, active: activeSessionDto(handle) })
       }
       if (action === 'interrupt') {
         await interruptSession(handle)
@@ -802,24 +808,41 @@ async function interruptSession(handle) {
   await handle.runtime.session.abort()
 }
 
-async function editActivePrompt(entryId, text, images = []) {
-  if (!activeRuntime) throw new Error('No active session')
+async function editSessionPrompt(handle, entryId, text, images = []) {
+  const session = handle.runtime.session
   if (!entryId) throw new Error('entryId is required')
-  if (activeRuntime.session.isStreaming) {
+  if (session.isStreaming) {
     throw new Error('Wait for the current response to finish before editing.')
   }
-  if (activeRuntime.session.isCompacting) {
+  if (session.isCompacting) {
     throw new Error('Wait for compaction to finish before editing.')
   }
 
-  const entry = activeRuntime.session.sessionManager.getEntry(entryId)
+  const entry = session.sessionManager.getEntry(entryId)
   if (entry?.type !== 'message' || entry.message?.role !== 'user') {
     throw new Error('Only user messages can be edited')
   }
 
-  const result = await activeRuntime.session.navigateTree(entryId)
-  if (result.cancelled) throw new Error('Edit cancelled')
-  await promptSession(activeHandle, text, images)
+  const oldLeafId = session.sessionManager.getLeafId()
+  if (oldLeafId === entryId) moveSessionLeaf(session, entry.parentId || null)
+  else {
+    const result = await session.navigateTree(entryId)
+    if (result.cancelled) throw new Error('Edit cancelled')
+  }
+
+  try {
+    await promptSession(handle, text, images)
+  } catch (error) {
+    moveSessionLeaf(session, oldLeafId)
+    throw error
+  }
+}
+
+function moveSessionLeaf(session, leafId) {
+  if (leafId) session.sessionManager.branch(leafId)
+  else session.sessionManager.resetLeaf()
+  const sessionContext = session.sessionManager.buildSessionContext()
+  session.agent.state.messages = sessionContext.messages
 }
 
 async function forkActiveSession(entryId) {

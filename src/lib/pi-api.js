@@ -91,11 +91,15 @@ export function compactPiSession(sessionId, customInstructions = '') {
   )
 }
 
-export function editPrompt(entryId, text, images = []) {
-  return apiRequest('/api/pi/edit-prompt', 'Failed to edit prompt', {
-    method: 'POST',
-    body: { entryId, text, images },
-  })
+export function editPrompt(sessionId, entryId, text, images = []) {
+  return apiRequest(
+    sessionActionUrl(sessionId, 'edit-prompt'),
+    'Failed to edit prompt',
+    {
+      method: 'POST',
+      body: { entryId, text, images },
+    },
+  )
 }
 
 export function interruptPiSession(sessionId) {

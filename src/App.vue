@@ -967,9 +967,15 @@ async function submitDraft(streamingBehavior) {
     return
   }
 
-  const editing = editingEntry.value
   const sessionId = selectedSessionId.value
+  const editing = persistedEditingEntry(editingEntry.value)
+  if (editingEntry.value && !editing) {
+    promptError.value = 'Wait for this message to finish saving before editing.'
+    return
+  }
+  if (editing && editing !== editingEntry.value) editingEntry.value = editing
   const previousDetail = sessionDetail.value
+  resetLiveState()
   reconcileCurrentDetail()
   const shouldFollowOutput = editing || stickToBottom.value
   if (editing) {
@@ -984,9 +990,11 @@ async function submitDraft(streamingBehavior) {
   else hasNewOutput.value = true
 
   try {
-    if (editing) await editPrompt(editing.id, text, images)
-    else await submitPrompt(sessionId, text, images)
+    const data = editing
+      ? await editPrompt(sessionId, editing.id, text, images)
+      : await submitPrompt(sessionId, text, images)
     if (selectedSessionId.value === sessionId) {
+      if (data.active) activeRuntimeSession.value = data.active
       if (isHandledSlashCommand(text)) removeOptimisticEntry(localEntry)
       draft.value = ''
       attachedImages.value = []
@@ -1133,17 +1141,48 @@ function startEditingEntry(entry) {
     || compactingContext.value
     || promptSubmitting.value
     || !entry?.id) return
-  if (entry.role !== 'user') return
 
-  editingEntry.value = entry
-  draft.value = entry.text || textFromBlocks(messageBlocksFor(entry))
-  attachedImages.value = imageBlocksFor(entry).map((image) => ({
+  const target = persistedEditingEntry(entry)
+  if (!target) {
+    promptError.value = 'Wait for this message to finish saving before editing.'
+    return
+  }
+  if (target.role !== 'user') return
+
+  editingEntry.value = target
+  draft.value = target.text || textFromBlocks(messageBlocksFor(target))
+  attachedImages.value = imageBlocksFor(target).map((image) => ({
     ...image,
     preview: imageSrcForComposer(image),
   }))
   promptError.value = ''
   closePickerMenus()
   nextTick(() => composerRef.value?.focus())
+}
+
+function persistedEditingEntry(entry) {
+  if (!entry) return null
+  if (!isLocalEntry(entry)) return entry
+  return matchingPersistedUserEntry(entry)
+}
+
+function isLocalEntry(entry) {
+  return entry?.persisted === false
+    || String(entry?.id || '').startsWith('local-')
+}
+
+function matchingPersistedUserEntry(entry) {
+  const entries = sessionDetail.value?.entries || []
+  return entries.find((candidate) => {
+    if (candidate.type !== 'message' || candidate.role !== 'user') return false
+    if (candidate.text !== entry.text) return false
+    if (imageBlocksFor(candidate).length !== imageBlocksFor(entry).length) {
+      return false
+    }
+    if (!entry.createdAt) return true
+    const timestamp = new Date(candidate.timestamp).getTime()
+    return !Number.isFinite(timestamp) || timestamp >= entry.createdAt - 1000
+  }) || null
 }
 
 function cancelEditingEntry() {
@@ -1154,10 +1193,12 @@ function trimSessionToEntry(entryId) {
   const detail = sessionDetail.value
   const index = detail?.entries?.findIndex((entry) => entry.id === entryId)
   if (!detail || index < 0) return
-  sessionDetail.value = {
+  const nextDetail = {
     ...detail,
     entries: detail.entries.slice(0, index),
   }
+  sessionDetail.value = nextDetail
+  liveTurn.setPersistedDetail(nextDetail)
 }
 
 function imageSrcForComposer(image) {
