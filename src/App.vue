@@ -480,7 +480,9 @@ const sessionHandoffStatus = computed(() => {
   }
 })
 const startFlowVisible = computed(() => {
-  return !selectedSession.value || Boolean(startupRun.value)
+  if (startupRun.value) return true
+  if (sessionLoading.value || sessionSwitching.value) return false
+  return !selectedSession.value
 })
 const runtimeChromeVisible = computed(() => {
   return initializing.value || (selectedSession.value && !startupRun.value)
@@ -1018,6 +1020,8 @@ async function submitDraft(streamingBehavior) {
   if (!text && images.length === 0) return
   if (promptSubmitting.value
     || reloadingSession.value
+    || sessionLoading.value
+    || sessionSwitching.value
     || sessionActivating.value
     || compactingContext.value) {
     return
@@ -1883,12 +1887,18 @@ function closePickerMenus() {
         v-if="selectedSession
           && !initializing
           && !isEmptySelectedSession
-          && !startupRun"
+          && !startupRun
+          && !sessionLoading
+          && !sessionSwitching"
         class="composer-fade"
       ></div>
 
       <SessionComposer
-        v-if="selectedSession && !initializing && !startupRun"
+        v-if="selectedSession
+          && !initializing
+          && !startupRun
+          && !sessionLoading
+          && !sessionSwitching"
         ref="composerRef"
         v-model:draft="draft"
         :agent-running="agentRunning"

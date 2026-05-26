@@ -214,6 +214,12 @@ export function useSessionWorkspace({
     const token = ++sessionSelectionToken
     sessionSwitching.value = true
     const switchStarted = Date.now()
+    if (sessionDetail.value?.session?.id !== session.id) {
+      sessionDetail.value = null
+    }
+    if (activeRuntimeSession.value?.id !== session.id) {
+      activeRuntimeSession.value = null
+    }
     selectedSessionId.value = session.id
     markRuntimeSessionRead(session.id)
     liveTurn?.selectSession?.(session.id)
