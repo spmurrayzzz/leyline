@@ -3,7 +3,10 @@ import { stat } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { extname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { configurePiWebSocketServer, piApiHandler } from './pi-api.js'
+import {
+  configurePiWebSocketServer,
+  piApiHandler,
+} from './pi-api/index.js'
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const defaultDist = join(root, 'dist')

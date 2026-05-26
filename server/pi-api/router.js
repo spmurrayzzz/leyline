@@ -1,0 +1,333 @@
+export function createPiApiHandler(api) {
+  const {
+    activeSessionDto,
+    bashSession,
+    compactSession,
+    createNewSession,
+    editSessionPrompt,
+    exportFilename,
+    exportSessionDetail,
+    exportShareMeta,
+    forkActiveSession,
+    html,
+    interruptSession,
+    json,
+    listSessions,
+    openEventStream,
+    promptSession,
+    readDirectory,
+    readJson,
+    reloadSession,
+    requireActiveHandle,
+    resolveSession,
+    runtimeHandleForId,
+    runtimeState,
+    setSessionMode,
+    setSessionModel,
+    setSessionThinkingLevel,
+    sessionDetail,
+    switchActiveSession,
+    toActiveSessionDetailDto,
+    toSessionDto,
+    trashSession,
+    renderSessionExportHtml,
+  } = api
+
+async function piApiHandler(req, res) {
+    const url = new URL(req.url, 'http://localhost')
+  
+    try {
+      if (url.pathname === '/sessions') {
+        if (req.method === 'GET') {
+          const sessions = await listSessions()
+          return json(res, { sessions: sessions.map(toSessionDto) })
+        }
+  
+        if (req.method === 'POST') {
+          const body = await readJson(req)
+          const active = await createNewSession(body.cwd)
+          return json(res, {
+            active,
+            detail: toActiveSessionDetailDto(),
+          })
+        }
+  
+        return json(res, { error: 'Method not allowed' }, 405)
+      }
+  
+      if (url.pathname === '/active-session') {
+        if (req.method !== 'POST') {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+  
+        const body = await readJson(req)
+        const session = await resolveSession(body.id, body.path, body.cwd)
+        if (!session) return json(res, { error: 'Session not found' }, 404)
+  
+        const active = await switchActiveSession(session)
+        return json(res, { active })
+      }
+  
+      if (url.pathname === '/state') {
+        if (req.method !== 'GET') {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+  
+        const active = await runtimeState(url.searchParams.get('cwd'))
+        return json(res, { active })
+      }
+  
+      if (url.pathname === '/fs') {
+        if (req.method !== 'GET') {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+  
+        return json(res, await readDirectory(url.searchParams.get('path')))
+      }
+  
+      if (url.pathname === '/prompt') {
+        if (req.method !== 'POST') {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+  
+        const body = await readJson(req)
+        const handle = requireActiveHandle()
+        await promptSession(
+          handle,
+          body.text,
+          body.images,
+          body.streamingBehavior,
+        )
+        return json(res, { ok: true, active: activeSessionDto(handle) })
+      }
+  
+      if (url.pathname === '/bash') {
+        if (req.method !== 'POST') {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+  
+        const body = await readJson(req)
+        const handle = requireActiveHandle()
+        await bashSession(handle, body.command, body.excludeFromContext)
+        return json(res, {
+          ok: true,
+          active: activeSessionDto(handle),
+          detail: toActiveSessionDetailDto(handle),
+        })
+      }
+  
+      if (url.pathname === '/compact') {
+        if (req.method !== 'POST') {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+  
+        const body = await readJson(req)
+        const handle = requireActiveHandle()
+        await compactSession(handle, body.customInstructions)
+        return json(res, {
+          ok: true,
+          active: activeSessionDto(handle),
+          detail: toActiveSessionDetailDto(handle),
+        })
+      }
+  
+      if (url.pathname === '/edit-prompt') {
+        if (req.method !== 'POST') {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+  
+        const body = await readJson(req)
+        const handle = requireActiveHandle()
+        await editSessionPrompt(handle, body.entryId, body.text, body.images)
+        return json(res, { ok: true, active: activeSessionDto(handle) })
+      }
+  
+      if (url.pathname === '/fork') {
+        if (req.method !== 'POST') {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+  
+        const body = await readJson(req)
+        const active = await forkActiveSession(body.entryId)
+        return json(res, {
+          ok: true,
+          active,
+          detail: toActiveSessionDetailDto(),
+        })
+      }
+  
+      if (url.pathname === '/reload') {
+        if (req.method !== 'POST') {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+  
+        const handle = requireActiveHandle()
+        await reloadSession(handle)
+        return json(res, { ok: true, active: activeSessionDto(handle) })
+      }
+  
+      if (url.pathname === '/model') {
+        if (req.method !== 'POST') {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+  
+        const body = await readJson(req)
+        const handle = requireActiveHandle()
+        await setSessionModel(handle, body.provider, body.id)
+        return json(res, { ok: true, active: activeSessionDto(handle) })
+      }
+  
+      if (url.pathname === '/thinking') {
+        if (req.method !== 'POST') {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+  
+        const body = await readJson(req)
+        const handle = requireActiveHandle()
+        setSessionThinkingLevel(handle, body.level)
+        return json(res, { ok: true, active: activeSessionDto(handle) })
+      }
+  
+      if (url.pathname === '/mode') {
+        if (req.method !== 'POST') {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+  
+        await readJson(req)
+        const handle = requireActiveHandle()
+        setSessionMode(handle)
+        return json(res, { ok: true, active: activeSessionDto(handle) })
+      }
+  
+      if (url.pathname === '/interrupt') {
+        if (req.method !== 'POST') {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+  
+        const handle = requireActiveHandle()
+        await interruptSession(handle)
+        return json(res, { ok: true, active: activeSessionDto(handle) })
+      }
+  
+      if (url.pathname === '/events') {
+        if (req.method !== 'GET') {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+  
+        return openEventStream(req, res)
+      }
+  
+      const scopedActions = [
+        'prompt',
+        'bash',
+        'compact',
+        'edit-prompt',
+        'interrupt',
+        'reload',
+        'model',
+        'thinking',
+      ].join('|')
+      const scopedActionMatch = url.pathname.match(
+        new RegExp(`^/sessions/([^/]+)/(${scopedActions})$`),
+      )
+      if (scopedActionMatch) {
+        if (req.method !== 'POST') {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+  
+        const handle = await runtimeHandleForId(
+          decodeURIComponent(scopedActionMatch[1]),
+        )
+        if (!handle) return json(res, { error: 'Session not found' }, 404)
+  
+        const body = await readJson(req)
+        const action = scopedActionMatch[2]
+        if (action === 'prompt') {
+          await promptSession(
+            handle,
+            body.text,
+            body.images,
+            body.streamingBehavior,
+          )
+          return json(res, { ok: true, active: activeSessionDto(handle) })
+        }
+        if (action === 'bash') {
+          await bashSession(handle, body.command, body.excludeFromContext)
+          return json(res, {
+            ok: true,
+            active: activeSessionDto(handle),
+            detail: toActiveSessionDetailDto(handle),
+          })
+        }
+        if (action === 'compact') {
+          await compactSession(handle, body.customInstructions)
+          return json(res, {
+            ok: true,
+            active: activeSessionDto(handle),
+            detail: toActiveSessionDetailDto(handle),
+          })
+        }
+        if (action === 'edit-prompt') {
+          await editSessionPrompt(handle, body.entryId, body.text, body.images)
+          return json(res, { ok: true, active: activeSessionDto(handle) })
+        }
+        if (action === 'interrupt') {
+          await interruptSession(handle)
+          return json(res, { ok: true, active: activeSessionDto(handle) })
+        }
+        if (action === 'reload') {
+          await reloadSession(handle)
+          return json(res, { ok: true, active: activeSessionDto(handle) })
+        }
+        if (action === 'model') {
+          await setSessionModel(handle, body.provider, body.id)
+          return json(res, { ok: true, active: activeSessionDto(handle) })
+        }
+  
+        setSessionThinkingLevel(handle, body.level)
+        return json(res, { ok: true, active: activeSessionDto(handle) })
+      }
+  
+      const exportMatch = url.pathname.match(/^\/sessions\/([^/]+)\/export$/)
+      if (exportMatch) {
+        if (req.method !== 'GET') {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+  
+        const id = decodeURIComponent(exportMatch[1])
+        const detail = await exportSessionDetail(id)
+        return html(
+          res,
+          await renderSessionExportHtml(detail, exportShareMeta(id)),
+          exportFilename(detail),
+          url.searchParams.get('disposition') === 'inline',
+        )
+      }
+  
+      const match = url.pathname.match(/^\/sessions\/([^/]+)$/)
+      if (match) {
+        const id = decodeURIComponent(match[1])
+        if (req.method === 'DELETE') {
+          const trashed = await trashSession(id)
+          return json(res, { ok: true, trashed })
+        }
+  
+        if (req.method !== 'GET') {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+  
+        const detail = await sessionDetail(id, url.searchParams.get('path'))
+        if (!detail) return json(res, { error: 'Session not found' }, 404)
+        return json(res, detail)
+      }
+  
+      return json(res, { error: 'Not found' }, 404)
+    } catch (error) {
+      return json(res, { error: error.message }, 500)
+    }
+  }
+  
+  
+
+  return piApiHandler
+}

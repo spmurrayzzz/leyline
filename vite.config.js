@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { createServer as createVitePressServer } from 'vitepress'
-import { piApi } from './server/pi-api.js'
+import { piApi } from './server/pi-api/index.js'
 
 function docsSite() {
   return {
