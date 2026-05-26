@@ -84,6 +84,7 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     liveActivity.value = activityText(event)
     updateLiveTool(event)
     updateLiveAssistant(event)
+    releaseLiveAnchorIfSettled()
     emit({ type: 'runtime-queue', event })
     surfaceRuntimeError(event)
     if (hasLiveOutput()) emit({ type: 'scroll-live', activeSessionId })
@@ -104,7 +105,10 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     persistedDetail.value = detail
     if (!detail) return
     reconcileOptimisticEntries(detail)
+    reconcileLiveUsers(detail)
+    reconcileLiveAssistants(detail)
     reconcileLiveTools(detail)
+    releaseLiveAnchorIfSettled()
   }
 
   function beginUserTurn(text, images = []) {
@@ -389,14 +393,14 @@ export function useLiveTurnProjection({ onIntent } = {}) {
   function isCoveredByLiveAssistant(entry) {
     if (entry.type !== 'message' || entry.role !== 'assistant') return false
     return liveAssistantMessages.value.some((message) => {
-      return message.id && message.id === entry.id
+      return liveAssistantMatchesEntry(message, entry)
     })
   }
 
   function isCoveredByLiveUser(entry) {
     if (entry.type !== 'message' || entry.role !== 'user') return false
     return liveUserMessages.value.some((message) => {
-      return localEntryMatches(message, entry)
+      return liveUserMatchesEntry(message, entry)
     })
   }
 
@@ -411,6 +415,83 @@ export function useLiveTurnProjection({ onIntent } = {}) {
 
     if (tool.code && entry.code) return tool.code === entry.code
     return Boolean(tool.toolName && entry.toolName)
+  }
+
+  function releaseLiveAnchorIfSettled() {
+    if (liveTurnAnchorLength === null) return
+    if (agentRunning.value || compactingContext.value || liveActivity.value) {
+      return
+    }
+    if (liveUserMessages.value.some((message) => !message.persistedEntry)) {
+      return
+    }
+    if (liveAssistantMessages.value.some((message) => {
+      return message.streaming || !message.persistedEntry
+    })) return
+    if (liveTools.value.some((tool) => !liveToolSettled(tool))) return
+    liveTurnAnchorLength = null
+  }
+
+  function liveToolSettled(tool) {
+    if (tool.persistedEntry) return true
+    return ['completed', 'error', 'aborted'].includes(tool.status)
+  }
+
+  function reconcileLiveUsers(detail) {
+    const persisted = (detail.entries || []).filter((entry) => {
+      return entry.type === 'message' && entry.role === 'user'
+    })
+    const matchedIds = new Set()
+
+    liveUserMessages.value = liveUserMessages.value.map((message) => {
+      const entry = persisted.find((item) => {
+        return !matchedIds.has(item.id) && liveUserMatchesEntry(message, item)
+      })
+      if (!entry) return message
+      matchedIds.add(entry.id)
+      return { ...message, persistedEntry: entry }
+    })
+  }
+
+  function liveUserMatchesEntry(message, entry) {
+    if (message.persistedEntry?.id) {
+      return message.persistedEntry.id === entry.id
+    }
+    return localEntryMatches(message, entry)
+  }
+
+  function reconcileLiveAssistants(detail) {
+    const persisted = (detail.entries || []).filter((entry) => {
+      return entry.type === 'message' && entry.role === 'assistant'
+    })
+    const matchedIds = new Set()
+
+    liveAssistantMessages.value = liveAssistantMessages.value.map((message) => {
+      const entry = persisted.find((item) => {
+        return !matchedIds.has(item.id)
+          && liveAssistantMatchesEntry(message, item)
+      })
+      if (!entry) return message
+      matchedIds.add(entry.id)
+      return { ...message, persistedEntry: entry, streaming: false }
+    })
+  }
+
+  function liveAssistantMatchesEntry(message, entry) {
+    if (message.persistedEntry?.id) {
+      return message.persistedEntry.id === entry.id
+    }
+    if (message.streaming) return false
+    if (message.id && message.id === entry.id) return true
+    if (!entryIsNearLiveMessage(entry, message)) return false
+    return blocksSignature(message.blocks) === blocksSignature(entry.blocks)
+  }
+
+  function entryIsNearLiveMessage(entry, message) {
+    if (!message.createdAt) return true
+    const entryTime = new Date(entry.timestamp).getTime()
+    if (!Number.isFinite(entryTime)) return true
+    return entryTime >= message.createdAt - 120000
   }
 
   function updateLiveAssistant(event) {
@@ -448,6 +529,7 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     const next = {
       id,
       seq,
+      createdAt: existing?.createdAt || Date.now(),
       type: 'assistant',
       blocks,
       text,

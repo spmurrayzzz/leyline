@@ -709,8 +709,17 @@ function entryCopyText(entry) {
   return entry.copyText || entry.preview?.fallbackText || entry.text || ''
 }
 
+function liveAssistantDisplayBlocks(item) {
+  if (item?.persistedEntry) return messageBlocksFor(item.persistedEntry)
+  return item?.blocks || []
+}
+
 function liveAssistantCopyText(blocks = liveAssistantBlocks.value) {
   return blocks.map((block) => block.text).join('\n\n')
+}
+
+function liveAssistantDisplayCopyText(item) {
+  return liveAssistantCopyText(liveAssistantDisplayBlocks(item))
 }
 
 async function copyEntry(entry) {
@@ -975,13 +984,14 @@ async function submitDraft(streamingBehavior) {
   }
   if (editing && editing !== editingEntry.value) editingEntry.value = editing
   const previousDetail = sessionDetail.value
-  resetLiveState()
-  reconcileCurrentDetail()
   const shouldFollowOutput = editing || stickToBottom.value
   if (editing) {
+    resetLiveState()
     trimSessionToEntry(editing.id)
     stickToBottom.value = true
     hasNewOutput.value = false
+  } else {
+    reconcileCurrentDetail()
   }
   const localEntry = beginUserTurn(text, images)
   promptSubmitting.value = true
@@ -1005,10 +1015,12 @@ async function submitDraft(streamingBehavior) {
     }
   } catch (error) {
     if (selectedSessionId.value === sessionId) {
-      if (editing) sessionDetail.value = previousDetail
+      if (editing) {
+        sessionDetail.value = previousDetail
+        resetLiveState()
+      }
       removeOptimisticEntry(localEntry)
       promptError.value = error.message
-      resetLiveState()
     }
   } finally {
     promptSubmitting.value = false
@@ -1727,8 +1739,8 @@ function closePickerMenus() {
             <TranscriptEntry
               v-if="item.type === 'message'"
               :copied-entry-id="copiedEntryId"
-              :entry="item"
-              :skill-expanded="isSkillExpanded(item)"
+              :entry="item.persistedEntry || item"
+              :skill-expanded="isSkillExpanded(item.persistedEntry || item)"
               @copy="copyEntry"
               @edit="startEditingEntry"
               @fork="forkSession"
@@ -1765,11 +1777,13 @@ function closePickerMenus() {
 
             <LiveAssistantMessage
               v-else-if="item.type === 'assistant'"
-              :blocks="item.blocks"
+              :blocks="liveAssistantDisplayBlocks(item)"
               :copied-entry-id="copiedEntryId"
               :message-id="item.id"
+              :persisted-entry="item.persistedEntry"
               :streaming="item.streaming"
-              @copy="copyTranscriptItem(item.id, liveAssistantCopyText(item.blocks))"
+              @copy="copyTranscriptItem(item.id, liveAssistantDisplayCopyText(item))"
+              @fork="forkSession"
             />
 
           </div>

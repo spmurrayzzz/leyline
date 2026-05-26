@@ -15,13 +15,17 @@ const props = defineProps({
     type: String,
     default: 'live-assistant',
   },
+  persistedEntry: {
+    type: Object,
+    default: null,
+  },
   streaming: {
     type: Boolean,
     default: false,
   },
 })
 
-const emit = defineEmits(['copy'])
+const emit = defineEmits(['copy', 'fork'])
 
 const thinkingExpanded = ref(true)
 
@@ -53,12 +57,21 @@ function copyGlyph(id) {
         Working
       </span>
       <button
+        v-if="persistedEntry?.id"
         class="copy-button"
         type="button"
-        :title="copyTitle('live-assistant')"
+        title="Fork from here"
+        @click="emit('fork', persistedEntry)"
+      >
+        ⎇
+      </button>
+      <button
+        class="copy-button"
+        type="button"
+        :title="copyTitle(messageId)"
         @click="emit('copy')"
       >
-        {{ copyGlyph('live-assistant') }}
+        {{ copyGlyph(messageId) }}
       </button>
     </div>
     <template v-for="(block, index) in blocks" :key="`live-${index}`">
