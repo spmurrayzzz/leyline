@@ -191,9 +191,16 @@ export function useLiveTurnProjection({ onIntent } = {}) {
   }
 
   function markLiveTurnStart(event) {
-    if (event?.type !== 'agent_start' && event?.type !== 'turn_start') return
+    if (!startsLiveTurn(event)) return
     if (liveTurnAnchorLength !== null) return
     liveTurnAnchorLength = rawEntries.value.length
+  }
+
+  function startsLiveTurn(event) {
+    const type = event?.type
+    if (type === 'agent_start' || type === 'turn_start') return true
+    return ['message_start', 'message_update', 'message_end'].includes(type)
+      && event.message?.role === 'assistant'
   }
 
   function updateCompactionState(event) {
@@ -382,7 +389,7 @@ export function useLiveTurnProjection({ onIntent } = {}) {
   function isCoveredByLiveAssistant(entry) {
     if (entry.type !== 'message' || entry.role !== 'assistant') return false
     return liveAssistantMessages.value.some((message) => {
-      return blocksSignature(message.blocks) === blocksSignature(entry.blocks)
+      return message.id && message.id === entry.id
     })
   }
 
@@ -489,7 +496,11 @@ export function useLiveTurnProjection({ onIntent } = {}) {
   }
 
   function messageEventId(event) {
-    return event?.message?.id || event?.message?.entryId || event?.id || ''
+    return event?.message?.entryId
+      || event?.entryId
+      || event?.message?.id
+      || event?.id
+      || ''
   }
 
   function blocksSignature(blocks = []) {
