@@ -40,7 +40,6 @@ export function useSessionWorkspace({
   const runtimeSessionsById = ref({})
   const startupRun = ref(null)
   const sessionHandoff = ref(null)
-  const startupPhaseSlow = ref(false)
   const switchingModel = ref(false)
   const switchingThinking = ref(false)
   const reloadingSession = ref(false)
@@ -102,7 +101,6 @@ export function useSessionWorkspace({
   let sessionSelectionToken = 0
   let sessionActivationQueue = Promise.resolve()
   let refreshTimer
-  let startupPhaseTimer
 
   async function loadSessions({
     routeSessionId = '',
@@ -727,26 +725,6 @@ export function useSessionWorkspace({
     return handoff
   }
 
-  function sessionHandoffStep(handoff, id, label) {
-    const phases = ['clearing', 'creating', 'loading']
-    const activeIndex = Math.max(0, phases.indexOf(handoff.phase))
-    const index = phases.indexOf(id)
-
-    return {
-      id,
-      label,
-      active: index === activeIndex,
-      done: index < activeIndex,
-    }
-  }
-
-  function sessionHandoffDetail(phase) {
-    if (phase === 'clearing') return 'Clearing the current transcript view.'
-    if (phase === 'creating') return 'Opening a fresh pi session.'
-    if (phase === 'loading') return 'Loading the fresh transcript shell.'
-    return 'Preparing a fresh runtime.'
-  }
-
   function setSessionHandoffPhase(handoff, phase) {
     if (sessionHandoff.value?.id !== handoff.id) return
     sessionHandoff.value = {
@@ -786,11 +764,6 @@ export function useSessionWorkspace({
     if (!startupRun.value) return
 
     startupRun.value = { ...startupRun.value, phase }
-    startupPhaseSlow.value = false
-    clearTimeout(startupPhaseTimer)
-    startupPhaseTimer = setTimeout(() => {
-      if (startupRun.value?.phase === phase) startupPhaseSlow.value = true
-    }, 4500)
   }
 
   async function runStartupPhase(phase, task) {
@@ -805,49 +778,6 @@ export function useSessionWorkspace({
 
   function finishStartupRun() {
     startupRun.value = null
-    startupPhaseSlow.value = false
-    clearTimeout(startupPhaseTimer)
-  }
-
-  function startupStep(id, label) {
-    const phases = startupStepsForRun(startupRun.value)
-    const activeIndex = Math.max(0, phases.indexOf(startupRun.value?.phase))
-    const index = phases.indexOf(id)
-
-    return {
-      id,
-      label,
-      active: index === activeIndex,
-      done: index < activeIndex,
-    }
-  }
-
-  function startupStepsForRun(run) {
-    if (!run) return []
-    return [
-      'accepted',
-      'creating',
-      run.model ? 'model' : '',
-      run.thinking ? 'thinking' : '',
-      run.hasPrompt ? 'submitting' : '',
-    ].filter(Boolean)
-  }
-
-  function startupStatusDetail(phase) {
-    if (phase === 'accepted') {
-      return startupRun.value?.hasPrompt
-        ? 'Request received; preparing the run.'
-        : 'Request received; preparing a fresh session.'
-    }
-    if (phase === 'creating') {
-      return 'Opening a fresh pi session for this project.'
-    }
-    if (phase === 'model') {
-      return 'Syncing the selected model before the first turn.'
-    }
-    if (phase === 'thinking') return 'Applying the selected reasoning level.'
-    if (phase === 'submitting') return 'Handing the prompt to the active runtime.'
-    return 'Preparing run.'
   }
 
   function sessionTitle(session) {
@@ -961,7 +891,6 @@ export function useSessionWorkspace({
 
   function dispose() {
     clearTimeout(refreshTimer)
-    clearTimeout(startupPhaseTimer)
   }
 
   return {
@@ -1016,8 +945,6 @@ export function useSessionWorkspace({
     sessionError,
     sessionHandoff,
     sessionIdFromRoute,
-    sessionHandoffDetail,
-    sessionHandoffStep,
     sessionLoading,
     sessionQuery,
     sessionRuntimeStatus,
@@ -1034,10 +961,6 @@ export function useSessionWorkspace({
     startRuntimeState,
     startSelectedModel,
     startSelectedThinkingLevel,
-    startupPhaseSlow,
-    startupStatusDetail,
-    startupStep,
-    startupStepsForRun,
     startupRun,
     switchingModel,
     switchingThinking,

@@ -53,8 +53,6 @@ const eventLogOpen = ref(false)
 const settingsOpen = ref(false)
 const fullscreenTool = ref(null)
 const promptSubmitting = ref(false)
-const promptSubmitSlow = ref(false)
-const shellCommandSubmitting = ref(false)
 const interrupting = ref(false)
 const goalCommandSubmitting = ref('')
 const editingEntry = ref(null)
@@ -83,7 +81,6 @@ const terminalDrawerHeight = ref(310)
 let terminalResizeStartY = 0
 let terminalResizeStartHeight = 0
 let terminalResizeFrame = 0
-let promptSubmitTimer
 let scrollFrame
 let scrollAnimationFrame
 let scrollSettleFrame
@@ -95,10 +92,7 @@ const maxScrollTravelPx = 480
 const scrollAnimationMs = 220
 const scrollSettleMs = 900
 const userScrollIdleMs = 450
-const startupPhaseFloorMs = 650
 const startupAcceptedFloorMs = 420
-const sessionHandoffPhaseFloorMs = 320
-const sessionHandoffTotalFloorMs = 860
 const initPhaseFloorMs = 340
 const composerReservedHeight = computed(() => {
   return `${Math.max(240, composerHeight.value + 78)}px`
@@ -197,8 +191,6 @@ const {
   sessionError,
   sessionHandoff,
   sessionIdFromRoute,
-  sessionHandoffDetail,
-  sessionHandoffStep,
   sessionLoading,
   sessionQuery,
   sessionRuntimeStatus,
@@ -210,9 +202,6 @@ const {
   sidebarRuntimeSummary,
   startSelectedModel,
   startSelectedThinkingLevel,
-  startupPhaseSlow,
-  startupStatusDetail,
-  startupStep,
   startupRun,
   switchingModel,
   switchingThinking,
@@ -407,78 +396,6 @@ const composerPlaceholder = computed(() => {
   if (isEmptySelectedSession.value) return 'Describe the first task or attach images'
   return 'Ask for follow-up changes or attach images'
 })
-const startupSteps = computed(() => {
-  const run = startupRun.value
-  if (!run) return []
-
-  return [
-    startupStep(
-      'accepted',
-      run.hasPrompt ? 'Prompt accepted' : 'Project selected',
-    ),
-    startupStep('creating', `Creating session in ${run.project}`),
-    run.model ? startupStep('model', `Applying ${run.model}`) : null,
-    run.thinking
-      ? startupStep('thinking', `Setting thinking · ${run.thinking}`)
-      : null,
-    run.hasPrompt
-      ? startupStep('submitting', 'Submitting to pi runtime')
-      : null,
-  ].filter(Boolean)
-})
-const startupStatus = computed(() => {
-  const run = startupRun.value
-  if (!run) return null
-  const active = startupSteps.value.find((step) => step.active)
-    || startupSteps.value.at(-1)
-
-  return {
-    title: active?.label || 'Preparing run',
-    detail: startupPhaseSlow.value
-      ? 'Still working; waiting on local pi runtime.'
-      : startupStatusDetail(run.phase),
-    steps: startupSteps.value,
-  }
-})
-const promptSubmitStatus = computed(() => {
-  if (!promptSubmitting.value || agentRunning.value) return null
-  if (shellCommandSubmitting.value) return null
-
-  return {
-    title: 'Submitting prompt',
-    detail: promptSubmitSlow.value
-      ? 'Still waiting for runtime preflight to finish.'
-      : 'Validating model, context, and tool state before the run starts.',
-    steps: [
-      {
-        id: 'accepted',
-        label: 'Prompt accepted',
-        done: true,
-        active: false,
-      },
-      {
-        id: 'submitting',
-        label: 'Submitting to pi runtime',
-        done: false,
-        active: true,
-      },
-    ],
-  }
-})
-const sessionHandoffStatus = computed(() => {
-  const handoff = sessionHandoff.value
-  if (!handoff) return null
-
-  return {
-    title: `Starting a new session in ${handoff.project}`,
-    detail: sessionHandoffDetail(handoff.phase),
-    steps: [
-      sessionHandoffStep(handoff, 'clearing', 'Releasing current view'),
-      sessionHandoffStep(handoff, 'creating', 'Opening pi session'),
-      sessionHandoffStep(handoff, 'loading', 'Loading fresh transcript'),
-    ],
-  }
-})
 const startFlowVisible = computed(() => {
   if (startupRun.value) return true
   if (sessionLoading.value || sessionSwitching.value) return false
@@ -486,10 +403,6 @@ const startFlowVisible = computed(() => {
 })
 const runtimeChromeVisible = computed(() => {
   return initializing.value || (selectedSession.value && !startupRun.value)
-})
-const workbenchRunStatus = computed(() => {
-  if (startupRun.value) return null
-  return promptSubmitStatus.value
 })
 const editingLabel = computed(() => {
   if (!editingEntry.value) return ''
@@ -577,7 +490,6 @@ onUnmounted(() => {
   closeEventStream()
   sessionWorkspace.dispose()
   closeTerminalPanel()
-  clearTimeout(promptSubmitTimer)
   clearTimeout(copiedTimer)
   clearTimeout(userScrollTimer)
   composerResizeObserver?.disconnect()
@@ -679,21 +591,6 @@ function handleNativeEscape() {
 
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-function startPromptSubmitTimer() {
-  promptSubmitSlow.value = false
-  clearTimeout(promptSubmitTimer)
-  promptSubmitTimer = setTimeout(() => {
-    if (promptSubmitting.value && !agentRunning.value) {
-      promptSubmitSlow.value = true
-    }
-  }, 4500)
-}
-
-function stopPromptSubmitTimer() {
-  promptSubmitSlow.value = false
-  clearTimeout(promptSubmitTimer)
 }
 
 function navigateHome() {
@@ -1082,7 +979,6 @@ async function submitDraft(streamingBehavior) {
   }
   const localEntry = beginUserTurn(text, images)
   promptSubmitting.value = true
-  startPromptSubmitTimer()
   promptError.value = ''
   if (shouldFollowOutput) await scrollToLatest()
   else hasNewOutput.value = true
@@ -1108,7 +1004,6 @@ async function submitDraft(streamingBehavior) {
     }
   } finally {
     promptSubmitting.value = false
-    stopPromptSubmitTimer()
     refocusComposer()
   }
 }
@@ -1141,7 +1036,6 @@ async function submitCompactCommand(compactCommand, images) {
   }
 
   promptSubmitting.value = true
-  startPromptSubmitTimer()
   promptError.value = ''
   resetLiveState()
   draft.value = ''
@@ -1173,7 +1067,6 @@ async function submitCompactCommand(compactCommand, images) {
     }
   } finally {
     promptSubmitting.value = false
-    stopPromptSubmitTimer()
     refocusComposer()
   }
 }
@@ -1190,8 +1083,6 @@ async function submitShellCommand(shellCommand, images) {
 
   const submittedDraft = draft.value
   promptSubmitting.value = true
-  shellCommandSubmitting.value = true
-  startPromptSubmitTimer()
   promptError.value = ''
   draft.value = ''
   if (!agentRunning.value) resetLiveState()
@@ -1224,9 +1115,7 @@ async function submitShellCommand(shellCommand, images) {
     }
   } finally {
     promptSubmitting.value = false
-    shellCommandSubmitting.value = false
     if (selectedSessionId.value === sessionId) setLiveActivity('')
-    stopPromptSubmitTimer()
     refocusComposer()
   }
 }
@@ -1769,33 +1658,6 @@ function closePickerMenus() {
         >
           <h2>What should we work on in {{ topbarTitle }}?</h2>
         </div>
-
-        <Transition name="run-status">
-          <section
-            v-if="workbenchRunStatus"
-            class="run-status-card workbench-run-status"
-            aria-live="polite"
-          >
-            <div class="run-status-orb" aria-hidden="true"></div>
-            <div class="run-status-main">
-              <strong>{{ workbenchRunStatus.title }}</strong>
-              <span>{{ workbenchRunStatus.detail }}</span>
-              <div class="run-status-progress" aria-hidden="true">
-                <i></i>
-              </div>
-              <div class="run-status-steps">
-                <span
-                  v-for="step in workbenchRunStatus.steps"
-                  :key="step.id"
-                  :class="{
-                    done: step.done,
-                    active: step.active,
-                  }"
-                >{{ step.label }}</span>
-              </div>
-            </div>
-          </section>
-        </Transition>
 
         <template v-if="selectedSession && !startupRun && entries.length > 0">
           <TranscriptEntry
