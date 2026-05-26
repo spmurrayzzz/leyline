@@ -1822,7 +1822,18 @@ function closePickerMenus() {
         >
           <div v-for="item in liveFlowItems" :key="item.id" class="live-item">
             <TranscriptEntry
-              v-if="item.type === 'tool' && item.persistedEntry"
+              v-if="item.type === 'message'"
+              :copied-entry-id="copiedEntryId"
+              :entry="item"
+              :skill-expanded="isSkillExpanded(item)"
+              @copy="copyEntry"
+              @edit="startEditingEntry"
+              @fork="forkSession"
+              @toggle-skill="toggleSkill"
+            />
+
+            <TranscriptEntry
+              v-else-if="item.type === 'tool' && item.persistedEntry"
               :copied-entry-id="copiedEntryId"
               :entry="item.persistedEntry"
               :tool-expanded="isToolExpanded(item.persistedEntry)"

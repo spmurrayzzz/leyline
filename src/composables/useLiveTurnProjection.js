@@ -17,6 +17,7 @@ export function useLiveTurnProjection({ onIntent } = {}) {
   const liveAssistantText = ref('')
   const liveAssistantBlocks = ref([])
   const liveAssistantMessages = ref([])
+  const liveUserMessages = ref([])
   const liveTools = ref([])
   const rawEntries = computed(() => [
     ...(persistedDetail.value?.entries || []),
@@ -24,6 +25,7 @@ export function useLiveTurnProjection({ onIntent } = {}) {
   ])
   const liveItems = computed(() => [
     ...liveAssistantMessages.value,
+    ...liveUserMessages.value,
     ...liveTools.value,
     compactingContext.value ? {
       id: 'live-compaction',
@@ -43,6 +45,7 @@ export function useLiveTurnProjection({ onIntent } = {}) {
       || compactingContext.value
       || liveTools.value.length > 0
       || liveAssistantMessages.value.length > 0
+      || liveUserMessages.value.length > 0
       || Boolean(liveActivity.value)
   })
   const entries = computed(() => {
@@ -55,6 +58,7 @@ export function useLiveTurnProjection({ onIntent } = {}) {
       return isRenderableEntry(entry)
         && !isCoveredByLiveTool(entry)
         && !isCoveredByLiveAssistant(entry)
+        && !isCoveredByLiveUser(entry)
     })
   })
   const liveToolSettleTimers = new Map()
@@ -104,18 +108,25 @@ export function useLiveTurnProjection({ onIntent } = {}) {
   }
 
   function beginUserTurn(text, images = []) {
-    liveAssistantMessages.value = []
-    liveTools.value = []
     activeLiveAssistantId = ''
     clearLiveToolSettleTimers()
     const entry = pendingUserEntry(text, images)
     optimisticEntries.value = [...optimisticEntries.value, entry]
+    if (hasLiveTranscriptOutput()) {
+      liveUserMessages.value = [
+        ...liveUserMessages.value,
+        { ...entry, seq: ++liveItemSeq },
+      ]
+    }
     liveTurnAnchorLength = rawEntries.value.length
     return entry
   }
 
   function removeOptimisticEntry(entry) {
     optimisticEntries.value = optimisticEntries.value.filter((item) => {
+      return item.id !== entry?.id
+    })
+    liveUserMessages.value = liveUserMessages.value.filter((item) => {
       return item.id !== entry?.id
     })
   }
@@ -126,6 +137,7 @@ export function useLiveTurnProjection({ onIntent } = {}) {
 
   function clearLiveOutput() {
     liveAssistantMessages.value = []
+    liveUserMessages.value = []
     liveTools.value = []
     activeLiveAssistantId = ''
     clearLiveToolSettleTimers()
@@ -164,6 +176,7 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     liveAssistantText.value = ''
     liveAssistantBlocks.value = []
     liveAssistantMessages.value = []
+    liveUserMessages.value = []
     liveTools.value = []
     optimisticEntries.value = []
     agentRunning.value = false
@@ -373,6 +386,13 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     })
   }
 
+  function isCoveredByLiveUser(entry) {
+    if (entry.type !== 'message' || entry.role !== 'user') return false
+    return liveUserMessages.value.some((message) => {
+      return localEntryMatches(message, entry)
+    })
+  }
+
   function liveToolMatchesEntry(tool, entry) {
     if (tool.toolCallId && entry.toolCallId) {
       return tool.toolCallId === entry.toolCallId
@@ -460,6 +480,8 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     })
     if (streaming) return streaming
 
+    if (liveUserMessages.value.length) return null
+
     const signature = blocksSignature(blocks)
     return [...liveAssistantMessages.value].reverse().find((item) => {
       return blocksSignature(item.blocks) === signature
@@ -481,7 +503,12 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     cancelAnimationFrame(liveAssistantFrame)
     liveAssistantText.value = ''
     liveAssistantBlocks.value = []
-    liveAssistantMessages.value = []
+    liveAssistantMessages.value = liveAssistantMessages.value.filter((item) => {
+      if (activeLiveAssistantId && item.id === activeLiveAssistantId) {
+        return false
+      }
+      return !item.streaming
+    })
     activeLiveAssistantId = ''
   }
 
@@ -536,8 +563,13 @@ export function useLiveTurnProjection({ onIntent } = {}) {
 
   function hasLiveOutput() {
     return liveAssistantMessages.value.length
+      || liveUserMessages.value.length
       || liveActivity.value
       || liveTools.value.length
+  }
+
+  function hasLiveTranscriptOutput() {
+    return liveAssistantMessages.value.length || liveTools.value.length
   }
 
   function emit(intent) {
