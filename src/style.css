@@ -1473,7 +1473,9 @@ h1 {
 }
 
 .workbench {
+  position: relative;
   min-height: 0;
+  height: 100%;
   overflow: auto;
   padding: 20px 44px var(--composer-reserved-height, 240px);
   transition: padding-bottom var(--motion-base) var(--ease-standard);
@@ -1502,11 +1504,14 @@ h1 {
   background: #4b4658;
 }
 
-.init-workbench,
-.session-loading-workbench {
+.init-workbench {
   display: grid;
   place-items: center;
   padding: 0 44px 12vh;
+}
+
+.session-loading-workbench {
+  padding: 0 44px;
 }
 
 .start-workbench-shell {
@@ -2741,10 +2746,14 @@ h1 {
 }
 
 .session-loading-panel {
+  position: absolute;
+  top: 50%;
+  left: 50%;
   display: flex;
   align-items: center;
   gap: 14px;
-  width: min(360px, 100%);
+  width: min(360px, calc(100% - 88px));
+  transform: translate(-50%, -50%);
   border: 1px solid var(--border-soft);
   border-radius: 16px;
   background: #15161b;
@@ -4329,6 +4338,10 @@ textarea::placeholder {
   .init-workbench,
   .session-loading-workbench {
     padding: 0 12px;
+  }
+
+  .session-loading-panel {
+    width: min(360px, calc(100% - 24px));
   }
 
   .message,
