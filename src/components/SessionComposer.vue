@@ -1,5 +1,6 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useDictation } from '../composables/useDictation'
 import { formatMode, modelChip } from '../lib/format'
 
 const props = defineProps({
@@ -149,11 +150,38 @@ const hiddenShellMode = computed(() => props.draft.trimStart().startsWith('!!'))
 const shellModeLabel = computed(() => {
   return hiddenShellMode.value ? 'shell · hidden' : 'shell · context'
 })
+const inputDisabled = computed(() => {
+  return props.promptSubmitting || props.reloadingSession || props.compacting
+})
+const {
+  dictationError,
+  dictationListening,
+  dictationSupported,
+  stopDictation,
+  toggleDictation,
+} = useDictation({
+  focus: () => textarea.value?.focus(),
+  getDraft: () => props.draft,
+  onDraftChange: () => emit('show-slash-picker'),
+  setDraft: (value) => emit('update:draft', value),
+})
+const dictationButtonDisabled = computed(() => {
+  return inputDisabled.value && !dictationListening.value
+})
+const dictationTitle = computed(() => {
+  if (!dictationSupported.value) {
+    return 'Dictation is not supported in this browser'
+  }
+  if (dictationListening.value) return 'Stop dictation'
+  return dictationError.value || 'Start dictation'
+})
+
+watch(inputDisabled, (disabled) => {
+  if (disabled) stopDictation()
+})
 
 function focus() {
-  if (props.promptSubmitting
-    || props.reloadingSession
-    || props.compacting) return
+  if (inputDisabled.value) return
   textarea.value?.focus()
 }
 
@@ -214,7 +242,7 @@ function updateDraft(event) {
       <textarea
         ref="textarea"
         :value="draft"
-        :disabled="promptSubmitting || reloadingSession || compacting"
+        :disabled="inputDisabled"
         :placeholder="placeholder"
         @keydown="emit('keydown', $event)"
         @input="updateDraft"
@@ -327,6 +355,38 @@ function updateDraft(event) {
               </div>
             </Transition>
           </div>
+          <button
+            class="dictation-button"
+            :class="{
+              active: dictationListening,
+              unsupported: !dictationSupported,
+            }"
+            type="button"
+            :disabled="dictationButtonDisabled"
+            :title="dictationTitle"
+            :aria-label="dictationTitle"
+            :aria-disabled="!dictationSupported"
+            :aria-pressed="dictationListening"
+            @click="toggleDictation"
+          >
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <rect
+                x="9"
+                y="3"
+                width="6"
+                height="11"
+                rx="3"
+                stroke="currentColor"
+                stroke-width="1.8"
+              ></rect>
+              <path
+                d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+              ></path>
+            </svg>
+          </button>
           <button
             class="send-button"
             :class="{

@@ -3917,6 +3917,59 @@ textarea::placeholder {
   color: var(--muted-strong);
 }
 
+.composer-actions .dictation-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border: 1px solid #312d3d;
+  border-radius: 50%;
+  background: #1a1722;
+  padding: 0;
+  color: var(--muted-strong);
+  line-height: 1;
+  transition:
+    border-color var(--motion-base) var(--ease-decelerate),
+    background-color var(--motion-base) var(--ease-decelerate),
+    box-shadow var(--motion-base) var(--ease-decelerate),
+    color var(--motion-base) var(--ease-decelerate),
+    opacity var(--motion-base) var(--ease-decelerate),
+    transform var(--motion-base) var(--ease-decelerate);
+}
+
+.composer-actions .dictation-button svg {
+  width: 18px;
+  height: 18px;
+}
+
+.composer-actions .dictation-button:hover:not(:disabled):not(.unsupported),
+.composer-actions .dictation-button.active {
+  border-color: var(--accent-border);
+  background: #211b32;
+  color: #d8d0ff;
+  transform: translateY(-0.5px);
+  transition-duration: var(--motion-quick);
+  transition-timing-function: var(--ease-accelerate);
+}
+
+.composer-actions .dictation-button.active {
+  border-color: rgba(248, 113, 113, 0.46);
+  background: rgba(127, 29, 29, 0.36);
+  box-shadow: 0 0 0 3px rgb(248 113 113 / 10%);
+  color: #fecaca;
+}
+
+.composer-actions .dictation-button:disabled,
+.composer-actions .dictation-button.unsupported {
+  opacity: 0.45;
+}
+
+.composer-actions .dictation-button.unsupported {
+  cursor: not-allowed;
+}
+
 .send-button {
   flex: none;
   width: 38px;
@@ -4056,6 +4109,7 @@ textarea::placeholder {
   .model-caret,
   .model-menu button,
   .send-button,
+  .composer-actions .dictation-button,
   .event-drawer-enter-active,
   .event-drawer-leave-active,
   .composer-popover-enter-active,
@@ -4080,6 +4134,8 @@ textarea::placeholder {
   .start-composer-chip:hover,
   .editing-banner button:hover,
   .model-picker-button:hover .model-caret,
+  .composer-actions .dictation-button:hover:not(:disabled),
+  .composer-actions .dictation-button.active,
   .send-button:hover:not(:disabled),
   .start-send-button:hover:not(:disabled) {
     transform: none;
@@ -4414,7 +4470,8 @@ textarea::placeholder {
     width: min(320px, calc(100vw - 20px));
   }
 
-  .send-button {
+  .send-button,
+  .composer-actions .dictation-button {
     width: 36px;
     height: 36px;
     margin-left: 0;
