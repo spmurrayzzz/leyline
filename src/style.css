@@ -28,6 +28,7 @@
   --ease-dock: cubic-bezier(0.12, 0.82, 0.16, 1);
   --content-max: 1080px;
   --start-composer-width: min(760px, calc(100vw - 364px));
+  --empty-session-composer-width: min(900px, calc(100vw - 364px));
   --docked-composer-width: min(var(--content-max), calc(100vw - 364px));
   --terminal-drawer-height: 310px;
   font-family:
@@ -118,6 +119,7 @@ button {
 
 .leyline-app.sidebar-hidden {
   --start-composer-width: min(760px, calc(100vw - 88px));
+  --empty-session-composer-width: min(900px, calc(100vw - 88px));
   --docked-composer-width: min(var(--content-max), calc(100vw - 88px));
   grid-template-columns: 0 minmax(0, 1fr) 0;
 }
@@ -218,6 +220,18 @@ button {
   from {
     width: var(--start-composer-width);
     transform: translate(-50%, -34vh);
+  }
+
+  to {
+    width: var(--docked-composer-width);
+    transform: translate(-50%, 0);
+  }
+}
+
+@keyframes in-project-composer-dock {
+  from {
+    width: var(--empty-session-composer-width);
+    transform: translate(-50%, -40vh);
   }
 
   to {
@@ -1623,14 +1637,16 @@ h1 {
   width: var(--start-composer-width);
 }
 
-.start-headline-text {
+.start-headline-text,
+.empty-session-panel h2 {
   transition:
     opacity 320ms var(--ease-accelerate),
     transform 320ms var(--ease-accelerate),
     filter 320ms var(--ease-accelerate);
 }
 
-.startup-workbench .start-headline-text {
+.startup-workbench .start-headline-text,
+.in-project-startup-workbench .empty-session-panel h2 {
   opacity: 0;
   transform: translateY(-10px);
   filter: blur(2px);
@@ -1712,6 +1728,18 @@ h1 {
 .sidebar-hidden .startup-init-panel {
   left: 50vw;
   width: min(340px, calc(100vw - 88px));
+}
+
+.in-project-init-panel {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 2;
+  width: min(340px, calc(100% - 88px));
+  opacity: 0;
+  transform: translate(-50%, calc(-50% + 8px));
+  animation: startup-loading-enter var(--motion-slow) var(--ease-decelerate)
+    380ms both;
 }
 
 .startup-composer-docking .start-composer {
@@ -2405,7 +2433,10 @@ h1 {
 .new-session-transition:not(.start-state) .workbench > .message,
 .new-session-transition:not(.start-state) .workbench > .tool-card,
 .new-session-transition:not(.start-state) .workbench > .live-stack,
-.new-session-transition:not(.start-state) .workbench > .empty-session-panel {
+.new-session-transition:not(.start-state) .workbench > .empty-session-panel,
+.in-project-new-session-transition .workbench > .message,
+.in-project-new-session-transition .workbench > .tool-card,
+.in-project-new-session-transition .workbench > .live-stack {
   animation: session-content-enter 560ms var(--ease-emphasized) both;
 }
 
@@ -3571,8 +3602,21 @@ h1 {
 .composer.empty-session-composer {
   top: calc(50% - 125px);
   bottom: auto;
-  width: min(900px, calc(100% - 88px));
+  width: var(--empty-session-composer-width);
+  max-width: calc(100% - 88px);
   transform: translateX(-50%);
+}
+
+.in-project-composer-docking .composer.empty-session-composer {
+  top: auto;
+  bottom: 22px;
+  width: var(--docked-composer-width);
+  max-width: calc(100% - 88px);
+  animation: in-project-composer-dock 980ms var(--ease-dock) both;
+}
+
+.terminal-open.in-project-composer-docking .composer.empty-session-composer {
+  bottom: calc(var(--terminal-drawer-height) + 22px);
 }
 
 .composer.empty-session-composer .slash-picker {
@@ -3766,7 +3810,8 @@ h1 {
   animation: session-composer-enter 620ms var(--ease-emphasized) both;
 }
 
-.new-session-transition:not(.start-state) .composer-fade {
+.new-session-transition:not(.start-state) .composer-fade,
+.in-project-new-session-transition .composer-fade {
   animation: session-fade-enter 520ms var(--ease-decelerate) both;
 }
 
@@ -4258,6 +4303,7 @@ textarea::placeholder {
   .shell-glyph-enter-active,
   .shell-glyph-leave-active,
   .start-headline-text,
+  .empty-session-panel h2,
   textarea,
   .slash-picker button,
   .slash-command-name,
@@ -4331,6 +4377,7 @@ textarea::placeholder {
   .tool-fullscreen-enter-from .tool-fullscreen,
   .tool-fullscreen-leave-to .tool-fullscreen,
   .startup-workbench .start-headline-text,
+  .in-project-startup-workbench .empty-session-panel h2,
   .composer-popover-enter-from,
   .composer-popover-leave-to,
   .composer-reveal-enter-from,
@@ -4356,8 +4403,14 @@ textarea::placeholder {
   .new-session-transition:not(.start-state) .workbench > .empty-session-panel,
   .new-session-transition:not(.start-state) .composer,
   .new-session-transition:not(.start-state) .composer-fade,
+  .in-project-new-session-transition .workbench > .message,
+  .in-project-new-session-transition .workbench > .tool-card,
+  .in-project-new-session-transition .workbench > .live-stack,
+  .in-project-new-session-transition .composer-fade,
   .startup-composer-docking .start-composer,
+  .in-project-composer-docking .composer.empty-session-composer,
   .startup-init-panel,
+  .in-project-init-panel,
   .live-message-status i,
   .live-tool-spinner,
   .session-loading-mark {
@@ -4369,6 +4422,7 @@ textarea::placeholder {
   :root {
     --content-max: 100%;
     --start-composer-width: calc(100vw - 24px);
+    --empty-session-composer-width: calc(100vw - 24px);
     --docked-composer-width: calc(100vw - 20px);
     --terminal-drawer-height: min(46vh, 310px);
   }
@@ -4555,7 +4609,8 @@ textarea::placeholder {
     width: calc(100vw - 24px);
   }
 
-  .startup-init-panel {
+  .startup-init-panel,
+  .in-project-init-panel {
     left: 50vw;
     width: min(340px, calc(100vw - 24px));
   }
@@ -4564,6 +4619,12 @@ textarea::placeholder {
     bottom: 10px;
     left: 50vw;
     width: calc(100vw - 20px);
+  }
+
+  .in-project-composer-docking .composer.empty-session-composer {
+    bottom: 10px;
+    width: calc(100vw - 20px);
+    max-width: none;
   }
 
   .composer {

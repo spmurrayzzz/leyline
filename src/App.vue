@@ -66,6 +66,9 @@ const slashPickerDismissed = ref(false)
 const promptError = ref('')
 const newSessionSettling = ref(false)
 const startupComposerDocking = ref(false)
+const inProjectNewSessionRun = ref(false)
+const inProjectComposerDocking = ref(false)
+const inProjectNewSessionSettling = ref(false)
 const stickToBottom = ref(true)
 const userScrollActive = ref(false)
 const hasNewOutput = ref(false)
@@ -95,6 +98,7 @@ const scrollAnimationMs = 220
 const scrollSettleMs = 900
 const userScrollIdleMs = 450
 const startupAcceptedFloorMs = 420
+const inProjectNewSessionFloorMs = 1240
 const initPhaseFloorMs = 340
 const composerReservedHeight = computed(() => {
   return `${Math.max(240, composerHeight.value + 78)}px`
@@ -114,6 +118,9 @@ const settingsPath = computed(() => {
 let initPhaseTimer = null
 let startupDockTimer = null
 let newSessionSettlingTimer = null
+let inProjectDockTimer = null
+let inProjectSettlingTimer = null
+let inProjectNewSessionStartedAt = 0
 const liveTurn = useLiveTurnProjection({ onIntent: handleLiveTurnIntent })
 const {
   addTool: upsertLiveTool,
@@ -408,6 +415,14 @@ const startFlowVisible = computed(() => {
 const newSessionTransitionActive = computed(() => {
   return Boolean(startupRun.value || newSessionSettling.value)
 })
+const inProjectTransitionActive = computed(() => {
+  return Boolean(
+    inProjectNewSessionRun.value || inProjectNewSessionSettling.value,
+  )
+})
+const emptySessionShellVisible = computed(() => {
+  return Boolean(isEmptySelectedSession.value || inProjectNewSessionRun.value)
+})
 const runtimeChromeVisible = computed(() => {
   return initializing.value || selectedSession.value
 })
@@ -508,6 +523,8 @@ onUnmounted(() => {
   clearTimeout(initPhaseTimer)
   clearTimeout(startupDockTimer)
   clearTimeout(newSessionSettlingTimer)
+  clearTimeout(inProjectDockTimer)
+  clearTimeout(inProjectSettlingTimer)
 })
 
 function handleLiveTurnIntent(intent) {
@@ -929,6 +946,45 @@ async function refocusComposer() {
   composerRef.value?.focus()
 }
 
+function beginInProjectNewSessionRun() {
+  clearTimeout(inProjectDockTimer)
+  clearTimeout(inProjectSettlingTimer)
+  inProjectNewSessionSettling.value = false
+  inProjectNewSessionStartedAt = Date.now()
+  inProjectNewSessionRun.value = true
+  inProjectComposerDocking.value = false
+  inProjectDockTimer = window.setTimeout(() => {
+    inProjectComposerDocking.value = true
+  }, 320)
+}
+
+async function finishInProjectNewSessionRun() {
+  if (!inProjectNewSessionRun.value) return
+
+  clearTimeout(inProjectDockTimer)
+  inProjectComposerDocking.value = true
+
+  const elapsed = Date.now() - inProjectNewSessionStartedAt
+  const remaining = Math.max(0, inProjectNewSessionFloorMs - elapsed)
+  if (remaining) await wait(remaining)
+
+  inProjectNewSessionSettling.value = true
+  inProjectNewSessionRun.value = false
+  inProjectComposerDocking.value = false
+  clearTimeout(inProjectSettlingTimer)
+  inProjectSettlingTimer = window.setTimeout(() => {
+    inProjectNewSessionSettling.value = false
+  }, 720)
+}
+
+function cancelInProjectNewSessionRun() {
+  clearTimeout(inProjectDockTimer)
+  clearTimeout(inProjectSettlingTimer)
+  inProjectNewSessionRun.value = false
+  inProjectComposerDocking.value = false
+  inProjectNewSessionSettling.value = false
+}
+
 async function submitDraft(streamingBehavior) {
   const text = draft.value.trim()
   const images = attachedImages.value.map(({ preview, ...image }) => image)
@@ -990,6 +1046,11 @@ async function submitDraft(streamingBehavior) {
   if (editing && editing !== editingEntry.value) editingEntry.value = editing
   const previousDetail = sessionDetail.value
   const shouldFollowOutput = editing || stickToBottom.value
+  const startsTurn = !isHandledSlashCommand(text)
+    || slashCommandStartsTurn(text)
+  const startsEmptySession = isEmptySelectedSession.value
+    && !editing
+    && startsTurn
   if (editing) {
     resetLiveState()
     trimSessionToEntry(editing.id)
@@ -998,12 +1059,14 @@ async function submitDraft(streamingBehavior) {
   } else {
     reconcileCurrentDetail()
   }
+  if (startsEmptySession) beginInProjectNewSessionRun()
   const localEntry = beginUserTurn(text, images)
   promptSubmitting.value = true
   promptError.value = ''
   if (shouldFollowOutput) await scrollToLatest()
   else hasNewOutput.value = true
 
+  let promptAccepted = false
   try {
     const data = editing
       ? await editPrompt(sessionId, editing.id, text, images)
@@ -1014,9 +1077,8 @@ async function submitDraft(streamingBehavior) {
       draft.value = ''
       attachedImages.value = []
       editingEntry.value = null
-      if (!isHandledSlashCommand(text) || slashCommandStartsTurn(text)) {
-        setAgentRunning(true, 'Working…')
-      }
+      if (startsTurn) setAgentRunning(true, 'Working…')
+      promptAccepted = true
     }
   } catch (error) {
     if (selectedSessionId.value === sessionId) {
@@ -1028,6 +1090,10 @@ async function submitDraft(streamingBehavior) {
       promptError.value = error.message
     }
   } finally {
+    if (startsEmptySession) {
+      if (promptAccepted) await finishInProjectNewSessionRun()
+      else cancelInProjectNewSessionRun()
+    }
     promptSubmitting.value = false
     refocusComposer()
   }
@@ -1490,6 +1556,8 @@ function closePickerMenus() {
       'start-state': !initializing && startFlowVisible,
       'new-session-transition': newSessionTransitionActive,
       'startup-composer-docking': startupComposerDocking,
+      'in-project-new-session-transition': inProjectTransitionActive,
+      'in-project-composer-docking': inProjectComposerDocking,
       'session-handoff': sessionHandoff,
       'terminal-open': terminalOpen,
       'event-log-open': eventLogOpen,
@@ -1645,7 +1713,8 @@ function closePickerMenus() {
           'session-switching': sessionSwitching,
           'start-workbench-shell': !initializing && startFlowVisible,
           'startup-workbench': startupRun,
-          'empty-selected-workbench': isEmptySelectedSession && !startupRun,
+          'in-project-startup-workbench': inProjectNewSessionRun,
+          'empty-selected-workbench': emptySessionShellVisible && !startupRun,
         }"
         @scroll="handleWorkbenchScroll"
         @touchmove.passive="handleWorkbenchTouchMove"
@@ -1735,13 +1804,27 @@ function closePickerMenus() {
           />
         </div>
         <div
-          v-if="isEmptySelectedSession && !startupRun"
+          v-if="emptySessionShellVisible && !startupRun"
           class="empty-session-panel"
         >
           <h2>What should we work on in {{ topbarTitle }}?</h2>
         </div>
+        <div
+          v-if="inProjectNewSessionRun"
+          class="init-panel in-project-init-panel"
+          aria-label="Starting new session"
+        >
+          <div class="init-skeleton-line skeleton-line skeleton-title"></div>
+          <div class="init-skeleton-line skeleton-line"></div>
+          <div class="init-skeleton-line skeleton-line short"></div>
+        </div>
 
-        <template v-if="selectedSession && !startupRun && entries.length > 0">
+        <template
+          v-if="selectedSession
+            && !startupRun
+            && !inProjectNewSessionRun
+            && entries.length > 0"
+        >
           <TranscriptEntry
             v-for="entry in entries"
             :key="entry.id"
@@ -1759,7 +1842,7 @@ function closePickerMenus() {
         </template>
 
         <TransitionGroup
-          v-if="!startupRun"
+          v-if="!startupRun && !inProjectNewSessionRun"
           name="live-row"
           tag="div"
           class="live-stack"
@@ -1857,7 +1940,7 @@ function closePickerMenus() {
       <div
         v-if="selectedSession
           && !initializing
-          && !isEmptySelectedSession
+          && !emptySessionShellVisible
           && !startupRun
           && !sessionLoading
           && !sessionSwitching"
@@ -1891,9 +1974,11 @@ function closePickerMenus() {
         :error="promptError || eventStreamError || imageSupportWarning"
         :interrupting="interrupting"
         :class="{
-          'empty-session-composer': isEmptySelectedSession,
+          'empty-session-composer': emptySessionShellVisible,
           'session-handoff-composer': sessionHandoff,
-          'activity-scanning-composer': promptSubmitting || sessionHandoff,
+          'activity-scanning-composer': promptSubmitting
+            || sessionHandoff
+            || inProjectNewSessionRun,
         }"
         :model-key="modelKey"
         :model-picker-open="modelPickerOpen"
