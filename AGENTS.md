@@ -42,6 +42,8 @@
 
 ## Memory maintenance
 
+- At the start of a new session, use `list_memory` to review relevant injected
+  global/project/session context before making recommendations or edits.
 - Use Leyline memory tools for durable local memory instead of editing
   `MEMORY.md`.
 - Use `list_memory` or `search_memory` when you need prior project/session/global
