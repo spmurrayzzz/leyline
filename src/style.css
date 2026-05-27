@@ -25,7 +25,10 @@
   --ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
   --ease-accelerate: cubic-bezier(0.4, 0, 1, 1);
+  --ease-dock: cubic-bezier(0.12, 0.82, 0.16, 1);
   --content-max: 1080px;
+  --start-composer-width: min(760px, calc(100vw - 364px));
+  --docked-composer-width: min(var(--content-max), calc(100vw - 364px));
   --terminal-drawer-height: 310px;
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
@@ -114,6 +117,8 @@ button {
 }
 
 .leyline-app.sidebar-hidden {
+  --start-composer-width: min(760px, calc(100vw - 88px));
+  --docked-composer-width: min(var(--content-max), calc(100vw - 88px));
   grid-template-columns: 0 minmax(0, 1fr) 0;
 }
 
@@ -152,6 +157,79 @@ button {
   to {
     opacity: 1;
     transform: translateX(0);
+  }
+}
+
+@keyframes session-chrome-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes session-content-enter {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.992);
+    filter: blur(3px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes session-composer-enter {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 28px);
+  }
+
+  58% {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@keyframes session-fade-enter {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes startup-composer-dock {
+  from {
+    width: var(--start-composer-width);
+    transform: translate(-50%, -34vh);
+  }
+
+  to {
+    width: var(--docked-composer-width);
+    transform: translate(-50%, 0);
+  }
+}
+
+@keyframes startup-loading-enter {
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
   }
 }
 
@@ -1157,15 +1235,20 @@ kbd {
   background: #111217;
 }
 
-.leyline-app.start-state .main-pane {
-  grid-template-rows: 1fr;
+.leyline-app.start-state:not(.new-session-transition) .main-pane {
+  grid-template-rows: 0 1fr;
 }
 
 .runtime-chrome {
   position: relative;
   z-index: 3;
+  grid-row: 1;
   border-bottom: 1px solid var(--border-soft);
   background: #0f1014;
+}
+
+.new-session-transition .runtime-chrome {
+  animation: session-chrome-enter 520ms var(--ease-emphasized) both;
 }
 
 .topbar {
@@ -1481,6 +1564,7 @@ h1 {
 
 .workbench {
   position: relative;
+  grid-row: 2;
   min-height: 0;
   height: 100%;
   overflow: auto;
@@ -1536,7 +1620,20 @@ h1 {
 .start-panel {
   display: grid;
   justify-items: center;
-  width: min(900px, 100%);
+  width: var(--start-composer-width);
+}
+
+.start-headline-text {
+  transition:
+    opacity 320ms var(--ease-accelerate),
+    transform 320ms var(--ease-accelerate),
+    filter 320ms var(--ease-accelerate);
+}
+
+.startup-workbench .start-headline-text {
+  opacity: 0;
+  transform: translateY(-10px);
+  filter: blur(2px);
 }
 
 .start-panel h2,
@@ -1576,8 +1673,10 @@ h1 {
 
 .start-composer {
   position: relative;
-  width: min(900px, 100%);
-  min-width: min(760px, calc(100vw - 88px));
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 187px;
   border: 1px solid #35323f;
   border-radius: 22px;
   background: #17161d;
@@ -1591,11 +1690,46 @@ h1 {
     background-color var(--motion-base) var(--ease-standard),
     box-shadow var(--motion-base) var(--ease-standard),
     opacity var(--motion-base) var(--ease-standard),
+    min-height var(--motion-slow) var(--ease-decelerate),
     transform var(--motion-base) var(--ease-standard);
 }
 
 .start-composer:focus-within {
   border-color: #4a415f;
+}
+
+.startup-init-panel {
+  position: fixed;
+  top: 50%;
+  left: calc(276px + (100vw - 276px) / 2);
+  width: min(340px, calc(100vw - 364px));
+  opacity: 0;
+  transform: translate(-50%, calc(-50% + 8px));
+  animation: startup-loading-enter var(--motion-slow) var(--ease-decelerate)
+    380ms both;
+}
+
+.sidebar-hidden .startup-init-panel {
+  left: 50vw;
+  width: min(340px, calc(100vw - 88px));
+}
+
+.startup-composer-docking .start-composer {
+  position: fixed;
+  bottom: 22px;
+  left: calc(276px + (100vw - 276px) / 2);
+  width: var(--docked-composer-width);
+  min-width: 0;
+  opacity: 0.96;
+  transform: translateX(-50%);
+  animation: startup-composer-dock 980ms var(--ease-dock) both;
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 3%) inset,
+    0 10px 30px -18px rgb(0 0 0 / 52%);
+}
+
+.sidebar-hidden.startup-composer-docking .start-composer {
+  left: 50vw;
 }
 
 .start-composer.shell-mode-composer,
@@ -1696,8 +1830,8 @@ h1 {
 }
 
 .start-composer textarea {
-  height: 58px;
-  padding: 18px 20px 0;
+  height: 78px;
+  padding: 17px 20px 4px;
   color: #e5e6ec;
   font-size: 15px;
 }
@@ -2266,6 +2400,13 @@ h1 {
   transform: translateY(6px) scale(0.985);
   filter: blur(2px);
   pointer-events: none;
+}
+
+.new-session-transition:not(.start-state) .workbench > .message,
+.new-session-transition:not(.start-state) .workbench > .tool-card,
+.new-session-transition:not(.start-state) .workbench > .live-stack,
+.new-session-transition:not(.start-state) .workbench > .empty-session-panel {
+  animation: session-content-enter 560ms var(--ease-emphasized) both;
 }
 
 .session-handoff-workbench > .message,
@@ -3621,6 +3762,14 @@ h1 {
   border-color: #4a415f;
 }
 
+.new-session-transition:not(.start-state) .composer {
+  animation: session-composer-enter 620ms var(--ease-emphasized) both;
+}
+
+.new-session-transition:not(.start-state) .composer-fade {
+  animation: session-fade-enter 520ms var(--ease-decelerate) both;
+}
+
 .composer.session-handoff-composer {
   opacity: 0;
   pointer-events: none;
@@ -4108,6 +4257,7 @@ textarea::placeholder {
   .shell-prompt-glyph,
   .shell-glyph-enter-active,
   .shell-glyph-leave-active,
+  .start-headline-text,
   textarea,
   .slash-picker button,
   .slash-command-name,
@@ -4180,6 +4330,7 @@ textarea::placeholder {
 
   .tool-fullscreen-enter-from .tool-fullscreen,
   .tool-fullscreen-leave-to .tool-fullscreen,
+  .startup-workbench .start-headline-text,
   .composer-popover-enter-from,
   .composer-popover-leave-to,
   .composer-reveal-enter-from,
@@ -4198,6 +4349,15 @@ textarea::placeholder {
     transform: none;
   }
 
+  .new-session-transition:not(.start-state) .runtime-chrome,
+  .new-session-transition:not(.start-state) .workbench > .message,
+  .new-session-transition:not(.start-state) .workbench > .tool-card,
+  .new-session-transition:not(.start-state) .workbench > .live-stack,
+  .new-session-transition:not(.start-state) .workbench > .empty-session-panel,
+  .new-session-transition:not(.start-state) .composer,
+  .new-session-transition:not(.start-state) .composer-fade,
+  .startup-composer-docking .start-composer,
+  .startup-init-panel,
   .live-message-status i,
   .live-tool-spinner,
   .session-loading-mark {
@@ -4208,6 +4368,8 @@ textarea::placeholder {
 @media (max-width: 760px) {
   :root {
     --content-max: 100%;
+    --start-composer-width: calc(100vw - 24px);
+    --docked-composer-width: calc(100vw - 20px);
     --terminal-drawer-height: min(46vh, 310px);
   }
 
@@ -4380,9 +4542,28 @@ textarea::placeholder {
     height: 166px;
   }
 
+  .start-panel {
+    width: calc(100vw - 24px);
+  }
+
   .composer,
   .start-composer {
     min-width: 0;
+  }
+
+  .start-composer {
+    width: calc(100vw - 24px);
+  }
+
+  .startup-init-panel {
+    left: 50vw;
+    width: min(340px, calc(100vw - 24px));
+  }
+
+  .startup-composer-docking .start-composer {
+    bottom: 10px;
+    left: 50vw;
+    width: calc(100vw - 20px);
   }
 
   .composer {

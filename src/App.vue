@@ -64,6 +64,8 @@ const toolsPickerOpen = ref(false)
 const slashActiveIndex = ref(0)
 const slashPickerDismissed = ref(false)
 const promptError = ref('')
+const newSessionSettling = ref(false)
+const startupComposerDocking = ref(false)
 const stickToBottom = ref(true)
 const userScrollActive = ref(false)
 const hasNewOutput = ref(false)
@@ -110,6 +112,8 @@ const settingsPath = computed(() => {
   return selectedSession.value?.path || activeRuntimeSession.value?.path || ''
 })
 let initPhaseTimer = null
+let startupDockTimer = null
+let newSessionSettlingTimer = null
 const liveTurn = useLiveTurnProjection({ onIntent: handleLiveTurnIntent })
 const {
   addTool: upsertLiveTool,
@@ -401,8 +405,11 @@ const startFlowVisible = computed(() => {
   if (sessionLoading.value || sessionSwitching.value) return false
   return !selectedSession.value
 })
+const newSessionTransitionActive = computed(() => {
+  return Boolean(startupRun.value || newSessionSettling.value)
+})
 const runtimeChromeVisible = computed(() => {
-  return initializing.value || (selectedSession.value && !startupRun.value)
+  return initializing.value || selectedSession.value
 })
 const editingLabel = computed(() => {
   if (!editingEntry.value) return ''
@@ -499,6 +506,8 @@ onUnmounted(() => {
   cancelAnimationFrame(scrollSettleFrame)
   cancelAnimationFrame(terminalResizeFrame)
   clearTimeout(initPhaseTimer)
+  clearTimeout(startupDockTimer)
+  clearTimeout(newSessionSettlingTimer)
 })
 
 function handleLiveTurnIntent(intent) {
@@ -1405,7 +1414,12 @@ async function submitStartDraft() {
   const hasPrompt = Boolean(text || attachedImages.value.length)
   if (!targetCwd || creatingSessionCwd.value) return
 
+  clearTimeout(startupDockTimer)
+  startupComposerDocking.value = false
   beginStartupRun(targetCwd, { hasPrompt, model, thinkingLevel })
+  startupDockTimer = window.setTimeout(() => {
+    startupComposerDocking.value = true
+  }, 320)
 
   try {
     await wait(startupAcceptedFloorMs)
@@ -1421,7 +1435,14 @@ async function submitStartDraft() {
     if (hasPrompt) await runStartupPhase('submitting', submitDraft)
   } finally {
     await wait(260)
+    clearTimeout(startupDockTimer)
+    newSessionSettling.value = true
     finishStartupRun()
+    startupComposerDocking.value = false
+    clearTimeout(newSessionSettlingTimer)
+    newSessionSettlingTimer = window.setTimeout(() => {
+      newSessionSettling.value = false
+    }, 720)
   }
 }
 
@@ -1467,6 +1488,8 @@ function closePickerMenus() {
       'sidebar-open': sidebarOpen,
       'sidebar-hidden': desktopSidebarHidden,
       'start-state': !initializing && startFlowVisible,
+      'new-session-transition': newSessionTransitionActive,
+      'startup-composer-docking': startupComposerDocking,
       'session-handoff': sessionHandoff,
       'terminal-open': terminalOpen,
       'event-log-open': eventLogOpen,
@@ -1621,6 +1644,7 @@ function closePickerMenus() {
           'session-handoff-workbench': sessionHandoff,
           'session-switching': sessionSwitching,
           'start-workbench-shell': !initializing && startFlowVisible,
+          'startup-workbench': startupRun,
           'empty-selected-workbench': isEmptySelectedSession && !startupRun,
         }"
         @scroll="handleWorkbenchScroll"
@@ -1656,7 +1680,16 @@ function closePickerMenus() {
           {{ sessionError }}
         </div>
         <div v-else-if="startFlowVisible" class="start-panel">
-          <h2>What should we work on?</h2>
+          <h2 class="start-headline-text">What should we work on?</h2>
+          <div
+            v-if="startupRun"
+            class="init-panel startup-init-panel"
+            aria-label="Starting new session"
+          >
+            <div class="init-skeleton-line skeleton-line skeleton-title"></div>
+            <div class="init-skeleton-line skeleton-line"></div>
+            <div class="init-skeleton-line skeleton-line short"></div>
+          </div>
           <StartComposer
             v-model:draft="draft"
             :class="{ 'activity-scanning-composer': startupRun }"
