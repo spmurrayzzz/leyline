@@ -20,8 +20,11 @@ export function fetchSessionDetail(session) {
   )
 }
 
-export function fetchFsDirectory(path) {
-  const query = path ? `?path=${encodeURIComponent(path)}` : ''
+export function fetchFsDirectory(path, cwd = '') {
+  const params = new URLSearchParams()
+  if (path) params.set('path', path)
+  if (cwd) params.set('cwd', cwd)
+  const query = params.toString() ? `?${params}` : ''
   return apiRequest(`/api/pi/fs${query}`, 'Failed to read folder')
 }
 

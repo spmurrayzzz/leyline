@@ -819,8 +819,14 @@ kbd {
 
 .project-browser-shortcuts {
   display: flex;
+  align-items: center;
   gap: 8px;
   padding: 10px 16px 12px;
+}
+
+.project-browser-shortcuts span {
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .project-browser-list {
@@ -843,7 +849,8 @@ kbd {
   text-align: left;
 }
 
-.project-browser-list button:hover {
+.project-browser-list button:hover,
+.project-browser-list button.highlighted {
   background: #201a32;
   transition-duration: var(--motion-quick);
   transition-timing-function: var(--ease-accelerate);

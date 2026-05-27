@@ -82,7 +82,10 @@ async function piApiHandler(req, res) {
           return json(res, { error: 'Method not allowed' }, 405)
         }
   
-        return json(res, await readDirectory(url.searchParams.get('path')))
+        return json(res, await readDirectory(
+          url.searchParams.get('path'),
+          url.searchParams.get('cwd'),
+        ))
       }
   
       if (url.pathname === '/prompt') {

@@ -449,6 +449,7 @@ function forceOneAtATime(session) {
 
 async function createNewSession(cwd) {
   if (!cwd) throw new Error('cwd is required')
+  await mkdir(cwd, { recursive: true })
 
   const runtime = await createAgentSessionRuntime(createRuntime, {
     cwd,

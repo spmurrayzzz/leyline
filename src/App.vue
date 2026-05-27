@@ -657,10 +657,6 @@ function openProjectBrowser(path = '') {
   projectBrowserOpen.value = true
 }
 
-function handleProjectBrowserBrowse(cwd) {
-  newSessionCwd.value = cwd
-}
-
 function closeProjectBrowser() {
   projectBrowserOpen.value = false
 }
@@ -1498,9 +1494,9 @@ function closePickerMenus() {
 
     <ProjectBrowser
       v-if="projectBrowserOpen"
+      :active-cwd="selectedSession?.cwd || ''"
       :busy="!!creatingSessionCwd"
       :initial-path="projectBrowserInitialPath"
-      @browse="handleProjectBrowserBrowse"
       @close="closeProjectBrowser"
       @select="createSessionForCwd"
     />
