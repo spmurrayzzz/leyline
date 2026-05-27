@@ -1027,7 +1027,8 @@ function cancelInProjectNewSessionRun() {
 
 async function submitDraft(streamingBehavior) {
   const text = draft.value.trim()
-  const images = attachedImages.value.map(({ preview, ...image }) => image)
+  const submittedAttachments = attachedImages.value
+  const images = submittedAttachments.map(({ preview, ...image }) => image)
   const shellCommand = shellCommandFromText(text)
   const compactCommand = compactCommandFromText(text)
   if (!text && images.length === 0) return
@@ -1052,8 +1053,11 @@ async function submitDraft(streamingBehavior) {
 
   if (agentRunning.value && !editingEntry.value) {
     const sessionId = selectedSessionId.value
+    const submittedDraft = draft.value
     promptSubmitting.value = true
     promptError.value = ''
+    draft.value = ''
+    attachedImages.value = []
     try {
       const data = await submitPrompt(
         sessionId,
@@ -1064,10 +1068,12 @@ async function submitDraft(streamingBehavior) {
       if (data.active && selectedSessionId.value === sessionId) {
         activeRuntimeSession.value = data.active
       }
-      draft.value = ''
-      attachedImages.value = []
     } catch (error) {
       if (selectedSessionId.value === sessionId) {
+        if (!draft.value && !attachedImages.value.length) {
+          draft.value = submittedDraft
+          attachedImages.value = submittedAttachments
+        }
         promptError.value = error.message
       }
     } finally {
@@ -1101,8 +1107,11 @@ async function submitDraft(streamingBehavior) {
   }
   if (startsEmptySession) beginInProjectNewSessionRun()
   const localEntry = beginUserTurn(text, images)
+  const submittedDraft = draft.value
   promptSubmitting.value = true
   promptError.value = ''
+  draft.value = ''
+  attachedImages.value = []
   if (shouldFollowOutput) await scrollToLatest()
   else hasNewOutput.value = true
 
@@ -1114,8 +1123,6 @@ async function submitDraft(streamingBehavior) {
     if (selectedSessionId.value === sessionId) {
       if (data.active) activeRuntimeSession.value = data.active
       if (isHandledSlashCommand(text)) removeOptimisticEntry(localEntry)
-      draft.value = ''
-      attachedImages.value = []
       editingEntry.value = null
       if (startsTurn) setAgentRunning(true, 'Working…')
       promptAccepted = true
@@ -1127,6 +1134,10 @@ async function submitDraft(streamingBehavior) {
         resetLiveState()
       }
       removeOptimisticEntry(localEntry)
+      if (!draft.value && !attachedImages.value.length) {
+        draft.value = submittedDraft
+        attachedImages.value = submittedAttachments
+      }
       promptError.value = error.message
     }
   } finally {
