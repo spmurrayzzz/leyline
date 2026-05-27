@@ -674,11 +674,12 @@ export function useSessionWorkspace({
   }
 
   function setSelectedSessionData(detail, active) {
+    sessionSelectionToken += 1
     activeRuntimeSession.value = active || null
     sessionDetail.value = detail
     selectedSessionId.value = detail.session.id
     liveTurn?.selectSession?.(detail.session.id)
-    liveTurn?.reset?.()
+    liveTurn?.setPersistedDetail?.(detail)
     updateSessionRoute(detail.session.id)
   }
 
