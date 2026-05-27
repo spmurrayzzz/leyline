@@ -48,6 +48,15 @@ const BUNDLED_GOAL_EXTENSION = resolve(
   'goal',
   'index.ts',
 )
+const BUNDLED_MEMORY_EXTENSION = resolve(
+  __dirname,
+  '..',
+  '..',
+  '.pi',
+  'extensions',
+  'memory',
+  'index.ts',
+)
 
 let activeHandle
 let activeRuntime
@@ -67,17 +76,28 @@ process.env.PI_CODING_AGENT ??= 'true'
 
 const ONE_AT_A_TIME = 'one-at-a-time'
 
-function preferBundledGoalExtension(result) {
-  const bundled = result.extensions.find((extension) => {
-    return extension.resolvedPath === BUNDLED_GOAL_EXTENSION
+function preferBundledExtensions(result) {
+  const bundledCommands = new Map([
+    [BUNDLED_GOAL_EXTENSION, 'goal'],
+    [BUNDLED_MEMORY_EXTENSION, 'memory'],
+  ])
+  const bundled = result.extensions.filter((extension) => {
+    const command = bundledCommands.get(extension.resolvedPath)
+    return command && extension.commands?.has(command)
   })
-  if (!bundled?.commands?.has('goal')) return result
+  if (bundled.length === 0) return result
 
+  const commands = new Set(bundled.map((extension) => {
+    return bundledCommands.get(extension.resolvedPath)
+  }))
   return {
     ...result,
     extensions: result.extensions.filter((extension) => {
-      if (extension === bundled) return true
-      return !extension.commands?.has('goal')
+      if (bundled.includes(extension)) return true
+      for (const command of commands) {
+        if (extension.commands?.has(command)) return false
+      }
+      return true
     }),
   }
 }
@@ -86,8 +106,11 @@ const createRuntime = async ({ cwd, sessionManager, sessionStartEvent }) => {
   const services = await createAgentSessionServices({
     cwd,
     resourceLoaderOptions: {
-      additionalExtensionPaths: [BUNDLED_GOAL_EXTENSION],
-      extensionsOverride: preferBundledGoalExtension,
+      additionalExtensionPaths: [
+        BUNDLED_GOAL_EXTENSION,
+        BUNDLED_MEMORY_EXTENSION,
+      ],
+      extensionsOverride: preferBundledExtensions,
     },
   })
   const runtime = {

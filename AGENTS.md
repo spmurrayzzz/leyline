@@ -42,11 +42,21 @@
 
 ## Memory maintenance
 
-- Read `MEMORY.md` at the start of future sessions before making changes if it exists.
-- Keep `MEMORY.md` up to date when project direction, architecture, pi SDK
-  learnings, workflows, or important UI decisions change.
-- Update `MEMORY.md` at natural checkpoints or when the user asks for a memory
-  refresh. Be detailed but concise: capture decisions and rationale, not every
-  line-by-line edit.
-- If `AGENTS.md` and `MEMORY.md` disagree, ask the user or inspect recent code;
-  do not silently assume the older note is correct.
+- Use Leyline memory tools for durable local memory instead of editing
+  `MEMORY.md`.
+- Use `list_memory` or `search_memory` when you need prior project/session/global
+  context that was not injected automatically.
+- Use `record_memory` when project direction, architecture, pi SDK learnings,
+  workflows, or important UI decisions change.
+- Choose scope intentionally:
+  - `session`: transient current-thread facts, pending work, failed attempts, or
+    decisions that should survive compaction but not leak to other sessions.
+  - `project`: stable Leyline repo facts, architecture direction, workflows,
+    gotchas, or project-specific user preferences.
+  - `global`: stable user or Leyline/pi preferences that apply across projects.
+- Record concise Markdown with the reason when useful. Capture decisions and
+  rationale, not every line-by-line edit.
+- Use `update_memory` to correct an existing memory and `archive_memory` when a
+  memory is stale or the user asks to forget it.
+- If `AGENTS.md` and memory disagree, ask the user or inspect recent code; do not
+  silently assume the older note is correct.
