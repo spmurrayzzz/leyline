@@ -2914,6 +2914,21 @@ h1 {
   animation: composer-scanner-rail 1450ms ease-in-out infinite;
 }
 
+.activity-scanner-settling::after {
+  animation: composer-scanner-fade 420ms var(--ease-decelerate) both;
+}
+
+.activity-scanner-settling::before {
+  animation:
+    composer-scanner-rail 1450ms ease-in-out infinite,
+    composer-scanner-fade 420ms var(--ease-decelerate) both;
+}
+
+@keyframes composer-scanner-fade {
+  to {
+    opacity: 0;
+  }
+}
 
 @keyframes composer-scanner-rail {
   0%,
@@ -4428,6 +4443,8 @@ textarea::placeholder {
   .in-project-new-session-transition .composer-fade,
   .startup-composer-docking .start-composer,
   .in-project-composer-docking .composer.empty-session-composer,
+  .activity-scanning-composer::before,
+  .activity-scanner-settling::after,
   .startup-init-panel,
   .in-project-init-panel,
   .live-message-status i,

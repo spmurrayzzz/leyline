@@ -64,6 +64,7 @@ const toolsPickerOpen = ref(false)
 const slashActiveIndex = ref(0)
 const slashPickerDismissed = ref(false)
 const promptError = ref('')
+const composerScannerSettling = ref(false)
 const newSessionSettling = ref(false)
 const startupComposerDocking = ref(false)
 const startupRevealHold = ref(false)
@@ -119,6 +120,7 @@ const settingsPath = computed(() => {
   return selectedSession.value?.path || activeRuntimeSession.value?.path || ''
 })
 let initPhaseTimer = null
+let composerScannerSettlingTimer = null
 let startupDockTimer = null
 let startupRevealTimer = null
 let newSessionSettlingTimer = null
@@ -435,6 +437,19 @@ const emptySessionShellVisible = computed(() => {
 const runtimeChromeVisible = computed(() => {
   return initializing.value || selectedSession.value
 })
+const composerScannerSourceActive = computed(() => {
+  return Boolean(
+    promptSubmitting.value
+      || agentRunning.value
+      || sessionHandoff.value
+      || inProjectNewSessionRun.value,
+  )
+})
+const composerScannerVisible = computed(() => {
+  return Boolean(
+    composerScannerSourceActive.value || composerScannerSettling.value,
+  )
+})
 const editingLabel = computed(() => {
   if (!editingEntry.value) return ''
   return 'Editing earlier message · send to replace the current branch'
@@ -489,6 +504,20 @@ watch(selectedSessionId, () => {
   resetWorkbenchScrollState()
 })
 
+watch(composerScannerSourceActive, (active, wasActive) => {
+  clearTimeout(composerScannerSettlingTimer)
+  if (active) {
+    composerScannerSettling.value = false
+    return
+  }
+  if (!wasActive) return
+
+  composerScannerSettling.value = true
+  composerScannerSettlingTimer = window.setTimeout(() => {
+    composerScannerSettling.value = false
+  }, 420)
+})
+
 watch(() => composerRef.value?.form, (el) => {
   observeComposer(el)
 }, { flush: 'post' })
@@ -530,6 +559,7 @@ onUnmounted(() => {
   cancelAnimationFrame(scrollSettleFrame)
   cancelAnimationFrame(terminalResizeFrame)
   clearTimeout(initPhaseTimer)
+  clearTimeout(composerScannerSettlingTimer)
   clearTimeout(startupDockTimer)
   clearTimeout(startupRevealTimer)
   clearTimeout(newSessionSettlingTimer)
@@ -2004,9 +2034,8 @@ function closePickerMenus() {
         :class="{
           'empty-session-composer': emptySessionShellVisible,
           'session-handoff-composer': sessionHandoff,
-          'activity-scanning-composer': promptSubmitting
-            || sessionHandoff
-            || inProjectNewSessionRun,
+          'activity-scanning-composer': composerScannerVisible,
+          'activity-scanner-settling': composerScannerSettling,
         }"
         :model-key="modelKey"
         :model-picker-open="modelPickerOpen"
