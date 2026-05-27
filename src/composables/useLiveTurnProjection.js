@@ -83,6 +83,7 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     agentRunning.value = isRunningEvent(event)
     liveActivity.value = activityText(event)
     updateLiveTool(event)
+    updateLiveUser(event)
     updateLiveAssistant(event)
     releaseLiveAnchorIfSettled()
     emit({ type: 'runtime-queue', event })
@@ -435,6 +436,58 @@ export function useLiveTurnProjection({ onIntent } = {}) {
   function liveToolSettled(tool) {
     if (tool.persistedEntry) return true
     return ['completed', 'error', 'aborted'].includes(tool.status)
+  }
+
+  function updateLiveUser(event) {
+    if (!['message_start', 'message_end'].includes(event?.type)) return
+    if (event.message?.role !== 'user') return
+
+    const entry = liveUserEntry(event)
+    const existing = findLiveUser(entry)
+    if (existing) {
+      liveUserMessages.value = liveUserMessages.value.map((item) => {
+        if (item.id !== existing.id) return item
+        return {
+          ...entry,
+          id: item.id,
+          seq: item.seq,
+          createdAt: item.createdAt,
+          persistedEntry: item.persistedEntry,
+        }
+      })
+      return
+    }
+
+    if (optimisticEntries.value.some((item) => localEntryMatches(item, entry))) {
+      return
+    }
+
+    const seq = ++liveItemSeq
+    liveUserMessages.value = [
+      ...liveUserMessages.value,
+      { ...entry, id: entry.id || `live-user-${seq}`, seq },
+    ]
+  }
+
+  function liveUserEntry(event) {
+    const blocks = messageBlocks(event.message.content)
+    const text = textFromBlocks(blocks)
+    return {
+      id: messageEventId(event),
+      createdAt: Date.now(),
+      type: 'message',
+      role: 'user',
+      label: 'You',
+      text,
+      blocks,
+      copyText: text,
+    }
+  }
+
+  function findLiveUser(entry) {
+    return liveUserMessages.value.find((message) => {
+      return liveUserMatchesEntry(message, entry)
+    })
   }
 
   function reconcileLiveUsers(detail) {

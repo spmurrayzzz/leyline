@@ -2880,7 +2880,7 @@ h1 {
 }
 
 .activity-scanning-composer {
-  overflow: hidden;
+  overflow: visible;
 }
 
 .activity-scanning-composer::after {
@@ -2933,11 +2933,11 @@ h1 {
 @keyframes composer-scanner-rail {
   0%,
   100% {
-    left: -14%;
+    left: 0;
   }
 
   50% {
-    left: 86%;
+    left: 72%;
   }
 }
 
