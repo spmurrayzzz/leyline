@@ -680,10 +680,11 @@ button, input, textarea { color: inherit; font: inherit; }
 .thinking-block + .assistant-text-block { margin-top: 8px; }
 .user-message {
   margin-top: 22px;
-  border: 1px solid var(--accent-border);
+  border: 1px solid #40384d;
   border-radius: 12px;
-  background: rgb(124 92 255 / 9%);
+  background: #1d1a27;
   padding: 10px 12px;
+  box-shadow: 0 1px 0 rgb(255 255 255 / 4%) inset;
 }
 .user-message .message-meta { color: #bfb5ff; }
 .message-images {
