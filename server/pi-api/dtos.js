@@ -15,6 +15,7 @@ const HIDDEN_SLASH_COMMANDS = new Set([
   'import',
   'login',
   'logout',
+  'memory',
   'model',
   'name',
   'new',
