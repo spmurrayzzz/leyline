@@ -440,9 +440,40 @@ async function reloadSession(handle) {
     throw new Error('Wait for compaction to finish before reloading.')
   }
 
-  await session.reload()
-  forceOneAtATime(session)
-  await bindRuntimeHandle(handle)
+  const previousSessionFile = session.sessionFile
+  const previousLeafId = session.sessionManager.getLeafId()
+  const sessionManager = SessionManager.open(previousSessionFile)
+  if (previousLeafId) sessionManager.branch(previousLeafId)
+
+  const result = await createRuntime({
+    cwd: sessionManager.getCwd(),
+    agentDir: handle.runtime.services.agentDir,
+    sessionManager,
+    sessionStartEvent: {
+      type: 'session_start',
+      reason: 'reload',
+      previousSessionFile,
+    },
+  })
+
+  let applied = false
+  try {
+    await handle.runtime.teardownCurrent('reload', previousSessionFile)
+    handle.unsubscribe?.()
+    const previousId = handle.sessionId
+    handle.runtime.apply(result)
+    applied = true
+    handle.sessionId = handle.runtime.session.sessionManager.getSessionId()
+    handle.extensionUiState = emptyExtensionUiState()
+    if (previousId !== handle.sessionId) runtimeHandles.delete(previousId)
+    runtimeHandles.set(handle.sessionId, handle)
+    forceOneAtATime(handle.runtime.session)
+    if (activeHandle === handle) setActiveHandle(handle)
+    await bindRuntimeHandle(handle)
+  } catch (error) {
+    if (!applied) result.session.dispose()
+    throw error
+  }
 }
 
 async function setSessionModel(handle, provider, id) {
