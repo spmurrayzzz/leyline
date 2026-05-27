@@ -1,4 +1,4 @@
-# Leyline
+# <img src="assets/icon.png" width="96" height="96" alt="Leyline icon" align="center"> Leyline
 
 Leyline is a local web UI for pi coding-agent sessions. It uses Vue 3 and Vite
 for the frontend, with Vite middleware that talks to the pi SDK for session
@@ -6,7 +6,7 @@ state, prompts, model controls, runtime events, and an embedded terminal.
 
 | Home View | Workbench |
 | --- | --- |
-| <a href="https://github.com/user-attachments/assets/66b771a5-0b0c-4905-b788-b605dd4ee80b" target="_blank" rel="noopener noreferrer"><img width="760" alt="Home View" src="https://github.com/user-attachments/assets/66b771a5-0b0c-4905-b788-b605dd4ee80b" /></a> | <a href="https://github.com/user-attachments/assets/d9406f53-c110-43d5-98ed-e08599e2f3a7" target="_blank" rel="noopener noreferrer"><img width="760" alt="Workbench" src="https://github.com/user-attachments/assets/d9406f53-c110-43d5-98ed-e08599e2f3a7" /></a> |
+| <a href="https://github.com/user-attachments/assets/ae22c31c-9f60-4142-ae58-308ff54309fd" target="_blank" rel="noopener noreferrer"><img width="760" alt="Home View" src="https://github.com/user-attachments/assets/ae22c31c-9f60-4142-ae58-308ff54309fd" /></a> | <a href="https://github.com/user-attachments/assets/ac8dfefe-2ef0-4b0b-8d24-e66dde7484e1" target="_blank" rel="noopener noreferrer"><img width="760" alt="Workbench" src="https://github.com/user-attachments/assets/ac8dfefe-2ef0-4b0b-8d24-e66dde7484e1" /></a> |
 
 
 ## Features
