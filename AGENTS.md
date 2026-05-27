@@ -56,8 +56,13 @@
   - `project`: stable Leyline repo facts, architecture direction, workflows,
     gotchas, or project-specific user preferences.
   - `global`: stable user or Leyline/pi preferences that apply across projects.
-- Record concise Markdown with the reason when useful. Capture decisions and
-  rationale, not every line-by-line edit.
+- Record concise Markdown with the reason when useful. Capture durable
+  decisions, rationale, and transferable lessons, not every line-by-line edit.
+- When asked whether there are learnings to remember after a fix, prefer the
+  generic reusable lesson over implementation-specific details unless the
+  implementation changes project architecture or workflow.
+- If a proposed memory may be ambiguous in scope or phrasing, summarize the
+  intended memory and ask before recording it.
 - Use `update_memory` to correct an existing memory and `archive_memory` when a
   memory is stale or the user asks to forget it.
 - If `AGENTS.md` and memory disagree, ask the user or inspect recent code; do not
