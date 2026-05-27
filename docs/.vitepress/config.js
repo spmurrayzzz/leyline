@@ -9,6 +9,7 @@ export default defineConfig({
   themeConfig: {
     nav: [
       { text: 'Guide', link: '/getting-started/' },
+      { text: 'Motivations', link: '/motivations' },
       { text: 'User Guide', link: '/user-guide/' },
       { text: 'Developer Guide', link: '/developer-guide/' },
       { text: 'Reference', link: '/reference/commands' },
@@ -18,6 +19,7 @@ export default defineConfig({
         text: 'Guide',
         items: [
           { text: 'Overview', link: '/getting-started/' },
+          { text: 'Motivations', link: '/motivations' },
           { text: 'Requirements', link: '/getting-started/requirements' },
           { text: 'Installation', link: '/getting-started/installation' },
           { text: 'First run', link: '/getting-started/first-run' },

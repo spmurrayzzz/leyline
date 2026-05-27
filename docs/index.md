@@ -40,6 +40,7 @@ shell environment loading, and window-state persistence.
 ## Quick links
 
 - [Install and run Leyline](/getting-started/)
+- [Read the motivations](/motivations)
 - [Learn the UI](/user-guide/)
 - [Understand the architecture](/developer-guide/)
 - [Review API routes](/reference/api)

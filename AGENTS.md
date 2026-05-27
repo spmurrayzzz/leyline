@@ -6,6 +6,9 @@
   so that you can validate with screenshots/browser before moving on. You may
   need to tell them to restart on config changes.
 - Use Vue 3, Vite, Node.js, and JavaScript. Do not introduce TypeScript.
+- Use `docs/motivations.md` as an alignment vector for product direction:
+  reduce agent workflow pain, keep the interface malleable, avoid noisy
+  dashboards, and do not drift toward IDE replacement.
 - Prefer simple CSS and small focused changes. No component library unless the
   user asks.
 - Keep in-app transcript styles in `src/style.css` and export transcript styles

@@ -14,6 +14,8 @@ state, prompts, model controls, runtime events, and an embedded terminal.
 Browse, search, create, and run pi sessions from a local web UI, with rendered
 transcripts, live runtime output, model/mode controls, and an embedded terminal.
 
+For the reasoning behind the project, see [Motivations](docs/motivations.md).
+
 ## Requirements
 
 - Node.js
