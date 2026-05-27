@@ -66,6 +66,9 @@ const slashPickerDismissed = ref(false)
 const promptError = ref('')
 const newSessionSettling = ref(false)
 const startupComposerDocking = ref(false)
+const startupRevealHold = ref(false)
+const startupRevealSettling = ref(false)
+const startupRevealCwd = ref('')
 const inProjectNewSessionRun = ref(false)
 const inProjectComposerDocking = ref(false)
 const inProjectNewSessionSettling = ref(false)
@@ -117,6 +120,7 @@ const settingsPath = computed(() => {
 })
 let initPhaseTimer = null
 let startupDockTimer = null
+let startupRevealTimer = null
 let newSessionSettlingTimer = null
 let inProjectDockTimer = null
 let inProjectSettlingTimer = null
@@ -407,13 +411,18 @@ const composerPlaceholder = computed(() => {
   if (isEmptySelectedSession.value) return 'Describe the first task or attach images'
   return 'Ask for follow-up changes or attach images'
 })
+const startupShellVisible = computed(() => {
+  return Boolean(startupRun.value || startupRevealHold.value)
+})
 const startFlowVisible = computed(() => {
   if (startupRun.value) return true
   if (sessionLoading.value || sessionSwitching.value) return false
   return !selectedSession.value
 })
 const newSessionTransitionActive = computed(() => {
-  return Boolean(startupRun.value || newSessionSettling.value)
+  return Boolean(
+    startupShellVisible.value || newSessionSettling.value,
+  )
 })
 const inProjectTransitionActive = computed(() => {
   return Boolean(
@@ -522,6 +531,7 @@ onUnmounted(() => {
   cancelAnimationFrame(terminalResizeFrame)
   clearTimeout(initPhaseTimer)
   clearTimeout(startupDockTimer)
+  clearTimeout(startupRevealTimer)
   clearTimeout(newSessionSettlingTimer)
   clearTimeout(inProjectDockTimer)
   clearTimeout(inProjectSettlingTimer)
@@ -1502,12 +1512,22 @@ async function submitStartDraft() {
   } finally {
     await wait(260)
     clearTimeout(startupDockTimer)
+    clearTimeout(startupRevealTimer)
+    const shouldRevealSession = Boolean(selectedSession.value)
+    startupRevealHold.value = shouldRevealSession
+    startupRevealSettling.value = shouldRevealSession
+    startupRevealCwd.value = targetCwd
     newSessionSettling.value = true
     finishStartupRun()
     startupComposerDocking.value = false
+    startupRevealTimer = window.setTimeout(() => {
+      startupRevealHold.value = false
+      startupRevealCwd.value = ''
+    }, 180)
     clearTimeout(newSessionSettlingTimer)
     newSessionSettlingTimer = window.setTimeout(() => {
       newSessionSettling.value = false
+      startupRevealSettling.value = false
     }, 720)
   }
 }
@@ -1555,7 +1575,9 @@ function closePickerMenus() {
       'sidebar-hidden': desktopSidebarHidden,
       'start-state': !initializing && startFlowVisible,
       'new-session-transition': newSessionTransitionActive,
-      'startup-composer-docking': startupComposerDocking,
+      'startup-composer-docking': startupComposerDocking || startupRevealHold,
+      'startup-reveal-hold': startupRevealHold,
+      'startup-reveal-settling': startupRevealSettling,
       'in-project-new-session-transition': inProjectTransitionActive,
       'in-project-composer-docking': inProjectComposerDocking,
       'session-handoff': sessionHandoff,
@@ -1712,7 +1734,7 @@ function closePickerMenus() {
           'session-handoff-workbench': sessionHandoff,
           'session-switching': sessionSwitching,
           'start-workbench-shell': !initializing && startFlowVisible,
-          'startup-workbench': startupRun,
+          'startup-workbench': startupShellVisible,
           'in-project-startup-workbench': inProjectNewSessionRun,
           'empty-selected-workbench': emptySessionShellVisible && !startupRun,
         }"
@@ -1748,10 +1770,13 @@ function closePickerMenus() {
         <div v-else-if="sessionError" class="empty-workbench error-note">
           {{ sessionError }}
         </div>
-        <div v-else-if="startFlowVisible" class="start-panel">
+        <div
+          v-else-if="startFlowVisible || startupRevealHold"
+          class="start-panel"
+        >
           <h2 class="start-headline-text">What should we work on?</h2>
           <div
-            v-if="startupRun"
+            v-if="startupShellVisible"
             class="init-panel startup-init-panel"
             aria-label="Starting new session"
           >
@@ -1761,13 +1786,16 @@ function closePickerMenus() {
           </div>
           <StartComposer
             v-model:draft="draft"
-            :class="{ 'activity-scanning-composer': startupRun }"
+            :class="{ 'activity-scanning-composer': startupShellVisible }"
             v-model:start-project-query="startProjectQuery"
             :attached-images="attachedImages"
             :available-models="availableModels"
             :available-thinking-levels="availableThinkingLevels"
             :chips="composerChips"
-            :creating-session-cwd="creatingSessionCwd || startupRun?.cwd || ''"
+            :creating-session-cwd="creatingSessionCwd
+              || startupRun?.cwd
+              || startupRevealCwd
+              || ''"
             :current-model-label="currentModelLabel"
             :current-thinking-label="currentThinkingLabel"
             :image-support-warning="imageSupportWarning"

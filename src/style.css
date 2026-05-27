@@ -1637,6 +1637,16 @@ h1 {
   width: var(--start-composer-width);
 }
 
+.startup-reveal-hold .start-panel {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  place-content: center;
+  width: auto;
+  background: #111217;
+  pointer-events: none;
+}
+
 .start-headline-text,
 .empty-session-panel h2 {
   transition:
@@ -3810,9 +3820,18 @@ h1 {
   animation: session-composer-enter 620ms var(--ease-emphasized) both;
 }
 
+.startup-reveal-settling.new-session-transition:not(.start-state) .composer {
+  animation: none;
+}
+
 .new-session-transition:not(.start-state) .composer-fade,
 .in-project-new-session-transition .composer-fade {
   animation: session-fade-enter 520ms var(--ease-decelerate) both;
+}
+
+.startup-reveal-settling.new-session-transition:not(.start-state)
+  .composer-fade {
+  animation: none;
 }
 
 .composer.session-handoff-composer {
