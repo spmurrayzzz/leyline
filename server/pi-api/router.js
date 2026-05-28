@@ -304,6 +304,7 @@ async function piApiHandler(req, res) {
         const feedback = await setRolloutFeedback({
           cwd: body.cwd,
           entryId: body.entryId,
+          feedbackText: body.feedbackText,
           label: body.label,
           sessionId: decodeURIComponent(feedbackMatch[1]),
           sessionPath: body.sessionPath,

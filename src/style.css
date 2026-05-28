@@ -2594,6 +2594,90 @@ h1 {
   color: #a48d96;
 }
 
+.feedback-note-button {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  padding: 2px 7px;
+  font: inherit;
+  font-size: 10px;
+  line-height: 1.4;
+  opacity: 0.72;
+  transition:
+    border-color var(--motion-base) var(--ease-decelerate),
+    background-color var(--motion-base) var(--ease-decelerate),
+    color var(--motion-base) var(--ease-decelerate),
+    opacity var(--motion-base) var(--ease-decelerate);
+}
+
+.feedback-note-button:hover {
+  border-color: var(--border-soft);
+  background: var(--panel-soft);
+  color: var(--muted-strong);
+  opacity: 1;
+}
+
+.feedback-note-popover {
+  position: absolute;
+  z-index: 3;
+  top: 34px;
+  right: 12px;
+  display: grid;
+  gap: 7px;
+  width: min(300px, calc(100% - 24px));
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--panel);
+  padding: 8px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.22);
+}
+
+.feedback-note-popover textarea {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.025);
+  color: var(--text);
+  padding: 7px 8px;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.45;
+  outline: none;
+  caret-color: var(--accent);
+}
+
+.feedback-note-popover textarea:focus {
+  border-color: #4a415f;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.feedback-note-popover textarea::placeholder {
+  color: var(--muted);
+}
+
+.feedback-note-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.feedback-note-actions button {
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted-strong);
+  padding: 3px 9px;
+  font: inherit;
+  font-size: 11px;
+}
+
+.feedback-note-actions button:last-child {
+  background: var(--panel-soft);
+  color: var(--text);
+}
+
 .copy-button {
   display: grid;
   place-items: center;
@@ -2630,6 +2714,7 @@ h1 {
 }
 
 .transcript-message {
+  position: relative;
   border-radius: 10px;
   padding: 2px 0;
   transition:

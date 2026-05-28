@@ -12,7 +12,7 @@ export function readRolloutFeedbackForSession(cwd, sessionPath, sessionId) {
   const db = openDb()
   try {
     const rows = db.prepare(`
-      SELECT entry_id, label, updated_at
+      SELECT entry_id, label, feedback_text, updated_at
       FROM rollout_feedback
       WHERE cwd = ? AND session_path = ? AND session_id = ?
     `).all(cwd, sessionPath, sessionId)
@@ -25,6 +25,7 @@ export function readRolloutFeedbackForSession(cwd, sessionPath, sessionId) {
         sessionPath,
         entryId: row.entry_id,
         label: row.label,
+        feedbackText: row.feedback_text || '',
         updatedAt: row.updated_at,
       },
     ]))
@@ -38,12 +39,14 @@ export function applyRolloutFeedback(entries, cwd, sessionPath, sessionId) {
   return entries.map((entry) => ({
     ...entry,
     rolloutFeedback: feedback[entry.id]?.label || '',
+    rolloutFeedbackText: feedback[entry.id]?.feedbackText || '',
   }))
 }
 
 export async function setRolloutFeedback({
   cwd,
   entryId,
+  feedbackText = '',
   label,
   sessionId,
   sessionPath,
@@ -55,6 +58,7 @@ export async function setRolloutFeedback({
   if (label && !FEEDBACK_LABELS.has(label)) {
     throw new Error('Invalid feedback label')
   }
+  const note = String(feedbackText || '').trim()
 
   await mkdir(dirname(dbPath()), { recursive: true })
 
@@ -80,12 +84,14 @@ export async function setRolloutFeedback({
         session_id,
         entry_id,
         label,
+        feedback_text,
         updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(cwd, session_path, session_id, entry_id) DO UPDATE SET
         label = excluded.label,
+        feedback_text = excluded.feedback_text,
         updated_at = excluded.updated_at
-    `).run(cwd, sessionPath, sessionId, entryId, label, updatedAt)
+    `).run(cwd, sessionPath, sessionId, entryId, label, note, updatedAt)
 
     return {
       cwd,
@@ -93,6 +99,7 @@ export async function setRolloutFeedback({
       sessionPath,
       entryId,
       label,
+      feedbackText: note,
       updatedAt,
     }
   } finally {
@@ -110,13 +117,21 @@ function openDb() {
       session_id TEXT NOT NULL,
       entry_id TEXT NOT NULL,
       label TEXT NOT NULL CHECK (label IN ('helpful', 'unhelpful')),
+      feedback_text TEXT NOT NULL DEFAULT '',
       updated_at INTEGER NOT NULL,
       PRIMARY KEY (cwd, session_path, session_id, entry_id)
     );
     CREATE INDEX IF NOT EXISTS idx_rollout_feedback_session
       ON rollout_feedback(session_id, updated_at DESC);
   `)
+  ensureFeedbackTextColumn(db)
   return db
+}
+
+function ensureFeedbackTextColumn(db) {
+  const columns = db.prepare('PRAGMA table_info(rollout_feedback)').all()
+  if (columns.some((column) => column.name === 'feedback_text')) return
+  db.exec("ALTER TABLE rollout_feedback ADD COLUMN feedback_text TEXT NOT NULL DEFAULT ''")
 }
 
 function dbPath() {

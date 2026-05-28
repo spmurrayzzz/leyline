@@ -35,6 +35,8 @@ const emit = defineEmits([
   'toggle-tool',
 ])
 
+const feedbackDraft = ref('')
+const noteOpen = ref(false)
 const thinkingExpanded = ref(false)
 const helpfulThumbPaths = [
   'M7 10v11',
@@ -92,11 +94,20 @@ function feedbackClass(entry, label) {
 }
 
 function markFeedback(entry, label) {
-  emit(
-    'mark-feedback',
-    entry,
-    entry.rolloutFeedback === label ? '' : label,
-  )
+  const nextLabel = entry.rolloutFeedback === label ? '' : label
+  if (!nextLabel) noteOpen.value = false
+  emit('mark-feedback', entry, nextLabel, entry.rolloutFeedbackText || '')
+}
+
+function openFeedbackNote(entry) {
+  feedbackDraft.value = entry.rolloutFeedbackText || ''
+  noteOpen.value = true
+}
+
+function saveFeedbackNote(entry) {
+  if (!entry.rolloutFeedback) return
+  emit('mark-feedback', entry, entry.rolloutFeedback, feedbackDraft.value)
+  noteOpen.value = false
 }
 </script>
 
@@ -251,6 +262,16 @@ function markFeedback(entry, label) {
             />
           </svg>
         </button>
+        <button
+          v-if="entry.rolloutFeedback"
+          class="feedback-note-button"
+          type="button"
+          :title="entry.rolloutFeedbackText ? 'Edit note' : 'Add note'"
+          :aria-label="entry.rolloutFeedbackText ? 'edit note' : 'add note'"
+          @click="openFeedbackNote(entry)"
+        >
+          {{ entry.rolloutFeedbackText ? 'note' : '+ note' }}
+        </button>
       </div>
       <button
         v-if="canEditEntry(entry)"
@@ -277,6 +298,20 @@ function markFeedback(entry, label) {
       >
         {{ copyGlyph(entry.id) }}
       </button>
+    </div>
+    <div
+      v-if="canMarkFeedback(entry) && entry.rolloutFeedback && noteOpen"
+      class="feedback-note-popover"
+    >
+      <textarea
+        v-model="feedbackDraft"
+        placeholder="Optional rollout feedback..."
+        rows="3"
+      ></textarea>
+      <div class="feedback-note-actions">
+        <button type="button" @click="noteOpen = false">Cancel</button>
+        <button type="button" @click="saveFeedbackNote(entry)">Save</button>
+      </div>
     </div>
     <template v-if="entry.role === 'assistant' && entry.blocks?.length">
       <template

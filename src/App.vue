@@ -589,21 +589,25 @@ onUnmounted(() => {
   clearTimeout(inProjectSettlingTimer)
 })
 
-async function markEntryFeedback(entry, label) {
+async function markEntryFeedback(entry, label, feedbackText) {
   const session = sessionDetail.value?.session
   if (!session || entry.role !== 'assistant') return
 
-  patchEntryFeedback(entry.id, label)
+  const previousLabel = entry.rolloutFeedback || ''
+  const previousText = entry.rolloutFeedbackText || ''
+  const nextText = label ? feedbackText ?? previousText : ''
+
+  patchEntryFeedback(entry.id, label, nextText)
 
   try {
-    await setEntryFeedback(session, entry.id, label)
+    await setEntryFeedback(session, entry.id, label, nextText)
   } catch (error) {
-    patchEntryFeedback(entry.id, entry.rolloutFeedback || '')
+    patchEntryFeedback(entry.id, previousLabel, previousText)
     promptError.value = error.message
   }
 }
 
-function patchEntryFeedback(entryId, label) {
+function patchEntryFeedback(entryId, label, feedbackText = '') {
   const detail = sessionDetail.value
   if (!detail?.entries) return
 
@@ -611,7 +615,11 @@ function patchEntryFeedback(entryId, label) {
     ...detail,
     entries: detail.entries.map((entry) => {
       if (entry.id !== entryId) return entry
-      return { ...entry, rolloutFeedback: label }
+      return {
+        ...entry,
+        rolloutFeedback: label,
+        rolloutFeedbackText: feedbackText,
+      }
     }),
   }
 }

@@ -120,7 +120,7 @@ export function forkPiSession(entryId) {
   })
 }
 
-export function setEntryFeedback(session, entryId, label) {
+export function setEntryFeedback(session, entryId, label, feedbackText = '') {
   return apiRequest(
     `/api/pi/sessions/${encodeURIComponent(session.id)}/feedback`,
     'Failed to mark rollout',
@@ -129,6 +129,7 @@ export function setEntryFeedback(session, entryId, label) {
       body: {
         cwd: session.cwd,
         entryId,
+        feedbackText,
         label,
         sessionPath: session.sessionFile || session.path,
       },
