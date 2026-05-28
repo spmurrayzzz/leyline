@@ -372,13 +372,20 @@ function parseTags(value: string) {
 
 function formatRows(rows: MemoryRow[]) {
 	if (rows.length === 0) return "No memories found.";
-	return rows.map((row) => {
-		const tags = parseTags(row.tags_json);
-		const suffix = tags.length ? ` tags: ${tags.join(", ")}` : "";
-		return `- [${row.id}] ${row.scope}/${row.status}${suffix}\n${indent(
-			truncate(row.content_md, 800),
-		)}`;
-	}).join("\n");
+	return rows.map(formatRow).join("\n");
+}
+
+function formatRow(row: MemoryRow) {
+	const tags = parseTags(row.tags_json);
+	const suffix = tags.length ? ` tags: ${tags.join(", ")}` : "";
+	const lines = [
+		`- [${row.id}] ${row.scope}/${row.status}${suffix}`,
+		indent(truncate(row.content_md, 800)),
+	];
+	if (row.reason_md) {
+		lines.push(indent(`Reason: ${truncate(row.reason_md, 400)}`));
+	}
+	return lines.join("\n");
 }
 
 function indent(text: string) {
@@ -473,12 +480,14 @@ function visibleRow(id: string) {
 
 function updateMemory(id: string, content: string, reason: string | undefined,
 	tags: unknown) {
-	if (!visibleRow(id)) throw new Error(`memory not found: ${id}`);
+	const before = visibleRow(id);
+	if (!before) throw new Error(`memory not found: ${id}`);
 	openDatabase().prepare(`
 		UPDATE memories
 		SET content_md = ?, reason_md = ?, tags_json = ?, updated_at = ?
 		WHERE id = ?
 	`).run(content, reason?.trim() || null, tagJson(tags), now(), id);
+	return visibleRow(id);
 }
 
 function archiveMemories(ids: string[], reason: string | undefined) {
@@ -748,13 +757,21 @@ export default function memoryExtension(pi: ExtensionAPI) {
 		parameters: UpdateParams,
 		async execute(_id, params, _signal, _onUpdate, ctx) {
 			ensureReady(ctx);
-			updateMemory(params.id, validateContent(params.content_md),
-				params.reason_md, params.tags);
+			const memory = updateMemory(params.id,
+				validateContent(params.content_md), params.reason_md, params.tags);
 			refreshCache();
 			updateUi(ctx);
 			return {
-				content: [{ type: "text", text: `Updated memory ${params.id}` }],
-				details: { id: params.id },
+				content: [{
+					type: "text",
+					text: memory
+						? `Updated memory:\n${formatRows([memory])}`
+						: `Updated memory ${params.id}`,
+				}],
+				details: {
+					id: params.id,
+					memory: memory ? rowDetails(memory) : undefined,
+				},
 			};
 		},
 	});
@@ -770,16 +787,24 @@ export default function memoryExtension(pi: ExtensionAPI) {
 		async execute(_id, params, _signal, _onUpdate, ctx) {
 			ensureReady(ctx);
 			archiveMemories(params.ids, params.reason_md);
+			const memories = params.ids
+				.map((id) => visibleRow(id))
+				.filter((row): row is MemoryRow => Boolean(row));
 			refreshCache();
 			updateUi(ctx);
 			return {
 				content: [{
 					type: "text",
-					text: `Archived ${params.ids.length} memor${params.ids.length === 1
-						? "y"
-						: "ies"}`,
+					text: memories.length
+						? `Archived memories:\n${formatRows(memories)}`
+						: `Archived ${params.ids.length} memor${params.ids.length === 1
+							? "y"
+							: "ies"}`,
 				}],
-				details: { ids: params.ids },
+				details: {
+					ids: params.ids,
+					memories: memories.map(rowDetails),
+				},
 			};
 		},
 	});

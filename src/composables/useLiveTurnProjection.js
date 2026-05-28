@@ -313,7 +313,9 @@ export function useLiveTurnProjection({ onIntent } = {}) {
 
   function liveToolCode(event) {
     const args = event.args || event.input || {}
-    return args.command || args.path || args.customInstructions || ''
+    return args.command || args.path || args.customInstructions
+      || args.query || args.id || args.scope
+      || (Array.isArray(args.ids) ? args.ids.join(', ') : '')
   }
 
   function finishLiveTools(status) {

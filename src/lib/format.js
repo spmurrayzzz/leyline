@@ -48,12 +48,19 @@ export function toolLabel(toolName) {
   if (!toolName) return 'tool'
   if (toolName === 'bash') return 'bash'
   if (toolName === 'compact') return 'Compact'
+  if (toolName === 'list_memory') return 'Memory · List'
+  if (toolName === 'search_memory') return 'Memory · Search'
+  if (toolName === 'record_memory') return 'Memory · Record'
+  if (toolName === 'update_memory') return 'Memory · Update'
+  if (toolName === 'archive_memory') return 'Memory · Archive'
   return toolName
 }
 
 export function toolTarget(args) {
   if (!args) return ''
-  const value = args.command || args.path
+  let value = args.command || args.path
+  value ||= args.query || args.id || args.scope
+  if (!value && Array.isArray(args.ids)) value = args.ids.join(', ')
   if (!value) return ''
   return ` · ${String(value).slice(0, 80)}`
 }
