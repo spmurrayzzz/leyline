@@ -1821,19 +1821,25 @@ function closePickerMenus() {
           v-if="initializing"
           class="init-panel"
           aria-label="Loading workspace"
+          aria-hidden="true"
         >
           <div class="init-skeleton-line skeleton-line skeleton-title"></div>
           <div class="init-skeleton-line skeleton-line"></div>
           <div class="init-skeleton-line skeleton-line short"></div>
+          <div class="init-skeleton-line skeleton-line"></div>
+          <div class="init-skeleton-line skeleton-line shorter"></div>
         </div>
         <div
           v-else-if="sessionHandoff"
           class="init-panel session-handoff-init-panel"
           aria-label="Starting new session"
+          aria-hidden="true"
         >
           <div class="init-skeleton-line skeleton-line skeleton-title"></div>
           <div class="init-skeleton-line skeleton-line"></div>
           <div class="init-skeleton-line skeleton-line short"></div>
+          <div class="init-skeleton-line skeleton-line"></div>
+          <div class="init-skeleton-line skeleton-line shorter"></div>
         </div>
         <div v-else-if="sessionError" class="empty-workbench error-note">
           {{ sessionError }}
@@ -1847,10 +1853,13 @@ function closePickerMenus() {
             v-if="startupShellVisible"
             class="init-panel startup-init-panel"
             aria-label="Starting new session"
+            aria-hidden="true"
           >
             <div class="init-skeleton-line skeleton-line skeleton-title"></div>
             <div class="init-skeleton-line skeleton-line"></div>
             <div class="init-skeleton-line skeleton-line short"></div>
+            <div class="init-skeleton-line skeleton-line"></div>
+            <div class="init-skeleton-line skeleton-line shorter"></div>
           </div>
           <StartComposer
             v-model:draft="draft"
@@ -1909,10 +1918,13 @@ function closePickerMenus() {
           v-if="inProjectNewSessionRun"
           class="init-panel in-project-init-panel"
           aria-label="Starting new session"
+          aria-hidden="true"
         >
           <div class="init-skeleton-line skeleton-line skeleton-title"></div>
           <div class="init-skeleton-line skeleton-line"></div>
           <div class="init-skeleton-line skeleton-line short"></div>
+          <div class="init-skeleton-line skeleton-line"></div>
+          <div class="init-skeleton-line skeleton-line shorter"></div>
         </div>
 
         <template

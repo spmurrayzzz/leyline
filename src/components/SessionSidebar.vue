@@ -138,11 +138,30 @@ const onAfterLeave = (el) => {
         >＋</button>
       </div>
 
-      <div v-if="sessionsLoading" class="sidebar-skeleton">
-        <div v-for="index in 3" :key="index" class="skeleton-project">
+      <div
+        v-if="sessionsLoading"
+        class="sidebar-skeleton"
+        aria-hidden="true"
+      >
+        <div class="skeleton-project">
           <div class="skeleton-line skeleton-title"></div>
           <div class="skeleton-line"></div>
           <div class="skeleton-line short"></div>
+        </div>
+        <div class="skeleton-project">
+          <div class="skeleton-line skeleton-title"
+            style="width: 44%"
+          ></div>
+          <div class="skeleton-line"></div>
+          <div class="skeleton-line shorter"></div>
+          <div class="skeleton-line short"></div>
+        </div>
+        <div class="skeleton-project">
+          <div class="skeleton-line skeleton-title"
+            style="width: 68%"
+          ></div>
+          <div class="skeleton-line short"></div>
+          <div class="skeleton-line"></div>
         </div>
       </div>
       <div v-else-if="sessionsError" class="sidebar-note error-note">

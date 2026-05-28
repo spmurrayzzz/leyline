@@ -26,6 +26,10 @@
   --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
   --ease-accelerate: cubic-bezier(0.4, 0, 1, 1);
   --ease-dock: cubic-bezier(0.12, 0.82, 0.16, 1);
+  --sk-base: #1a1b21;
+  --sk-highlight: rgb(255 255 255 / 0.06);
+  --sk-duration: 1.3s;
+  --sk-radius: 6px;
   --content-max: 1080px;
   --start-composer-width: min(760px, calc(100vw - 364px));
   --empty-session-composer-width: min(900px, calc(100vw - 364px));
@@ -767,31 +771,83 @@ kbd {
 
 .sidebar-skeleton {
   display: grid;
-  gap: 16px;
+  gap: 18px;
   padding: 2px 4px;
 }
 
 .skeleton-project {
   display: grid;
-  gap: 7px;
+  gap: 6px;
 }
 
 .skeleton-line {
-  height: 24px;
-  border-radius: 8px;
-  background: linear-gradient(90deg, #1a1b21, #22242d, #1a1b21);
-  background-size: 180% 100%;
-  animation: skeleton-pulse 1.6s ease-in-out infinite;
+  position: relative;
+  height: 22px;
+  overflow: hidden;
+  border-radius: var(--sk-radius);
+  background: var(--sk-base);
+}
+
+.skeleton-line::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--sk-highlight) 50%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  animation:
+    skeleton-sweep var(--sk-duration) ease-in-out infinite;
+  animation-delay: var(--sk-delay, 0ms);
+  content: '';
 }
 
 .skeleton-title {
-  width: 62%;
-  height: 11px;
+  width: 58%;
+  height: 10px;
   border-radius: 999px;
 }
 
 .skeleton-line.short {
-  width: 78%;
+  width: 76%;
+}
+
+.skeleton-line.shorter {
+  width: 52%;
+}
+
+.skeleton-project .skeleton-line:nth-child(2) {
+  --sk-delay: 80ms;
+}
+
+.skeleton-project .skeleton-line:nth-child(3) {
+  --sk-delay: 160ms;
+}
+
+.skeleton-project:nth-child(2) .skeleton-line {
+  --sk-delay: 120ms;
+}
+
+.skeleton-project:nth-child(2) .skeleton-line:nth-child(2) {
+  --sk-delay: 200ms;
+}
+
+.skeleton-project:nth-child(2) .skeleton-line:nth-child(3) {
+  --sk-delay: 280ms;
+}
+
+.skeleton-project:nth-child(3) .skeleton-line {
+  --sk-delay: 240ms;
+}
+
+.skeleton-project:nth-child(3) .skeleton-line:nth-child(2) {
+  --sk-delay: 320ms;
+}
+
+.skeleton-project:nth-child(3) .skeleton-line:nth-child(3) {
+  --sk-delay: 400ms;
 }
 
 .error-note {
@@ -3088,17 +3144,17 @@ h1 {
 
 .init-panel {
   display: grid;
-  gap: 10px;
-  width: min(340px, 100%);
-  opacity: 0.82;
+  gap: 12px;
+  width: min(380px, 100%);
+  opacity: 0.78;
 }
 
 .init-skeleton-line {
-  height: 18px;
+  height: 16px;
 }
 
 .init-skeleton-line.skeleton-title {
-  width: 54%;
+  width: 48%;
   height: 10px;
 }
 
@@ -3106,13 +3162,37 @@ h1 {
   width: 72%;
 }
 
-@keyframes skeleton-pulse {
+.init-skeleton-line.shorter {
+  width: 40%;
+}
+
+.init-panel .skeleton-line:nth-child(1) {
+  --sk-delay: 0ms;
+}
+
+.init-panel .skeleton-line:nth-child(2) {
+  --sk-delay: 100ms;
+}
+
+.init-panel .skeleton-line:nth-child(3) {
+  --sk-delay: 200ms;
+}
+
+.init-panel .skeleton-line:nth-child(4) {
+  --sk-delay: 300ms;
+}
+
+.init-panel .skeleton-line:nth-child(5) {
+  --sk-delay: 400ms;
+}
+
+@keyframes skeleton-sweep {
   0% {
-    background-position: 100% 0;
+    transform: translateX(-100%);
   }
 
   100% {
-    background-position: -80% 0;
+    transform: translateX(100%);
   }
 }
 
@@ -4571,6 +4651,7 @@ textarea::placeholder {
   .in-project-composer-docking .composer.empty-session-composer,
   .activity-scanning-composer::before,
   .activity-scanner-settling::after,
+  .skeleton-line::after,
   .startup-init-panel,
   .in-project-init-panel,
   .thought-ellipsis span,
