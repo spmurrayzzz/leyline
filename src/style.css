@@ -16,6 +16,15 @@
   --accent: #7c5cff;
   --accent-soft: rgb(124 92 255 / 13%);
   --accent-border: rgb(124 92 255 / 34%);
+  --syntax-comment: #6b7280;
+  --syntax-keyword: #c084fc;
+  --syntax-number: #f7c986;
+  --syntax-string: #86efac;
+  --syntax-function: #93c5fd;
+  --syntax-type: #67e8f9;
+  --syntax-variable: #fca5a5;
+  --syntax-operator: #d8dbe3;
+  --syntax-punctuation: #9ca3af;
   --blue-accent: #9b8cff;
   --motion-quick: 100ms;
   --motion-fast: 180ms;
@@ -2977,6 +2986,85 @@ h1 {
   border-radius: 0;
   background: transparent;
   padding: 0;
+  color: #d8dbe3;
+}
+
+.markdown-body .hljs-comment,
+.markdown-body .hljs-quote {
+  color: var(--syntax-comment);
+}
+
+.markdown-body .hljs-keyword,
+.markdown-body .hljs-selector-tag {
+  color: var(--syntax-keyword);
+}
+
+.markdown-body .hljs-number,
+.markdown-body .hljs-literal {
+  color: var(--syntax-number);
+}
+
+.markdown-body .hljs-string,
+.markdown-body .hljs-doctag {
+  color: var(--syntax-string);
+}
+
+.markdown-body .hljs-function,
+.markdown-body .hljs-title,
+.markdown-body .hljs-title.function_,
+.markdown-body .hljs-section,
+.markdown-body .hljs-name {
+  color: var(--syntax-function);
+}
+
+.markdown-body .hljs-type,
+.markdown-body .hljs-class,
+.markdown-body .hljs-title.class_,
+.markdown-body .hljs-built_in {
+  color: var(--syntax-type);
+}
+
+.markdown-body .hljs-attr,
+.markdown-body .hljs-variable,
+.markdown-body .hljs-variable.language_,
+.markdown-body .hljs-params,
+.markdown-body .hljs-property {
+  color: var(--syntax-variable);
+}
+
+.markdown-body .hljs-meta,
+.markdown-body .hljs-meta .hljs-keyword,
+.markdown-body .hljs-meta .hljs-string {
+  color: var(--syntax-keyword);
+}
+
+.markdown-body .hljs-operator {
+  color: var(--syntax-operator);
+}
+
+.markdown-body .hljs-punctuation {
+  color: var(--syntax-punctuation);
+}
+
+.markdown-body .hljs-subst {
+  color: #d8dbe3;
+}
+
+.markdown-body .hljs-regexp {
+  color: var(--syntax-string);
+}
+
+.markdown-body .hljs-symbol,
+.markdown-body .hljs-bullet {
+  color: var(--syntax-keyword);
+}
+
+.markdown-body .hljs-addition {
+  color: var(--syntax-string);
+}
+
+.markdown-body .hljs-deletion {
+  color: var(--syntax-variable);
 }
 
 .markdown-body blockquote {

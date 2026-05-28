@@ -1,4 +1,5 @@
 import MarkdownIt from 'markdown-it'
+import highlightJsSource from '../../node_modules/@earendil-works/pi-coding-agent/dist/core/export-html/vendor/highlight.min.js?raw'
 import {
   imageBlocksFor,
   messageBlocks,
@@ -8,10 +9,12 @@ import {
   textFromContent,
 } from '../../lib/transcript-projection'
 
+const hljs = loadHighlightJs()
 const markdown = new MarkdownIt({
   html: false,
   linkify: true,
   breaks: false,
+  highlight: highlightCode,
 })
 
 export function entryClass(entry) {
@@ -40,6 +43,66 @@ export function renderedToolJson(entry) {
     return highlightJson(JSON.stringify(JSON.parse(trimmed), null, 2))
   } catch {
     return ''
+  }
+}
+
+function highlightCode(source, language) {
+  const lang = normalizeLanguage(language)
+  if (hljs && lang && hljs.getLanguage(lang)) {
+    try {
+      return hljs.highlight(source, {
+        language: lang,
+        ignoreIllegals: true,
+      }).value
+    } catch {}
+  }
+
+  if (hljs && !lang) {
+    try {
+      return hljs.highlightAuto(source).value
+    } catch {}
+  }
+
+  return escapeHtml(source)
+}
+
+function normalizeLanguage(language) {
+  const value = String(language || '').trim().toLowerCase()
+  if (!value) return ''
+  return {
+    bash: 'bash',
+    cjs: 'javascript',
+    console: 'bash',
+    html: 'xml',
+    js: 'javascript',
+    jsx: 'javascript',
+    md: 'markdown',
+    mjs: 'javascript',
+    py: 'python',
+    rb: 'ruby',
+    shell: 'bash',
+    sh: 'bash',
+    ts: 'typescript',
+    tsx: 'typescript',
+    vue: 'xml',
+    yml: 'yaml',
+    zsh: 'bash',
+  }[value] || value
+}
+
+function loadHighlightJs() {
+  const globalHljs = globalThis.hljs
+  if (globalHljs) return globalHljs
+
+  const previousModule = globalThis.module
+  const previousExports = globalThis.exports
+  try {
+    globalThis.module = undefined
+    globalThis.exports = undefined
+    return new Function(`${highlightJsSource}; return hljs`)()
+  } finally {
+    globalThis.module = previousModule
+    globalThis.exports = previousExports
   }
 }
 
