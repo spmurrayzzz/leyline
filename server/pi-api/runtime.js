@@ -351,6 +351,37 @@ async function editSessionPrompt(handle, entryId, text, images = []) {
 function moveSessionLeaf(session, leafId) {
   if (leafId) session.sessionManager.branch(leafId)
   else session.sessionManager.resetLeaf()
+  updateSessionContext(session)
+}
+
+async function resetSessionToEntry(handle, entryId) {
+  const session = handle.runtime.session
+  if (!entryId) throw new Error('entryId is required')
+  if (session.isStreaming) {
+    throw new Error('Wait for the current response to finish before resetting.')
+  }
+  if (session.isCompacting) {
+    throw new Error('Wait for compaction to finish before resetting.')
+  }
+
+  const manager = session.sessionManager
+  const entry = manager.getEntry(entryId)
+  if (!entry) throw new Error('Entry not found')
+
+  const activeBranch = manager.getBranch()
+  if (!activeBranch.some((item) => item.id === entryId)) {
+    throw new Error('Entry is not on the active thread')
+  }
+
+  const header = manager.getHeader()
+  manager.fileEntries = [header, ...manager.getBranch(entryId)]
+  manager._buildIndex()
+  manager._rewriteFile()
+  updateSessionContext(session)
+  return activeSessionDto(handle)
+}
+
+function updateSessionContext(session) {
   const sessionContext = session.sessionManager.buildSessionContext()
   session.agent.state.messages = sessionContext.messages
 }
@@ -617,6 +648,7 @@ export function createPiRuntimeApi() {
   reloadSession,
   renderSessionExportHtml,
   requireActiveHandle,
+  resetSessionToEntry,
   resolveSession,
   runtimeHandleForId,
   runtimeState,

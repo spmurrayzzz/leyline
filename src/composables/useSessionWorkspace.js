@@ -10,6 +10,7 @@ import {
   fetchSessions,
   forkPiSession,
   reloadPiSession,
+  resetPiSession,
   switchPiModel,
   switchPiThinkingLevel,
 } from '../lib/pi-api'
@@ -48,6 +49,7 @@ export function useSessionWorkspace({
   const deleteSessionError = ref('')
   const deleteSessionPhase = ref('')
   const forkingEntryId = ref('')
+  const resettingEntryId = ref('')
   const initPhase = ref('sessions')
   const selectedSession = computed(() => {
     return sessionDetail.value?.session || sessions.value.find((s) => s.id === selectedSessionId.value)
@@ -534,10 +536,7 @@ export function useSessionWorkspace({
   }
 
   async function forkSession(entry) {
-    if (!entry?.id
-      || forkingEntryId.value
-      || liveTurn?.agentRunning?.value
-      || liveTurn?.compactingContext?.value) return
+    if (!entry?.id || !canBranchFromEntry()) return
 
     forkingEntryId.value = entry.id
     sessionError.value = ''
@@ -555,6 +554,34 @@ export function useSessionWorkspace({
     } finally {
       forkingEntryId.value = ''
     }
+  }
+
+  async function resetSessionToEntry(entry) {
+    if (!entry?.id || !selectedSession.value || !canBranchFromEntry()) return
+
+    resettingEntryId.value = entry.id
+    sessionError.value = ''
+    liveTurn?.setActivity?.('Resetting session…')
+
+    try {
+      const data = await resetPiSession(entry.id)
+      setSelectedSessionData(data.detail, data.active)
+      updateSelectedSessionSummary(data.detail.session)
+      await scrollToLatest?.()
+      await reconnectTerminalIfOpen()
+    } catch (error) {
+      sessionError.value = error.message
+      liveTurn?.setActivity?.('')
+    } finally {
+      resettingEntryId.value = ''
+    }
+  }
+
+  function canBranchFromEntry() {
+    return !forkingEntryId.value
+      && !resettingEntryId.value
+      && !liveTurn?.agentRunning?.value
+      && !liveTurn?.compactingContext?.value
   }
 
   async function reloadSession() {
@@ -929,6 +956,8 @@ export function useSessionWorkspace({
     reloadSession,
     reloadingSession,
     requestDeleteSession,
+    resettingEntryId,
+    resetSessionToEntry,
     runStartupPhase,
     scheduleSessionRefresh,
     selectModel,

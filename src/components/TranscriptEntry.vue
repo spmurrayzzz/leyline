@@ -30,6 +30,7 @@ const emit = defineEmits([
   'edit',
   'fork',
   'mark-feedback',
+  'reset',
   'open-tool-fullscreen',
   'toggle-skill',
   'toggle-tool',
@@ -158,6 +159,18 @@ function saveFeedbackNote(entry) {
         @click.stop="emit('fork', entry)"
       >
         ⎇
+      </button>
+      <button
+        class="copy-button reset-button"
+        type="button"
+        title="Reset to here"
+        aria-label="reset this thread to this message"
+        @click.stop="emit('reset', entry)"
+      >
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 5v14" />
+          <path d="M6 19h12" />
+        </svg>
       </button>
       <button
         class="copy-button"
@@ -289,6 +302,18 @@ function saveFeedbackNote(entry) {
         @click="emit('fork', entry)"
       >
         ⎇
+      </button>
+      <button
+        class="copy-button reset-button"
+        type="button"
+        title="Reset to here"
+        aria-label="reset this thread to this message"
+        @click="emit('reset', entry)"
+      >
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 5v14" />
+          <path d="M6 19h12" />
+        </svg>
       </button>
       <button
         class="copy-button"

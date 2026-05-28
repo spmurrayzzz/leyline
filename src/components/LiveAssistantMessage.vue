@@ -25,7 +25,7 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits(['copy', 'fork'])
+const emit = defineEmits(['copy', 'fork', 'reset'])
 
 const thinkingExpanded = ref(true)
 
@@ -70,6 +70,19 @@ function copyGlyph(id) {
         @click="emit('fork', persistedEntry)"
       >
         ⎇
+      </button>
+      <button
+        v-if="persistedEntry?.id"
+        class="copy-button reset-button"
+        type="button"
+        title="Reset to here"
+        aria-label="reset this thread to this message"
+        @click="emit('reset', persistedEntry)"
+      >
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 5v14" />
+          <path d="M6 19h12" />
+        </svg>
       </button>
       <button
         class="copy-button"

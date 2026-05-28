@@ -120,6 +120,13 @@ export function forkPiSession(entryId) {
   })
 }
 
+export function resetPiSession(entryId) {
+  return apiRequest('/api/pi/reset-to-entry', 'Failed to reset session', {
+    method: 'POST',
+    body: { entryId },
+  })
+}
+
 export function setEntryFeedback(session, entryId, label, feedbackText = '') {
   return apiRequest(
     `/api/pi/sessions/${encodeURIComponent(session.id)}/feedback`,

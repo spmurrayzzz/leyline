@@ -2709,6 +2709,15 @@ h1 {
   transition-timing-function: var(--ease-accelerate);
 }
 
+.reset-button svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .compact-message {
   margin-top: 14px;
 }

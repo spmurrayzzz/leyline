@@ -19,6 +19,7 @@ export function createPiApiHandler(api) {
     readJson,
     reloadSession,
     requireActiveHandle,
+    resetSessionToEntry,
     resolveSession,
     runtimeHandleForId,
     runtimeState,
@@ -157,6 +158,21 @@ async function piApiHandler(req, res) {
           ok: true,
           active,
           detail: toActiveSessionDetailDto(),
+        })
+      }
+
+      if (url.pathname === '/reset-to-entry') {
+        if (req.method !== 'POST') {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+  
+        const body = await readJson(req)
+        const handle = requireActiveHandle()
+        await resetSessionToEntry(handle, body.entryId)
+        return json(res, {
+          ok: true,
+          active: activeSessionDto(handle),
+          detail: toActiveSessionDetailDto(handle),
         })
       }
   

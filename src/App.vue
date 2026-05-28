@@ -200,6 +200,7 @@ const {
   reloadSession,
   reloadingSession,
   requestDeleteSession,
+  resetSessionToEntry,
   runStartupPhase,
   scheduleSessionRefresh,
   selectModel: selectWorkspaceModel,
@@ -1990,6 +1991,7 @@ function closePickerMenus() {
             @edit="startEditingEntry"
             @fork="forkSession"
             @mark-feedback="markEntryFeedback"
+            @reset="resetSessionToEntry"
             @open-tool-fullscreen="openToolFullscreen"
             @toggle-skill="toggleSkill"
             @toggle-tool="toggleTool"
@@ -2018,6 +2020,7 @@ function closePickerMenus() {
               @edit="startEditingEntry"
               @fork="forkSession"
               @mark-feedback="markEntryFeedback"
+              @reset="resetSessionToEntry"
               @toggle-skill="toggleSkill"
             />
 
@@ -2029,6 +2032,7 @@ function closePickerMenus() {
               @copy="copyEntry"
               @fork="forkSession"
               @mark-feedback="markEntryFeedback"
+              @reset="resetSessionToEntry"
               @open-tool-fullscreen="openToolFullscreen"
               @toggle-tool="toggleTool"
             />
@@ -2059,6 +2063,7 @@ function closePickerMenus() {
               :streaming="item.streaming"
               @copy="copyTranscriptItem(item.id, liveAssistantDisplayCopyText(item))"
               @fork="forkSession"
+              @reset="resetSessionToEntry"
             />
 
           </div>
