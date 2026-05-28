@@ -117,12 +117,10 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     clearLiveToolSettleTimers()
     const entry = pendingUserEntry(text, images)
     optimisticEntries.value = [...optimisticEntries.value, entry]
-    if (hasLiveTranscriptOutput()) {
-      liveUserMessages.value = [
-        ...liveUserMessages.value,
-        { ...entry, seq: ++liveItemSeq },
-      ]
-    }
+    liveUserMessages.value = [
+      ...liveUserMessages.value,
+      { ...entry, seq: ++liveItemSeq },
+    ]
     liveTurnAnchorLength = rawEntries.value.length
     return entry
   }
@@ -716,10 +714,6 @@ export function useLiveTurnProjection({ onIntent } = {}) {
       || liveUserMessages.value.length
       || liveActivity.value
       || liveTools.value.length
-  }
-
-  function hasLiveTranscriptOutput() {
-    return liveAssistantMessages.value.length || liveTools.value.length
   }
 
   function emit(intent) {
