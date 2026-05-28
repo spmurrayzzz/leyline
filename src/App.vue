@@ -56,6 +56,8 @@ const promptSubmitting = ref(false)
 const interrupting = ref(false)
 const goalCommandSubmitting = ref('')
 const editingEntry = ref(null)
+const seenEntryIds = ref(new Set())
+const animatingEntryIds = ref(new Set())
 const composerRef = ref(null)
 const composerHeight = ref(0)
 const modelPickerOpen = ref(false)
@@ -503,7 +505,23 @@ watch(selectedSessionId, () => {
   expandedSkills.value = new Set()
   editingEntry.value = null
   promptError.value = ''
+  seenEntryIds.value = new Set()
+  animatingEntryIds.value = new Set()
   resetWorkbenchScrollState()
+})
+
+watch(entries, (newEntries) => {
+  const skip = sessionSwitching.value || sessionLoading.value
+    || seenEntryIds.value.size === 0
+  for (const entry of newEntries) {
+    if (!seenEntryIds.value.has(entry.id)) {
+      seenEntryIds.value.add(entry.id)
+      if (!skip) {
+        animatingEntryIds.value.add(entry.id)
+        setTimeout(() => animatingEntryIds.value.delete(entry.id), 300)
+      }
+    }
+  }
 })
 
 watch(composerScannerSourceActive, (active, wasActive) => {
@@ -761,6 +779,10 @@ function closeToolFullscreen() {
 
 function isSkillExpanded(entry) {
   return expandedSkills.value.has(entry.id)
+}
+
+function isEnteringEntry(entry) {
+  return animatingEntryIds.value.has(entry.id)
 }
 
 function toggleSkill(entry) {
@@ -1902,6 +1924,7 @@ function closePickerMenus() {
           <TranscriptEntry
             v-for="entry in entries"
             :key="entry.id"
+            :class="{ 'message-enter': isEnteringEntry(entry) }"
             :copied-entry-id="copiedEntryId"
             :entry="entry"
             :skill-expanded="isSkillExpanded(entry)"

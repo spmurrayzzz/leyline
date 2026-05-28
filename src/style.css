@@ -4484,6 +4484,7 @@ textarea::placeholder {
     transition-duration: 1ms;
   }
 
+  .message-enter,
   .submit-handoff-message,
   .composer.composer-committing .composer-input-shell,
   .composer.composer-committing .send-button:not(.stop-button) {
