@@ -26,6 +26,7 @@ import {
   editPrompt,
   interruptPiSession,
   runShellCommand,
+  setEntryFeedback,
   submitPrompt,
 } from './lib/pi-api'
 import {
@@ -587,6 +588,33 @@ onUnmounted(() => {
   clearTimeout(inProjectDockTimer)
   clearTimeout(inProjectSettlingTimer)
 })
+
+async function markEntryFeedback(entry, label) {
+  const session = sessionDetail.value?.session
+  if (!session || entry.role !== 'assistant') return
+
+  patchEntryFeedback(entry.id, label)
+
+  try {
+    await setEntryFeedback(session, entry.id, label)
+  } catch (error) {
+    patchEntryFeedback(entry.id, entry.rolloutFeedback || '')
+    promptError.value = error.message
+  }
+}
+
+function patchEntryFeedback(entryId, label) {
+  const detail = sessionDetail.value
+  if (!detail?.entries) return
+
+  sessionDetail.value = {
+    ...detail,
+    entries: detail.entries.map((entry) => {
+      if (entry.id !== entryId) return entry
+      return { ...entry, rolloutFeedback: label }
+    }),
+  }
+}
 
 function handleLiveTurnIntent(intent) {
   if (intent.type === 'refresh-session') {
@@ -1953,6 +1981,7 @@ function closePickerMenus() {
             @copy="copyEntry"
             @edit="startEditingEntry"
             @fork="forkSession"
+            @mark-feedback="markEntryFeedback"
             @open-tool-fullscreen="openToolFullscreen"
             @toggle-skill="toggleSkill"
             @toggle-tool="toggleTool"
@@ -1980,6 +2009,7 @@ function closePickerMenus() {
               @copy="copyEntry"
               @edit="startEditingEntry"
               @fork="forkSession"
+              @mark-feedback="markEntryFeedback"
               @toggle-skill="toggleSkill"
             />
 
@@ -1990,6 +2020,7 @@ function closePickerMenus() {
               :tool-expanded="isToolExpanded(item.persistedEntry)"
               @copy="copyEntry"
               @fork="forkSession"
+              @mark-feedback="markEntryFeedback"
               @open-tool-fullscreen="openToolFullscreen"
               @toggle-tool="toggleTool"
             />

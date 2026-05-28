@@ -22,6 +22,7 @@ export function createPiApiHandler(api) {
     resolveSession,
     runtimeHandleForId,
     runtimeState,
+    setRolloutFeedback,
     setSessionMode,
     setSessionModel,
     setSessionThinkingLevel,
@@ -291,6 +292,25 @@ async function piApiHandler(req, res) {
         return json(res, { ok: true, active: activeSessionDto(handle) })
       }
   
+      const feedbackMatch = url.pathname.match(
+        /^\/sessions\/([^/]+)\/feedback$/,
+      )
+      if (feedbackMatch) {
+        if (req.method !== 'POST') {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+
+        const body = await readJson(req)
+        const feedback = await setRolloutFeedback({
+          cwd: body.cwd,
+          entryId: body.entryId,
+          label: body.label,
+          sessionId: decodeURIComponent(feedbackMatch[1]),
+          sessionPath: body.sessionPath,
+        })
+        return json(res, { ok: true, feedback })
+      }
+
       const exportMatch = url.pathname.match(/^\/sessions\/([^/]+)\/export$/)
       if (exportMatch) {
         if (req.method !== 'GET') {

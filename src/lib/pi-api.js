@@ -120,6 +120,22 @@ export function forkPiSession(entryId) {
   })
 }
 
+export function setEntryFeedback(session, entryId, label) {
+  return apiRequest(
+    `/api/pi/sessions/${encodeURIComponent(session.id)}/feedback`,
+    'Failed to mark rollout',
+    {
+      method: 'POST',
+      body: {
+        cwd: session.cwd,
+        entryId,
+        label,
+        sessionPath: session.sessionFile || session.path,
+      },
+    },
+  )
+}
+
 export async function reloadPiSession(sessionId) {
   const data = await apiRequest(
     sessionActionUrl(sessionId, 'reload'),

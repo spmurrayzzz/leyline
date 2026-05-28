@@ -29,12 +29,29 @@ const emit = defineEmits([
   'copy',
   'edit',
   'fork',
+  'mark-feedback',
   'open-tool-fullscreen',
   'toggle-skill',
   'toggle-tool',
 ])
 
 const thinkingExpanded = ref(false)
+const helpfulThumbPaths = [
+  'M7 10v11',
+  'M15 5.2 14 10h5.2a2 2 0 0 1 2 2.4l-1.4 6.8'
+    + 'A2.2 2.2 0 0 1 17.6 21H7',
+  'M7 10H4a1.5 1.5 0 0 0-1.5 1.5v8'
+    + 'A1.5 1.5 0 0 0 4 21h3',
+  'M14 10V5.2a2.2 2.2 0 0 0-2.2-2.2L7 10',
+]
+const unhelpfulThumbPaths = [
+  'M17 14V3',
+  'M9 18.8 10 14H4.8a2 2 0 0 1-2-2.4l1.4-6.8'
+    + 'A2.2 2.2 0 0 1 6.4 3H17',
+  'M17 14h3a1.5 1.5 0 0 0 1.5-1.5v-8'
+    + 'A1.5 1.5 0 0 0 20 3h-3',
+  'M10 14v4.8a2.2 2.2 0 0 0 2.2 2.2L17 14',
+]
 
 function toggleThinking() {
   thinkingExpanded.value = !thinkingExpanded.value
@@ -55,6 +72,31 @@ function isLocalEntry(entry) {
 
 function canEditEntry(entry) {
   return entry.role === 'user' && !isLocalEntry(entry)
+}
+
+function canMarkFeedback(entry) {
+  return entry.role === 'assistant' && !isLocalEntry(entry)
+}
+
+function feedbackTitle(entry, label) {
+  if (entry.rolloutFeedback === label) return 'Clear rollout mark'
+  return label === 'helpful' ? 'Mark helpful' : 'Mark not helpful'
+}
+
+function feedbackClass(entry, label) {
+  return {
+    'is-selected': entry.rolloutFeedback === label,
+    'is-helpful': label === 'helpful',
+    'is-unhelpful': label === 'unhelpful',
+  }
+}
+
+function markFeedback(entry, label) {
+  emit(
+    'mark-feedback',
+    entry,
+    entry.rolloutFeedback === label ? '' : label,
+  )
 }
 </script>
 
@@ -172,6 +214,44 @@ function canEditEntry(entry) {
   >
     <div class="message-meta message-meta-row">
       <span>{{ entry.label }}</span>
+      <div
+        v-if="canMarkFeedback(entry)"
+        class="turn-feedback"
+        aria-label="rollout feedback"
+      >
+        <button
+          class="feedback-button"
+          :class="feedbackClass(entry, 'helpful')"
+          type="button"
+          :title="feedbackTitle(entry, 'helpful')"
+          aria-label="mark helpful"
+          @click="markFeedback(entry, 'helpful')"
+        >
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path
+              v-for="path in helpfulThumbPaths"
+              :key="path"
+              :d="path"
+            />
+          </svg>
+        </button>
+        <button
+          class="feedback-button"
+          :class="feedbackClass(entry, 'unhelpful')"
+          type="button"
+          :title="feedbackTitle(entry, 'unhelpful')"
+          aria-label="mark not helpful"
+          @click="markFeedback(entry, 'unhelpful')"
+        >
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path
+              v-for="path in unhelpfulThumbPaths"
+              :key="path"
+              :d="path"
+            />
+          </svg>
+        </button>
+      </div>
       <button
         v-if="canEditEntry(entry)"
         class="copy-button"

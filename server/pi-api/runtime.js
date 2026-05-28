@@ -29,6 +29,7 @@ import {
   toSessionDto,
 } from './dtos.js'
 import { html, json, readJson } from './http.js'
+import { setRolloutFeedback } from './rollout-feedback.js'
 import { configuredSessionDir, listPersistedSessions } from './sessions.js'
 import {
   createAgentSessionFromServices,
@@ -621,6 +622,7 @@ export function createPiRuntimeApi() {
   runtimeState,
   setSessionMode,
   setSessionModel,
+  setRolloutFeedback,
   setSessionThinkingLevel,
   sessionDetail,
   switchActiveSession,

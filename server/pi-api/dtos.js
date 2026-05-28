@@ -3,6 +3,7 @@ import { projectTranscriptEntries } from '../../lib/transcript-projection.js'
 import { SessionManager } from '@earendil-works/pi-coding-agent'
 import { emptyExtensionUiState } from './extension-ui.js'
 import { goalStateFromEntries, goalStateFromSession } from './goal-state.js'
+import { applyRolloutFeedback } from './rollout-feedback.js'
 import { messageText, sessionModifiedDate } from './sessions.js'
 
 const HIDDEN_SLASH_COMMANDS = new Set([
@@ -193,7 +194,12 @@ function toSessionDetailFromManager(manager, session, contextUsage) {
       created: info.created,
       contextUsage,
     },
-    entries: projectTranscriptEntries(entries),
+    entries: applyRolloutFeedback(
+      projectTranscriptEntries(entries),
+      info.cwd,
+      info.path,
+      info.id,
+    ),
   }
 }
 
