@@ -56,6 +56,11 @@ textarea {
   font: inherit;
 }
 
+input,
+textarea {
+  caret-color: var(--accent);
+}
+
 button {
   cursor: default;
 }
@@ -1845,6 +1850,10 @@ h1 {
   border-color: rgba(147, 197, 253, 0.58);
 }
 
+.hidden-shell-mode-composer textarea {
+  caret-color: #93c5fd;
+}
+
 .composer-input-shell {
   position: relative;
 }
@@ -1885,6 +1894,7 @@ h1 {
 .composer.shell-mode-composer textarea {
   padding-left: 56px;
   color: #dcfce7;
+  caret-color: #86efac;
 }
 
 .start-composer.shell-mode-composer textarea::placeholder,
