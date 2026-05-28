@@ -68,6 +68,29 @@ const emit = defineEmits([
   'toggle-project',
   'update:query',
 ])
+
+const onEnter = (el) => {
+  el.style.maxHeight = '0'
+  el.offsetHeight
+  el.style.maxHeight = `${el.scrollHeight}px`
+}
+
+const onAfterEnter = (el) => {
+  el.style.maxHeight = ''
+}
+
+const onBeforeLeave = (el) => {
+  el.style.maxHeight = `${el.scrollHeight}px`
+  el.offsetHeight
+}
+
+const onLeave = (el) => {
+  el.style.maxHeight = '0'
+}
+
+const onAfterLeave = (el) => {
+  el.style.maxHeight = ''
+}
 </script>
 
 <template>
@@ -157,7 +180,14 @@ const emit = defineEmits([
           </button>
         </div>
 
-        <Transition name="project-sessions">
+        <Transition
+          name="project-sessions"
+          @enter="onEnter"
+          @after-enter="onAfterEnter"
+          @before-leave="onBeforeLeave"
+          @leave="onLeave"
+          @after-leave="onAfterLeave"
+        >
           <div v-if="expandedProject(project)" class="project-session-list">
             <div
               v-for="session in project.sessions.slice(0, 5)"
