@@ -2892,35 +2892,49 @@ h1 {
 
 .live-message-status {
   display: inline-flex;
-  align-items: center;
-  gap: 7px;
+  align-items: baseline;
+  gap: 1px;
   margin-left: auto;
-  color: #aaa2db;
+  color: #948dad;
   font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.02em;
+  font-style: italic;
+  font-weight: 650;
+  letter-spacing: 0.01em;
   line-height: 1;
 }
 
-.live-message-status i {
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: #9182ff;
-  box-shadow: 0 0 0 4px rgb(124 92 255 / 10%);
-  animation: live-status-pulse 1400ms ease-in-out infinite;
+.thought-ellipsis {
+  display: inline-grid;
+  grid-template-columns: repeat(3, 0.34em);
+  width: 1.02em;
+  color: #b4aadf;
+  font-style: normal;
 }
 
-@keyframes live-status-pulse {
+.thought-ellipsis span {
+  opacity: 0.26;
+  animation: thought-ellipsis 1450ms var(--ease-emphasized) infinite;
+}
+
+.thought-ellipsis span:nth-child(2) {
+  animation-delay: 160ms;
+}
+
+.thought-ellipsis span:nth-child(3) {
+  animation-delay: 320ms;
+}
+
+@keyframes thought-ellipsis {
   0%,
+  72%,
   100% {
-    opacity: 0.55;
-    transform: scale(0.86);
+    opacity: 0.24;
+    transform: translateY(0);
   }
 
-  50% {
-    opacity: 1;
-    transform: scale(1);
+  28% {
+    opacity: 0.95;
+    transform: translateY(-0.5px);
   }
 }
 
@@ -4522,7 +4536,7 @@ textarea::placeholder {
   .activity-scanner-settling::after,
   .startup-init-panel,
   .in-project-init-panel,
-  .live-message-status i,
+  .thought-ellipsis span,
   .live-tool-spinner,
   .session-loading-mark,
   .submit-handoff-message,

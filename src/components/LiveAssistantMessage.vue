@@ -52,9 +52,15 @@ function copyGlyph(id) {
   >
     <div class="message-meta message-meta-row">
       <span>Agent</span>
-      <span v-if="streaming" class="live-message-status">
-        <i aria-hidden="true"></i>
-        Working
+      <span
+        v-if="streaming"
+        class="live-message-status"
+        aria-label="Thinking"
+      >
+        <span aria-hidden="true">thinking</span>
+        <span class="thought-ellipsis" aria-hidden="true">
+          <span>.</span><span>.</span><span>.</span>
+        </span>
       </span>
       <button
         v-if="persistedEntry?.id"

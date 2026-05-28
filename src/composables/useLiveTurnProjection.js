@@ -31,7 +31,7 @@ export function useLiveTurnProjection({ onIntent } = {}) {
       id: 'live-compaction',
       seq: Number.MAX_SAFE_INTEGER - 1,
       type: 'activity',
-      text: 'Working…',
+      text: 'Thinking…',
     } : null,
     liveActivity.value ? {
       id: 'live-activity',
@@ -163,7 +163,7 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     agentRunning.value = state.isStreaming === true
     if (!agentRunning.value && !compactingContext.value) return
     if (liveActivity.value || liveAssistantMessages.value.length) return
-    liveActivity.value = 'Working…'
+    liveActivity.value = 'Thinking…'
   }
 
   function addTool(event, status) {
@@ -225,7 +225,7 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     const type = event?.type || ''
     if (type === 'agent_end' || type === 'error' || type === 'aborted') return ''
     if (type === 'compaction_end') return ''
-    if (agentRunning.value || compactingContext.value) return 'Working…'
+    if (agentRunning.value || compactingContext.value) return 'Thinking…'
     return liveActivity.value
   }
 

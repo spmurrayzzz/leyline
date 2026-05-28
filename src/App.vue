@@ -1136,7 +1136,7 @@ async function submitDraft(streamingBehavior) {
       if (data.active) activeRuntimeSession.value = data.active
       if (isHandledSlashCommand(text)) removeOptimisticEntry(localEntry)
       editingEntry.value = null
-      if (startsTurn) setAgentRunning(true, 'Working…')
+      if (startsTurn) setAgentRunning(true, 'Thinking…')
       promptAccepted = true
     }
   } catch (error) {
@@ -1367,7 +1367,7 @@ async function runGoalCommand(command) {
     }
     await submitPrompt(sessionId, `/goal ${command}`)
     if (command === 'resume') {
-      setAgentRunning(true, 'Working…')
+      setAgentRunning(true, 'Thinking…')
     }
   } catch (error) {
     if (selectedSessionId.value === sessionId) promptError.value = error.message
