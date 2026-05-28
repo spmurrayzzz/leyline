@@ -19,6 +19,7 @@ export function entryClass(entry) {
     'user-message': entry.role === 'user',
     'assistant-message': entry.role === 'assistant',
     'summary-message': entry.type === 'summary',
+    'submit-handoff-message': entry.submitHandoff === true,
   }
 }
 

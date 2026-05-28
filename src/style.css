@@ -216,6 +216,53 @@ button {
   }
 }
 
+@keyframes prompt-submit-handoff {
+  from {
+    opacity: 0;
+    transform: translateY(34px) scale(0.985);
+    filter: blur(2px);
+  }
+
+  58% {
+    opacity: 1;
+    filter: blur(0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes composer-input-commit {
+  from {
+    transform: translateY(0);
+  }
+
+  45% {
+    transform: translateY(2px);
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes send-button-commit {
+  from {
+    transform: scale(1);
+  }
+
+  45% {
+    transform: scale(0.9);
+  }
+
+  to {
+    transform: scale(1);
+  }
+}
+
 @keyframes startup-composer-dock {
   from {
     width: var(--start-composer-width);
@@ -2406,6 +2453,11 @@ h1 {
   color: var(--muted);
 }
 
+.submit-handoff-message {
+  transform-origin: bottom center;
+  animation: prompt-submit-handoff 520ms var(--ease-emphasized) both;
+}
+
 .live-stack {
   width: min(var(--content-max), 100%);
   margin: 0 auto;
@@ -3831,6 +3883,23 @@ h1 {
   border-color: #4a415f;
 }
 
+.composer.composer-committing {
+  border-color: #54466f;
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 3%) inset,
+    0 2px 6px -3px rgb(0 0 0 / 45%),
+    0 16px 38px -18px rgb(0 0 0 / 34%),
+    0 0 0 3px rgb(124 92 255 / 5%);
+}
+
+.composer.composer-committing .composer-input-shell {
+  animation: composer-input-commit 260ms var(--ease-emphasized) both;
+}
+
+.composer.composer-committing .send-button:not(.stop-button) {
+  animation: send-button-commit 260ms var(--ease-emphasized) both;
+}
+
 .new-session-transition:not(.start-state) .composer {
   animation: session-composer-enter 620ms var(--ease-emphasized) both;
 }
@@ -4366,6 +4435,12 @@ textarea::placeholder {
     transition-duration: 1ms;
   }
 
+  .submit-handoff-message,
+  .composer.composer-committing .composer-input-shell,
+  .composer.composer-committing .send-button:not(.stop-button) {
+    animation: none;
+  }
+
   .sidebar-collapse-button:hover,
   .sidebar-reveal-button:hover,
   .section-action:hover,
@@ -4449,7 +4524,10 @@ textarea::placeholder {
   .in-project-init-panel,
   .live-message-status i,
   .live-tool-spinner,
-  .session-loading-mark {
+  .session-loading-mark,
+  .submit-handoff-message,
+  .composer.composer-committing .composer-input-shell,
+  .composer.composer-committing .send-button:not(.stop-button) {
     animation: none;
   }
 }

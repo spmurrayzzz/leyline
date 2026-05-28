@@ -65,6 +65,7 @@ const slashActiveIndex = ref(0)
 const slashPickerDismissed = ref(false)
 const promptError = ref('')
 const composerScannerSettling = ref(false)
+const composerCommitPulse = ref(false)
 const newSessionSettling = ref(false)
 const startupComposerDocking = ref(false)
 const startupRevealHold = ref(false)
@@ -121,6 +122,7 @@ const settingsPath = computed(() => {
 })
 let initPhaseTimer = null
 let composerScannerSettlingTimer = null
+let composerCommitTimer = null
 let startupDockTimer = null
 let startupRevealTimer = null
 let newSessionSettlingTimer = null
@@ -439,7 +441,7 @@ const runtimeChromeVisible = computed(() => {
 })
 const composerScannerSourceActive = computed(() => {
   return Boolean(
-    promptSubmitting.value
+    (promptSubmitting.value && !composerCommitPulse.value)
       || agentRunning.value
       || sessionHandoff.value
       || inProjectNewSessionRun.value,
@@ -560,6 +562,7 @@ onUnmounted(() => {
   cancelAnimationFrame(terminalResizeFrame)
   clearTimeout(initPhaseTimer)
   clearTimeout(composerScannerSettlingTimer)
+  clearTimeout(composerCommitTimer)
   clearTimeout(startupDockTimer)
   clearTimeout(startupRevealTimer)
   clearTimeout(newSessionSettlingTimer)
@@ -1025,6 +1028,14 @@ function cancelInProjectNewSessionRun() {
   inProjectNewSessionSettling.value = false
 }
 
+function pulseComposerCommit() {
+  composerCommitPulse.value = true
+  clearTimeout(composerCommitTimer)
+  composerCommitTimer = window.setTimeout(() => {
+    composerCommitPulse.value = false
+  }, 240)
+}
+
 async function submitDraft(streamingBehavior) {
   const text = draft.value.trim()
   const submittedAttachments = attachedImages.value
@@ -1106,6 +1117,7 @@ async function submitDraft(streamingBehavior) {
     reconcileCurrentDetail()
   }
   if (startsEmptySession) beginInProjectNewSessionRun()
+  pulseComposerCommit()
   const localEntry = beginUserTurn(text, images)
   const submittedDraft = draft.value
   promptSubmitting.value = true
@@ -2047,6 +2059,7 @@ function closePickerMenus() {
           'session-handoff-composer': sessionHandoff,
           'activity-scanning-composer': composerScannerVisible,
           'activity-scanner-settling': composerScannerSettling,
+          'composer-committing': composerCommitPulse,
         }"
         :model-key="modelKey"
         :model-picker-open="modelPickerOpen"
