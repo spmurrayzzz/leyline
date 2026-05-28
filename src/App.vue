@@ -1813,13 +1813,6 @@ function closePickerMenus() {
           <div class="init-skeleton-line skeleton-line"></div>
           <div class="init-skeleton-line skeleton-line short"></div>
         </div>
-        <div v-else-if="sessionLoading" class="session-loading-panel">
-          <div class="session-loading-mark" aria-hidden="true"></div>
-          <div>
-            <strong>Opening session</strong>
-            <span>Reading transcript and activating pi runtime…</span>
-          </div>
-        </div>
         <div v-else-if="sessionError" class="empty-workbench error-note">
           {{ sessionError }}
         </div>
@@ -2022,18 +2015,15 @@ function closePickerMenus() {
         v-if="selectedSession
           && !initializing
           && !emptySessionShellVisible
-          && !startupRun
-          && !sessionLoading
-          && !sessionSwitching"
+          && !startupRun"
         class="composer-fade"
+        :class="{ 'is-switching': sessionLoading || sessionSwitching }"
       ></div>
 
       <SessionComposer
         v-if="selectedSession
           && !initializing
-          && !startupRun
-          && !sessionLoading
-          && !sessionSwitching"
+          && !startupRun"
         ref="composerRef"
         v-model:draft="draft"
         :agent-running="agentRunning"
@@ -2060,6 +2050,7 @@ function closePickerMenus() {
           'activity-scanning-composer': composerScannerVisible,
           'activity-scanner-settling': composerScannerSettling,
           'composer-committing': composerCommitPulse,
+          'is-switching': sessionLoading || sessionSwitching,
         }"
         :model-key="modelKey"
         :model-picker-open="modelPickerOpen"

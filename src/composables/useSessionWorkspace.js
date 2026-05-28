@@ -49,7 +49,9 @@ export function useSessionWorkspace({
   const deleteSessionPhase = ref('')
   const forkingEntryId = ref('')
   const initPhase = ref('sessions')
-  const selectedSession = computed(() => sessionDetail.value?.session)
+  const selectedSession = computed(() => {
+    return sessionDetail.value?.session || sessions.value.find((s) => s.id === selectedSessionId.value)
+  })
   const visibleProjects = computed(() => visibleProjectList())
   const initializing = computed(() => {
     return sessionsLoading.value && !selectedSession.value
@@ -212,12 +214,6 @@ export function useSessionWorkspace({
     const token = ++sessionSelectionToken
     sessionSwitching.value = true
     const switchStarted = Date.now()
-    if (sessionDetail.value?.session?.id !== session.id) {
-      sessionDetail.value = null
-    }
-    if (activeRuntimeSession.value?.id !== session.id) {
-      activeRuntimeSession.value = null
-    }
     selectedSessionId.value = session.id
     markRuntimeSessionRead(session.id)
     liveTurn?.selectSession?.(session.id)
