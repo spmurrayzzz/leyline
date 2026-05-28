@@ -715,6 +715,15 @@ function liveToolStatus(tool) {
   return 'completed'
 }
 
+function liveItemClass(item) {
+  return [
+    `live-${item.type}-item`,
+    item.status ? `is-${item.status}` : '',
+    item.persistedEntry ? 'is-persisted' : '',
+    item.streaming ? 'is-streaming' : '',
+  ]
+}
+
 function isProjectExpanded(project) {
   return expandedProjects.value.has(project.cwd)
 }
@@ -1955,8 +1964,14 @@ function closePickerMenus() {
           name="live-row"
           tag="div"
           class="live-stack"
+          :class="{ 'is-active': liveTurnActive, 'is-running': agentRunning }"
         >
-          <div v-for="item in liveFlowItems" :key="item.id" class="live-item">
+          <div
+            v-for="item in liveFlowItems"
+            :key="item.id"
+            class="live-item"
+            :class="liveItemClass(item)"
+          >
             <TranscriptEntry
               v-if="item.type === 'message'"
               :copied-entry-id="copiedEntryId"

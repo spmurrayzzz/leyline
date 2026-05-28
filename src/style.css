@@ -244,6 +244,64 @@ button {
   }
 }
 
+@keyframes live-user-handoff {
+  from {
+    opacity: 0;
+    transform: translateY(30px) scale(0.985);
+    filter: blur(3px);
+  }
+
+  52% {
+    opacity: 1;
+    filter: blur(0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes live-assistant-wake {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+    filter: blur(2px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+@keyframes live-tool-edge {
+  0%,
+  100% {
+    opacity: 0.16;
+    transform: translateX(-24%);
+  }
+
+  50% {
+    opacity: 0.54;
+    transform: translateX(24%);
+  }
+}
+
+@keyframes live-tool-settle {
+  from {
+    transform: translateY(0) scale(1);
+    filter: saturate(1.1);
+  }
+
+  to {
+    transform: translateY(0) scale(1);
+    filter: saturate(1);
+  }
+}
+
 @keyframes composer-input-commit {
   from {
     transform: translateY(0);
@@ -2525,8 +2583,13 @@ h1 {
 }
 
 .live-stack {
+  position: relative;
   width: min(var(--content-max), 100%);
   margin: 0 auto;
+}
+
+.live-stack.is-active {
+  isolation: isolate;
 }
 
 .workbench > .message,
@@ -2585,6 +2648,7 @@ h1 {
 }
 
 .live-item {
+  position: relative;
   width: 100%;
 }
 
@@ -2593,22 +2657,45 @@ h1 {
   width: 100%;
 }
 
+.live-user-item > .message {
+  transform-origin: bottom center;
+  animation: live-user-handoff 560ms var(--ease-emphasized) both;
+}
+
+.live-assistant-item > .message {
+  transform-origin: top center;
+}
+
+.live-assistant-item.is-streaming > .message {
+  animation: live-assistant-wake 320ms var(--ease-decelerate) both;
+}
+
 .live-row-enter-active {
   transition:
-    opacity var(--motion-base) var(--ease-decelerate),
-    transform var(--motion-base) var(--ease-decelerate);
+    opacity 360ms var(--ease-decelerate),
+    transform 360ms var(--ease-decelerate),
+    filter 360ms var(--ease-decelerate);
 }
 
 .live-row-leave-active {
+  position: absolute;
+  right: 0;
+  left: 0;
   transition:
     opacity var(--motion-fast) var(--ease-accelerate),
-    transform var(--motion-fast) var(--ease-accelerate);
+    transform var(--motion-fast) var(--ease-accelerate),
+    filter var(--motion-fast) var(--ease-accelerate);
+}
+
+.live-row-move {
+  transition: transform 360ms var(--ease-emphasized);
 }
 
 .live-row-enter-from,
 .live-row-leave-to {
   opacity: 0;
-  transform: translateY(4px);
+  transform: translateY(10px) scale(0.992);
+  filter: blur(2px);
 }
 
 .loading-fade-enter-active {
@@ -3300,15 +3387,47 @@ h1 {
 }
 
 .live-tool-card {
+  position: relative;
   min-height: 42px;
+  overflow: hidden;
   border-color: var(--accent-border);
   background: rgb(124 92 255 / 7%);
   cursor: default;
 }
 
+.live-tool-card::before {
+  position: absolute;
+  right: 12px;
+  bottom: 0;
+  left: 12px;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    rgb(124 92 255 / 0%),
+    rgb(191 181 255 / 28%),
+    rgb(124 92 255 / 0%)
+  );
+  content: '';
+  opacity: 0.5;
+  pointer-events: none;
+  transform: translateX(-8%);
+}
+
+.live-tool-card.is-running::before,
+.live-tool-card:not(.is-completed):not(.error-card)::before {
+  animation: live-tool-edge 1900ms ease-in-out infinite;
+}
+
 .live-tool-card.is-completed {
   border-color: #292b34;
   background: #131419;
+  animation: live-tool-settle 260ms var(--ease-decelerate) both;
+}
+
+.live-tool-card.is-completed::before,
+.live-tool-card.error-card::before {
+  opacity: 0;
+  animation: none;
 }
 
 .live-tool-card .tool-card-header {
@@ -4013,12 +4132,17 @@ h1 {
 }
 
 .composer.composer-committing {
-  border-color: #54466f;
+  border-color: #5f4b83;
   box-shadow:
-    0 1px 0 rgb(255 255 255 / 3%) inset,
+    0 1px 0 rgb(255 255 255 / 4%) inset,
     0 2px 6px -3px rgb(0 0 0 / 45%),
     0 16px 38px -18px rgb(0 0 0 / 34%),
-    0 0 0 3px rgb(124 92 255 / 5%);
+    0 0 0 3px rgb(124 92 255 / 8%),
+    0 0 34px -24px rgb(191 181 255 / 58%);
+}
+
+.composer.composer-committing .composer-input-shell {
+  border-color: rgb(124 92 255 / 24%);
 }
 
 .composer.composer-committing .composer-input-shell {
@@ -4472,7 +4596,8 @@ textarea::placeholder {
 
 @media (prefers-reduced-motion: reduce) {
   .live-row-enter-active,
-  .live-row-leave-active {
+  .live-row-leave-active,
+  .live-row-move {
     transition: none;
   }
 
@@ -4566,6 +4691,10 @@ textarea::placeholder {
 
   .message-enter,
   .submit-handoff-message,
+  .live-user-item > .message,
+  .live-assistant-item.is-streaming > .message,
+  .live-tool-card::before,
+  .live-tool-card.is-completed,
   .composer.composer-committing .composer-input-shell,
   .composer.composer-committing .send-button:not(.stop-button) {
     animation: none;
@@ -4634,6 +4763,7 @@ textarea::placeholder {
   .live-row-leave-to {
     opacity: 1;
     transform: none;
+    filter: none;
   }
 
   .new-session-transition:not(.start-state) .runtime-chrome,
@@ -4656,6 +4786,10 @@ textarea::placeholder {
   .in-project-init-panel,
   .thought-ellipsis span,
   .live-tool-spinner,
+  .live-user-item > .message,
+  .live-assistant-item.is-streaming > .message,
+  .live-tool-card::before,
+  .live-tool-card.is-completed,
   .session-loading-mark,
   .submit-handoff-message,
   .composer.composer-committing .composer-input-shell,
