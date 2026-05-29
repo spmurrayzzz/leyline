@@ -422,6 +422,9 @@ const composerPlaceholder = computed(() => {
 const startupShellVisible = computed(() => {
   return Boolean(startupRun.value || startupRevealHold.value)
 })
+const startupLoadingVisible = computed(() => {
+  return Boolean(startupComposerDocking.value || startupRevealHold.value)
+})
 const startFlowVisible = computed(() => {
   if (startupRun.value) return true
   if (sessionLoading.value || sessionSwitching.value) return false
@@ -1960,7 +1963,7 @@ function closePickerMenus() {
         >
           <h2 class="start-headline-text">What should we work on?</h2>
           <div
-            v-if="startupShellVisible"
+            v-if="startupLoadingVisible"
             class="init-panel transcript-skeleton-panel startup-init-panel"
             aria-label="Starting new session"
             aria-hidden="true"
