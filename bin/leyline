@@ -3,6 +3,20 @@ set -euo pipefail
 
 cwd="${LEYLINE_CWD:-$PWD}"
 app_path="${LEYLINE_APP:-/Applications/Leyline.app}"
+new_window=0
+
+while (($#)); do
+  case "$1" in
+    -n)
+      new_window=1
+      shift
+      ;;
+    *)
+      echo "usage: leyline [-n]" >&2
+      exit 2
+      ;;
+  esac
+done
 
 if [[ ! -d "$app_path" ]]; then
   repo_app="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/release/Leyline-darwin-arm64/Leyline.app"
@@ -20,4 +34,9 @@ if [[ ! -x "$executable" ]]; then
   exit 1
 fi
 
-"$executable" --leyline-new-session --leyline-cwd="$cwd" >/dev/null 2>&1 &
+args=(--leyline-new-session --leyline-cwd="$cwd")
+if [[ "$new_window" -eq 1 ]]; then
+  args+=(--leyline-new-window)
+fi
+
+"$executable" "${args[@]}" >/dev/null 2>&1 &

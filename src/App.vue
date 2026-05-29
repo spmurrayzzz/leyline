@@ -486,6 +486,7 @@ const slashCommandItems = computed(() => {
 
 watch(newSessionCwd, (cwd) => {
   loadStartRuntimeState(cwd)
+  updateNativeWindowCwd()
 })
 
 watch(slashCommandItems, () => {
@@ -495,6 +496,7 @@ watch(slashCommandItems, () => {
 watch(sessionDetail, (detail) => {
   liveTurn.setPersistedDetail(detail)
   if (detail?.session?.cwd) expandProject(detail.session.cwd)
+  updateNativeWindowCwd()
 })
 
 watch(activeRuntimeSession, (session) => {
@@ -503,6 +505,7 @@ watch(activeRuntimeSession, (session) => {
 })
 
 watch(selectedSessionId, () => {
+  updateNativeWindowCwd()
   expandedTools.value = new Set()
   expandedSkills.value = new Set()
   editingEntry.value = null
@@ -553,6 +556,7 @@ onMounted(async () => {
   window.addEventListener('leyline:open-settings', handleNativeOpenSettings)
   window.addEventListener('leyline:toggle-sidebar', handleNativeToggleSidebar)
   window.addEventListener('leyline:escape', handleNativeEscape)
+  updateNativeWindowCwd()
   openEventStream()
   initPhase.value = 'sessions'
   const initialNativeCwd = consumeInitialNativeNewSessionCwd()
@@ -579,6 +583,7 @@ onUnmounted(() => {
   window.removeEventListener('leyline:open-settings', handleNativeOpenSettings)
   window.removeEventListener('leyline:toggle-sidebar', handleNativeToggleSidebar)
   window.removeEventListener('leyline:escape', handleNativeEscape)
+  delete window.__leylineCurrentCwd
   stopTerminalResize()
   closeEventStream()
   sessionWorkspace.dispose()
@@ -1692,6 +1697,12 @@ function consumeInitialNativeNewSessionCwd() {
   const next = `${url.pathname}${url.search}${url.hash}`
   window.history.replaceState({}, '', next)
   return cwd
+}
+
+function updateNativeWindowCwd() {
+  window.__leylineCurrentCwd = selectedSession.value?.cwd
+    || newSessionCwd.value
+    || ''
 }
 
 function closeMenusOnOutsideClick(event) {

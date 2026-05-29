@@ -82,7 +82,14 @@ leyline
 ```
 
 The CLI opens or focuses the Electron app and creates a new session for the
-current shell directory.
+current shell directory. Use `leyline -n` to create that session in a new
+Leyline window.
+
+## Electron shortcuts
+
+- `cmd+n`: create a new session in the current window
+- `cmd+shift+n`: create a new session in a new window
+- `cmd+w`: close the current window
 
 ## Useful commands
 

@@ -7,31 +7,35 @@ import { app, BrowserWindow } from 'electron'
 const execFileAsync = promisify(execFile)
 
 let leylineServer
+let leylineServerUrl
+let leylineServerStarting
 let mainWindow
-const pendingWindowCommands = []
 
 const gotSingleInstanceLock = app.requestSingleInstanceLock()
 if (!gotSingleInstanceLock) app.quit()
 
 app.on('second-instance', (_event, argv) => {
   const command = nativeCommandFromArgv(argv)
-  if (!mainWindow || mainWindow.isDestroyed()) {
+  if (command?.newWindow) {
     void createWindow(command)
     return
   }
 
-  if (mainWindow.isMinimized()) mainWindow.restore()
-  mainWindow.show()
-  app.focus({ steal: true })
-  mainWindow.focus()
-  if (command) sendWindowCommand(mainWindow, command.name, command.detail)
+  const window = activeWindow()
+  if (!window) {
+    void createWindow(command)
+    return
+  }
+
+  focusWindow(window)
+  if (command) sendWindowCommand(window, command.name, command.detail)
 })
 
 async function createWindow(initialCommand) {
   const url = await appUrl(initialCommand)
   const windowState = await readWindowState()
 
-  mainWindow = new BrowserWindow({
+  const window = new BrowserWindow({
     ...windowState.bounds,
     minWidth: 900,
     minHeight: 640,
@@ -41,19 +45,29 @@ async function createWindow(initialCommand) {
       nodeIntegration: false,
     },
   })
+  mainWindow = window
 
-  if (windowState.isMaximized) mainWindow.maximize()
-  if (windowState.isFullScreen) mainWindow.setFullScreen(true)
+  if (windowState.isMaximized) window.maximize()
+  if (windowState.isFullScreen) window.setFullScreen(true)
 
-  mainWindow.on('close', () => {
-    void saveWindowState(mainWindow).catch(() => {})
+  window.on('focus', () => { mainWindow = window })
+  window.on('close', () => {
+    void saveWindowState(window).catch(() => {})
   })
 
-  mainWindow.webContents.on('before-input-event', (event, input) => {
+  window.webContents.on('before-input-event', (event, input) => {
     const key = input.key?.toLowerCase()
+    const isNewSessionWindow = input.type === 'keyDown'
+      && key === 'n'
+      && input.meta
+      && input.shift
     const isNewSession = input.type === 'keyDown'
       && key === 'n'
       && (input.meta || input.control)
+      && !input.shift
+    const isCloseWindow = input.type === 'keyDown'
+      && key === 'w'
+      && input.meta
     const isToggleTerminal = input.type === 'keyDown'
       && key === 't'
       && input.meta
@@ -69,7 +83,9 @@ async function createWindow(initialCommand) {
     const isEscape = input.type === 'keyDown' && key === 'escape'
 
     if (
-      !isNewSession
+      !isNewSessionWindow
+      && !isNewSession
+      && !isCloseWindow
       && !isToggleTerminal
       && !isOpenSettings
       && !isToggleSidebar
@@ -77,22 +93,21 @@ async function createWindow(initialCommand) {
     ) return
 
     if (isEscape) {
-      sendEscapeCommand(mainWindow)
+      sendEscapeCommand(window)
       return
     }
 
     event.preventDefault()
-    if (isNewSession) sendNewSessionCommand(mainWindow)
-    if (isToggleTerminal) sendToggleTerminalCommand(mainWindow)
-    if (isOpenSettings) sendOpenSettingsCommand(mainWindow)
-    if (isToggleSidebar) sendToggleSidebarCommand(mainWindow)
+    if (isNewSessionWindow) void createNewSessionWindow(window)
+    if (isNewSession) sendNewSessionCommand(window)
+    if (isCloseWindow) window.close()
+    if (isToggleTerminal) sendToggleTerminalCommand(window)
+    if (isOpenSettings) sendOpenSettingsCommand(window)
+    if (isToggleSidebar) sendToggleSidebarCommand(window)
   })
 
-  await mainWindow.loadURL(url)
-  flushWindowCommands(mainWindow)
-  if (initialCommand) {
-    sendWindowCommand(mainWindow, initialCommand.name, initialCommand.detail)
-  }
+  await window.loadURL(url)
+  focusWindow(window)
 }
 
 function sendEscapeCommand(window) {
@@ -119,7 +134,9 @@ function sendWindowCommand(window, name, detail = null) {
   if (!window || window.isDestroyed()) return
 
   if (window.webContents.isLoading()) {
-    pendingWindowCommands.push({ name, detail })
+    window.webContents.once('did-finish-load', () => {
+      sendWindowCommand(window, name, detail)
+    })
     return
   }
 
@@ -128,20 +145,56 @@ function sendWindowCommand(window, name, detail = null) {
   window.webContents.executeJavaScript(script).catch(() => {})
 }
 
-function flushWindowCommands(window) {
-  const commands = pendingWindowCommands.splice(0)
-  for (const command of commands) {
-    sendWindowCommand(window, command.name, command.detail)
+async function createNewSessionWindow(sourceWindow) {
+  const cwd = await currentWindowCwd(sourceWindow)
+  if (!cwd) return
+  await createWindow(newSessionCommand(cwd, { newWindow: true }))
+}
+
+async function currentWindowCwd(window) {
+  if (!window || window.isDestroyed()) return ''
+
+  try {
+    const cwd = await window.webContents.executeJavaScript(
+      'window.__leylineCurrentCwd || ""',
+    )
+    return typeof cwd === 'string' ? cwd.trim() : ''
+  } catch {
+    return ''
   }
+}
+
+function activeWindow() {
+  const focused = BrowserWindow.getFocusedWindow()
+  if (focused && !focused.isDestroyed()) return focused
+  if (mainWindow && !mainWindow.isDestroyed()) return mainWindow
+  return BrowserWindow.getAllWindows().find((window) => !window.isDestroyed())
+}
+
+function focusWindow(window) {
+  if (!window || window.isDestroyed()) return
+  if (window.isMinimized()) window.restore()
+  window.show()
+  app.focus({ steal: true })
+  window.focus()
+  mainWindow = window
 }
 
 function nativeCommandFromArgv(argv) {
   if (!argv.includes('--leyline-new-session')) return null
 
   const cwd = argvValue(argv, '--leyline-cwd')
+  return newSessionCommand(
+    validCwdArg(cwd) ? resolve(cwd) : '',
+    { newWindow: argv.includes('--leyline-new-window') },
+  )
+}
+
+function newSessionCommand(cwd, options = {}) {
   return {
     name: 'leyline:new-session',
-    detail: { cwd: validCwdArg(cwd) ? resolve(cwd) : '' },
+    detail: { cwd },
+    newWindow: Boolean(options.newWindow),
   }
 }
 
@@ -227,9 +280,22 @@ async function appUrl(initialCommand) {
 }
 
 async function packagedAppUrl() {
-  const { startLeylineServer } = await import('../server/leyline-server.js')
-  leylineServer = await startLeylineServer()
-  return leylineServer.url
+  if (leylineServerUrl) return leylineServerUrl
+  if (leylineServerStarting) return leylineServerStarting
+
+  leylineServerStarting = startPackagedAppServer()
+  return leylineServerStarting
+}
+
+async function startPackagedAppServer() {
+  try {
+    const { startLeylineServer } = await import('../server/leyline-server.js')
+    leylineServer = await startLeylineServer()
+    leylineServerUrl = leylineServer.url
+    return leylineServerUrl
+  } finally {
+    leylineServerStarting = null
+  }
 }
 
 function urlWithInitialCommand(url, command) {
