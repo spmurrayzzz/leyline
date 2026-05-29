@@ -18,9 +18,13 @@ For the reasoning behind the project, see [Motivations](docs/motivations.md).
 
 ## Requirements
 
+- macOS
 - Node.js
 - npm
 - A configured pi coding-agent environment
+
+Leyline is currently developed and tested on macOS only. Linux and Windows are
+not supported yet, and many things are expected to be broken there.
 
 ## Setup
 
