@@ -1700,9 +1700,7 @@ function consumeInitialNativeNewSessionCwd() {
 }
 
 function updateNativeWindowCwd() {
-  window.__leylineCurrentCwd = selectedSession.value?.cwd
-    || newSessionCwd.value
-    || ''
+  window.__leylineCurrentCwd = selectedSession.value?.cwd || ''
 }
 
 function closeMenusOnOutsideClick(event) {

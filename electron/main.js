@@ -147,8 +147,7 @@ function sendWindowCommand(window, name, detail = null) {
 
 async function createNewSessionWindow(sourceWindow) {
   const cwd = await currentWindowCwd(sourceWindow)
-  if (!cwd) return
-  await createWindow(newSessionCommand(cwd, { newWindow: true }))
+  await createWindow(cwd ? newSessionCommand(cwd, { newWindow: true }) : null)
 }
 
 async function currentWindowCwd(window) {
