@@ -67,6 +67,23 @@ The packaged app is written to `release/`. The build first creates the Vite
 `dist/` output, then packages Electron with the app icon from `assets/icon` and
 unpacks native terminal dependencies needed by `node-pty`.
 
+To install the packaged app locally and expose the `leyline` command:
+
+```sh
+npm run local-publish
+```
+
+This copies `Leyline.app` to `/Applications/` and symlinks the CLI to
+`~/.local/bin/leyline`. Make sure `~/.local/bin` is on your `PATH`, then run:
+
+```sh
+cd /path/to/project
+leyline
+```
+
+The CLI opens or focuses the Electron app and creates a new session for the
+current shell directory.
+
 ## Useful commands
 
 ```sh
@@ -74,6 +91,7 @@ npm run build
 npm run preview
 npm run electron:dev
 npm run electron:build
+npm run local-publish
 npm run screenshot
 ```
 

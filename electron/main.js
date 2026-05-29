@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import { app, BrowserWindow } from 'electron'
 
@@ -8,9 +8,27 @@ const execFileAsync = promisify(execFile)
 
 let leylineServer
 let mainWindow
+const pendingWindowCommands = []
 
-async function createWindow() {
-  const url = await appUrl()
+const gotSingleInstanceLock = app.requestSingleInstanceLock()
+if (!gotSingleInstanceLock) app.quit()
+
+app.on('second-instance', (_event, argv) => {
+  const command = nativeCommandFromArgv(argv)
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    void createWindow(command)
+    return
+  }
+
+  if (mainWindow.isMinimized()) mainWindow.restore()
+  mainWindow.show()
+  app.focus({ steal: true })
+  mainWindow.focus()
+  if (command) sendWindowCommand(mainWindow, command.name, command.detail)
+})
+
+async function createWindow(initialCommand) {
+  const url = await appUrl(initialCommand)
   const windowState = await readWindowState()
 
   mainWindow = new BrowserWindow({
@@ -71,6 +89,10 @@ async function createWindow() {
   })
 
   await mainWindow.loadURL(url)
+  flushWindowCommands(mainWindow)
+  if (initialCommand) {
+    sendWindowCommand(mainWindow, initialCommand.name, initialCommand.detail)
+  }
 }
 
 function sendEscapeCommand(window) {
@@ -93,12 +115,47 @@ function sendToggleSidebarCommand(window) {
   sendWindowCommand(window, 'leyline:toggle-sidebar')
 }
 
-function sendWindowCommand(window, name) {
+function sendWindowCommand(window, name, detail = null) {
   if (!window || window.isDestroyed()) return
 
-  window.webContents.executeJavaScript(
-    `window.dispatchEvent(new CustomEvent('${name}'))`,
-  ).catch(() => {})
+  if (window.webContents.isLoading()) {
+    pendingWindowCommands.push({ name, detail })
+    return
+  }
+
+  const script = `window.dispatchEvent(new CustomEvent(${JSON.stringify(name)}, `
+    + `{ detail: ${JSON.stringify(detail)} }))`
+  window.webContents.executeJavaScript(script).catch(() => {})
+}
+
+function flushWindowCommands(window) {
+  const commands = pendingWindowCommands.splice(0)
+  for (const command of commands) {
+    sendWindowCommand(window, command.name, command.detail)
+  }
+}
+
+function nativeCommandFromArgv(argv) {
+  if (!argv.includes('--leyline-new-session')) return null
+
+  const cwd = argvValue(argv, '--leyline-cwd')
+  return {
+    name: 'leyline:new-session',
+    detail: { cwd: validCwdArg(cwd) ? resolve(cwd) : '' },
+  }
+}
+
+function argvValue(argv, name) {
+  const inline = argv.find((item) => item.startsWith(`${name}=`))
+  if (inline) return inline.slice(name.length + 1)
+
+  const index = argv.indexOf(name)
+  if (index === -1 || index + 1 >= argv.length) return ''
+  return argv[index + 1]
+}
+
+function validCwdArg(value) {
+  return Boolean(value && !value.startsWith('--'))
 }
 
 async function readWindowState() {
@@ -163,14 +220,26 @@ function validPosition(value) {
   return Number.isInteger(value)
 }
 
-async function appUrl() {
-  if (process.env.LEYLINE_DEV_SERVER_URL) {
-    return process.env.LEYLINE_DEV_SERVER_URL
-  }
+async function appUrl(initialCommand) {
+  const url = process.env.LEYLINE_DEV_SERVER_URL
+    || await packagedAppUrl()
+  return urlWithInitialCommand(url, initialCommand)
+}
 
+async function packagedAppUrl() {
   const { startLeylineServer } = await import('../server/leyline-server.js')
   leylineServer = await startLeylineServer()
   return leylineServer.url
+}
+
+function urlWithInitialCommand(url, command) {
+  if (command?.name !== 'leyline:new-session' || !command.detail?.cwd) {
+    return url
+  }
+
+  const next = new URL(url)
+  next.searchParams.set('leylineNewSessionCwd', command.detail.cwd)
+  return next.toString()
 }
 
 async function loadLoginShellEnvironment() {
@@ -197,10 +266,12 @@ async function loadLoginShellEnvironment() {
   }
 }
 
-app.whenReady().then(async () => {
-  await loadLoginShellEnvironment()
-  await createWindow()
-})
+if (gotSingleInstanceLock) {
+  app.whenReady().then(async () => {
+    await loadLoginShellEnvironment()
+    await createWindow(nativeCommandFromArgv(process.argv))
+  })
+}
 
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) createWindow()

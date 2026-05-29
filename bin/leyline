@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cwd="${LEYLINE_CWD:-$PWD}"
+app_path="${LEYLINE_APP:-/Applications/Leyline.app}"
+
+if [[ ! -d "$app_path" ]]; then
+  repo_app="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/release/Leyline-darwin-arm64/Leyline.app"
+  if [[ -d "$repo_app" ]]; then
+    app_path="$repo_app"
+  else
+    echo "Leyline.app not found. Build and install it with npm run local-publish." >&2
+    exit 1
+  fi
+fi
+
+executable="$app_path/Contents/MacOS/Leyline"
+if [[ ! -x "$executable" ]]; then
+  echo "Leyline executable not found at $executable." >&2
+  exit 1
+fi
+
+"$executable" --leyline-new-session --leyline-cwd="$cwd" >/dev/null 2>&1 &

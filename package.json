@@ -2,6 +2,9 @@
   "name": "leyline",
   "version": "0.0.0",
   "private": true,
+  "bin": {
+    "leyline": "bin/leyline"
+  },
   "type": "module",
   "main": "electron/main.js",
   "scripts": {

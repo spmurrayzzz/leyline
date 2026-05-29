@@ -291,11 +291,12 @@ export function useSessionWorkspace({
     else await loadSessions({ routeSessionId: id })
   }
 
-  async function handleNativeNewSession() {
-    if (!selectedSession.value) return
+  async function handleNativeNewSession(event) {
+    const cwd = event?.detail?.cwd?.trim() || selectedSession.value?.cwd || ''
+    if (!cwd) return
     if (liveTurn?.agentRunning?.value || creatingSessionCwd.value) return
 
-    await createSessionForCwd(selectedSession.value.cwd)
+    await createSessionForCwd(cwd)
   }
 
   function sessionIdFromRoute() {

@@ -555,7 +555,18 @@ onMounted(async () => {
   window.addEventListener('leyline:escape', handleNativeEscape)
   openEventStream()
   initPhase.value = 'sessions'
+  const initialNativeCwd = consumeInitialNativeNewSessionCwd()
+  if (initialNativeCwd) newSessionCwd.value = initialNativeCwd
   await waitInitPhaseFloor()
+  if (initialNativeCwd) {
+    try {
+      await handleNativeNewSession({ detail: { cwd: initialNativeCwd } })
+    } finally {
+      sessionsLoading.value = false
+      initPhase.value = 'sessions'
+    }
+    return
+  }
   await loadSessions({ routeSessionId: sessionIdFromRoute() })
 })
 
@@ -1670,6 +1681,17 @@ function handleEscape(event) {
   cancelDeleteSession()
   cancelEditingEntry()
   closePickerMenus()
+}
+
+function consumeInitialNativeNewSessionCwd() {
+  const url = new URL(window.location.href)
+  const cwd = url.searchParams.get('leylineNewSessionCwd')?.trim() || ''
+  if (!cwd) return ''
+
+  url.searchParams.delete('leylineNewSessionCwd')
+  const next = `${url.pathname}${url.search}${url.hash}`
+  window.history.replaceState({}, '', next)
+  return cwd
 }
 
 function closeMenusOnOutsideClick(event) {
