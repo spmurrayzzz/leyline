@@ -878,8 +878,11 @@ kbd {
   );
   transform: translateX(-100%);
   animation:
-    skeleton-sweep var(--sk-duration) ease-in-out infinite;
-  animation-delay: var(--sk-delay, 0ms);
+    skeleton-sweep var(--sk-line-duration, var(--sk-duration)) ease-in-out
+    infinite;
+  animation-delay: calc(
+    var(--sk-delay, var(--sk-row-delay, 0ms)) + var(--sk-line-offset, 0ms)
+  );
   content: '';
 }
 
@@ -3495,6 +3498,7 @@ h1 {
 .transcript-skeleton-panel {
   --sk-base: rgb(124 92 255 / 4%);
   --sk-highlight: rgb(255 255 255 / 4%);
+  --sk-duration: 1.45s;
   display: grid;
   gap: 14px;
   width: min(var(--content-max), 100%);
@@ -3579,6 +3583,7 @@ h1 {
     rgb(255 255 255 / 5%) 48%,
     transparent 100%
   );
+  opacity: var(--sk-sweep-opacity, 1);
 }
 
 .transcript-skeleton-panel .skeleton-title {
@@ -3608,29 +3613,53 @@ h1 {
   height: 10px;
 }
 
-.transcript-skeleton-row:nth-child(1) .skeleton-line {
-  --sk-delay: 0ms;
+.transcript-skeleton-row:nth-child(1) {
+  --sk-row-delay: -180ms;
+  --sk-line-duration: 1.62s;
 }
 
-.transcript-skeleton-row:nth-child(2) .skeleton-line {
-  --sk-delay: 120ms;
+.transcript-skeleton-row:nth-child(2) {
+  --sk-row-delay: 70ms;
+  --sk-line-duration: 1.38s;
 }
 
-.transcript-skeleton-row:nth-child(3) .skeleton-line {
-  --sk-delay: 240ms;
+.transcript-skeleton-row:nth-child(3) {
+  --sk-row-delay: -40ms;
+  --sk-line-duration: 1.7s;
 }
 
-.transcript-skeleton-row:nth-child(4) .skeleton-line {
-  --sk-delay: 360ms;
+.transcript-skeleton-row:nth-child(4) {
+  --sk-row-delay: 210ms;
+  --sk-line-duration: 1.5s;
+}
+
+.transcript-skeleton-row .skeleton-line:nth-child(1) {
+  --sk-line-offset: 0ms;
+  --sk-sweep-opacity: 0.82;
+}
+
+.transcript-skeleton-row .skeleton-line:nth-child(2) {
+  --sk-line-offset: 170ms;
+  --sk-sweep-opacity: 1;
+}
+
+.transcript-skeleton-row .skeleton-line:nth-child(3) {
+  --sk-line-offset: -90ms;
+  --sk-sweep-opacity: 0.74;
+}
+
+.transcript-skeleton-row .skeleton-line:nth-child(4) {
+  --sk-line-offset: 260ms;
+  --sk-sweep-opacity: 0.9;
 }
 
 @keyframes skeleton-sweep {
   0% {
-    transform: translateX(-100%);
+    transform: translateX(var(--sk-start, -100%));
   }
 
   100% {
-    transform: translateX(100%);
+    transform: translateX(var(--sk-end, 100%));
   }
 }
 
