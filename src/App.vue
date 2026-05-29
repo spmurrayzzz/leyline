@@ -1189,7 +1189,8 @@ async function submitDraft(streamingBehavior) {
   const shouldFollowOutput = editing || stickToBottom.value
   const startsTurn = !isHandledSlashCommand(text)
     || slashCommandStartsTurn(text)
-  const startsEmptySession = isEmptySelectedSession.value
+  const startsEmptySession = !startupRun.value
+    && isEmptySelectedSession.value
     && !editing
     && startsTurn
   if (editing) {
@@ -1896,27 +1897,59 @@ function closePickerMenus() {
       >
         <div
           v-if="initializing"
-          class="init-panel"
+          class="init-panel transcript-skeleton-panel"
           aria-label="Loading workspace"
           aria-hidden="true"
         >
-          <div class="init-skeleton-line skeleton-line skeleton-title"></div>
-          <div class="init-skeleton-line skeleton-line"></div>
-          <div class="init-skeleton-line skeleton-line short"></div>
-          <div class="init-skeleton-line skeleton-line"></div>
-          <div class="init-skeleton-line skeleton-line shorter"></div>
+          <div class="transcript-skeleton-row skeleton-user-row">
+            <div class="transcript-skeleton-bubble skeleton-user-bubble">
+              <div class="skeleton-line skeleton-title"></div>
+              <div class="skeleton-line"></div>
+            </div>
+          </div>
+          <div class="transcript-skeleton-row skeleton-assistant-row">
+            <div class="skeleton-line skeleton-title"></div>
+            <div class="skeleton-line"></div>
+            <div class="skeleton-line short"></div>
+            <div class="skeleton-line shorter"></div>
+          </div>
+          <div class="transcript-skeleton-row skeleton-tool-row">
+            <div class="skeleton-line skeleton-tool-title"></div>
+            <div class="skeleton-line skeleton-tool-target"></div>
+          </div>
+          <div class="transcript-skeleton-row skeleton-assistant-row tail">
+            <div class="skeleton-line skeleton-title"></div>
+            <div class="skeleton-line"></div>
+            <div class="skeleton-line short"></div>
+          </div>
         </div>
         <div
           v-else-if="sessionHandoff"
-          class="init-panel session-handoff-init-panel"
+          class="init-panel transcript-skeleton-panel session-handoff-init-panel"
           aria-label="Starting new session"
           aria-hidden="true"
         >
-          <div class="init-skeleton-line skeleton-line skeleton-title"></div>
-          <div class="init-skeleton-line skeleton-line"></div>
-          <div class="init-skeleton-line skeleton-line short"></div>
-          <div class="init-skeleton-line skeleton-line"></div>
-          <div class="init-skeleton-line skeleton-line shorter"></div>
+          <div class="transcript-skeleton-row skeleton-user-row">
+            <div class="transcript-skeleton-bubble skeleton-user-bubble">
+              <div class="skeleton-line skeleton-title"></div>
+              <div class="skeleton-line"></div>
+            </div>
+          </div>
+          <div class="transcript-skeleton-row skeleton-assistant-row">
+            <div class="skeleton-line skeleton-title"></div>
+            <div class="skeleton-line"></div>
+            <div class="skeleton-line short"></div>
+            <div class="skeleton-line shorter"></div>
+          </div>
+          <div class="transcript-skeleton-row skeleton-tool-row">
+            <div class="skeleton-line skeleton-tool-title"></div>
+            <div class="skeleton-line skeleton-tool-target"></div>
+          </div>
+          <div class="transcript-skeleton-row skeleton-assistant-row tail">
+            <div class="skeleton-line skeleton-title"></div>
+            <div class="skeleton-line"></div>
+            <div class="skeleton-line short"></div>
+          </div>
         </div>
         <div v-else-if="sessionError" class="empty-workbench error-note">
           {{ sessionError }}
@@ -1928,15 +1961,31 @@ function closePickerMenus() {
           <h2 class="start-headline-text">What should we work on?</h2>
           <div
             v-if="startupShellVisible"
-            class="init-panel startup-init-panel"
+            class="init-panel transcript-skeleton-panel startup-init-panel"
             aria-label="Starting new session"
             aria-hidden="true"
           >
-            <div class="init-skeleton-line skeleton-line skeleton-title"></div>
-            <div class="init-skeleton-line skeleton-line"></div>
-            <div class="init-skeleton-line skeleton-line short"></div>
-            <div class="init-skeleton-line skeleton-line"></div>
-            <div class="init-skeleton-line skeleton-line shorter"></div>
+            <div class="transcript-skeleton-row skeleton-user-row">
+              <div class="transcript-skeleton-bubble skeleton-user-bubble">
+                <div class="skeleton-line skeleton-title"></div>
+                <div class="skeleton-line"></div>
+              </div>
+            </div>
+            <div class="transcript-skeleton-row skeleton-assistant-row">
+              <div class="skeleton-line skeleton-title"></div>
+              <div class="skeleton-line"></div>
+              <div class="skeleton-line short"></div>
+              <div class="skeleton-line shorter"></div>
+            </div>
+            <div class="transcript-skeleton-row skeleton-tool-row">
+              <div class="skeleton-line skeleton-tool-title"></div>
+              <div class="skeleton-line skeleton-tool-target"></div>
+            </div>
+            <div class="transcript-skeleton-row skeleton-assistant-row tail">
+              <div class="skeleton-line skeleton-title"></div>
+              <div class="skeleton-line"></div>
+              <div class="skeleton-line short"></div>
+            </div>
           </div>
           <StartComposer
             v-model:draft="draft"
@@ -1992,16 +2041,32 @@ function closePickerMenus() {
           <h2>What should we work on in {{ topbarTitle }}?</h2>
         </div>
         <div
-          v-if="inProjectNewSessionRun"
-          class="init-panel in-project-init-panel"
+          v-if="inProjectNewSessionRun && !startupRun && !startupRevealHold"
+          class="init-panel transcript-skeleton-panel in-project-init-panel"
           aria-label="Starting new session"
           aria-hidden="true"
         >
-          <div class="init-skeleton-line skeleton-line skeleton-title"></div>
-          <div class="init-skeleton-line skeleton-line"></div>
-          <div class="init-skeleton-line skeleton-line short"></div>
-          <div class="init-skeleton-line skeleton-line"></div>
-          <div class="init-skeleton-line skeleton-line shorter"></div>
+          <div class="transcript-skeleton-row skeleton-user-row">
+            <div class="transcript-skeleton-bubble skeleton-user-bubble">
+              <div class="skeleton-line skeleton-title"></div>
+              <div class="skeleton-line"></div>
+            </div>
+          </div>
+          <div class="transcript-skeleton-row skeleton-assistant-row">
+            <div class="skeleton-line skeleton-title"></div>
+            <div class="skeleton-line"></div>
+            <div class="skeleton-line short"></div>
+            <div class="skeleton-line shorter"></div>
+          </div>
+          <div class="transcript-skeleton-row skeleton-tool-row">
+            <div class="skeleton-line skeleton-tool-title"></div>
+            <div class="skeleton-line skeleton-tool-target"></div>
+          </div>
+          <div class="transcript-skeleton-row skeleton-assistant-row tail">
+            <div class="skeleton-line skeleton-title"></div>
+            <div class="skeleton-line"></div>
+            <div class="skeleton-line short"></div>
+          </div>
         </div>
 
         <template

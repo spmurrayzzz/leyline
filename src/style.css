@@ -366,7 +366,7 @@ button {
 @keyframes startup-loading-enter {
   to {
     opacity: 1;
-    transform: translate(-50%, -50%);
+    transform: translate(var(--skeleton-x, 0), 0);
   }
 }
 
@@ -1785,13 +1785,11 @@ h1 {
 }
 
 .init-workbench {
-  display: grid;
-  place-items: center;
-  padding: 0 44px 12vh;
+  padding: 20px 44px var(--composer-reserved-height, 240px);
 }
 
 .session-loading-workbench {
-  padding: 0 44px;
+  padding: 20px 44px var(--composer-reserved-height, 240px);
 }
 
 .start-workbench-shell {
@@ -1900,29 +1898,32 @@ h1 {
 }
 
 .startup-init-panel {
+  --skeleton-x: -50%;
   position: fixed;
-  top: 50%;
+  top: 90px;
   left: calc(276px + (100vw - 276px) / 2);
-  width: min(340px, calc(100vw - 364px));
+  z-index: 2;
+  width: min(var(--content-max), calc(100vw - 364px));
   opacity: 0;
-  transform: translate(-50%, calc(-50% + 8px));
+  transform: translate(var(--skeleton-x), 8px);
   animation: startup-loading-enter var(--motion-slow) var(--ease-decelerate)
     380ms both;
 }
 
 .sidebar-hidden .startup-init-panel {
   left: 50vw;
-  width: min(340px, calc(100vw - 88px));
+  width: min(var(--content-max), calc(100vw - 88px));
 }
 
 .in-project-init-panel {
+  --skeleton-x: -50%;
   position: absolute;
-  top: 50%;
+  top: 20px;
   left: 50%;
   z-index: 2;
-  width: min(340px, calc(100% - 88px));
+  width: min(var(--content-max), calc(100% - 88px));
   opacity: 0;
-  transform: translate(-50%, calc(-50% + 8px));
+  transform: translate(var(--skeleton-x), 8px);
   animation: startup-loading-enter var(--motion-slow) var(--ease-decelerate)
     380ms both;
 }
@@ -3351,7 +3352,7 @@ h1 {
 
 .session-handoff-init-panel {
   position: sticky;
-  top: calc(50% - 42px);
+  top: 20px;
   z-index: 3;
   margin: 0 auto;
 }
@@ -3481,41 +3482,113 @@ h1 {
   opacity: 0.78;
 }
 
-.init-skeleton-line {
-  height: 16px;
+.transcript-skeleton-panel {
+  display: grid;
+  gap: 14px;
+  width: min(var(--content-max), 100%);
+  margin: 0 auto;
+  opacity: 1;
+  mask-image: linear-gradient(
+    180deg,
+    #000 0%,
+    #000 50%,
+    rgb(0 0 0 / 72%) 74%,
+    rgb(0 0 0 / 24%) 100%
+  );
 }
 
-.init-skeleton-line.skeleton-title {
-  width: 48%;
-  height: 10px;
+
+.transcript-skeleton-row {
+  display: grid;
+  gap: 9px;
+  width: 100%;
 }
 
-.init-skeleton-line.short {
+.transcript-skeleton-bubble {
+  display: grid;
+  gap: 9px;
+}
+
+.skeleton-user-row {
+  opacity: 0.5;
+}
+
+.skeleton-user-bubble {
+  width: 100%;
+  border: 1px solid #40384d;
+  border-radius: 12px;
+  background: #1d1a27;
+  padding: 10px 12px;
+  box-shadow: 0 1px 0 rgb(255 255 255 / 4%) inset;
+}
+
+.skeleton-assistant-row {
+  border-radius: 10px;
+  background: rgb(124 92 255 / 5%);
+  padding: 8px 12px;
+  opacity: 0.42;
+}
+
+.skeleton-tool-row {
+  grid-template-columns: minmax(120px, 0.22fr) minmax(180px, 0.46fr);
+  align-items: center;
+  width: 100%;
+  border: 1px solid #292b34;
+  border-radius: 12px;
+  background: #14151a;
+  padding: 11px 13px;
+  opacity: 0.34;
+}
+
+.skeleton-assistant-row.tail {
+  opacity: 0.24;
+}
+
+.transcript-skeleton-panel .skeleton-line {
+  height: 14px;
+}
+
+.transcript-skeleton-panel .skeleton-title {
+  width: 30%;
+  height: 9px;
+}
+
+.transcript-skeleton-panel .skeleton-line.short {
   width: 72%;
 }
 
-.init-skeleton-line.shorter {
-  width: 40%;
+.transcript-skeleton-panel .skeleton-line.shorter {
+  width: 46%;
 }
 
-.init-panel .skeleton-line:nth-child(1) {
+.skeleton-user-bubble .skeleton-title {
+  width: 36%;
+}
+
+.skeleton-tool-title {
+  width: 100%;
+  height: 10px;
+}
+
+.skeleton-tool-target {
+  width: 100%;
+  height: 10px;
+}
+
+.transcript-skeleton-row:nth-child(1) .skeleton-line {
   --sk-delay: 0ms;
 }
 
-.init-panel .skeleton-line:nth-child(2) {
-  --sk-delay: 100ms;
+.transcript-skeleton-row:nth-child(2) .skeleton-line {
+  --sk-delay: 120ms;
 }
 
-.init-panel .skeleton-line:nth-child(3) {
-  --sk-delay: 200ms;
+.transcript-skeleton-row:nth-child(3) .skeleton-line {
+  --sk-delay: 240ms;
 }
 
-.init-panel .skeleton-line:nth-child(4) {
-  --sk-delay: 300ms;
-}
-
-.init-panel .skeleton-line:nth-child(5) {
-  --sk-delay: 400ms;
+.transcript-skeleton-row:nth-child(4) .skeleton-line {
+  --sk-delay: 360ms;
 }
 
 @keyframes skeleton-sweep {
@@ -4983,6 +5056,12 @@ textarea::placeholder {
     transition-duration: 1ms;
   }
 
+  .startup-init-panel,
+  .in-project-init-panel {
+    opacity: 1;
+    transform: translate(var(--skeleton-x, 0), 0);
+  }
+
   .thinking-block.is-streaming .thinking-trigger .thinking-label::after {
     animation: none;
     opacity: 1;
@@ -5186,7 +5265,7 @@ textarea::placeholder {
 
   .init-workbench,
   .session-loading-workbench {
-    padding: 0 12px;
+    padding: 14px 12px var(--composer-reserved-height, 270px);
   }
 
   .session-loading-panel {
@@ -5237,7 +5316,11 @@ textarea::placeholder {
   .startup-init-panel,
   .in-project-init-panel {
     left: 50vw;
-    width: min(340px, calc(100vw - 24px));
+    width: calc(100vw - 24px);
+  }
+
+  .startup-init-panel {
+    top: 86px;
   }
 
   .startup-composer-docking .start-composer {
