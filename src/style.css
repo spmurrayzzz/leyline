@@ -1887,6 +1887,8 @@ h1 {
 
 .start-composer {
   position: relative;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -2266,6 +2268,7 @@ h1 {
 .start-composer-bar {
   display: grid;
   min-width: 0;
+  margin-top: auto;
   padding: 0;
 }
 
