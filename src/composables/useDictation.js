@@ -1,8 +1,18 @@
 import { computed, onBeforeUnmount, ref } from 'vue'
 
+function isElectron() {
+  if (typeof navigator === 'undefined') return false
+  return /\bElectron\//.test(navigator.userAgent)
+}
+
 function recognitionConstructor() {
-  if (typeof window === 'undefined') return null
+  if (typeof window === 'undefined' || isElectron()) return null
   return window.SpeechRecognition || window.webkitSpeechRecognition || null
+}
+
+function unsupportedMessage() {
+  if (isElectron()) return 'Dictation is not supported in Electron'
+  return 'Dictation is not supported in this browser'
 }
 
 function dictationErrorMessage(error) {
@@ -118,6 +128,7 @@ export function useDictation(options) {
     dictationError: error,
     dictationListening: listening,
     dictationSupported: supported,
+    dictationUnsupportedMessage: unsupportedMessage,
     stopDictation,
     toggleDictation,
   }

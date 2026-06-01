@@ -131,6 +131,7 @@ const {
   dictationError,
   dictationListening,
   dictationSupported,
+  dictationUnsupportedMessage,
   stopDictation,
   toggleDictation,
 } = useDictation({
@@ -143,9 +144,7 @@ const dictationButtonDisabled = computed(() => {
   return inputDisabled.value && !dictationListening.value
 })
 const dictationTitle = computed(() => {
-  if (!dictationSupported.value) {
-    return 'Dictation is not supported in this browser'
-  }
+  if (!dictationSupported.value) return dictationUnsupportedMessage()
   if (dictationListening.value) return 'Stop dictation'
   return dictationError.value || 'Start dictation'
 })
