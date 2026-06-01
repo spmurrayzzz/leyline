@@ -1,7 +1,8 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useDictation } from '../composables/useDictation'
-import { formatMode, modelChip } from '../lib/format'
+import ModelPicker from './ModelPicker.vue'
+import { formatMode } from '../lib/format'
 
 const props = defineProps({
   agentRunning: Boolean,
@@ -287,40 +288,21 @@ function updateDraft(event) {
       <div class="composer-primary-row">
         <div class="composer-row-spacer"></div>
         <div class="composer-actions">
-          <div class="model-picker">
-            <button
-              class="composer-chip model-picker-button"
-              type="button"
-              :disabled="agentRunning
-                || compacting
-                || promptSubmitting
-                || reloadingSession
-                || switchingModel"
-              @click="emit('toggle-picker', 'model')"
-            >
-              <span class="model-label desktop-label">
-                {{ currentModelLabel }}
-              </span>
-              <span class="model-label mobile-label">
-                {{ currentMobileModelLabel }}
-              </span>
-              <span class="model-caret">▾</span>
-            </button>
-            <Transition name="composer-popover">
-              <div v-if="modelPickerOpen" class="model-menu">
-                <button
-                  v-for="model in availableModels"
-                  :key="modelKey(model)"
-                  type="button"
-                  :class="{ active: modelKey(model) === selectedModelKey }"
-                  @click="emit('select-model', model)"
-                >
-                  <span>{{ modelChip(model) }}</span>
-                  <span v-if="modelKey(model) === selectedModelKey">✓</span>
-                </button>
-              </div>
-            </Transition>
-          </div>
+          <ModelPicker
+            :available-models="availableModels"
+            :current-mobile-model-label="currentMobileModelLabel"
+            :current-model-label="currentModelLabel"
+            :disabled="agentRunning
+              || compacting
+              || promptSubmitting
+              || reloadingSession
+              || switchingModel"
+            :model-key="modelKey"
+            :open="modelPickerOpen"
+            :selected-model-key="selectedModelKey"
+            @select="emit('select-model', $event)"
+            @toggle="emit('toggle-picker', 'model')"
+          />
           <div class="model-picker small-picker">
             <button
               class="composer-chip model-picker-button"

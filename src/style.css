@@ -4765,6 +4765,50 @@ textarea::placeholder {
   transform-origin: bottom left;
 }
 
+.model-search-menu {
+  max-height: 310px;
+}
+
+.model-search-field {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid rgb(255 255 255 / 5%);
+  background: #111018;
+  padding: 9px 10px;
+  color: var(--muted);
+}
+
+.model-search-field input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #2b2637;
+  border-radius: 9px;
+  background: #17131f;
+  padding: 7px 9px;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
+  outline: none;
+  caret-color: var(--accent);
+}
+
+.model-search-field input:focus {
+  border-color: #4a415f;
+}
+
+.model-menu-empty {
+  padding: 16px 12px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
 .small-menu {
   width: 190px;
 }
