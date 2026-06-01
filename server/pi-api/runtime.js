@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { mkdir, rename } from 'node:fs/promises'
 import {
   basename,
@@ -58,6 +58,13 @@ const BUNDLED_MEMORY_EXTENSION = resolve(
   'memory',
   'index.ts',
 )
+const BUNDLED_LEYLINE_SYSTEM_PROMPT = resolve(
+  __dirname,
+  '..',
+  '..',
+  '.pi',
+  'LEYLINE_SYSTEM.md',
+)
 
 let activeHandle
 let activeRuntime
@@ -76,6 +83,13 @@ const events = createEventHub({
 process.env.PI_CODING_AGENT ??= 'true'
 
 const ONE_AT_A_TIME = 'one-at-a-time'
+
+function appendLeylineSystemPrompt(base) {
+  if (!existsSync(BUNDLED_LEYLINE_SYSTEM_PROMPT)) return base
+  const prompt = readFileSync(BUNDLED_LEYLINE_SYSTEM_PROMPT, 'utf8').trim()
+  if (!prompt || base.includes(prompt)) return base
+  return [...base, prompt]
+}
 
 function preferBundledExtensions(result) {
   const bundledCommands = new Map([
@@ -112,6 +126,7 @@ const createRuntime = async ({ cwd, sessionManager, sessionStartEvent }) => {
         BUNDLED_MEMORY_EXTENSION,
       ],
       extensionsOverride: preferBundledExtensions,
+      appendSystemPromptOverride: appendLeylineSystemPrompt,
     },
   })
   const runtime = {
