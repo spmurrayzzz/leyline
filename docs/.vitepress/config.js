@@ -52,7 +52,7 @@ export default defineConfig({
             link: '/user-guide/images-and-previews',
           },
           {
-            text: 'Editing, forking, and compaction',
+            text: 'Editing, forking, resetting, and compaction',
             link: '/user-guide/editing-forking-compaction',
           },
           { text: 'Export', link: '/user-guide/export' },
@@ -67,7 +67,7 @@ export default defineConfig({
           { text: 'Electron development', link: '/electron/development' },
           { text: 'Packaging', link: '/electron/packaging' },
           { text: 'Environment handling', link: '/electron/environment' },
-          { text: 'Window state', link: '/electron/window-state' },
+          { text: 'Windows and state management', link: '/electron/window-state' },
         ],
       },
       {
