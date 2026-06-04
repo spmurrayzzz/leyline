@@ -3,7 +3,9 @@ export function createPiApiHandler(api) {
     activeSessionDto,
     bashSession,
     compactSession,
+    createMemory,
     createNewSession,
+    deleteMemories,
     editSessionPrompt,
     exportFilename,
     exportSessionDetail,
@@ -13,6 +15,7 @@ export function createPiApiHandler(api) {
     interruptSession,
     json,
     listSessions,
+    listVisibleMemories,
     openEventStream,
     promptSession,
     readDirectory,
@@ -23,6 +26,7 @@ export function createPiApiHandler(api) {
     resolveSession,
     runtimeHandleForId,
     runtimeState,
+    setMemoryStatus,
     setRolloutFeedback,
     setSessionMode,
     setSessionModel,
@@ -32,6 +36,7 @@ export function createPiApiHandler(api) {
     toActiveSessionDetailDto,
     toSessionDto,
     trashSession,
+    updateMemory,
     renderSessionExportHtml,
   } = api
 
@@ -235,6 +240,81 @@ async function piApiHandler(req, res) {
         }
   
         return openEventStream(req, res)
+      }
+
+      if (url.pathname === '/memories') {
+        if (req.method === 'GET') {
+          return json(res, await listVisibleMemories({
+            cwd: url.searchParams.get('cwd'),
+            sessionPath: url.searchParams.get('sessionPath'),
+          }))
+        }
+
+        if (req.method === 'POST') {
+          const body = await readJson(req)
+          const memory = await createMemory({
+            contentMd: body.contentMd,
+            cwd: body.cwd,
+            scope: body.scope,
+            sessionPath: body.sessionPath,
+            tags: body.tags,
+          })
+          return json(res, { ok: true, memory })
+        }
+
+        if (req.method === 'DELETE') {
+          const body = await readJson(req)
+          const memories = await deleteMemories({
+            cwd: body.cwd,
+            ids: body.ids,
+            sessionPath: body.sessionPath,
+          })
+          return json(res, { ok: true, memories })
+        }
+
+        return json(res, { error: 'Method not allowed' }, 405)
+      }
+
+      if (url.pathname === '/memories/status') {
+        if (req.method !== 'POST') {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+
+        const body = await readJson(req)
+        const memories = await setMemoryStatus({
+          cwd: body.cwd,
+          ids: body.ids,
+          sessionPath: body.sessionPath,
+          status: body.status,
+        })
+        return json(res, { ok: true, memories })
+      }
+
+      const memoryMatch = url.pathname.match(/^\/memories\/([^/]+)$/)
+      if (memoryMatch) {
+        if (req.method === 'PATCH') {
+          const body = await readJson(req)
+          const memory = await updateMemory({
+            contentMd: body.contentMd,
+            cwd: body.cwd,
+            id: decodeURIComponent(memoryMatch[1]),
+            sessionPath: body.sessionPath,
+            tags: body.tags,
+          })
+          return json(res, { ok: true, memory })
+        }
+
+        if (req.method === 'DELETE') {
+          const body = await readJson(req)
+          const memories = await deleteMemories({
+            cwd: body.cwd,
+            ids: [decodeURIComponent(memoryMatch[1])],
+            sessionPath: body.sessionPath,
+          })
+          return json(res, { ok: true, memories })
+        }
+
+        return json(res, { error: 'Method not allowed' }, 405)
       }
   
       const scopedActions = [

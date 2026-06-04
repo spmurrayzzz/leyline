@@ -29,6 +29,13 @@ import {
   toSessionDto,
 } from './dtos.js'
 import { html, json, readJson } from './http.js'
+import {
+  createMemory,
+  deleteMemories,
+  listVisibleMemories,
+  setMemoryStatus,
+  updateMemory,
+} from './memories.js'
 import { setRolloutFeedback } from './rollout-feedback.js'
 import { configuredSessionDir, listPersistedSessions } from './sessions.js'
 import {
@@ -646,7 +653,9 @@ export function createPiRuntimeApi() {
   activeSessionDto,
   bashSession,
   compactSession,
+  createMemory,
   createNewSession,
+  deleteMemories,
   editSessionPrompt,
   exportFilename,
   exportSessionDetail,
@@ -656,6 +665,7 @@ export function createPiRuntimeApi() {
   interruptSession,
   json,
   listSessions,
+  listVisibleMemories,
   openEventStream,
   promptSession,
   readDirectory,
@@ -667,6 +677,7 @@ export function createPiRuntimeApi() {
   resolveSession,
   runtimeHandleForId,
   runtimeState,
+  setMemoryStatus,
   setSessionMode,
   setSessionModel,
   setRolloutFeedback,
@@ -676,5 +687,6 @@ export function createPiRuntimeApi() {
   toActiveSessionDetailDto,
   toSessionDto,
   trashSession,
+  updateMemory,
   }
 }

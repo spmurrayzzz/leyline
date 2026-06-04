@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import PierrePreview from './components/PierrePreview.vue'
 import LiveAssistantMessage from './components/LiveAssistantMessage.vue'
 import ProjectBrowser from './components/ProjectBrowser.vue'
+import MemoryInspector from './components/MemoryInspector.vue'
 import SessionComposer from './components/SessionComposer.vue'
 import StartComposer from './components/StartComposer.vue'
 import SessionSidebar from './components/SessionSidebar.vue'
@@ -23,11 +24,16 @@ import {
 } from './lib/format'
 import {
   compactPiSession,
+  createPiMemory,
+  deletePiMemories,
   editPrompt,
+  fetchVisibleMemories,
   interruptPiSession,
   runShellCommand,
   setEntryFeedback,
+  setPiMemoryStatus,
   submitPrompt,
+  updatePiMemory,
 } from './lib/pi-api'
 import {
   imageBlocksFor,
@@ -51,6 +57,16 @@ const draft = ref('')
 const attachedImages = ref([])
 const workbench = ref(null)
 const eventLogOpen = ref(false)
+const memoryOpen = ref(false)
+const memoryDirty = ref(false)
+const memoryLoading = ref(false)
+const memorySaving = ref(false)
+const memoryError = ref('')
+const memoryData = ref({
+  context: {},
+  counts: { active: 0, archived: 0, scopes: {} },
+  memories: [],
+})
 const settingsOpen = ref(false)
 const fullscreenTool = ref(null)
 const promptSubmitting = ref(false)
@@ -132,6 +148,7 @@ let newSessionSettlingTimer = null
 let inProjectDockTimer = null
 let inProjectSettlingTimer = null
 let inProjectNewSessionStartedAt = 0
+let memoryLoadToken = 0
 const liveTurn = useLiveTurnProjection({ onIntent: handleLiveTurnIntent })
 const {
   addTool: upsertLiveTool,
@@ -387,6 +404,10 @@ const topbarSubtitle = computed(() => {
   if (initializing.value) return 'Reading local pi state'
   return selectedSession.value?.cwd || 'Choose a session or start fresh'
 })
+const memoryEnabled = computed(() => {
+  return Boolean(selectedSession.value?.cwd) && !sessionLoading.value
+})
+const memoryActiveCount = computed(() => memoryData.value.counts?.active || 0)
 const isEmptySelectedSession = computed(() => {
   return Boolean(selectedSession.value)
     && entries.value.length === 0
@@ -509,6 +530,12 @@ watch(activeRuntimeSession, (session) => {
 
 watch(selectedSessionId, () => {
   updateNativeWindowCwd()
+  if (selectedSession.value?.cwd) void loadVisibleMemory()
+  else memoryData.value = {
+    context: {},
+    counts: { active: 0, archived: 0, scopes: {} },
+    memories: [],
+  }
   expandedTools.value = new Set()
   expandedSkills.value = new Set()
   editingEntry.value = null
@@ -530,6 +557,10 @@ watch(entries, (newEntries) => {
       }
     }
   }
+})
+
+watch(liveTurnActive, (active, wasActive) => {
+  if (!active && wasActive && memoryOpen.value) void loadVisibleMemory()
 })
 
 watch(composerScannerSourceActive, (active, wasActive) => {
@@ -557,6 +588,7 @@ onMounted(async () => {
   window.addEventListener('leyline:new-session', handleNativeNewSession)
   window.addEventListener('leyline:toggle-terminal', handleNativeToggleTerminal)
   window.addEventListener('leyline:open-settings', handleNativeOpenSettings)
+  window.addEventListener('leyline:toggle-memory', handleNativeToggleMemory)
   window.addEventListener('leyline:toggle-sidebar', handleNativeToggleSidebar)
   window.addEventListener('leyline:escape', handleNativeEscape)
   updateNativeWindowCwd()
@@ -584,6 +616,7 @@ onUnmounted(() => {
   window.removeEventListener('leyline:new-session', handleNativeNewSession)
   window.removeEventListener('leyline:toggle-terminal', handleNativeToggleTerminal)
   window.removeEventListener('leyline:open-settings', handleNativeOpenSettings)
+  window.removeEventListener('leyline:toggle-memory', handleNativeToggleMemory)
   window.removeEventListener('leyline:toggle-sidebar', handleNativeToggleSidebar)
   window.removeEventListener('leyline:escape', handleNativeEscape)
   delete window.__leylineCurrentCwd
@@ -705,6 +738,7 @@ async function createSessionForCwd(cwd) {
 }
 
 async function selectSession(session, options) {
+  if (memoryDirty.value && !confirmDiscardMemoryChanges()) return
   await workspaceSelectSession(session, options)
   sidebarOpen.value = false
 }
@@ -717,6 +751,10 @@ async function handleNativeToggleTerminal() {
 
 function handleNativeOpenSettings() {
   toggleSettingsDrawer()
+}
+
+function handleNativeToggleMemory() {
+  toggleMemoryDrawer()
 }
 
 function handleNativeToggleSidebar() {
@@ -814,13 +852,193 @@ function closeProjectBrowser() {
 }
 
 function toggleSettingsDrawer() {
+  if (memoryDirty.value && !confirmDiscardMemoryChanges()) return
   settingsOpen.value = !settingsOpen.value
   eventLogOpen.value = false
+  memoryOpen.value = false
 }
 
 function toggleEventDrawer() {
+  if (memoryDirty.value && !confirmDiscardMemoryChanges()) return
   eventLogOpen.value = !eventLogOpen.value
   settingsOpen.value = false
+  memoryOpen.value = false
+}
+
+function toggleMemoryDrawer() {
+  if (!memoryEnabled.value && !memoryOpen.value) return
+  if (memoryOpen.value && memoryDirty.value && !confirmDiscardMemoryChanges()) {
+    return
+  }
+  memoryOpen.value = !memoryOpen.value
+  if (memoryOpen.value) {
+    settingsOpen.value = false
+    eventLogOpen.value = false
+    void loadVisibleMemory()
+  }
+}
+
+function closeMemoryDrawer() {
+  if (memoryDirty.value && !confirmDiscardMemoryChanges()) return
+  memoryOpen.value = false
+}
+
+function confirmDiscardMemoryChanges() {
+  const discard = window.confirm('Discard unsaved memory changes?')
+  if (discard) memoryDirty.value = false
+  return discard
+}
+
+async function loadVisibleMemory() {
+  const session = selectedSession.value
+  if (!session?.cwd) return
+  const token = ++memoryLoadToken
+  const sessionKey = `${session.id || ''}:${session.sessionFile || session.path || ''}`
+  memoryLoading.value = true
+  memoryError.value = ''
+  try {
+    const data = await fetchVisibleMemories(session)
+    const current = selectedSession.value
+    const currentKey = `${current?.id || ''}:${current?.sessionFile || current?.path || ''}`
+    if (token === memoryLoadToken && sessionKey === currentKey) {
+      memoryData.value = data
+    }
+  } catch (error) {
+    if (token === memoryLoadToken) {
+      memoryError.value = error.message || 'Failed to load memories'
+    }
+  } finally {
+    if (token === memoryLoadToken) memoryLoading.value = false
+  }
+}
+
+function replaceMemories(memories) {
+  memoryData.value = {
+    ...memoryData.value,
+    memories,
+    counts: memoryCounts(memories),
+  }
+}
+
+function upsertMemory(memory) {
+  const memories = memoryData.value.memories.filter((item) => item.id !== memory.id)
+  replaceMemories([memory, ...memories])
+}
+
+async function createMemory(payload) {
+  if (!selectedSession.value) return
+  memorySaving.value = true
+  memoryError.value = ''
+  try {
+    const { memory } = await createPiMemory(
+      selectedSession.value,
+      payload.scope,
+      payload.contentMd,
+      payload.tags,
+    )
+    upsertMemory(memory)
+  } catch (error) {
+    memoryError.value = error.message || 'Failed to create memory'
+    await loadVisibleMemory()
+  } finally {
+    memorySaving.value = false
+  }
+}
+
+async function updateMemory(payload) {
+  if (!selectedSession.value) return
+  const previous = memoryData.value.memories
+  const memory = previous.find((item) => item.id === payload.id)
+  if (memory) {
+    upsertMemory({
+      ...memory,
+      contentMd: payload.contentMd.trim(),
+      tags: payload.tags,
+      updatedAt: Date.now(),
+    })
+  }
+  memorySaving.value = true
+  memoryError.value = ''
+  try {
+    const { memory: updated } = await updatePiMemory(
+      selectedSession.value,
+      payload.id,
+      payload.contentMd,
+      payload.tags,
+    )
+    upsertMemory(updated)
+  } catch (error) {
+    memoryError.value = error.message || 'Failed to update memory'
+    memoryData.value = { ...memoryData.value, memories: previous }
+  } finally {
+    memorySaving.value = false
+  }
+}
+
+async function archiveMemories(ids) {
+  await setMemoryStatus(ids, 'archived')
+}
+
+async function restoreMemories(ids) {
+  await setMemoryStatus(ids, 'active')
+}
+
+async function setMemoryStatus(ids, status) {
+  if (!selectedSession.value || !ids.length) return
+  const previous = memoryData.value.memories
+  const time = Date.now()
+  replaceMemories(previous.map((memory) => {
+    if (!ids.includes(memory.id)) return memory
+    return {
+      ...memory,
+      archivedAt: status === 'archived' ? time : null,
+      status,
+      updatedAt: time,
+    }
+  }))
+  memoryError.value = ''
+  try {
+    const { memories } = await setPiMemoryStatus(
+      selectedSession.value,
+      ids,
+      status,
+    )
+    replaceMemories(memories)
+  } catch (error) {
+    memoryError.value = error.message || 'Failed to update memories'
+    memoryData.value = { ...memoryData.value, memories: previous }
+  }
+}
+
+async function deleteMemories(ids) {
+  if (!selectedSession.value || !ids.length) return
+  const previous = memoryData.value.memories
+  replaceMemories(previous.filter((memory) => !ids.includes(memory.id)))
+  memoryError.value = ''
+  try {
+    const { memories } = await deletePiMemories(selectedSession.value, ids)
+    replaceMemories(memories)
+  } catch (error) {
+    memoryError.value = error.message || 'Failed to delete memories'
+    memoryData.value = { ...memoryData.value, memories: previous }
+  }
+}
+
+function memoryCounts(memories) {
+  const counts = {
+    active: 0,
+    archived: 0,
+    scopes: {
+      project: { active: 0, archived: 0 },
+      session: { active: 0, archived: 0 },
+      global: { active: 0, archived: 0 },
+    },
+  }
+  for (const memory of memories) {
+    counts[memory.status] += 1
+    counts.scopes[memory.scope][memory.status] += 1
+  }
+  return counts
 }
 
 function isToolExpanded(entry) {
@@ -1685,6 +1903,7 @@ function handleEscape(event) {
   }
   settingsOpen.value = false
   eventLogOpen.value = false
+  if (memoryOpen.value) closeMemoryDrawer()
   closeToolFullscreen()
   closeProjectBrowser()
   cancelDeleteSession()
@@ -1739,6 +1958,7 @@ function closePickerMenus() {
       'session-handoff': sessionHandoff,
       'terminal-open': terminalOpen,
       'event-log-open': eventLogOpen,
+      'memory-open': memoryOpen,
     }"
     :style="{
       '--composer-reserved-height': composerReservedHeight,
@@ -1819,6 +2039,14 @@ function closePickerMenus() {
           </span>
           <span class="topbar-runtime-pill">{{ currentModelLabel }}</span>
           <span class="topbar-runtime-pill">{{ currentThinkingLabel }}</span>
+          <button
+            class="event-log-button"
+            type="button"
+            :disabled="!memoryEnabled"
+            @click="toggleMemoryDrawer"
+          >
+            Memory {{ memoryActiveCount || '' }}
+          </button>
           <template v-if="!isEmptySelectedSession">
             <button
               class="event-log-button"
@@ -2327,6 +2555,28 @@ function closePickerMenus() {
         </div>
       </section>
     </div>
+
+    <Transition name="event-drawer">
+      <div v-if="memoryOpen" class="memory-drawer-slot">
+        <MemoryInspector
+          :context="memoryData.context"
+          :counts="memoryData.counts"
+          :disabled="!memoryEnabled"
+          :error="memoryError"
+          :loading="memoryLoading"
+          :memories="memoryData.memories"
+          :saving="memorySaving"
+          @archive="archiveMemories"
+          @close="closeMemoryDrawer"
+          @create="createMemory"
+          @delete="deleteMemories"
+          @dirty-change="memoryDirty = $event"
+          @refresh="loadVisibleMemory"
+          @restore="restoreMemories"
+          @update="updateMemory"
+        />
+      </div>
+    </Transition>
 
     <Transition name="event-drawer">
       <div v-if="settingsOpen" class="settings-drawer-slot">

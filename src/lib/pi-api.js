@@ -57,6 +57,46 @@ export async function fetchPiRuntimeState(cwd) {
   return data.active
 }
 
+export function fetchVisibleMemories(session) {
+  const params = memorySessionParams(session)
+  return apiRequest(
+    `/api/pi/memories?${params}`,
+    'Failed to load memories',
+  )
+}
+
+export function createPiMemory(session, scope, contentMd, tags = []) {
+  return apiRequest('/api/pi/memories', 'Failed to create memory', {
+    method: 'POST',
+    body: memoryBody(session, { contentMd, scope, tags }),
+  })
+}
+
+export function updatePiMemory(session, memoryId, contentMd, tags = []) {
+  return apiRequest(
+    `/api/pi/memories/${encodeURIComponent(memoryId)}`,
+    'Failed to update memory',
+    {
+      method: 'PATCH',
+      body: memoryBody(session, { contentMd, tags }),
+    },
+  )
+}
+
+export function setPiMemoryStatus(session, ids, status) {
+  return apiRequest('/api/pi/memories/status', 'Failed to update memories', {
+    method: 'POST',
+    body: memoryBody(session, { ids, status }),
+  })
+}
+
+export function deletePiMemories(session, ids) {
+  return apiRequest('/api/pi/memories', 'Failed to delete memories', {
+    method: 'DELETE',
+    body: memoryBody(session, { ids }),
+  })
+}
+
 export function submitPrompt(sessionId, text, images = [], streamingBehavior) {
   return apiRequest(
     sessionActionUrl(sessionId, 'prompt'),
@@ -175,6 +215,22 @@ export async function switchPiThinkingLevel(sessionId, level) {
     },
   )
   return data.active
+}
+
+function memorySessionParams(session) {
+  const params = new URLSearchParams()
+  if (session?.cwd) params.set('cwd', session.cwd)
+  const path = session?.sessionFile || session?.path
+  if (path) params.set('sessionPath', path)
+  return params.toString()
+}
+
+function memoryBody(session, body) {
+  return {
+    ...body,
+    cwd: session?.cwd || '',
+    sessionPath: session?.sessionFile || session?.path || '',
+  }
 }
 
 function sessionActionUrl(sessionId, action) {
