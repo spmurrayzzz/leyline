@@ -34,11 +34,12 @@ const query = ref('')
 const input = ref(null)
 
 const filteredModels = computed(() => {
-  const terms = tokenize(query.value)
+  const rawQuery = query.value.trim().toLowerCase()
+  const terms = tokenize(rawQuery)
   if (!terms.length) return props.availableModels
 
   return props.availableModels
-    .map((model) => ({ model, score: modelScore(model, terms) }))
+    .map((model) => ({ model, score: modelScore(model, terms, rawQuery) }))
     .filter((item) => item.score > 0)
     .sort((a, b) => {
       return b.score - a.score || modelChip(a.model).localeCompare(
@@ -57,7 +58,7 @@ watch(() => props.open, async (open) => {
   input.value?.focus()
 })
 
-function modelScore(model, terms) {
+function modelScore(model, terms, rawQuery) {
   const fields = [
     modelChip(model),
     model.name || '',
@@ -65,7 +66,9 @@ function modelScore(model, terms) {
     model.id || '',
   ]
   const tokens = [...new Set(fields.flatMap(tokenize))]
-  let total = 0
+  let total = Math.max(
+    ...fields.map((field) => exactScore(field, rawQuery, 200)),
+  )
 
   for (const term of terms) {
     const score = Math.max(
@@ -83,10 +86,12 @@ function tokenize(value) {
   return String(value || '').toLowerCase().match(/[a-z0-9]+/g) || []
 }
 
-function exactScore(value, term) {
+function exactScore(value, term, bonus = 0) {
   const text = String(value || '').toLowerCase()
   if (!text.includes(term)) return 0
-  return text.startsWith(term) ? term.length + 30 : term.length + 20
+  return text.startsWith(term)
+    ? term.length + 30 + bonus
+    : term.length + 20 + bonus
 }
 
 function selectModel(model) {
