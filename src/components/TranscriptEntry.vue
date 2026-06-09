@@ -31,6 +31,7 @@ const emit = defineEmits([
   'fork',
   'mark-feedback',
   'reset',
+  'retry',
   'open-tool-fullscreen',
   'toggle-skill',
   'toggle-tool',
@@ -294,6 +295,16 @@ function saveFeedbackNote(entry) {
         @click="emit('edit', entry)"
       >
         ✎
+      </button>
+      <button
+        v-if="canEditEntry(entry)"
+        class="copy-button"
+        type="button"
+        title="Retry request"
+        aria-label="retry this request"
+        @click="emit('retry', entry)"
+      >
+        ↻
       </button>
       <button
         class="copy-button"

@@ -3097,7 +3097,7 @@ h1 {
   transition-timing-function: var(--ease-accelerate);
 }
 
-.reset-button svg {
+.copy-button svg {
   width: 14px;
   height: 14px;
   stroke: currentColor;

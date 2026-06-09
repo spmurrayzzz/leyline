@@ -1612,6 +1612,59 @@ function startEditingEntry(entry) {
   nextTick(() => composerRef.value?.focus())
 }
 
+async function retryEntry(entry) {
+  if (agentRunning.value
+    || compactingContext.value
+    || promptSubmitting.value
+    || reloadingSession.value
+    || sessionLoading.value
+    || sessionSwitching.value
+    || sessionActivating.value
+    || !entry?.id) return
+
+  const target = persistedEditingEntry(entry)
+  if (!target) {
+    promptError.value = 'Wait for this message to finish saving before retrying.'
+    return
+  }
+  if (target.role !== 'user') return
+
+  const text = (target.text || textFromBlocks(messageBlocksFor(target))).trim()
+  const images = imageBlocksFor(target).map(({ preview, ...image }) => image)
+  if (!text && images.length === 0) return
+
+  const sessionId = selectedSessionId.value
+  const previousDetail = sessionDetail.value
+  resetLiveState()
+  trimSessionToEntry(target.id)
+  stickToBottom.value = true
+  hasNewOutput.value = false
+  pulseComposerCommit()
+  const localEntry = beginUserTurn(text, images)
+  promptSubmitting.value = true
+  promptError.value = ''
+  closePickerMenus()
+  await scrollToLatest()
+
+  try {
+    const data = await editPrompt(sessionId, target.id, text, images)
+    if (selectedSessionId.value === sessionId) {
+      if (data.active) activeRuntimeSession.value = data.active
+      setAgentRunning(true, 'Thinking…')
+    }
+  } catch (error) {
+    if (selectedSessionId.value === sessionId) {
+      sessionDetail.value = previousDetail
+      resetLiveState()
+      removeOptimisticEntry(localEntry)
+      promptError.value = error.message
+    }
+  } finally {
+    promptSubmitting.value = false
+    refocusComposer()
+  }
+}
+
 function persistedEditingEntry(entry) {
   if (!entry) return null
   if (!isLocalEntry(entry)) return entry
@@ -2319,6 +2372,7 @@ function closePickerMenus() {
             @fork="forkSession"
             @mark-feedback="markEntryFeedback"
             @reset="resetSessionToEntry"
+            @retry="retryEntry"
             @open-tool-fullscreen="openToolFullscreen"
             @toggle-skill="toggleSkill"
             @toggle-tool="toggleTool"
@@ -2348,6 +2402,7 @@ function closePickerMenus() {
               @fork="forkSession"
               @mark-feedback="markEntryFeedback"
               @reset="resetSessionToEntry"
+              @retry="retryEntry"
               @toggle-skill="toggleSkill"
             />
 
