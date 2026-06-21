@@ -1,0 +1,336 @@
+.main-pane {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-width: 0;
+  min-height: 0;
+  background: #111217;
+}
+
+.leyline-app.start-state:not(.new-session-transition) .main-pane {
+  grid-template-rows: 0 1fr;
+}
+
+.runtime-chrome {
+  position: relative;
+  z-index: 3;
+  grid-row: 1;
+  border-bottom: 1px solid var(--border-soft);
+  background: #0f1014;
+}
+
+.new-session-transition .runtime-chrome {
+  animation: session-chrome-enter 520ms var(--ease-emphasized) both;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  min-width: 0;
+  min-height: 48px;
+  background: #0f1014;
+  padding: 0 max(44px, calc((100% - var(--content-max)) / 2));
+}
+
+.composer-bar {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+h1 {
+  overflow: hidden;
+  min-width: 0;
+  margin: 0;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar-project {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.topbar-project strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar-project span {
+  overflow: hidden;
+  max-width: 560px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-pill {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #181922;
+  padding: 4px 7px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.changed-header button,
+.composer-bar button {
+  border-color: var(--border);
+  background: var(--panel-soft);
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.topbar-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.running-pill,
+.topbar-runtime-pill,
+.goal-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  line-height: 1;
+}
+
+.running-pill {
+  border: 1px solid var(--accent-border);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  padding: 2px 7px;
+  color: #bfb5ff;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.topbar-runtime-pill {
+  overflow: hidden;
+  max-width: 180px;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  background: #17181e;
+  padding: 3px 8px;
+  color: #a3a3a3;
+  text-overflow: ellipsis;
+}
+
+.goal-pill {
+  border: 1px solid rgba(125, 211, 252, 0.28);
+  border-radius: 999px;
+  background: rgba(14, 116, 144, 0.16);
+  padding: 3px 8px;
+  color: #9bdcf5;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.context-usage-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+}
+
+.context-usage-pill i {
+  overflow: hidden;
+  display: block;
+  width: 34px;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.context-usage-pill b {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #8b7cf6;
+}
+
+.context-usage-pill.is-warning b {
+  background: #f59e0b;
+}
+
+.context-usage-pill.is-danger b {
+  background: #f87171;
+}
+
+.context-usage-pill:hover {
+  border-color: var(--accent-border);
+  background: #201a32;
+  color: var(--text);
+  transition-duration: var(--motion-quick);
+  transition-timing-function: var(--ease-accelerate);
+}
+
+.event-log-button,
+.delete-session-button {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel-soft);
+  padding: 3px 8px;
+  color: var(--muted-strong);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.event-log-button {
+  text-decoration: none;
+}
+
+.goal-control-plane {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-top: 1px solid rgba(125, 211, 252, 0.12);
+  background: rgba(14, 116, 144, 0.08);
+  padding: 9px max(44px, calc((100% - var(--content-max)) / 2));
+}
+
+.goal-control-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  color: #7fadb9;
+  font-size: 12px;
+}
+
+.goal-control-kicker {
+  border: 1px solid rgba(125, 211, 252, 0.24);
+  border-radius: 999px;
+  background: rgba(14, 116, 144, 0.16);
+  padding: 2px 7px;
+  color: #9bdcf5;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.goal-control-main strong {
+  overflow: hidden;
+  color: #d6f3ff;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.goal-control-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.goal-control-actions button {
+  border: 1px solid rgba(125, 211, 252, 0.24);
+  border-radius: 999px;
+  background: rgba(9, 25, 33, 0.82);
+  padding: 4px 9px;
+  color: #bfeeff;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.goal-control-actions button:hover:not(:disabled) {
+  border-color: rgba(125, 211, 252, 0.44);
+  background: rgba(14, 116, 144, 0.2);
+  transition-duration: var(--motion-quick);
+  transition-timing-function: var(--ease-accelerate);
+}
+
+.goal-control-actions button:disabled {
+  opacity: 0.55;
+}
+
+.delete-session-button {
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 24px;
+  padding: 0;
+}
+
+.event-log-button:hover,
+.delete-session-button:hover {
+  border-color: var(--accent-border);
+  color: #e2e3e8;
+  transition-duration: var(--motion-quick);
+  transition-timing-function: var(--ease-accelerate);
+}
+
+.delete-session-button:hover {
+  border-color: rgb(248 113 113 / 44%);
+  color: #fca5a5;
+}
+
+.delete-session-button:disabled {
+  opacity: 0.6;
+}
+
+.event-log-row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 120px) 1fr;
+  gap: 7px;
+  align-items: center;
+  min-height: 28px;
+  border-top: 1px solid rgb(255 255 255 / 5%);
+  color: #7f818b;
+  font-size: 10px;
+}
+
+.event-log-row time {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.event-log-row code {
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 5px;
+  background: rgb(255 255 255 / 3%);
+  padding: 1px 5px;
+  color: #b9bac4;
+  font-family: inherit;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.event-log-row span {
+  overflow: hidden;
+  color: #9a9ca6;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.event-log-empty {
+  border-top: 1px solid rgb(255 255 255 / 5%);
+  padding-top: 10px;
+  color: var(--muted);
+  font-size: 11px;
+}
+

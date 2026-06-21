@@ -1,0 +1,574 @@
+@media (prefers-reduced-motion: reduce) {
+  .live-row-enter-active,
+  .live-row-leave-active,
+  .live-row-move {
+    transition: none;
+  }
+
+  .leyline-app,
+  .sidebar,
+  .sidebar-collapse-button,
+  .sidebar-reveal-button,
+  .section-action,
+  .search-field,
+  .project-title button,
+  .project-caret,
+  .new-session-button,
+  .session,
+  .session time,
+  .session-delete-button,
+  .settings-button,
+  .project-sessions-enter-active,
+  .project-sessions-leave-active,
+  .copy-button,
+  .transcript-message,
+  .session-switching > .message,
+  .session-switching > .tool-card,
+  .session-switching > .live-stack,
+  .session-switching > .empty-session-panel,
+  .session-switching > .start-panel,
+  .workbench > .message,
+  .workbench > .tool-card,
+  .workbench > .live-stack,
+  .workbench > .empty-session-panel,
+  .workbench > .session-loading-panel,
+  .workbench > .init-panel,
+  .workbench > .start-panel,
+  .workbench > .error-note,
+  .live-row-enter-active,
+  .live-row-leave-active,
+  .skill-summary,
+  .tool-card,
+  .tool-card-header > span:first-child,
+  .chevron,
+  .thinking-block,
+  .thinking-trigger,
+  .thinking-trigger .chevron,
+  .thinking-expand-wrapper,
+  .thinking-expand-inner,
+  .tool-context-pill,
+  .tool-preview-clip,
+  .tool-preview-cta,
+  .tool-expand-wrapper,
+  .tool-expand-inner,
+  .skill-expand-wrapper,
+  .skill-expand-inner,
+  .tool-fullscreen-enter-active,
+  .tool-fullscreen-leave-active,
+  .tool-fullscreen-enter-active .tool-fullscreen,
+  .tool-fullscreen-leave-active .tool-fullscreen,
+  .tool-fullscreen-header button,
+  .start-composer,
+  .composer,
+  .shell-prompt-glyph,
+  .shell-glyph-enter-active,
+  .shell-glyph-leave-active,
+  .start-headline-text,
+  .empty-session-panel h2,
+  textarea,
+  .slash-picker button,
+  .slash-command-name,
+  .slash-command-description,
+  .slash-command-source,
+  .attachment-chip,
+  .attachment-chip img,
+  .attachment-chip button,
+  .composer-bar .terminal-toggle-button,
+  .composer-context-row,
+  .start-project-button,
+  .start-send-button,
+  .start-project-menu button,
+  .editing-banner button,
+  .composer-chip,
+  .model-caret,
+  .model-menu button,
+  .send-button,
+  .composer-actions .dictation-button,
+  .event-drawer-enter-active,
+  .event-drawer-leave-active,
+  .composer-popover-enter-active,
+  .composer-popover-leave-active,
+  .composer-reveal-enter-active,
+  .composer-reveal-leave-active {
+    transition-duration: 1ms;
+  }
+
+  .message-enter,
+  .submit-handoff-message,
+  .live-user-item > .message,
+  .live-assistant-item.is-streaming > .message,
+  .live-tool-card::before,
+  .live-tool-card.is-completed,
+  .composer.composer-committing .composer-input-shell,
+  .composer.composer-committing .send-button:not(.stop-button) {
+    animation: none;
+  }
+
+  .sidebar-collapse-button:hover,
+  .sidebar-reveal-button:hover,
+  .section-action:hover,
+  .settings-button:hover:not(:disabled),
+  .copy-button:hover,
+  .skill-summary:hover,
+  .transcript-tool:hover,
+  .tool-preview-cta:hover,
+  .tool-fullscreen-header button:hover,
+  .attachment-chip button:hover,
+  .composer-bar .terminal-toggle-button:hover,
+  .start-project-button:hover,
+  .start-composer-chip:hover,
+  .editing-banner button:hover,
+  .model-picker-button:hover .model-caret,
+  .composer-actions .dictation-button:hover:not(:disabled),
+  .composer-actions .dictation-button.active,
+  .send-button:hover:not(:disabled),
+  .start-send-button:hover:not(:disabled) {
+    transform: none;
+  }
+
+  .session-switching > .message,
+  .session-switching > .tool-card,
+  .session-switching > .live-stack,
+  .session-switching > .empty-session-panel,
+  .session-switching > .start-panel,
+  .composer.is-switching {
+    transform: none;
+    filter: none;
+  }
+
+  .tool-expand-wrapper,
+  .skill-expand-wrapper,
+  .thinking-expand-wrapper {
+    transition-duration: 1ms;
+  }
+
+  .startup-init-panel,
+  .in-project-init-panel {
+    opacity: 1;
+    transform: translate(var(--skeleton-x, 0), 0);
+  }
+
+  .thinking-block.is-streaming .thinking-trigger .thinking-label::after {
+    animation: none;
+    opacity: 1;
+  }
+
+  .tool-fullscreen-enter-from .tool-fullscreen,
+  .tool-fullscreen-leave-to .tool-fullscreen,
+  .startup-workbench .start-headline-text,
+  .in-project-startup-workbench .empty-session-panel h2,
+  .composer-popover-enter-from,
+  .composer-popover-leave-to,
+  .composer-reveal-enter-from,
+  .composer-reveal-leave-to,
+  .project-sessions-enter-from,
+  .project-sessions-leave-to,
+  .shell-glyph-enter-from,
+  .shell-glyph-leave-to {
+    transform: none;
+    filter: none;
+  }
+
+  .live-row-enter-from,
+  .live-row-leave-to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+
+  .new-session-transition:not(.start-state) .runtime-chrome,
+  .new-session-transition:not(.start-state) .workbench > .message,
+  .new-session-transition:not(.start-state) .workbench > .tool-card,
+  .new-session-transition:not(.start-state) .workbench > .live-stack,
+  .new-session-transition:not(.start-state) .workbench > .empty-session-panel,
+  .new-session-transition:not(.start-state) .composer,
+  .new-session-transition:not(.start-state) .composer-fade,
+  .in-project-new-session-transition .workbench > .message,
+  .in-project-new-session-transition .workbench > .tool-card,
+  .in-project-new-session-transition .workbench > .live-stack,
+  .in-project-new-session-transition .composer-fade,
+  .startup-composer-docking .start-composer,
+  .in-project-composer-docking .composer.empty-session-composer,
+  .activity-scanning-composer::before,
+  .activity-scanner-settling::after,
+  .skeleton-line::after,
+  .startup-init-panel,
+  .in-project-init-panel,
+  .thought-ellipsis span,
+  .live-tool-spinner,
+  .live-user-item > .message,
+  .live-assistant-item.is-streaming > .message,
+  .live-tool-card::before,
+  .live-tool-card.is-completed,
+  .session-loading-mark,
+  .submit-handoff-message,
+  .composer.composer-committing .composer-input-shell,
+  .composer.composer-committing .send-button:not(.stop-button) {
+    animation: none;
+  }
+}
+
+@media (max-width: 760px) {
+  :root {
+    --content-max: 100%;
+    --start-composer-width: calc(100vw - 24px);
+    --empty-session-composer-width: calc(100vw - 24px);
+    --docked-composer-width: calc(100vw - 20px);
+    --terminal-drawer-height: min(46vh, 310px);
+  }
+
+  .leyline-app,
+  .leyline-app.sidebar-hidden,
+  .leyline-app.event-log-open,
+  .leyline-app.sidebar-hidden.event-log-open {
+    grid-template-columns: 1fr;
+    overflow: hidden;
+  }
+
+  .leyline-app.sidebar-hidden .sidebar {
+    width: min(86vw, 320px);
+    min-width: 0;
+    border-right: 1px solid var(--border-soft);
+    padding: 18px 14px 14px;
+    pointer-events: auto;
+  }
+
+  .sidebar-reveal-button,
+  .sidebar-collapse-button {
+    display: none;
+  }
+
+  .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 30;
+    width: min(86vw, 320px);
+    transform: translateX(-100%);
+    transition: transform var(--motion-base) var(--ease-emphasized);
+    box-shadow: 18px 0 50px rgb(0 0 0 / 46%);
+  }
+
+  .sidebar-open .sidebar {
+    transform: translateX(0);
+  }
+
+  .sidebar-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    border: 0;
+    background: rgb(0 0 0 / 56%);
+  }
+
+  .main-pane {
+    grid-template-rows: auto 1fr;
+    width: 100vw;
+  }
+
+  .topbar {
+    gap: 10px;
+    min-height: 56px;
+    padding: 0 12px;
+  }
+
+  .goal-control-plane {
+    align-items: flex-start;
+    padding: 8px 12px;
+  }
+
+  .goal-control-main {
+    display: grid;
+    gap: 5px;
+  }
+
+  .goal-control-actions {
+    padding-top: 1px;
+  }
+
+  .mobile-sidebar-button {
+    display: grid;
+    flex: 0 0 auto;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--panel-soft);
+    color: var(--muted-strong);
+    font-size: 16px;
+  }
+
+  .topbar-project {
+    flex: 1 1 auto;
+  }
+
+  .topbar-project span {
+    max-width: none;
+  }
+
+  .topbar-meta {
+    gap: 6px;
+    overflow-x: auto;
+    flex: 0 1 auto;
+    max-width: 46vw;
+    scrollbar-width: none;
+  }
+
+  .topbar-meta::-webkit-scrollbar {
+    display: none;
+  }
+
+  .topbar-meta > span:not(.running-pill) {
+    display: none;
+  }
+
+  .event-log-button {
+    flex: 0 0 auto;
+    padding: 4px 8px;
+  }
+
+  .memory-drawer-slot,
+  .settings-drawer-slot,
+  .event-log-slot {
+    width: min(420px, 100vw);
+  }
+
+  .memory-drawer,
+  .settings-drawer,
+  .event-log-drawer {
+    width: min(420px, 100vw);
+    min-width: 0;
+    box-shadow: -18px 0 50px rgb(0 0 0 / 38%);
+  }
+
+  .event-log-row {
+    grid-template-columns: 58px 100px 1fr;
+    gap: 6px;
+  }
+
+  .workbench {
+    padding: 14px 12px var(--composer-reserved-height, 270px);
+  }
+
+  .init-workbench,
+  .session-loading-workbench {
+    padding: 14px 12px var(--composer-reserved-height, 270px);
+  }
+
+  .session-loading-panel {
+    width: min(360px, calc(100% - 24px));
+  }
+
+  .message,
+  .tool-card,
+  .event-row,
+  .empty-workbench {
+    width: 100%;
+  }
+
+
+  .user-message {
+    margin-top: 16px;
+    padding: 9px 10px;
+  }
+
+  .tool-card-header {
+    gap: 7px;
+  }
+
+  .tool-card-header code {
+    overflow: hidden;
+    min-width: 0;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .composer-fade {
+    height: 166px;
+  }
+
+  .start-panel {
+    width: calc(100vw - 24px);
+  }
+
+  .composer,
+  .start-composer {
+    min-width: 0;
+  }
+
+  .start-composer {
+    width: calc(100vw - 24px);
+  }
+
+  .startup-init-panel,
+  .in-project-init-panel {
+    left: 50vw;
+    width: calc(100vw - 24px);
+  }
+
+  .startup-init-panel {
+    top: 86px;
+  }
+
+  .startup-composer-docking .start-composer {
+    bottom: 10px;
+    left: 50vw;
+    width: calc(100vw - 20px);
+  }
+
+  .in-project-composer-docking .composer.empty-session-composer {
+    bottom: 10px;
+    width: calc(100vw - 20px);
+    max-width: none;
+  }
+
+  .composer {
+    right: 10px;
+    bottom: 10px;
+    left: 10px;
+    width: auto;
+    max-width: none;
+    transform: none;
+    border-radius: 18px;
+  }
+
+  textarea {
+    height: 86px;
+    padding: 14px 14px 6px;
+    font-size: 16px;
+  }
+
+  .shell-prompt-glyph {
+    top: 15px;
+    left: 14px;
+    font-size: 16px;
+  }
+
+  .start-composer.shell-mode-composer textarea,
+  .composer.shell-mode-composer textarea {
+    padding-left: 46px;
+  }
+
+  .composer-bar,
+  .start-composer-bar {
+    gap: 9px;
+    min-height: 42px;
+    padding: 0 10px 10px 14px;
+  }
+
+  .composer-primary-row {
+    gap: 8px;
+  }
+
+  .composer-actions {
+    flex: 1 1 auto;
+    justify-content: flex-end;
+    gap: 13px;
+  }
+
+  .composer-row-spacer {
+    display: none;
+  }
+
+  .composer-context-row {
+    overflow-x: auto;
+    padding-top: 9px;
+    scrollbar-width: none;
+  }
+
+  .composer-context-row::-webkit-scrollbar {
+    display: none;
+  }
+
+  .model-picker,
+  .small-picker {
+    min-width: 0;
+    max-width: none;
+  }
+
+  .model-picker-button,
+  .composer-chip {
+    max-width: none;
+  }
+
+  .composer-context-row > .composer-chip:nth-of-type(n + 2) {
+    display: none;
+  }
+
+  .composer-bar .model-picker-button,
+  .start-composer-bar .model-picker-button {
+    height: 32px;
+    border: 0 !important;
+    background: transparent !important;
+    padding: 0 !important;
+    color: var(--muted-strong);
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .composer-bar .model-picker-button:hover,
+  .start-composer-bar .model-picker-button:hover {
+    color: #d8d1ff;
+  }
+
+  .desktop-label {
+    display: none;
+  }
+
+  .mobile-label {
+    display: block;
+  }
+
+  .model-caret {
+    font-size: 11px;
+    opacity: 0.72;
+  }
+
+  .model-menu {
+    width: min(320px, calc(100vw - 20px));
+  }
+
+  .send-button,
+  .composer-actions .dictation-button {
+    width: 36px;
+    height: 36px;
+    margin-left: 0;
+  }
+
+  .jump-latest-button {
+    right: 16px;
+    bottom: 214px;
+  }
+
+  .terminal-open .workbench {
+    padding-bottom: calc(
+      var(--terminal-drawer-height) + var(--composer-reserved-height, 270px)
+    );
+  }
+
+  .terminal-open .composer-fade {
+    bottom: var(--terminal-drawer-height);
+  }
+
+  .terminal-open .composer {
+    bottom: calc(var(--terminal-drawer-height) + 10px);
+  }
+
+  .terminal-open .jump-latest-button {
+    bottom: calc(var(--terminal-drawer-height) + 214px);
+  }
+
+  .terminal-panel {
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: var(--terminal-drawer-height);
+    border-radius: 16px 16px 0 0;
+  }
+
+  .terminal-header {
+    grid-template-columns: auto 1fr auto auto;
+    gap: 7px;
+  }
+}
