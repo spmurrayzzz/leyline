@@ -1,6 +1,5 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { fuzzyScore } from '../lib/fuzzy'
 import { formatDate } from '../lib/format'
 import { renderedBlock } from '../lib/transcript'
 
@@ -47,9 +46,7 @@ const dirty = computed(() => Boolean(creatingScope.value || editingId.value))
 const matchingMemories = computed(() => {
   const text = query.value.trim()
   if (!text) return props.memories
-  return props.memories.filter((memory) => {
-    return fuzzyScore(memorySearchText(memory), text) > 0
-  })
+  return props.memories.filter((memory) => memoryMatchesSearch(memory, text))
 })
 const selectedMemories = computed(() => {
   return props.memories.filter((memory) => selectedIds.value.has(memory.id))
@@ -202,13 +199,16 @@ function parseTags(value) {
     .filter(Boolean)
 }
 
-function memorySearchText(memory) {
-  return [
+function memoryMatchesSearch(memory, query) {
+  const text = [
     memory.contentMd,
     memory.reasonMd,
     memory.source,
     ...(memory.tags || []),
-  ].filter(Boolean).join(' ')
+  ].filter(Boolean).join(' ').toLowerCase()
+  return query.toLowerCase().split(/\s+/).filter(Boolean).every((term) => {
+    return text.includes(term)
+  })
 }
 
 function sourceLabel(source) {
