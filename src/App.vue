@@ -10,6 +10,7 @@ import SessionSidebar from './components/SessionSidebar.vue'
 import TranscriptEntry from './components/TranscriptEntry.vue'
 import { useLiveTurnProjection } from './composables/useLiveTurnProjection'
 import { useMemoryInspector } from './composables/useMemoryInspector'
+import { useProjectBrowser } from './composables/useProjectBrowser'
 import { useRuntimeEvents } from './composables/useRuntimeEvents'
 import { useSessionWorkspace } from './composables/useSessionWorkspace'
 import { useTerminal } from './composables/useTerminal'
@@ -40,11 +41,6 @@ import {
   textFromBlocks,
 } from './lib/transcript'
 
-const projectBrowserOpen = ref(false)
-const projectBrowserInitialPath = ref('')
-const startProjectPickerOpen = ref(false)
-const startProjectQuery = ref('')
-const expandedProjects = ref(new Set())
 const sidebarOpen = ref(false)
 const desktopSidebarHidden = ref(false)
 const expandedTools = ref(new Set())
@@ -238,6 +234,25 @@ const {
 } = sessionWorkspace
 workbenchScroll.bind({ selectedSessionId, liveItems })
 const {
+  projectBrowserOpen,
+  projectBrowserInitialPath,
+  startProjectPickerOpen,
+  startProjectQuery,
+  expandedProjects,
+  startProjectOptions,
+  startProjectLabel,
+  isProjectExpanded,
+  expandProject,
+  toggleProject,
+  selectStartProject,
+  openProjectBrowser,
+  closeProjectBrowser,
+} = useProjectBrowser({
+  visibleProjects,
+  newSessionCwd,
+  selectedSession,
+})
+const {
   memoryOpen,
   memoryDirty,
   memoryLoading,
@@ -421,15 +436,6 @@ const isEmptySelectedSession = computed(() => {
   return Boolean(selectedSession.value)
     && entries.value.length === 0
     && !liveTurnActive.value
-})
-const startProjectOptions = computed(() => {
-  const query = startProjectQuery.value.trim().toLowerCase()
-  return visibleProjects.value.filter((project) => {
-    return !query || fuzzyScore(project.name, query) > 0
-  })
-})
-const startProjectLabel = computed(() => {
-  return newSessionCwd.value ? projectName(newSessionCwd.value) : 'Choose project'
 })
 const sendButtonLabel = computed(() => {
   if (compactingContext.value) return '…'
@@ -809,38 +815,6 @@ function liveItemClass(item) {
   ]
 }
 
-function isProjectExpanded(project) {
-  return expandedProjects.value.has(project.cwd)
-}
-
-function expandProject(cwd) {
-  if (!cwd) return
-  expandedProjects.value = new Set([...expandedProjects.value, cwd])
-}
-
-function toggleProject(project) {
-  const next = new Set(expandedProjects.value)
-  if (next.has(project.cwd)) next.delete(project.cwd)
-  else next.add(project.cwd)
-  expandedProjects.value = next
-}
-
-function selectStartProject(cwd) {
-  newSessionCwd.value = cwd
-  startProjectPickerOpen.value = false
-  startProjectQuery.value = ''
-}
-
-function openProjectBrowser(path = '') {
-  startProjectPickerOpen.value = false
-  projectBrowserInitialPath.value =
-    path || newSessionCwd.value || selectedSession.value?.cwd || ''
-  projectBrowserOpen.value = true
-}
-
-function closeProjectBrowser() {
-  projectBrowserOpen.value = false
-}
 
 function toggleSettingsDrawer() {
   if (memoryDirty.value && !confirmDiscardMemoryChanges()) return
@@ -855,7 +829,6 @@ function toggleEventDrawer() {
   settingsOpen.value = false
   memoryOpen.value = false
 }
-
 
 function isToolExpanded(entry) {
   return expandedTools.value.has(entry.id)
