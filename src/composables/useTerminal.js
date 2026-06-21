@@ -8,11 +8,15 @@ export function useTerminal() {
   const terminalEl = ref(null)
   const terminalStatus = ref('closed')
   const terminalCwd = ref('')
+  const terminalDrawerHeight = ref(310)
   let terminalInstance
   let terminalFitAddon
   let terminalSocket
   let terminalInputDisposable
   let terminalRunId = 0
+  let terminalResizeStartY = 0
+  let terminalResizeStartHeight = 0
+  let terminalResizeFrame = 0
 
   async function toggleTerminal() {
     if (terminalOpen.value) {
@@ -133,6 +137,44 @@ export function useTerminal() {
     }
   }
 
+  function setTerminalDrawerHeight(height) {
+    const max = Math.max(220, Math.round(window.innerHeight * 0.72))
+    terminalDrawerHeight.value = Math.min(max, Math.max(180, Math.round(height)))
+    cancelAnimationFrame(terminalResizeFrame)
+    terminalResizeFrame = requestAnimationFrame(resizeTerminal)
+  }
+
+  function resizeTerminalDrawer(event) {
+    const nextHeight = terminalResizeStartHeight + terminalResizeStartY
+      - event.clientY
+    setTerminalDrawerHeight(nextHeight)
+  }
+
+  function stopTerminalResize() {
+    window.removeEventListener('pointermove', resizeTerminalDrawer)
+    window.removeEventListener('pointerup', stopTerminalResize)
+    window.removeEventListener('pointercancel', stopTerminalResize)
+    document.body.style.userSelect = ''
+  }
+
+  function startTerminalResize(event) {
+    terminalResizeStartY = event.clientY
+    terminalResizeStartHeight = terminalDrawerHeight.value
+    window.addEventListener('pointermove', resizeTerminalDrawer)
+    window.addEventListener('pointerup', stopTerminalResize)
+    window.addEventListener('pointercancel', stopTerminalResize)
+    document.body.style.userSelect = 'none'
+  }
+
+  function nudgeTerminalHeight(amount) {
+    setTerminalDrawerHeight(terminalDrawerHeight.value + amount)
+  }
+
+  function disposeTerminalResize() {
+    stopTerminalResize()
+    cancelAnimationFrame(terminalResizeFrame)
+  }
+
   return {
     closeTerminalPanel,
     connectTerminal,
@@ -140,8 +182,14 @@ export function useTerminal() {
     terminalEl,
     terminalOpen,
     terminalStatus,
+    terminalDrawerHeight,
     resizeTerminal,
     toggleTerminal,
+    startTerminalResize,
+    stopTerminalResize,
+    nudgeTerminalHeight,
+    setTerminalDrawerHeight,
+    disposeTerminalResize,
   }
 }
 
