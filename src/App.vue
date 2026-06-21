@@ -14,6 +14,7 @@ import { useProjectBrowser } from './composables/useProjectBrowser'
 import { useRuntimeEvents } from './composables/useRuntimeEvents'
 import { useSessionWorkspace } from './composables/useSessionWorkspace'
 import { useTerminal } from './composables/useTerminal'
+import { useToolExpansion } from './composables/useToolExpansion'
 import { useWorkbenchScroll } from './composables/useWorkbenchScroll'
 import { fuzzyScore } from './lib/fuzzy'
 import {
@@ -43,15 +44,11 @@ import {
 
 const sidebarOpen = ref(false)
 const desktopSidebarHidden = ref(false)
-const expandedTools = ref(new Set())
-const expandedSkills = ref(new Set())
-const copiedEntryId = ref('')
 const draft = ref('')
 const attachedImages = ref([])
 const workbench = ref(null)
 const eventLogOpen = ref(false)
 const settingsOpen = ref(false)
-const fullscreenTool = ref(null)
 const promptSubmitting = ref(false)
 const interrupting = ref(false)
 const goalCommandSubmitting = ref('')
@@ -89,7 +86,6 @@ const terminalDrawerHeight = ref(310)
 let terminalResizeStartY = 0
 let terminalResizeStartHeight = 0
 let terminalResizeFrame = 0
-let copiedTimer
 const startupAcceptedFloorMs = 420
 const inProjectNewSessionFloorMs = 1240
 const initPhaseFloorMs = 340
@@ -252,6 +248,27 @@ const {
   newSessionCwd,
   selectedSession,
 })
+const toolExpansion = useToolExpansion({ liveAssistantBlocks })
+const {
+  expandedTools,
+  expandedSkills,
+  copiedEntryId,
+  fullscreenTool,
+  isToolExpanded,
+  toggleTool,
+  openToolFullscreen,
+  closeToolFullscreen,
+  isSkillExpanded,
+  toggleSkill,
+  entryCopyText,
+  liveAssistantDisplayBlocks,
+  liveAssistantCopyText,
+  liveAssistantDisplayCopyText,
+  copyEntry,
+  copyTranscriptItem,
+  copyTitle,
+  copyGlyph,
+} = toolExpansion
 const {
   memoryOpen,
   memoryDirty,
@@ -625,9 +642,9 @@ onUnmounted(() => {
   closeEventStream()
   sessionWorkspace.dispose()
   closeTerminalPanel()
-  clearTimeout(copiedTimer)
   disposeLiveTurn()
   workbenchScroll.dispose()
+  toolExpansion.dispose()
   cancelAnimationFrame(terminalResizeFrame)
   clearTimeout(initPhaseTimer)
   clearTimeout(composerScannerSettlingTimer)
@@ -830,92 +847,11 @@ function toggleEventDrawer() {
   memoryOpen.value = false
 }
 
-function isToolExpanded(entry) {
-  return expandedTools.value.has(entry.id)
-}
-
-function toggleTool(entry) {
-  const next = new Set(expandedTools.value)
-  if (next.has(entry.id)) next.delete(entry.id)
-  else next.add(entry.id)
-  expandedTools.value = next
-}
-
-function openToolFullscreen(entry) {
-  fullscreenTool.value = entry
-}
-
-function closeToolFullscreen() {
-  fullscreenTool.value = null
-}
-
-function isSkillExpanded(entry) {
-  return expandedSkills.value.has(entry.id)
-}
 
 function isEnteringEntry(entry) {
   return animatingEntryIds.value.has(entry.id)
 }
 
-function toggleSkill(entry) {
-  const next = new Set(expandedSkills.value)
-  if (next.has(entry.id)) next.delete(entry.id)
-  else next.add(entry.id)
-  expandedSkills.value = next
-}
-
-function entryCopyText(entry) {
-  return entry.copyText || entry.preview?.fallbackText || entry.text || ''
-}
-
-function liveAssistantDisplayBlocks(item) {
-  if (item?.persistedEntry) return messageBlocksFor(item.persistedEntry)
-  return item?.blocks || []
-}
-
-function liveAssistantCopyText(blocks = liveAssistantBlocks.value) {
-  return blocks.map((block) => block.text).join('\n\n')
-}
-
-function liveAssistantDisplayCopyText(item) {
-  return liveAssistantCopyText(liveAssistantDisplayBlocks(item))
-}
-
-async function copyEntry(entry) {
-  await copyTranscriptItem(entry.id, entryCopyText(entry))
-}
-
-async function copyTranscriptItem(id, text) {
-  if (!text) return
-
-  try {
-    if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable')
-    await navigator.clipboard.writeText(text)
-  } catch {
-    const textarea = document.createElement('textarea')
-    textarea.value = text
-    textarea.style.position = 'fixed'
-    textarea.style.opacity = '0'
-    document.body.appendChild(textarea)
-    textarea.select()
-    document.execCommand('copy')
-    textarea.remove()
-  }
-
-  copiedEntryId.value = id
-  clearTimeout(copiedTimer)
-  copiedTimer = setTimeout(() => {
-    if (copiedEntryId.value === id) copiedEntryId.value = ''
-  }, 1200)
-}
-
-function copyTitle(id) {
-  return copiedEntryId.value === id ? 'Copied' : 'Copy to clipboard'
-}
-
-function copyGlyph(id) {
-  return copiedEntryId.value === id ? '✓' : '⧉'
-}
 
 function surfaceExtensionNotification(state) {
   const notification = state?.notifications?.at?.(-1)
