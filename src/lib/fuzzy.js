@@ -1,6 +1,6 @@
 export function fuzzyScore(value, query) {
   const text = String(value || '').toLowerCase()
-  const terms = String(query || '').split(/\s+/).filter(Boolean)
+  const terms = String(query || '').toLowerCase().split(/\s+/).filter(Boolean)
   let total = 0
 
   for (const term of terms) {
