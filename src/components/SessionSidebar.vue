@@ -24,6 +24,22 @@ const props = defineProps({
     default: '',
   },
   reloadingSession: Boolean,
+  renameDraft: {
+    type: String,
+    default: '',
+  },
+  renamingSessionId: {
+    type: String,
+    default: '',
+  },
+  renamingSessionSavingId: {
+    type: String,
+    default: '',
+  },
+  renamingSessionSource: {
+    type: String,
+    default: '',
+  },
   selectedSession: {
     type: Object,
     default: null,
@@ -56,6 +72,9 @@ const props = defineProps({
 })
 
 const emit = defineEmits([
+  'begin-rename-session',
+  'cancel-rename-session',
+  'commit-rename-session',
   'create-session',
   'hide',
   'navigate-home',
@@ -67,7 +86,26 @@ const emit = defineEmits([
   'select-session',
   'toggle-project',
   'update:query',
+  'update:renameDraft',
 ])
+
+const vFocusSelect = {
+  mounted(el) {
+    requestAnimationFrame(() => {
+      el.focus()
+      el.select()
+    })
+  },
+}
+
+function isRenaming(session) {
+  return props.renamingSessionId === session.id
+    && props.renamingSessionSource === 'sidebar'
+}
+
+function beginRename(session) {
+  emit('begin-rename-session', session, 'sidebar')
+}
 
 const onEnter = (el) => {
   el.style.maxHeight = '0'
@@ -212,26 +250,68 @@ const onAfterLeave = (el) => {
               v-for="session in project.sessions.slice(0, 5)"
               :key="session.path || session.id"
               class="session"
-              :class="{ active: session.id === selectedSessionId }"
+              :class="{
+                active: session.id === selectedSessionId,
+                'is-renaming': isRenaming(session),
+              }"
               role="button"
-              tabindex="0"
-              @click="emit('select-session', session)"
-              @keydown.enter="emit('select-session', session)"
-              @keydown.space.prevent="emit('select-session', session)"
+              :tabindex="isRenaming(session) ? -1 : 0"
+              @click="!isRenaming(session) && emit('select-session', session)"
+              @keydown.enter="!isRenaming(session)
+                && emit('select-session', session)"
+              @keydown.space.prevent="!isRenaming(session)
+                && emit('select-session', session)"
             >
+              <input
+                v-if="isRenaming(session)"
+                v-focus-select
+                class="session-title-input"
+                :value="renameDraft"
+                aria-label="Session name"
+                @click.stop
+                @input="emit('update:renameDraft', $event.target.value)"
+                @keydown.space.stop
+                @keydown.enter.stop.prevent="emit(
+                  'commit-rename-session',
+                  session,
+                )"
+                @keydown.esc.stop.prevent="emit('cancel-rename-session')"
+                @blur="isRenaming(session)
+                  && emit('commit-rename-session', session)"
+              />
               <span
+                v-else
                 class="session-title"
+                @dblclick.stop="beginRename(session)"
                 v-html="highlightedText(sessionTitle(session))"
               ></span>
               <span
-                v-if="sessionStatus(session.id).label"
+                v-if="!isRenaming(session) && sessionStatus(session.id).label"
                 class="session-status"
                 :class="`status-${sessionStatus(session.id).tone}`"
               >
                 {{ sessionStatus(session.id).label }}
               </span>
-              <time v-else>{{ sessionTime(session) }}</time>
+              <time v-else-if="!isRenaming(session)">
+                {{ sessionTime(session) }}
+              </time>
               <button
+                v-if="!isRenaming(session)"
+                class="session-rename-button"
+                type="button"
+                title="Rename session"
+                aria-label="Rename session"
+                :disabled="renamingSessionSavingId === session.id"
+                @click.stop="beginRename(session)"
+              >
+                <span v-if="renamingSessionSavingId === session.id">…</span>
+                <svg v-else viewBox="0 0 16 16" aria-hidden="true">
+                  <path d="M10.8 2.8l2.4 2.4"></path>
+                  <path d="M4 12l2.1-.4 6.2-6.2-1.7-1.7-6.2 6.2z"></path>
+                </svg>
+              </button>
+              <button
+                v-if="!isRenaming(session)"
                 class="session-delete-button"
                 type="button"
                 title="Delete session"

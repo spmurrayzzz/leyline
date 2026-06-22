@@ -36,6 +36,15 @@ export function deletePiSession(id) {
   )
 }
 
+export function renamePiSession(session, name) {
+  const id = typeof session === 'string' ? session : session.id
+  return apiRequest(
+    `/api/pi/sessions/${encodeURIComponent(id)}`,
+    'Failed to rename session',
+    { method: 'PATCH', body: { name } },
+  )
+}
+
 export async function activatePiSession(session) {
   const data = await apiRequest('/api/pi/active-session', 'Failed to activate session', {
     method: 'POST',

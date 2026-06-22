@@ -427,7 +427,7 @@ kbd {
   width: calc(100% - 12px);
   margin-left: 12px;
   gap: 10px;
-  padding: 6px 30px 6px 9px;
+  padding: 6px 54px 6px 9px;
   color: #aaaeba;
   font-size: 13px;
   font-weight: 500;
@@ -446,6 +446,27 @@ kbd {
   flex: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.session.is-renaming {
+  padding-right: 9px;
+  cursor: default;
+}
+
+.session-title-input {
+  min-width: 0;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  outline: none;
+  background: #15161d;
+  padding: 4px 6px;
+  color: var(--text);
+  font: inherit;
+}
+
+.session-title-input:focus {
+  border-color: #4a415f;
 }
 
 .session-status {
@@ -483,11 +504,11 @@ kbd {
   transition: opacity var(--motion-fast) var(--ease-decelerate);
 }
 
+.session-rename-button,
 .session-delete-button {
   display: grid;
   position: absolute;
   top: 50%;
-  right: 8px;
   place-items: center;
   width: 18px;
   height: 18px;
@@ -505,6 +526,15 @@ kbd {
     transform var(--motion-base) var(--ease-decelerate);
 }
 
+.session-rename-button {
+  right: 30px;
+}
+
+.session-delete-button {
+  right: 8px;
+}
+
+.session-rename-button svg,
 .session-delete-button svg,
 .delete-session-button svg {
   width: 13px;
@@ -516,6 +546,8 @@ kbd {
   stroke-width: 1.5;
 }
 
+.session:hover .session-rename-button,
+.session:focus-within .session-rename-button,
 .session:hover .session-delete-button,
 .session:focus-within .session-delete-button {
   opacity: 1;
@@ -527,11 +559,17 @@ kbd {
   opacity: 0;
 }
 
+.session-rename-button:hover {
+  background: transparent;
+  color: var(--text);
+}
+
 .session-delete-button:hover {
   background: transparent;
   color: #fca5a5;
 }
 
+.session-rename-button:disabled,
 .session-delete-button:disabled {
   opacity: 0.7;
 }

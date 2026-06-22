@@ -10,6 +10,7 @@ import {
   fetchSessions,
   forkPiSession,
   reloadPiSession,
+  renamePiSession,
   resetPiSession,
   switchPiModel,
   switchPiThinkingLevel,
@@ -44,6 +45,10 @@ export function useSessionWorkspace({
   const switchingModel = ref(false)
   const switchingThinking = ref(false)
   const reloadingSession = ref(false)
+  const renamingSessionId = ref('')
+  const renamingSessionSource = ref('')
+  const renamingSessionSavingId = ref('')
+  const renameDraft = ref('')
   const deletingSessionId = ref('')
   const deleteConfirmSession = ref(null)
   const deleteSessionError = ref('')
@@ -485,6 +490,83 @@ export function useSessionWorkspace({
     }
   }
 
+  function beginRenameSession(session, source = 'sidebar') {
+    if (!session?.id || renamingSessionSavingId.value) return
+    renamingSessionId.value = session.id
+    renamingSessionSource.value = source
+    renameDraft.value = session.name || sessionTitle(session)
+    sessionError.value = ''
+  }
+
+  function cancelRenameSession() {
+    if (renamingSessionSavingId.value) return
+    renamingSessionId.value = ''
+    renamingSessionSource.value = ''
+    renameDraft.value = ''
+  }
+
+  async function commitRenameSession(session, value = renameDraft.value) {
+    if (!session?.id || renamingSessionSavingId.value) return
+
+    const id = session.id
+    const name = normalizeSessionName(value)
+    const current = normalizeSessionName(session.name || sessionTitle(session))
+    if (name === current) {
+      cancelRenameSession()
+      return
+    }
+
+    const previousSessions = sessions.value
+    const previousDetail = sessionDetail.value
+    renamingSessionSavingId.value = id
+    renamingSessionId.value = ''
+    renamingSessionSource.value = ''
+    renameDraft.value = ''
+    patchSessionName(id, name || undefined)
+
+    try {
+      const data = await renamePiSession(session, name)
+      const renamed = data.detail?.session || data.session
+      if (renamed) patchSessionName(id, renamed.name)
+      if (data.detail && sessionDetail.value?.session?.id === id) {
+        sessionDetail.value = {
+          ...sessionDetail.value,
+          session: {
+            ...sessionDetail.value.session,
+            ...data.detail.session,
+          },
+        }
+      }
+    } catch (error) {
+      sessions.value = previousSessions
+      sessionDetail.value = previousDetail
+      sessionError.value = error.message
+    } finally {
+      if (renamingSessionSavingId.value === id) {
+        renamingSessionSavingId.value = ''
+      }
+    }
+  }
+
+  function patchSessionName(id, name) {
+    sessions.value = sessions.value.map((session) => {
+      if (session.id !== id) return session
+      return { ...session, name }
+    })
+
+    const detail = sessionDetail.value
+    if (!detail || detail.session.id !== id) return
+    sessionDetail.value = {
+      ...detail,
+      session: { ...detail.session, name },
+    }
+  }
+
+  function normalizeSessionName(name) {
+    if (typeof name !== 'string') return ''
+    return name.replace(/\s+/g, ' ').trim()
+  }
+
   function requestDeleteSession(session) {
     if (!session || deletingSessionId.value) return
     deleteConfirmSession.value = session
@@ -923,9 +1005,12 @@ export function useSessionWorkspace({
     activeRuntimeSession,
     availableModels,
     availableThinkingLevels,
+    beginRenameSession,
     beginStartupRun,
     cancelDeleteSession,
+    cancelRenameSession,
     clearSelectedSession,
+    commitRenameSession,
     composerRuntime,
     confirmDeleteSession,
     contextUsage,
@@ -956,6 +1041,10 @@ export function useSessionWorkspace({
     patchRuntimeExtensionUi,
     reloadSession,
     reloadingSession,
+    renameDraft,
+    renamingSessionId,
+    renamingSessionSavingId,
+    renamingSessionSource,
     requestDeleteSession,
     resettingEntryId,
     resetSessionToEntry,

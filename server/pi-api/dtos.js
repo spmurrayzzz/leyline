@@ -225,7 +225,7 @@ export function sessionInfo(handle) {
     id: manager.getSessionId(),
     path: manager.getSessionFile(),
     cwd: header.cwd || handle.runtime.cwd,
-    name: undefined,
+    name: manager.getSessionName?.(),
     firstMessage: firstMessage || goal?.objective || '(no messages)',
     created,
     modified: sessionModifiedDate(entries, header, created),

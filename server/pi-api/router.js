@@ -21,6 +21,7 @@ export function createPiApiHandler(api) {
     readDirectory,
     readJson,
     reloadSession,
+    renameSession,
     requireActiveHandle,
     resetSessionToEntry,
     resolveSession,
@@ -427,6 +428,12 @@ async function piApiHandler(req, res) {
       const match = url.pathname.match(/^\/sessions\/([^/]+)$/)
       if (match) {
         const id = decodeURIComponent(match[1])
+        if (req.method === 'PATCH') {
+          const body = await readJson(req)
+          const detail = await renameSession(id, body.name)
+          return json(res, { ok: true, detail, session: detail.session })
+        }
+
         if (req.method === 'DELETE') {
           const trashed = await trashSession(id)
           return json(res, { ok: true, trashed })

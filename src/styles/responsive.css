@@ -16,7 +16,9 @@
   .new-session-button,
   .session,
   .session time,
+  .session-rename-button,
   .session-delete-button,
+  .workbench-title-glyph,
   .settings-button,
   .project-sessions-enter-active,
   .project-sessions-leave-active,
@@ -303,8 +305,14 @@
     flex: 1 1 auto;
   }
 
-  .topbar-project span {
+  .topbar-project > span {
     max-width: none;
+  }
+
+  .workbench-title-button,
+  .workbench-title-input {
+    max-width: none;
+    width: 100%;
   }
 
   .topbar-meta {

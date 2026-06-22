@@ -430,6 +430,30 @@ async function forkActiveSession(entryId) {
   return activeSessionDto()
 }
 
+async function renameSession(id, name) {
+  const nextName = normalizeSessionName(name)
+  const handle = runtimeHandles.get(id)
+  if (handle) {
+    handle.runtime.session.setSessionName(nextName)
+    return toActiveSessionDetailDto(handle)
+  }
+
+  const session = await findSession(id)
+  if (!session) throw new Error('Session not found')
+
+  const manager = SessionManager.open(session.path)
+  if (manager.getSessionId() !== id) {
+    throw new Error('Session path does not match session id')
+  }
+  manager.appendSessionInfo(nextName)
+  return toSessionDetailDto({ ...session, name: manager.getSessionName() })
+}
+
+function normalizeSessionName(name) {
+  if (typeof name !== 'string') return ''
+  return name.replace(/\s+/g, ' ').trim()
+}
+
 async function trashSession(id) {
   const session = await findSession(id)
   if (!session) throw new Error('Session not found')
@@ -671,6 +695,7 @@ export function createPiRuntimeApi() {
   readDirectory,
   readJson,
   reloadSession,
+  renameSession,
   renderSessionExportHtml,
   requireActiveHandle,
   resetSessionToEntry,

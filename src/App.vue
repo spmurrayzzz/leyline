@@ -72,6 +72,14 @@ const startupRevealCwd = ref('')
 const inProjectNewSessionRun = ref(false)
 const inProjectComposerDocking = ref(false)
 const inProjectNewSessionSettling = ref(false)
+const vFocusSelect = {
+  mounted(el) {
+    requestAnimationFrame(() => {
+      el.focus()
+      el.select()
+    })
+  },
+}
 const {
   closeTerminalPanel,
   connectTerminal,
@@ -167,8 +175,11 @@ const {
   activeRuntimeSession,
   availableModels,
   availableThinkingLevels,
+  beginRenameSession,
   beginStartupRun,
   cancelDeleteSession,
+  cancelRenameSession,
+  commitRenameSession,
   composerRuntime,
   confirmDeleteSession,
   contextUsage,
@@ -196,6 +207,10 @@ const {
   patchRuntimeExtensionUi,
   reloadSession,
   reloadingSession,
+  renameDraft,
+  renamingSessionId,
+  renamingSessionSavingId,
+  renamingSessionSource,
   requestDeleteSession,
   resetSessionToEntry,
   runStartupPhase,
@@ -1602,6 +1617,10 @@ function closePickerMenus() {
       :expanded-project="isProjectExpanded"
       :highlighted-text="highlightedText"
       :reloading-session="reloadingSession"
+      v-model:rename-draft="renameDraft"
+      :renaming-session-id="renamingSessionId"
+      :renaming-session-saving-id="renamingSessionSavingId"
+      :renaming-session-source="renamingSessionSource"
       :selected-session="selectedSession"
       :selected-session-id="selectedSessionId"
       :session-status="sessionRuntimeStatus"
@@ -1610,6 +1629,9 @@ function closePickerMenus() {
       :sessions-loading="sessionsLoading"
       :summary="sidebarRuntimeSummary"
       :visible-projects="visibleProjects"
+      @begin-rename-session="beginRenameSession"
+      @cancel-rename-session="cancelRenameSession"
+      @commit-rename-session="commitRenameSession"
       @create-session="createSession"
       @hide="desktopSidebarHidden = true"
       @navigate-home="navigateHome"
@@ -1632,7 +1654,39 @@ function closePickerMenus() {
           @click="sidebarOpen = true"
         >☰</button>
         <div class="topbar-project">
-          <strong>{{ topbarTitle }}</strong>
+          <div v-if="selectedSession" class="workbench-title-row">
+            <input
+              v-if="renamingSessionId === selectedSession.id
+                && renamingSessionSource === 'workbench'"
+              v-focus-select
+              class="workbench-title-input"
+              :value="renameDraft"
+              aria-label="Session name"
+              :disabled="renamingSessionSavingId === selectedSession.id"
+              @input="renameDraft = $event.target.value"
+              @keydown.enter.stop.prevent="commitRenameSession(selectedSession)"
+              @keydown.esc.stop.prevent="cancelRenameSession"
+              @blur="renamingSessionId === selectedSession.id
+                && renamingSessionSource === 'workbench'
+                && commitRenameSession(selectedSession)"
+            />
+            <button
+              v-else
+              class="workbench-title-button"
+              type="button"
+              title="Rename session"
+              @click="beginRenameSession(selectedSession, 'workbench')"
+            >
+              <strong>{{ sessionTitle(selectedSession) }}</strong>
+              <span class="workbench-title-glyph" aria-hidden="true">
+                <svg viewBox="0 0 16 16">
+                  <path d="M10.8 2.8l2.4 2.4"></path>
+                  <path d="M4 12l2.1-.4 6.2-6.2-1.7-1.7-6.2 6.2z"></path>
+                </svg>
+              </span>
+            </button>
+          </div>
+          <strong v-else>{{ topbarTitle }}</strong>
           <span>{{ topbarSubtitle }}</span>
         </div>
         <div v-if="selectedSession" class="topbar-meta">
