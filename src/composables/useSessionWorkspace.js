@@ -888,12 +888,12 @@ export function useSessionWorkspace({
   }
 
   function sessionTitle(session) {
+    if (session?.name && session.name !== '(no messages)') return session.name
     if (session?.messageCount === 0
-      || session?.name === '(no messages)'
       || session?.firstMessage === '(no messages)') {
       return 'New session'
     }
-    return session?.name || session?.firstMessage || 'Untitled session'
+    return session?.firstMessage || 'Untitled session'
   }
 
   function highlightedText(value) {
