@@ -1,4 +1,5 @@
 <script setup>
+import { ref } from 'vue'
 import { sessionTime } from '../lib/format'
 
 const props = defineProps({
@@ -89,6 +90,9 @@ const emit = defineEmits([
   'update:renameDraft',
 ])
 
+const defaultVisibleSessionCount = 5
+const expandedSessionProjects = ref(new Set())
+
 const vFocusSelect = {
   mounted(el) {
     requestAnimationFrame(() => {
@@ -96,6 +100,41 @@ const vFocusSelect = {
       el.select()
     })
   },
+}
+
+function displayedSessions(project) {
+  if (props.query.trim() || expandedSessionProjects.value.has(project.cwd)) {
+    return project.sessions
+  }
+
+  const sessions = project.sessions.slice(0, defaultVisibleSessionCount)
+  const selected = project.sessions.find((session) => {
+    return session.id === props.selectedSessionId
+      && !sessions.some((item) => item.id === session.id)
+  })
+
+  return selected ? [...sessions, selected] : sessions
+}
+
+function canToggleSessionList(project) {
+  return !props.query.trim()
+    && project.sessions.length > defaultVisibleSessionCount
+}
+
+function sessionListExpanded(project) {
+  return expandedSessionProjects.value.has(project.cwd)
+}
+
+function toggleSessionList(project) {
+  const next = new Set(expandedSessionProjects.value)
+  if (next.has(project.cwd)) next.delete(project.cwd)
+  else next.add(project.cwd)
+  expandedSessionProjects.value = next
+}
+
+function sessionListToggleLabel(project) {
+  if (sessionListExpanded(project)) return 'Show fewer'
+  return `Show all ${project.sessions.length} sessions`
 }
 
 function isRenaming(session) {
@@ -247,7 +286,7 @@ const onAfterLeave = (el) => {
         >
           <div v-if="expandedProject(project)" class="project-session-list">
             <div
-              v-for="session in project.sessions.slice(0, 5)"
+              v-for="session in displayedSessions(project)"
               :key="session.path || session.id"
               class="session"
               :class="{
@@ -329,6 +368,13 @@ const onAfterLeave = (el) => {
                 </svg>
               </button>
             </div>
+            <button
+              v-if="canToggleSessionList(project)"
+              class="session-list-toggle"
+              type="button"
+              :aria-expanded="sessionListExpanded(project)"
+              @click="toggleSessionList(project)"
+            >{{ sessionListToggleLabel(project) }}</button>
           </div>
         </Transition>
       </div>

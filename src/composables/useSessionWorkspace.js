@@ -952,9 +952,7 @@ export function useSessionWorkspace({
       })
     }
 
-    return projectList
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 8)
+    return projectList.sort((a, b) => b.score - a.score)
   }
 
   function sessionScore(session, query) {

@@ -193,7 +193,11 @@ kbd {
 .sidebar-section {
   min-height: 0;
   flex: 1;
-  overflow: hidden;
+  overflow-y: auto;
+  padding-right: 2px;
+  scrollbar-color: #4b4658 transparent;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
 }
 
 .section-header {
@@ -288,7 +292,6 @@ kbd {
 
 .project-session-list {
   overflow: hidden;
-  max-height: 180px;
 }
 
 .project-sessions-enter-active {
@@ -502,6 +505,29 @@ kbd {
   flex: none;
   color: var(--muted);
   transition: opacity var(--motion-fast) var(--ease-decelerate);
+}
+
+.session-list-toggle {
+  width: calc(100% - 12px);
+  margin: 3px 0 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  padding: 5px 9px;
+  color: #7f8491;
+  font-size: 11px;
+  font-weight: 800;
+  text-align: left;
+  transition:
+    background-color var(--motion-base) var(--ease-decelerate),
+    color var(--motion-base) var(--ease-decelerate);
+}
+
+.session-list-toggle:hover {
+  background: var(--panel-soft);
+  color: var(--muted-strong);
+  transition-duration: var(--motion-quick);
+  transition-timing-function: var(--ease-accelerate);
 }
 
 .session-rename-button,
