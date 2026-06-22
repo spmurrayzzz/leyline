@@ -14,6 +14,7 @@
   .project-title button,
   .project-caret,
   .new-session-button,
+  .project-detail-button,
   .session,
   .session-list-toggle,
   .session time,
@@ -24,6 +25,11 @@
   .project-sessions-enter-active,
   .project-sessions-leave-active,
   .copy-button,
+  .project-detail-close,
+  .project-detail-primary,
+  .project-detail-sort button,
+  .project-session-card,
+  .project-session-actions button,
   .transcript-message,
   .session-switching > .message,
   .session-switching > .tool-card,
@@ -338,12 +344,14 @@
   }
 
   .memory-drawer-slot,
+  .project-detail-drawer-slot,
   .settings-drawer-slot,
   .event-log-slot {
     width: min(420px, 100vw);
   }
 
   .memory-drawer,
+  .project-detail-drawer,
   .settings-drawer,
   .event-log-drawer {
     width: min(420px, 100vw);

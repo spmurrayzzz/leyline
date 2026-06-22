@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import PierrePreview from './components/PierrePreview.vue'
 import LiveAssistantMessage from './components/LiveAssistantMessage.vue'
 import ProjectBrowser from './components/ProjectBrowser.vue'
+import ProjectDetailDrawer from './components/ProjectDetailDrawer.vue'
 import MemoryInspector from './components/MemoryInspector.vue'
 import SessionComposer from './components/SessionComposer.vue'
 import StartComposer from './components/StartComposer.vue'
@@ -49,6 +50,7 @@ const attachedImages = ref([])
 const workbench = ref(null)
 const eventLogOpen = ref(false)
 const settingsOpen = ref(false)
+const projectDetailCwd = ref('')
 const promptSubmitting = ref(false)
 const interrupting = ref(false)
 const goalCommandSubmitting = ref('')
@@ -264,6 +266,17 @@ const {
   visibleProjects,
   newSessionCwd,
   selectedSession,
+})
+const projectDetailProject = computed(() => {
+  const cwd = projectDetailCwd.value
+  if (!cwd) return null
+
+  const projectSessions = sessions.value
+    .filter((session) => (session.cwd || 'unknown') === cwd)
+    .sort((a, b) => sessionSortTime(b) - sessionSortTime(a))
+
+  if (!projectSessions.length) return null
+  return { cwd, name: projectName(cwd), sessions: projectSessions }
 })
 const toolExpansion = useToolExpansion({ liveAssistantBlocks })
 const {
@@ -725,19 +738,34 @@ async function waitInitPhaseFloor() {
 async function createSession(project) {
   await workspaceCreateSession(project)
   projectBrowserOpen.value = false
+  projectDetailCwd.value = ''
   sidebarOpen.value = false
 }
 
 async function createSessionForCwd(cwd) {
   await workspaceCreateSessionForCwd(cwd)
   projectBrowserOpen.value = false
+  projectDetailCwd.value = ''
   sidebarOpen.value = false
 }
 
 async function selectSession(session, options) {
   if (memoryDirty.value && !confirmDiscardMemoryChanges()) return
   await workspaceSelectSession(session, options)
+  projectDetailCwd.value = ''
   sidebarOpen.value = false
+}
+
+function openProjectDetail(project) {
+  if (memoryDirty.value && !confirmDiscardMemoryChanges()) return
+  projectDetailCwd.value = project.cwd
+  settingsOpen.value = false
+  eventLogOpen.value = false
+  if (memoryOpen.value) closeMemoryDrawer()
+}
+
+function closeProjectDetail() {
+  projectDetailCwd.value = ''
 }
 
 async function handleNativeToggleTerminal() {
@@ -751,7 +779,7 @@ function handleNativeOpenSettings() {
 }
 
 function handleNativeToggleMemory() {
-  toggleMemoryDrawer()
+  toggleMemoryPanel()
 }
 
 function handleNativeToggleSidebar() {
@@ -769,6 +797,11 @@ function handleNativeEscape() {
 
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function sessionSortTime(session) {
+  const time = new Date(session?.timestamp || 0).getTime()
+  return Number.isNaN(time) ? 0 : time
 }
 
 function navigateHome() {
@@ -821,6 +854,7 @@ function toggleSettingsDrawer() {
   settingsOpen.value = !settingsOpen.value
   eventLogOpen.value = false
   memoryOpen.value = false
+  if (settingsOpen.value) projectDetailCwd.value = ''
 }
 
 function toggleEventDrawer() {
@@ -828,6 +862,13 @@ function toggleEventDrawer() {
   eventLogOpen.value = !eventLogOpen.value
   settingsOpen.value = false
   memoryOpen.value = false
+  if (eventLogOpen.value) projectDetailCwd.value = ''
+}
+
+function toggleMemoryPanel() {
+  const wasOpen = memoryOpen.value
+  toggleMemoryDrawer()
+  if (!wasOpen && memoryOpen.value) projectDetailCwd.value = ''
 }
 
 
@@ -1522,6 +1563,7 @@ function handleEscape(event) {
   }
   settingsOpen.value = false
   eventLogOpen.value = false
+  projectDetailCwd.value = ''
   if (memoryOpen.value) closeMemoryDrawer()
   closeToolFullscreen()
   closeProjectBrowser()
@@ -1636,6 +1678,7 @@ function closePickerMenus() {
       @hide="desktopSidebarHidden = true"
       @navigate-home="navigateHome"
       @open-project-browser="openProjectBrowser"
+      @open-project-detail="openProjectDetail"
       @open-settings="toggleSettingsDrawer"
       @reload-session="reloadSession"
       @request-delete-session="requestDeleteSession"
@@ -1701,7 +1744,7 @@ function closePickerMenus() {
             class="event-log-button"
             type="button"
             :disabled="!memoryEnabled"
-            @click="toggleMemoryDrawer"
+            @click="toggleMemoryPanel"
           >
             Memory {{ memoryActiveCount || '' }}
           </button>
@@ -2215,6 +2258,33 @@ function closePickerMenus() {
         </div>
       </section>
     </div>
+
+    <Transition name="event-drawer">
+      <div
+        v-if="projectDetailProject"
+        class="project-detail-drawer-slot"
+      >
+        <ProjectDetailDrawer
+          v-model:rename-draft="renameDraft"
+          :creating-session-cwd="creatingSessionCwd"
+          :deleting-session-id="deletingSessionId"
+          :project="projectDetailProject"
+          :renaming-session-id="renamingSessionId"
+          :renaming-session-saving-id="renamingSessionSavingId"
+          :renaming-session-source="renamingSessionSource"
+          :selected-session-id="selectedSessionId"
+          :session-status="sessionRuntimeStatus"
+          :session-title="sessionTitle"
+          @begin-rename-session="beginRenameSession"
+          @cancel-rename-session="cancelRenameSession"
+          @close="closeProjectDetail"
+          @commit-rename-session="commitRenameSession"
+          @create-session="createSession"
+          @request-delete-session="requestDeleteSession"
+          @select-session="selectSession"
+        />
+      </div>
+    </Transition>
 
     <Transition name="event-drawer">
       <div v-if="memoryOpen" class="memory-drawer-slot">

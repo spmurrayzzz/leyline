@@ -80,6 +80,7 @@ const emit = defineEmits([
   'hide',
   'navigate-home',
   'open-project-browser',
+  'open-project-detail',
   'open-settings',
   'reload-session',
   'request-delete-session',
@@ -267,7 +268,15 @@ const onAfterLeave = (el) => {
             <time>{{ project.sessions.length }}</time>
           </button>
           <button
+            class="project-detail-button"
+            type="button"
+            title="Project details"
+            aria-label="Project details"
+            @click="emit('open-project-detail', project)"
+          >⋯</button>
+          <button
             class="new-session-button"
+            type="button"
             :disabled="creatingSessionCwd === project.cwd"
             title="New session"
             @click="emit('create-session', project)"
