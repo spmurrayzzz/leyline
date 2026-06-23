@@ -194,7 +194,7 @@ kbd {
   min-height: 0;
   flex: 1;
   overflow-y: auto;
-  padding-right: 2px;
+  padding-right: 12px;
   scrollbar-color: #4b4658 transparent;
   scrollbar-gutter: stable;
   scrollbar-width: thin;
