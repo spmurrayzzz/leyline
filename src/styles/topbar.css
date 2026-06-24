@@ -15,6 +15,7 @@
   position: relative;
   z-index: 3;
   grid-row: 1;
+  min-width: 0;
   border-bottom: 1px solid var(--border-soft);
   background: #0f1014;
 }
@@ -300,6 +301,7 @@ h1 {
 
 .goal-control-main strong {
   overflow: hidden;
+  min-width: 0;
   color: #d6f3ff;
   text-overflow: ellipsis;
   white-space: nowrap;
