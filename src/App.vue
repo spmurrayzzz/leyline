@@ -30,6 +30,7 @@ import {
 import {
   compactPiSession,
   editPrompt,
+  fetchSessionDetailByPath,
   interruptPiSession,
   runShellCommand,
   setEntryFeedback,
@@ -754,6 +755,24 @@ async function selectSession(session, options) {
   await workspaceSelectSession(session, options)
   projectDetailCwd.value = ''
   sidebarOpen.value = false
+}
+
+async function navigateParentSession() {
+  const parentPath = selectedSession.value?.parentSessionPath
+  if (!parentPath) return
+
+  const parent = sessions.value.find((session) => session.path === parentPath)
+  if (parent) {
+    await selectSession(parent)
+    return
+  }
+
+  const detail = await fetchSessionDetailByPath(parentPath)
+  await selectSession({
+    id: detail.session.id,
+    path: detail.session.path,
+    cwd: detail.session.cwd,
+  })
 }
 
 async function navigateChildSession(childSession) {
@@ -1723,6 +1742,12 @@ function closePickerMenus() {
         >☰</button>
         <div class="topbar-project">
           <div v-if="selectedSession" class="workbench-title-row">
+            <button
+              v-if="selectedSession.parentSessionPath"
+              class="parent-session-button"
+              type="button"
+              @click="navigateParentSession"
+            >← parent session</button>
             <input
               v-if="renamingSessionId === selectedSession.id
                 && renamingSessionSource === 'workbench'"

@@ -137,7 +137,7 @@ export function toSessionDetailDto(session) {
 
 export function toSessionDetailFromPath(id, path) {
   const manager = SessionManager.open(path)
-  if (manager.getSessionId() !== id) {
+  if (id && manager.getSessionId() !== id) {
     throw new Error('Session path does not match session id')
   }
   return toSessionDetailFromManager(manager, { id, path })
@@ -177,6 +177,7 @@ function toSessionDetailFromManager(manager, session, contextUsage) {
     path: manager.getSessionFile(),
     cwd: header.cwd || session.cwd,
     name,
+    parentSessionPath: session.parentSessionPath || header.parentSession,
     firstMessage: firstMessage || goal?.objective || '(no messages)',
     created: session.created || new Date(header.timestamp),
     modified: session.modified

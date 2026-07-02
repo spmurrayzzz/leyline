@@ -454,6 +454,19 @@ async function piApiHandler(req, res) {
         )
       }
   
+      if (url.pathname === '/sessions/by-path') {
+        if (req.method !== 'GET') {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+
+        const path = url.searchParams.get('path')
+        if (!path) return json(res, { error: 'Session path is required' }, 400)
+
+        const detail = await sessionDetail('', path)
+        if (!detail) return json(res, { error: 'Session not found' }, 404)
+        return json(res, detail)
+      }
+
       const match = url.pathname.match(/^\/sessions\/([^/]+)$/)
       if (match) {
         const id = decodeURIComponent(match[1])

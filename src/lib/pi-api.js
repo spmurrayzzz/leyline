@@ -20,6 +20,13 @@ export function fetchSessionDetail(session) {
   )
 }
 
+export function fetchSessionDetailByPath(path) {
+  return apiRequest(
+    `/api/pi/sessions/by-path?path=${encodeURIComponent(path)}`,
+    'Failed to load session',
+  )
+}
+
 export function fetchFsDirectory(path, cwd = '') {
   const params = new URLSearchParams()
   if (path) params.set('path', path)

@@ -80,7 +80,28 @@ h1 {
 .workbench-title-row {
   display: flex;
   align-items: center;
+  gap: 8px;
   min-width: 0;
+}
+
+.parent-session-button {
+  flex: none;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  background: #15161d;
+  padding: 3px 8px;
+  color: var(--muted-strong);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.parent-session-button:hover {
+  border-color: var(--accent-border);
+  background: #1a1b24;
+  color: var(--text);
+  transition-duration: var(--motion-quick);
+  transition-timing-function: var(--ease-accelerate);
 }
 
 .workbench-title-button {
