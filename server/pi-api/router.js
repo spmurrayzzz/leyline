@@ -25,6 +25,7 @@ export function createPiApiHandler(api) {
     requireActiveHandle,
     resetSessionToEntry,
     resolveSession,
+    runSubagent,
     runtimeHandleForId,
     runtimeState,
     setMemoryStatus,
@@ -317,7 +318,35 @@ async function piApiHandler(req, res) {
 
         return json(res, { error: 'Method not allowed' }, 405)
       }
-  
+
+      if (url.pathname === '/subagent') {
+        if (req.method !== 'POST') {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+
+        const body = await readJson(req)
+        const controller = new AbortController()
+        let responseFinished = false
+        res.on('finish', () => { responseFinished = true })
+        res.on('close', () => {
+          if (!responseFinished) controller.abort()
+        })
+        try {
+          const result = await runSubagent({
+            task: body.task,
+            cwd: body.cwd,
+            parentSessionPath: body.parentSessionPath,
+            model: body.model,
+            tools: body.tools,
+            systemPrompt: body.systemPrompt,
+            signal: controller.signal,
+          })
+          return json(res, result)
+        } catch (error) {
+          return json(res, { error: error.message }, 500)
+        }
+      }
+
       const scopedActions = [
         'prompt',
         'bash',

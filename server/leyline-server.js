@@ -39,10 +39,12 @@ export async function startLeylineServer(options = {}) {
 
   const address = server.address()
   const actualPort = typeof address === 'object' ? address.port : port
+  const url = `http://${host}:${actualPort}`
+  process.env.LEYLINE_SERVER_URL = url
 
   return {
     server,
-    url: `http://${host}:${actualPort}`,
+    url,
     close: () => new Promise((resolveClose) => server.close(resolveClose)),
   }
 }

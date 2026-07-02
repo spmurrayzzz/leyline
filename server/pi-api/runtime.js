@@ -65,6 +65,15 @@ const BUNDLED_MEMORY_EXTENSION = resolve(
   'memory',
   'index.ts',
 )
+const BUNDLED_SUBAGENT_EXTENSION = resolve(
+  __dirname,
+  '..',
+  '..',
+  '.pi',
+  'extensions',
+  'subagent',
+  'index.ts',
+)
 const BUNDLED_LEYLINE_SYSTEM_PROMPT = resolve(
   __dirname,
   '..',
@@ -131,6 +140,7 @@ const createRuntime = async ({ cwd, sessionManager, sessionStartEvent }) => {
       additionalExtensionPaths: [
         BUNDLED_GOAL_EXTENSION,
         BUNDLED_MEMORY_EXTENSION,
+        BUNDLED_SUBAGENT_EXTENSION,
       ],
       extensionsOverride: preferBundledExtensions,
       appendSystemPromptOverride: appendLeylineSystemPrompt,
@@ -671,6 +681,163 @@ async function exportSessionDetail(id) {
   if (!detail) throw new Error('Session not found')
   return detail
 }
+
+async function runSubagent({ task, cwd, parentSessionPath, model, tools, systemPrompt, signal }) {
+  if (!cwd) throw new Error('cwd is required')
+  if (!task) throw new Error('task is required')
+  if (signal?.aborted) throw new Error('Subagent cancelled')
+
+  const sessionManager = SessionManager.create(cwd, configuredSessionDir(cwd))
+  const childPath = sessionManager.newSession({
+    parentSession: parentSessionPath || undefined,
+  })
+  if (!childPath) {
+    throw new Error('Failed to create subagent session')
+  }
+
+  const childId = sessionManager.getSessionId()
+
+  let session
+  let abortSubagent
+  try {
+    const runtime = await createAgentSessionRuntime(createRuntime, {
+      cwd,
+      agentDir: getAgentDir(),
+      sessionManager,
+    })
+    session = runtime.session
+    if (signal?.aborted) throw new Error('Subagent cancelled')
+    abortSubagent = () => session?.abort?.()
+    signal?.addEventListener?.('abort', abortSubagent, { once: true })
+
+    const selectedModel = resolveSubagentModel(runtime.services.modelRegistry, model)
+    if (modelRequested(model) && !selectedModel) {
+      throw new Error(`Unknown subagent model: ${formatSubagentModel(model)}`)
+    }
+    if (selectedModel) {
+      if (!runtime.services.modelRegistry.hasConfiguredAuth(selectedModel)) {
+        throw new Error(`No API key for ${selectedModel.provider}/${selectedModel.id}`)
+      }
+      session.agent.state.model = selectedModel
+      session.sessionManager.appendModelChange(selectedModel.provider, selectedModel.id)
+    }
+
+    if (tools?.length) {
+      if (typeof session.setActiveToolsByName !== 'function') {
+        throw new Error('Subagent runtime does not support tool allowlists')
+      }
+
+      session.setActiveToolsByName(tools)
+
+      const activeTools = new Set(session.getActiveToolNames?.() || [])
+      const missingTools = tools.filter((tool) => !activeTools.has(tool))
+      if (missingTools.length) {
+        throw new Error(`Unknown subagent tools: ${missingTools.join(', ')}`)
+      }
+    }
+
+    const taskWithPrompt = systemPrompt && systemPrompt.trim()
+      ? `${systemPrompt.trim()}\n\nTask: ${task}`
+      : task
+    let preflightSucceeded = false
+    await new Promise((resolve, reject) => {
+      session
+        .prompt(taskWithPrompt, { source: 'api' })
+        .then(() => {
+          preflightSucceeded = true
+          resolve()
+        })
+        .catch((error) => {
+          if (!preflightSucceeded) reject(error)
+        })
+    })
+
+    const entries = sessionManager.getBranch()
+    const messages = []
+    let usage = { inputTokens: 0, outputTokens: 0, totalTokens: 0, cost: 0, turns: 0 }
+    let responseModel
+    let stopReason
+
+    for (const entry of entries) {
+      if (entry.type !== 'message') continue
+      const msg = entry.message
+      if (!msg || !('content' in msg)) continue
+
+      const text = extractMessageText(msg.content)
+      if (msg.role === 'assistant') {
+        usage.turns++
+        if (text) messages.push({ role: 'assistant', content: text })
+        if (msg.usage) {
+          const u = msg.usage
+          const msgInput = u.inputTokens ?? u.promptTokens ?? u.input ?? 0
+          const msgOutput = u.outputTokens ?? u.completionTokens ?? u.output ?? 0
+          usage.inputTokens = msgInput
+          usage.outputTokens = msgOutput
+          usage.totalTokens = u.totalTokens ?? (msgInput + msgOutput)
+          usage.cost = u.cost?.total ?? 0
+        }
+        if (msg.model) responseModel = msg.model
+        if (msg.stopReason) stopReason = msg.stopReason
+        if (msg.errorMessage) messages.push({ role: 'error', content: msg.errorMessage })
+      } else if (msg.role === 'toolResult' || msg.role === 'tool') {
+        if (text) messages.push({ role: msg.role, content: text })
+      }
+    }
+
+    signal?.removeEventListener?.('abort', abortSubagent)
+    session.dispose()
+
+    return {
+      childSession: { path: childPath, id: childId, cwd },
+      messages,
+      usage,
+      model: responseModel,
+      stopReason,
+    }
+  } catch (error) {
+    signal?.removeEventListener?.('abort', abortSubagent)
+    try { session?.dispose() } catch {}
+    if (signal?.aborted) throw new Error('Subagent cancelled')
+    throw error
+  }
+}
+
+function resolveSubagentModel(modelRegistry, model) {
+  if (!model || model === 'inherit') return undefined
+  if (typeof model === 'object' && model.provider && model.id) {
+    return modelRegistry.find(model.provider, model.id)
+  }
+  if (typeof model !== 'string') return undefined
+
+  const providerSeparator = model.indexOf('/')
+  if (providerSeparator > 0) {
+    return modelRegistry.find(
+      model.slice(0, providerSeparator),
+      model.slice(providerSeparator + 1),
+    )
+  }
+
+  return modelRegistry.getAvailable().find((item) => item.id === model)
+}
+
+function modelRequested(model) {
+  return Boolean(model && model !== 'inherit')
+}
+
+function formatSubagentModel(model) {
+  if (typeof model === 'object' && model) return `${model.provider || '?'} / ${model.id || '?'}`
+  return String(model)
+}
+
+function extractMessageText(content) {
+  if (typeof content === 'string') return content
+  if (!Array.isArray(content)) return ''
+  return content
+    .filter((b) => b?.type === 'text' || b?.type === 'toolResult')
+    .map((b) => b.type === 'toolResult' ? b.content || b.output || '' : b.text)
+    .join('\n')
+}
+
 export function createPiRuntimeApi() {
   return {
   activeRuntimeCwd: () => activeRuntime?.cwd,
@@ -713,5 +880,6 @@ export function createPiRuntimeApi() {
   toSessionDto,
   trashSession,
   updateMemory,
+  runSubagent,
   }
 }

@@ -756,6 +756,23 @@ async function selectSession(session, options) {
   sidebarOpen.value = false
 }
 
+async function navigateChildSession(childSession) {
+  if (!childSession) return
+
+  const session = sessions.value.find((s) => s.id === childSession.id)
+  if (session) {
+    await selectSession(session)
+    return
+  }
+
+  const childSessionObj = {
+    id: childSession.id,
+    path: childSession.path,
+    cwd: childSession.cwd,
+  }
+  await selectSession(childSessionObj)
+}
+
 function openProjectDetail(project) {
   if (memoryDirty.value && !confirmDiscardMemoryChanges()) return
   projectDetailCwd.value = project.cwd
@@ -837,6 +854,14 @@ function liveToolStatus(tool) {
   if (tool.status === 'error') return 'error'
   if (tool.status === 'aborted') return 'aborted'
   return 'completed'
+}
+
+function isLiveSubagentTool(item) {
+  return item.toolName === 'subagent'
+}
+
+function liveSubagentAgent(item) {
+  return item.label?.replace('Subagent · ', '') || 'subagent'
 }
 
 function liveItemClass(item) {
@@ -2019,6 +2044,7 @@ function closePickerMenus() {
             @edit="startEditingEntry"
             @fork="forkSession"
             @mark-feedback="markEntryFeedback"
+            @navigate-child-session="navigateChildSession"
             @reset="resetSessionToEntry"
             @retry="retryEntry"
             @open-tool-fullscreen="openToolFullscreen"
@@ -2062,6 +2088,7 @@ function closePickerMenus() {
               @copy="copyEntry"
               @fork="forkSession"
               @mark-feedback="markEntryFeedback"
+              @navigate-child-session="navigateChildSession"
               @reset="resetSessionToEntry"
               @open-tool-fullscreen="openToolFullscreen"
               @toggle-tool="toggleTool"
@@ -2071,12 +2098,20 @@ function closePickerMenus() {
               v-else-if="item.type === 'tool'"
               class="tool-card transcript-tool live-tool-card"
               :class="{
+                'subagent-card': isLiveSubagentTool(item),
                 'is-running': item.status === 'running',
                 'is-completed': item.status === 'completed',
                 'error-card': item.status === 'error',
               }"
             >
-              <div class="tool-card-header">
+              <div v-if="isLiveSubagentTool(item)" class="subagent-header">
+                <span class="live-tool-spinner"></span>
+                <span class="subagent-icon">↳</span>
+                <span class="subagent-agent-name">{{ liveSubagentAgent(item) }}</span>
+                <code v-if="item.code">{{ item.code }}</code>
+                <em>{{ liveToolStatus(item) }}</em>
+              </div>
+              <div v-else class="tool-card-header">
                 <span class="live-tool-spinner"></span>
                 <span>{{ item.label }}</span>
                 <code v-if="item.code">{{ item.code }}</code>

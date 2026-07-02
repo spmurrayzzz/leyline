@@ -919,6 +919,8 @@ export function useSessionWorkspace({
     const query = sessionQuery.value.trim().toLowerCase()
 
     for (const session of sessions.value) {
+      if (session.parentSessionPath) continue
+
       const key = session.cwd || 'unknown'
       const name = projectName(key)
       const projectScore = query ? fuzzyScore(name, query) : 1

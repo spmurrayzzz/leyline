@@ -11,7 +11,10 @@ export function piApi() {
     name: 'pi-api',
     configureServer(server) {
       configurePiWebSocketServer(server.httpServer)
-      server.middlewares.use('/api/pi', piApiHandler)
+      server.middlewares.use('/api/pi', (req, res, next) => {
+        if (req.headers.host) process.env.LEYLINE_SERVER_URL = `http://${req.headers.host}`
+        piApiHandler(req, res, next)
+      })
     },
   }
 }

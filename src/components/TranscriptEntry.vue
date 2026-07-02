@@ -30,6 +30,7 @@ const emit = defineEmits([
   'edit',
   'fork',
   'mark-feedback',
+  'navigate-child-session',
   'reset',
   'retry',
   'open-tool-fullscreen',
@@ -111,6 +112,36 @@ function saveFeedbackNote(entry) {
   emit('mark-feedback', entry, entry.rolloutFeedback, feedbackDraft.value)
   noteOpen.value = false
 }
+
+function isSubagentEntry(entry) {
+  return entry.type === 'tool' && entry.toolName === 'subagent'
+}
+
+function subagentStatus(result) {
+  if (result.error || result.exitCode !== 0) return 'error'
+  if (!result.messages.length && !result.childSession) return 'running'
+  return 'completed'
+}
+
+function entrySubagentStatus(entry) {
+  if (entry.subagentDetails?.background) return 'running'
+  if (entry.isError || entry.subagentDetails?.results?.some((result) => subagentStatus(result) === 'error')) return 'error'
+  return 'completed'
+}
+
+function subagentFinalOutput(result) {
+  if (result.error) return result.error
+  for (let i = result.messages.length - 1; i >= 0; i--) {
+    const message = result.messages[i]
+    if (message.role === 'assistant' || message.role === 'error') return message.content.trim()
+  }
+  return ''
+}
+
+function navigateChildSession(childSession) {
+  if (!childSession) return
+  emit('navigate-child-session', childSession)
+}
 </script>
 
 <template>
@@ -126,6 +157,96 @@ function saveFeedbackNote(entry) {
       {{ copyGlyph(entry.id) }}
     </button>
   </div>
+
+  <article
+    v-else-if="isSubagentEntry(entry)"
+    class="tool-card subagent-card transcript-tool"
+    :class="{ 'is-expanded': toolExpanded }"
+    @click="emit('toggle-tool', entry)"
+  >
+    <div class="subagent-header">
+      <span class="chevron">›</span>
+      <span class="subagent-icon">↳</span>
+      <span class="subagent-agent-name">{{ entry.label.replace('Subagent · ', '') }}</span>
+      <code v-if="entry.code">{{ entry.code }}</code>
+      <span
+        class="subagent-status"
+        :class="`status-${entrySubagentStatus(entry)}`"
+      >
+        {{ entrySubagentStatus(entry) }}
+      </span>
+      <button
+        class="copy-button"
+        type="button"
+        :title="copyTitle(entry.id)"
+        @click.stop="emit('copy', entry)"
+      >
+        {{ copyGlyph(entry.id) }}
+      </button>
+    </div>
+
+    <div
+      v-if="entry.subagentDetails?.results?.length"
+      class="subagent-results"
+    >
+      <div
+        v-for="(result, index) in entry.subagentDetails.results"
+        :key="index"
+        class="subagent-result-item"
+        :class="{ 'has-session': result.childSession }"
+        @click.stop="navigateChildSession(result.childSession)"
+      >
+        <span class="subagent-result-agent">{{ result.agent }}</span>
+        <span class="subagent-result-task">{{ result.task }}</span>
+        <span
+          v-if="result.childSession"
+          class="subagent-child-link"
+        >
+          → view session
+        </span>
+      </div>
+    </div>
+
+    <div class="tool-expand-wrapper" :class="{ 'is-expanded': toolExpanded }">
+      <div class="tool-expand-inner">
+        <div class="tool-expanded-body subagent-expanded" @click.stop>
+          <div
+            v-if="entry.isError && entry.text"
+            class="tool-error-summary"
+          >
+            <strong>Error</strong>
+            <pre>{{ entry.text }}</pre>
+          </div>
+          <template v-if="entry.subagentDetails?.results?.length">
+            <div
+              v-for="(result, index) in entry.subagentDetails.results"
+              :key="index"
+              class="subagent-detail-block"
+            >
+              <div class="subagent-detail-header">
+                <strong>{{ result.agent }}</strong>
+                <span class="subagent-detail-task">{{ result.task }}</span>
+              </div>
+              <pre v-if="subagentFinalOutput(result)" class="subagent-detail-output">{{ subagentFinalOutput(result) }}</pre>
+              <div v-if="result.childSession" class="subagent-child-meta">
+                <span>Session: {{ result.childSession.id }}</span>
+              </div>
+            </div>
+          </template>
+          <template v-else>
+            <div class="tool-preview-clip tool-plain-preview">
+              <pre
+                v-if="renderedToolJson(entry)"
+                class="tool-output json-output"
+                v-html="renderedToolJson(entry)"
+              ></pre>
+              <pre v-else class="tool-output">{{ entry.text }}</pre>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+  </article>
 
   <article
     v-else-if="entry.type === 'tool'"

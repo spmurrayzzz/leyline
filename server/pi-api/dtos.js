@@ -226,6 +226,7 @@ export function sessionInfo(handle) {
     path: manager.getSessionFile(),
     cwd: header.cwd || handle.runtime.cwd,
     name: manager.getSessionName?.(),
+    parentSessionPath: header.parentSession,
     firstMessage: firstMessage || goal?.objective || '(no messages)',
     created,
     modified: sessionModifiedDate(entries, header, created),
@@ -239,6 +240,7 @@ export function toSessionDto(session) {
     path: session.path,
     cwd: session.cwd,
     name: session.name,
+    parentSessionPath: session.parentSessionPath,
     firstMessage: truncate(session.firstMessage || '', 140),
     timestamp: session.created || timestampFromPath(session.path),
   }

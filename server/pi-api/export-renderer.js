@@ -181,6 +181,9 @@ function renderExportEntry(entry, index) {
 }
 
 function renderExportTool(entry, index) {
+  if (entry.toolName === 'subagent') {
+    return renderExportSubagent(entry, index)
+  }
   return `<details class="tool-card transcript-tool${entry.isError ? ' error-card' : ''}">
 <summary class="tool-card-header">
 <span class="chevron tool-chevron">›</span>
@@ -193,6 +196,49 @@ ${entry.contextLabel ? renderToolContext(entry) : ''}
 <div class="tool-lazy-placeholder">Open to render preview</div>
 </div>
 </details>`
+}
+
+function renderExportSubagent(entry, index) {
+  const details = entry.subagentDetails
+  const results = details?.results || []
+  const hasErroredResult = results.some((result) => result.error || result.exitCode !== 0)
+  const status = details?.background ? 'running' : (entry.isError || hasErroredResult ? 'error' : 'completed')
+  const agentName = entry.label.replace('Subagent · ', '')
+
+  let resultsHtml = ''
+  for (const result of results) {
+    const output = subagentFinalOutput(result)
+    resultsHtml += `
+<div class="subagent-detail-block">
+<div class="subagent-detail-header">
+<strong>${escapeHtml(result.agent)}</strong>
+<span class="subagent-detail-task">${escapeHtml(result.task)}</span>
+</div>
+${output ? `<pre class="subagent-detail-output">${escapeHtml(output)}</pre>` : ''}
+</div>`
+  }
+
+  return `<details class="tool-card subagent-card transcript-tool${entry.isError ? ' error-card' : ''}">
+<summary class="subagent-header">
+<span class="chevron tool-chevron">›</span>
+<span class="subagent-icon">↳</span>
+<span class="subagent-agent-name">${escapeHtml(agentName)}</span>
+${entry.code ? `<code>${escapeHtml(entry.code)}</code>` : ''}
+<span class="subagent-status status-${status}">${status}</span>
+</summary>
+<div class="tool-expanded-body subagent-expanded" data-tool-index="${index}">
+${resultsHtml || '<div class="tool-lazy-placeholder">Open to render details</div>'}
+</div>
+</details>`
+}
+
+function subagentFinalOutput(result) {
+  if (result.error) return result.error
+  for (let i = result.messages.length - 1; i >= 0; i--) {
+    const message = result.messages[i]
+    if (message.role === 'assistant' || message.role === 'error') return message.content.trim()
+  }
+  return ''
 }
 
 function renderToolContext(entry) {
@@ -995,5 +1041,100 @@ button, input, textarea { color: inherit; font: inherit; }
   .tool-card[open] .tool-chevron {
     transform: rotate(90deg);
   }
+  .subagent-card[open] .chevron,
+  .subagent-card[open] .tool-chevron {
+    transform: rotate(90deg);
+  }
+}
+
+.subagent-card {
+  border-color: rgb(124 92 255 / 20%);
+  background: rgb(124 92 255 / 4%);
+}
+
+.subagent-card summary { list-style: none; cursor: pointer; }
+.subagent-card summary::-webkit-details-marker { display: none; }
+
+.subagent-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #777;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.subagent-icon { color: #bfb5ff; font-size: 15px; font-weight: 800; line-height: 1; }
+
+.subagent-agent-name {
+  color: #d7d3ff;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.subagent-header code {
+  overflow: hidden;
+  max-width: 320px;
+  border: 1px solid var(--border-soft);
+  border-radius: 7px;
+  background: #17181e;
+  padding: 2px 6px;
+  color: #aaa;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subagent-status { margin-left: auto; font-size: 11px; font-style: normal; font-weight: 700; text-transform: uppercase; }
+.subagent-status.status-completed { color: #82d69a; }
+.subagent-status.status-running { color: #bfb5ff; }
+.subagent-status.status-error { color: #fca5a5; }
+
+.subagent-expanded {
+  margin-top: 9px;
+  border-top: 1px solid var(--border-soft);
+  padding-top: 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.subagent-detail-block {
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: #0f1014;
+  padding: 8px 10px;
+}
+
+.subagent-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.subagent-detail-header strong {
+  color: #bfb5ff;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.subagent-detail-task { color: #999; font-size: 12px; }
+
+.subagent-detail-output {
+  overflow: auto;
+  max-height: 200px;
+  margin: 0;
+  padding: 8px;
+  border-radius: 6px;
+  background: #131419;
+  color: #b8b8b8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
 }`
 }

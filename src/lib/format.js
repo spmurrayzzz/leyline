@@ -53,6 +53,7 @@ export function toolLabel(toolName) {
   if (toolName === 'record_memory') return 'Memory · Record'
   if (toolName === 'update_memory') return 'Memory · Update'
   if (toolName === 'archive_memory') return 'Memory · Archive'
+  if (toolName === 'subagent') return 'Subagent'
   return toolName
 }
 
