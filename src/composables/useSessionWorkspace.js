@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue'
-import { fuzzyScore, highlightedText as highlightFuzzyText } from '../lib/fuzzy'
+import { highlightedText as highlightFuzzyText } from '../lib/fuzzy'
 import { formatMode, modelChip, projectName } from '../lib/format'
 import {
   activatePiSession,
@@ -923,7 +923,7 @@ export function useSessionWorkspace({
 
       const key = session.cwd || 'unknown'
       const name = projectName(key)
-      const projectScore = query ? fuzzyScore(name, query) : 1
+      const projectScore = query ? sidebarSearchScore(name, query) : 1
       const sessionScoreValue = query ? sessionScore(session, query) : 1
 
       if (query && projectScore === 0 && sessionScoreValue === 0) continue
@@ -939,12 +939,13 @@ export function useSessionWorkspace({
 
       if (!query || projectScore > 0 || sessionScoreValue > 0) {
         projects.get(key).sessions.push(session)
-        projects.get(key).score = Math.max(
-          projects.get(key).score,
-          projectScore,
-          sessionScoreValue,
-        )
       }
+
+      projects.get(key).score = Math.max(
+        projects.get(key).score,
+        projectScore,
+        sessionScoreValue,
+      )
     }
 
     const projectList = Array.from(projects.values())
@@ -958,7 +959,76 @@ export function useSessionWorkspace({
   }
 
   function sessionScore(session, query) {
-    return fuzzyScore(sessionTitle(session), query)
+    return sidebarSearchScore(sessionTitle(session), query)
+  }
+
+  function sidebarSearchScore(value, query) {
+    const text = String(value || '').toLowerCase()
+    const terms = String(query || '').toLowerCase().split(/\s+/).filter(Boolean)
+    let total = 0
+
+    for (const term of terms) {
+      const score = sidebarTermScore(text, term)
+      if (!score) return 0
+      total += score
+    }
+
+    return total
+  }
+
+  function sidebarTermScore(text, term) {
+    if (!text || !term) return 0
+    if (text === term) return 600
+    if (text.startsWith(term)) return 500 + term.length
+
+    const wordIndex = text.search(new RegExp(`(^|[\\s/_\\-.])${escapeRegExp(term)}`))
+    if (wordIndex !== -1) return 420 + term.length - wordIndex
+
+    const index = text.indexOf(term)
+    if (index !== -1) return 320 + term.length - index
+    if (term.length < 3) return 0
+
+    return compactSubsequenceScore(text, term)
+  }
+
+  function compactSubsequenceScore(text, term) {
+    let best = 0
+
+    for (let start = 0; start < text.length; start++) {
+      if (text[start] !== term[0]) continue
+
+      let position = start
+      let consecutive = 1
+      let streak = 1
+
+      for (let index = 1; index < term.length; index++) {
+        const next = text.indexOf(term[index], position + 1)
+        if (next === -1) {
+          position = -1
+          break
+        }
+
+        streak = next === position + 1 ? streak + 1 : 1
+        if (streak > 1) consecutive += 1
+        position = next
+      }
+
+      if (position === -1) continue
+
+      const span = position - start + 1
+      const maxSpan = Math.ceil(term.length * 1.6)
+      if (span > maxSpan) continue
+
+      const boundary = start === 0 || /[\s/_\-.]/.test(text[start - 1])
+      const score = 180 + consecutive * 12 - span + (boundary ? 40 : 0)
+      best = Math.max(best, score)
+    }
+
+    return best
+  }
+
+  function escapeRegExp(value) {
+    return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   }
 
   function sessionTimestamp(session) {
