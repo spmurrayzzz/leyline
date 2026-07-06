@@ -20,6 +20,7 @@ interface SingleResult {
   agent: string;
   agentSource: "user" | "project" | "unknown";
   task: string;
+  requestedModel?: string;
   childSession: { path: string; id: string; cwd?: string } | null;
   exitCode: number;
   messages: Array<{ role: string; content: string }>;
@@ -180,6 +181,17 @@ function agentModel(agent: AgentDef, ctx: ExtensionContext): string | { provider
   return agent.model || undefined;
 }
 
+function selectedAgentModel(
+  agent: AgentDef,
+  modelOverride: string | undefined,
+  ctx: ExtensionContext,
+): string | { provider: string; id: string } | undefined {
+  const override = modelOverride?.trim();
+  if (!override) return agentModel(agent, ctx);
+  if (override === "inherit") return ctx.model ? { provider: ctx.model.provider, id: ctx.model.id } : undefined;
+  return override;
+}
+
 export default function subagentExtension(pi: ExtensionAPI) {
   let knownAgents = new Map<string, AgentDef>();
 
@@ -234,6 +246,9 @@ export default function subagentExtension(pi: ExtensionAPI) {
       task: Type.Optional(Type.String({
         description: "The task to delegate to the subagent",
       })),
+      model: Type.Optional(Type.String({
+        description: "Optional model override for the child agent. Use 'inherit', a model id, or provider/model-id.",
+      })),
       mode: Type.Optional(
         Type.Enum({
           single: "single",
@@ -253,6 +268,7 @@ export default function subagentExtension(pi: ExtensionAPI) {
           Type.Object({
             agent: Type.String({ description: "Agent name" }),
             task: Type.String({ description: "Task for this agent" }),
+            model: Type.Optional(Type.String({ description: "Optional model override for this child agent" })),
             cwd: Type.Optional(Type.String({ description: "Working directory" })),
           }),
           { description: "For parallel mode: concurrent tasks" },
@@ -265,6 +281,7 @@ export default function subagentExtension(pi: ExtensionAPI) {
             task: Type.String({
               description: "Task with {previous} replaced by prior step output",
             }),
+            model: Type.Optional(Type.String({ description: "Optional model override for this child agent" })),
             cwd: Type.Optional(Type.String({ description: "Working directory" })),
           }),
           { description: "For chain mode: sequential tasks" },
@@ -302,7 +319,7 @@ export default function subagentExtension(pi: ExtensionAPI) {
       const baseCwd = params.cwd || ctx.cwd;
 
       if (mode === "single") {
-        const result = await executeSingle(agent!, params.task, baseCwd, parentPath, signal, ctx);
+        const result = await executeSingle(agent!, params.task, baseCwd, parentPath, params.model, signal, ctx);
         const output = resultOutput(result);
         return {
           content: [{ type: "text", text: output }],
@@ -340,7 +357,7 @@ export default function subagentExtension(pi: ExtensionAPI) {
                   error: `Unknown agent: ${t.agent}`,
                 } as SingleResult;
               }
-              return executeSingle(a, t.task, t.cwd || baseCwd, parentPath, signal, ctx);
+              return executeSingle(a, t.task, t.cwd || baseCwd, parentPath, t.model || params.model, signal, ctx);
             }),
           );
           results.push(...batchResults);
@@ -388,7 +405,7 @@ export default function subagentExtension(pi: ExtensionAPI) {
           }
 
           const taskWithPrev = step.task.replace(/\{previous\}/g, previousOutput);
-          const result = await executeSingle(a, taskWithPrev, step.cwd || baseCwd, parentPath, signal, ctx);
+          const result = await executeSingle(a, taskWithPrev, step.cwd || baseCwd, parentPath, step.model || params.model, signal, ctx);
           results.push(result);
           if (result.error || result.exitCode !== 0) {
             return {
@@ -440,6 +457,7 @@ async function executeSingle(
   task: string,
   cwd: string,
   parentSessionPath: string | null,
+  modelOverride: string | undefined,
   signal: AbortSignal | undefined,
   ctx: ExtensionContext,
 ): Promise<SingleResult> {
@@ -450,7 +468,7 @@ async function executeSingle(
       task,
       cwd,
       parentSessionPath,
-      model: agentModel(agent, ctx),
+      model: selectedAgentModel(agent, modelOverride, ctx),
       tools: agent.tools,
       systemPrompt: agent.systemPrompt,
       signal,
@@ -461,6 +479,7 @@ async function executeSingle(
       agent: agent.name,
       agentSource: agent.source,
       task,
+      requestedModel: modelOverride,
       childSession: data.childSession || null,
       exitCode: failedResult(data) ? 1 : 0,
       messages: data.messages || [],
@@ -475,6 +494,7 @@ async function executeSingle(
       agent: agent.name,
       agentSource: agent.source,
       task,
+      requestedModel: modelOverride,
       childSession: null,
       exitCode: 1,
       messages: [],
