@@ -919,7 +919,7 @@ export function useSessionWorkspace({
     const query = sessionQuery.value.trim().toLowerCase()
 
     for (const session of sessions.value) {
-      if (session.parentSessionPath) continue
+      if (session.isSubagentSession) continue
 
       const key = session.cwd || 'unknown'
       const name = projectName(key)

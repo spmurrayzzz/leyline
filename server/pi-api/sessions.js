@@ -12,9 +12,9 @@ const SESSION_DIR_ENV = 'PI_CODING_AGENT_SESSION_DIR'
 
 export async function listPersistedSessions() {
   const sessionDir = configuredSessionDir(process.cwd())
-  return sessionDir
-    ? listSessionsFromConfiguredDir(sessionDir)
-    : SessionManager.listAll()
+  if (!sessionDir) return markSubagentSessions(await SessionManager.listAll())
+
+  return listSessionsFromConfiguredDir(sessionDir)
 }
 
 export function configuredSessionDir(cwd) {
@@ -31,10 +31,22 @@ function expandTildePath(value) {
 
 async function listSessionsFromConfiguredDir(sessionDir) {
   const files = await sessionFiles(sessionDir)
-  const sessions = await Promise.all(files.map(buildSessionInfo))
-  return sessions
-    .filter(Boolean)
-    .sort((a, b) => b.modified.getTime() - a.modified.getTime())
+  const sessions = (await Promise.all(files.map(buildSessionInfo))).filter(Boolean)
+  const marked = await markSubagentSessions(sessions)
+  return marked.sort((a, b) => b.modified.getTime() - a.modified.getTime())
+}
+
+async function markSubagentSessions(sessions) {
+  const childPathLists = await Promise.all(sessions.map(async (session) => {
+    if (session.subagentChildPaths) return session.subagentChildPaths
+    return subagentChildPathsFromFile(session.path)
+  }))
+  const subagentPaths = new Set(childPathLists.flat())
+
+  return sessions.map(({ subagentChildPaths, ...session }) => ({
+    ...session,
+    isSubagentSession: subagentPaths.has(session.path),
+  }))
 }
 
 async function sessionFiles(sessionDir) {
@@ -95,6 +107,8 @@ async function buildSessionInfo(filePath) {
       cwd: typeof header.cwd === 'string' ? header.cwd : '',
       name,
       parentSessionPath: header.parentSession,
+      isSubagentSession: false,
+      subagentChildPaths: subagentChildPaths(entries),
       created: new Date(header.timestamp),
       modified: sessionModifiedDate(entries, header, stats.mtime),
       messageCount,
@@ -115,6 +129,29 @@ function parseSessionEntries(content) {
     } catch {}
   }
   return entries
+}
+
+async function subagentChildPathsFromFile(path) {
+  try {
+    return subagentChildPaths(parseSessionEntries(await readFile(path, 'utf8')))
+  } catch {
+    return []
+  }
+}
+
+function subagentChildPaths(entries) {
+  const paths = []
+  for (const entry of entries) {
+    const message = entry.message
+    if (entry.type !== 'message' || message?.role !== 'toolResult') continue
+    if (message.toolName !== 'subagent') continue
+
+    for (const result of message.details?.results || []) {
+      const path = result.childSession?.path
+      if (typeof path === 'string' && path) paths.push(path)
+    }
+  }
+  return paths
 }
 
 export function messageText(content) {
