@@ -22,7 +22,7 @@
     "video:mp4": "node scripts/video-mp4.js"
   },
   "dependencies": {
-    "@earendil-works/pi-coding-agent": "0.80.2",
+    "@earendil-works/pi-coding-agent": "0.80.5",
     "@pierre/diffs": "1.2.0-beta.6",
     "@vitejs/plugin-vue": "6.0.7",
     "@xterm/addon-fit": "0.11.0",
