@@ -1743,7 +1743,7 @@ function closePickerMenus() {
         <div class="topbar-project">
           <div v-if="selectedSession" class="workbench-title-row">
             <button
-              v-if="selectedSession.parentSessionPath"
+              v-if="selectedSession.isSubagentSession && selectedSession.parentSessionPath"
               class="parent-session-button"
               type="button"
               @click="navigateParentSession"
