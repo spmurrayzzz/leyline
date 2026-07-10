@@ -1,3 +1,5 @@
 trusted_packages:
+  - purl: pkg:npm/@earendil-works/pi-coding-agent
+    reason: "First-party pi dependency; trust all versions without the dependency cooldown"
   - purl: pkg:npm/@mistralai/mistralai@2.2.1
     reason: "False positive in MAL-2026-3432; affected versions are 2.2.2, 2.2.3, and 2.2.4"
