@@ -4,7 +4,7 @@
   grid-template-rows: auto 1fr;
   min-width: 0;
   min-height: 0;
-  background: #111217;
+  background: #0c0c0e;
 }
 
 .leyline-app.start-state:not(.new-session-transition) .main-pane {
@@ -17,7 +17,8 @@
   grid-row: 1;
   min-width: 0;
   border-bottom: 1px solid var(--border-soft);
-  background: #0f1014;
+  background: rgb(16 16 18 / 94%);
+  backdrop-filter: blur(16px);
 }
 
 .new-session-transition .runtime-chrome {
@@ -30,9 +31,9 @@
   justify-content: space-between;
   gap: 18px;
   min-width: 0;
-  min-height: 48px;
-  background: #0f1014;
-  padding: 0 max(44px, calc((100% - var(--content-max)) / 2));
+  min-height: 46px;
+  background: transparent;
+  padding: 0 max(32px, calc((100% - var(--content-max)) / 2));
 }
 
 .composer-bar {
@@ -55,13 +56,15 @@ h1 {
 .topbar-project {
   display: grid;
   min-width: 0;
-  gap: 4px;
+  gap: 3px;
 }
 
 .topbar-project strong {
   overflow: hidden;
   color: var(--text);
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -87,9 +90,9 @@ h1 {
 .parent-session-button {
   flex: none;
   border: 1px solid var(--border-soft);
-  border-radius: 999px;
-  background: #15161d;
-  padding: 3px 8px;
+  border-radius: 6px;
+  background: #151517;
+  padding: 3px 7px;
   color: var(--muted-strong);
   font-size: 11px;
   font-weight: 800;
@@ -206,7 +209,7 @@ h1 {
 
 .running-pill {
   border: 1px solid var(--accent-border);
-  border-radius: 999px;
+  border-radius: 6px;
   background: var(--accent-soft);
   padding: 2px 7px;
   color: #bfb5ff;
@@ -218,8 +221,8 @@ h1 {
   overflow: hidden;
   max-width: 180px;
   border: 1px solid var(--border-soft);
-  border-radius: 999px;
-  background: #17181e;
+  border-radius: 6px;
+  background: #161618;
   padding: 3px 8px;
   color: #a3a3a3;
   text-overflow: ellipsis;
@@ -276,9 +279,9 @@ h1 {
 
 .event-log-button,
 .delete-session-button {
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--panel-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  background: transparent;
   padding: 3px 8px;
   color: var(--muted-strong);
   font-size: 11px;
