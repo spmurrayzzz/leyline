@@ -73,8 +73,35 @@ export async function fetchPiRuntimeState(cwd) {
   return data.active
 }
 
+export function fetchSubagentConfigs(session) {
+  const params = scopedSessionParams(session)
+  return apiRequest(`/api/pi/subagents?${params}`, 'Failed to load subagents')
+}
+
+export function setSubagentModelOverride(session, agentKey, scope, model) {
+  return apiRequest(
+    `/api/pi/subagents/${encodeURIComponent(agentKey)}/model`,
+    'Failed to update subagent',
+    {
+      method: 'PUT',
+      body: scopedBody(session, { scope, model }),
+    },
+  )
+}
+
+export function clearSubagentModelOverride(session, agentKey, scope) {
+  return apiRequest(
+    `/api/pi/subagents/${encodeURIComponent(agentKey)}/model`,
+    'Failed to reset subagent',
+    {
+      method: 'DELETE',
+      body: scopedBody(session, { scope }),
+    },
+  )
+}
+
 export function fetchVisibleMemories(session) {
-  const params = memorySessionParams(session)
+  const params = scopedSessionParams(session)
   return apiRequest(
     `/api/pi/memories?${params}`,
     'Failed to load memories',
@@ -84,7 +111,7 @@ export function fetchVisibleMemories(session) {
 export function createPiMemory(session, scope, contentMd, tags = []) {
   return apiRequest('/api/pi/memories', 'Failed to create memory', {
     method: 'POST',
-    body: memoryBody(session, { contentMd, scope, tags }),
+    body: scopedBody(session, { contentMd, scope, tags }),
   })
 }
 
@@ -94,7 +121,7 @@ export function updatePiMemory(session, memoryId, contentMd, tags = []) {
     'Failed to update memory',
     {
       method: 'PATCH',
-      body: memoryBody(session, { contentMd, tags }),
+      body: scopedBody(session, { contentMd, tags }),
     },
   )
 }
@@ -102,14 +129,14 @@ export function updatePiMemory(session, memoryId, contentMd, tags = []) {
 export function setPiMemoryStatus(session, ids, status) {
   return apiRequest('/api/pi/memories/status', 'Failed to update memories', {
     method: 'POST',
-    body: memoryBody(session, { ids, status }),
+    body: scopedBody(session, { ids, status }),
   })
 }
 
 export function deletePiMemories(session, ids) {
   return apiRequest('/api/pi/memories', 'Failed to delete memories', {
     method: 'DELETE',
-    body: memoryBody(session, { ids }),
+    body: scopedBody(session, { ids }),
   })
 }
 
@@ -233,7 +260,7 @@ export async function switchPiThinkingLevel(sessionId, level) {
   return data.active
 }
 
-function memorySessionParams(session) {
+function scopedSessionParams(session) {
   const params = new URLSearchParams()
   if (session?.cwd) params.set('cwd', session.cwd)
   const path = session?.sessionFile || session?.path
@@ -241,7 +268,7 @@ function memorySessionParams(session) {
   return params.toString()
 }
 
-function memoryBody(session, body) {
+function scopedBody(session, body) {
   return {
     ...body,
     cwd: session?.cwd || '',

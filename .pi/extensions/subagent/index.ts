@@ -3,7 +3,7 @@ import type {
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
 
@@ -14,6 +14,7 @@ interface AgentDef {
   tools: string[];
   systemPrompt: string;
   source: "user" | "project" | "unknown";
+  key: string;
 }
 
 interface SingleResult {
@@ -66,14 +67,14 @@ function loadAgentsFromDir(
 
       try {
         const content = readFileSync(join(dir, entry.name), "utf8");
-        const def = parseAgentDef(content, source);
+        const def = parseAgentDef(content, source, join(dir, entry.name));
         if (def) map.set(def.name, def);
       } catch {}
     }
   } catch {}
 }
 
-function parseAgentDef(content: string, source: "user" | "project"): AgentDef | null {
+function parseAgentDef(content: string, source: "user" | "project", path: string): AgentDef | null {
   const match = content.match(/^---\s*\n([\s\S]*?)\n---\s*\n?([\s\S]*)$/);
   if (!match) return null;
 
@@ -90,7 +91,9 @@ function parseAgentDef(content: string, source: "user" | "project"): AgentDef | 
 
   if (!name || !description) return null;
 
-  return { name, description, model, tools, systemPrompt: body, source };
+  let canonicalPath = path;
+  try { canonicalPath = realpathSync(path); } catch {}
+  return { name, description, model, tools, systemPrompt: body, source, key: `${source}:${canonicalPath}:${name}` };
 }
 
 function extractField(frontmatter: string, field: string): string | null {
@@ -139,6 +142,20 @@ async function callLeylineApi(
     throw new Error(data.error || `API error: ${response.status}`);
   }
   return data;
+}
+
+async function resolveSubagentConfig(params: {
+  agent: AgentDef;
+  cwd: string;
+  parentSessionPath: string | null;
+  signal?: AbortSignal;
+}): Promise<{ model?: string }> {
+  return callLeylineApi("/subagents/resolve", {
+    agentKey: params.agent.key,
+    cwd: params.cwd,
+    sessionPath: params.parentSessionPath,
+    staticModel: params.agent.model,
+  }, params.signal) as Promise<{ model?: string }>;
 }
 
 async function runSubagentViaApi(params: {
@@ -464,11 +481,14 @@ async function executeSingle(
   const emptyUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0, cost: 0, turns: 0 };
 
   try {
+    const configured = modelOverride?.trim()
+      ? { model: modelOverride }
+      : await resolveSubagentConfig({ agent, cwd: ctx.cwd, parentSessionPath, signal });
     const result = await runSubagentViaApi({
       task,
       cwd,
       parentSessionPath,
-      model: selectedAgentModel(agent, modelOverride, ctx),
+      model: selectedAgentModel(agent, configured.model, ctx),
       tools: agent.tools,
       systemPrompt: agent.systemPrompt,
       signal,

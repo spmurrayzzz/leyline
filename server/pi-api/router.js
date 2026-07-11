@@ -6,6 +6,7 @@ export function createPiApiHandler(api) {
     createMemory,
     createNewSession,
     deleteMemories,
+    deleteSubagentModelOverride,
     editSessionPrompt,
     exportFilename,
     exportSessionDetail,
@@ -15,6 +16,7 @@ export function createPiApiHandler(api) {
     interruptSession,
     json,
     listSessions,
+    listSubagentConfigs,
     listVisibleMemories,
     openEventStream,
     promptSession,
@@ -25,11 +27,13 @@ export function createPiApiHandler(api) {
     requireActiveHandle,
     resetSessionToEntry,
     resolveSession,
+    resolveSubagentConfig,
     runSubagent,
     runtimeHandleForId,
     runtimeState,
     setMemoryStatus,
     setRolloutFeedback,
+    setSubagentModelOverride,
     setSessionMode,
     setSessionModel,
     setSessionThinkingLevel,
@@ -317,6 +321,53 @@ async function piApiHandler(req, res) {
         }
 
         return json(res, { error: 'Method not allowed' }, 405)
+      }
+
+      if (url.pathname === '/subagents') {
+        if (req.method !== 'GET') {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+        return json(res, listSubagentConfigs({
+          cwd: url.searchParams.get('cwd'),
+          sessionPath: url.searchParams.get('sessionPath'),
+        }))
+      }
+
+      if (url.pathname === '/subagents/resolve') {
+        if (req.method !== 'POST') {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+        const body = await readJson(req)
+        return json(res, resolveSubagentConfig({
+          agentKey: body.agentKey,
+          cwd: body.cwd,
+          sessionPath: body.sessionPath,
+          staticModel: body.staticModel,
+        }))
+      }
+
+      const subagentOverrideMatch = url.pathname.match(/^\/subagents\/(.+)\/model$/)
+      if (subagentOverrideMatch) {
+        if (!['PUT', 'DELETE'].includes(req.method)) {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+        const agentKey = decodeURIComponent(subagentOverrideMatch[1])
+        const body = await readJson(req)
+        if (req.method === 'PUT') {
+          return json(res, setSubagentModelOverride({
+            agentKey,
+            cwd: body.cwd,
+            model: body.model,
+            scope: body.scope,
+            sessionPath: body.sessionPath,
+          }))
+        }
+        return json(res, deleteSubagentModelOverride({
+          agentKey,
+          cwd: body.cwd,
+          scope: body.scope,
+          sessionPath: body.sessionPath,
+        }))
       }
 
       if (url.pathname === '/subagent') {

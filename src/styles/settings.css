@@ -146,3 +146,162 @@
   margin-top: -2px;
 }
 
+.settings-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--panel);
+  padding: 10px;
+  color: var(--muted);
+  text-align: left;
+}
+
+.settings-action-row:hover:not(:disabled) {
+  border-color: #4b4d58;
+  color: var(--text);
+}
+
+.settings-action-row > span:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.settings-action-row strong {
+  color: #d9dbe4;
+  font-size: 12px;
+}
+
+.settings-action-row small {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.subagent-config-drawer {
+  gap: 12px;
+}
+
+.subagent-scope-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  border: 1px solid var(--border-soft);
+  border-radius: 9px;
+  background: #0c0d11;
+  padding: 3px;
+}
+
+.subagent-scope-tabs button {
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  padding: 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.subagent-scope-tabs button.active {
+  background: var(--panel-soft);
+  color: var(--text);
+}
+
+.subagent-scope-note {
+  margin: -4px 2px 2px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.subagent-config-list {
+  display: grid;
+  gap: 8px;
+}
+
+.subagent-config-card {
+  display: grid;
+  gap: 9px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--panel);
+  padding: 10px;
+}
+
+.subagent-config-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.subagent-config-heading > div {
+  display: grid;
+  gap: 2px;
+}
+
+.subagent-config-heading strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.subagent-config-heading span,
+.subagent-config-heading code,
+.subagent-effective-model span,
+.subagent-tool-summary {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.subagent-config-heading code {
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.subagent-config-card p {
+  margin: 0;
+  color: #b5b7c0;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.subagent-config-card label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.subagent-config-card select {
+  width: 100%;
+  border: 1px solid var(--border-soft);
+  border-radius: 7px;
+  background: #0c0d11;
+  padding: 7px 8px;
+  color: var(--text);
+  font: inherit;
+  font-size: 11px;
+}
+
+.subagent-effective-model {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  color: #b5b7c0;
+  font-size: 10px;
+}
+
+.subagent-effective-model strong {
+  color: #d9dbe4;
+  font-weight: 500;
+}
+
+.subagent-tool-summary {
+  overflow-wrap: anywhere;
+  border-top: 1px solid rgb(255 255 255 / 5%);
+  padding-top: 8px;
+  line-height: 1.4;
+}
+

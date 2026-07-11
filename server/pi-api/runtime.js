@@ -39,6 +39,13 @@ import {
 import { setRolloutFeedback } from './rollout-feedback.js'
 import { configuredSessionDir, listPersistedSessions } from './sessions.js'
 import {
+  copySessionSubagentOverrides,
+  deleteSubagentModelOverride,
+  listSubagentConfigs,
+  resolveSubagentConfig,
+  setSubagentModelOverride,
+} from './subagents.js'
+import {
   createAgentSessionFromServices,
   createAgentSessionRuntime,
   createAgentSessionServices,
@@ -429,6 +436,7 @@ async function forkActiveSession(entryId) {
   }
 
   const previousId = activeHandle.sessionId
+  const previousSessionPath = activeRuntime.session.sessionManager.getSessionFile()
   const result = await activeRuntime.fork(entryId, { position: 'at' })
   if (result.cancelled) throw new Error('Fork cancelled')
   forceOneAtATime(activeRuntime.session)
@@ -436,6 +444,11 @@ async function forkActiveSession(entryId) {
   activeHandle.sessionId = activeRuntime.session.sessionManager.getSessionId()
   runtimeHandles.set(activeHandle.sessionId, activeHandle)
   setActiveHandle(activeHandle)
+  copySessionSubagentOverrides({
+    cwd: activeRuntime.session.sessionManager.getCwd(),
+    fromSessionPath: previousSessionPath,
+    toSessionPath: activeRuntime.session.sessionManager.getSessionFile(),
+  })
   await bindActiveSession()
   return activeSessionDto()
 }
@@ -856,6 +869,7 @@ export function createPiRuntimeApi() {
   interruptSession,
   json,
   listSessions,
+  listSubagentConfigs,
   listVisibleMemories,
   openEventStream,
   promptSession,
@@ -867,9 +881,12 @@ export function createPiRuntimeApi() {
   requireActiveHandle,
   resetSessionToEntry,
   resolveSession,
+  resolveSubagentConfig,
   runtimeHandleForId,
   runtimeState,
   setMemoryStatus,
+  setSubagentModelOverride,
+  deleteSubagentModelOverride,
   setSessionMode,
   setSessionModel,
   setRolloutFeedback,

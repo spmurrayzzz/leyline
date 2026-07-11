@@ -6,6 +6,7 @@ import ProjectBrowser from './components/ProjectBrowser.vue'
 import ProjectDetailDrawer from './components/ProjectDetailDrawer.vue'
 import MemoryInspector from './components/MemoryInspector.vue'
 import SessionComposer from './components/SessionComposer.vue'
+import SubagentConfigDrawer from './components/SubagentConfigDrawer.vue'
 import StartComposer from './components/StartComposer.vue'
 import SessionSidebar from './components/SessionSidebar.vue'
 import TranscriptEntry from './components/TranscriptEntry.vue'
@@ -31,9 +32,12 @@ import {
   compactPiSession,
   editPrompt,
   fetchSessionDetailByPath,
+  clearSubagentModelOverride,
+  fetchSubagentConfigs,
   interruptPiSession,
   runShellCommand,
   setEntryFeedback,
+  setSubagentModelOverride,
   submitPrompt,
 } from './lib/pi-api'
 import {
@@ -51,6 +55,12 @@ const attachedImages = ref([])
 const workbench = ref(null)
 const eventLogOpen = ref(false)
 const settingsOpen = ref(false)
+const subagentConfigOpen = ref(false)
+const subagentConfigLoading = ref(false)
+const subagentConfigSaving = ref(false)
+const subagentConfigError = ref('')
+const subagentConfigData = ref({ context: {}, agents: [] })
+let subagentConfigRequestToken = 0
 const projectDetailCwd = ref('')
 const promptSubmitting = ref(false)
 const interrupting = ref(false)
@@ -249,6 +259,9 @@ const {
   visibleProjects,
 } = sessionWorkspace
 workbenchScroll.bind({ selectedSessionId, liveItems })
+watch(selectedSessionId, () => {
+  if (subagentConfigOpen.value) void loadSubagentConfigs()
+})
 const {
   projectBrowserOpen,
   projectBrowserInitialPath,
@@ -796,6 +809,7 @@ function openProjectDetail(project) {
   if (memoryDirty.value && !confirmDiscardMemoryChanges()) return
   projectDetailCwd.value = project.cwd
   settingsOpen.value = false
+  subagentConfigOpen.value = false
   eventLogOpen.value = false
   if (memoryOpen.value) closeMemoryDrawer()
 }
@@ -896,6 +910,7 @@ function liveItemClass(item) {
 function toggleSettingsDrawer() {
   if (memoryDirty.value && !confirmDiscardMemoryChanges()) return
   settingsOpen.value = !settingsOpen.value
+  subagentConfigOpen.value = false
   eventLogOpen.value = false
   memoryOpen.value = false
   if (settingsOpen.value) projectDetailCwd.value = ''
@@ -905,6 +920,7 @@ function toggleEventDrawer() {
   if (memoryDirty.value && !confirmDiscardMemoryChanges()) return
   eventLogOpen.value = !eventLogOpen.value
   settingsOpen.value = false
+  subagentConfigOpen.value = false
   memoryOpen.value = false
   if (eventLogOpen.value) projectDetailCwd.value = ''
 }
@@ -912,9 +928,97 @@ function toggleEventDrawer() {
 function toggleMemoryPanel() {
   const wasOpen = memoryOpen.value
   toggleMemoryDrawer()
-  if (!wasOpen && memoryOpen.value) projectDetailCwd.value = ''
+  if (!wasOpen && memoryOpen.value) {
+    projectDetailCwd.value = ''
+    subagentConfigOpen.value = false
+  }
 }
 
+async function openSubagentConfig() {
+  if (!selectedSession.value?.cwd) return
+  settingsOpen.value = false
+  eventLogOpen.value = false
+  memoryOpen.value = false
+  projectDetailCwd.value = ''
+  subagentConfigOpen.value = true
+  await loadSubagentConfigs()
+}
+
+function subagentSessionKey(session) {
+  return `${session?.id || ''}:${session?.sessionFile || session?.path || ''}`
+}
+
+function currentSubagentRequest(token, sessionKey) {
+  return token === subagentConfigRequestToken
+    && sessionKey === subagentSessionKey(selectedSession.value)
+}
+
+async function loadSubagentConfigs() {
+  const session = selectedSession.value
+  if (!session?.cwd) return
+  const token = ++subagentConfigRequestToken
+  const sessionKey = subagentSessionKey(session)
+  subagentConfigLoading.value = true
+  subagentConfigSaving.value = false
+  subagentConfigError.value = ''
+  try {
+    const data = await fetchSubagentConfigs(session)
+    if (currentSubagentRequest(token, sessionKey)) subagentConfigData.value = data
+  } catch (error) {
+    if (currentSubagentRequest(token, sessionKey)) {
+      subagentConfigError.value = error.message || 'Failed to load subagents'
+    }
+  } finally {
+    if (currentSubagentRequest(token, sessionKey)) subagentConfigLoading.value = false
+  }
+}
+
+async function saveSubagentModel(payload) {
+  const session = selectedSession.value
+  if (!session) return
+  const token = ++subagentConfigRequestToken
+  const sessionKey = subagentSessionKey(session)
+  subagentConfigSaving.value = true
+  subagentConfigError.value = ''
+  try {
+    const data = await setSubagentModelOverride(
+      session,
+      payload.agentKey,
+      payload.scope,
+      payload.model,
+    )
+    if (currentSubagentRequest(token, sessionKey)) subagentConfigData.value = data
+  } catch (error) {
+    if (currentSubagentRequest(token, sessionKey)) {
+      subagentConfigError.value = error.message || 'Failed to update subagent'
+    }
+  } finally {
+    if (currentSubagentRequest(token, sessionKey)) subagentConfigSaving.value = false
+  }
+}
+
+async function resetSubagentModel(payload) {
+  const session = selectedSession.value
+  if (!session) return
+  const token = ++subagentConfigRequestToken
+  const sessionKey = subagentSessionKey(session)
+  subagentConfigSaving.value = true
+  subagentConfigError.value = ''
+  try {
+    const data = await clearSubagentModelOverride(
+      session,
+      payload.agentKey,
+      payload.scope,
+    )
+    if (currentSubagentRequest(token, sessionKey)) subagentConfigData.value = data
+  } catch (error) {
+    if (currentSubagentRequest(token, sessionKey)) {
+      subagentConfigError.value = error.message || 'Failed to reset subagent'
+    }
+  } finally {
+    if (currentSubagentRequest(token, sessionKey)) subagentConfigSaving.value = false
+  }
+}
 
 function isEnteringEntry(entry) {
   return animatingEntryIds.value.has(entry.id)
@@ -1607,6 +1711,7 @@ function handleEscape(event) {
   }
   settingsOpen.value = false
   eventLogOpen.value = false
+  subagentConfigOpen.value = false
   projectDetailCwd.value = ''
   if (memoryOpen.value) closeMemoryDrawer()
   closeToolFullscreen()
@@ -2406,6 +2511,22 @@ function closePickerMenus() {
           </section>
 
           <section class="settings-group">
+            <h2>Agents</h2>
+            <button
+              type="button"
+              class="settings-action-row"
+              :disabled="!selectedSession?.cwd"
+              @click="openSubagentConfig"
+            >
+              <span>
+                <strong>Subagents</strong>
+                <small>Model defaults by transcript, project, and global scope</small>
+              </span>
+              <span>Manage</span>
+            </button>
+          </section>
+
+          <section class="settings-group">
             <h2>Session</h2>
             <dl>
               <div>
@@ -2461,6 +2582,23 @@ function closePickerMenus() {
             </dl>
           </section>
         </aside>
+      </div>
+    </Transition>
+
+    <Transition name="event-drawer">
+      <div v-if="subagentConfigOpen" class="settings-drawer-slot">
+        <SubagentConfigDrawer
+          :agents="subagentConfigData.agents"
+          :available-models="availableModels"
+          :context="subagentConfigData.context"
+          :error="subagentConfigError"
+          :loading="subagentConfigLoading"
+          :saving="subagentConfigSaving"
+          @close="subagentConfigOpen = false"
+          @refresh="loadSubagentConfigs"
+          @reset-model="resetSubagentModel"
+          @set-model="saveSubagentModel"
+        />
       </div>
     </Transition>
 
