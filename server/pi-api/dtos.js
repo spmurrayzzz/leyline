@@ -4,7 +4,11 @@ import { SessionManager } from '@earendil-works/pi-coding-agent'
 import { emptyExtensionUiState } from './extension-ui.js'
 import { goalStateFromEntries, goalStateFromSession } from './goal-state.js'
 import { applyRolloutFeedback } from './rollout-feedback.js'
-import { messageText, sessionModifiedDate } from './sessions.js'
+import {
+  hasSubagentSessionMarker,
+  messageText,
+  sessionModifiedDate,
+} from './sessions.js'
 
 const HIDDEN_SLASH_COMMANDS = new Set([
   'changelog',
@@ -178,7 +182,8 @@ function toSessionDetailFromManager(manager, session, contextUsage) {
     cwd: header.cwd || session.cwd,
     name,
     parentSessionPath: session.parentSessionPath || header.parentSession,
-    isSubagentSession: session.isSubagentSession === true,
+    isSubagentSession: session.isSubagentSession === true
+      || hasSubagentSessionMarker(entries, manager.getSessionId()),
     firstMessage: firstMessage || goal?.objective || '(no messages)',
     created: session.created || new Date(header.timestamp),
     modified: session.modified
@@ -229,7 +234,7 @@ export function sessionInfo(handle) {
     cwd: header.cwd || handle.runtime.cwd,
     name: manager.getSessionName?.(),
     parentSessionPath: header.parentSession,
-    isSubagentSession: false,
+    isSubagentSession: hasSubagentSessionMarker(entries, manager.getSessionId()),
     firstMessage: firstMessage || goal?.objective || '(no messages)',
     created,
     modified: sessionModifiedDate(entries, header, created),

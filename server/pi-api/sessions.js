@@ -9,6 +9,7 @@ import {
 import { goalStateFromEntries } from './goal-state.js'
 
 const SESSION_DIR_ENV = 'PI_CODING_AGENT_SESSION_DIR'
+export const SUBAGENT_SESSION_CUSTOM_TYPE = 'leyline-subagent-session'
 
 export async function listPersistedSessions() {
   const sessionDir = configuredSessionDir(process.cwd())
@@ -37,15 +38,20 @@ async function listSessionsFromConfiguredDir(sessionDir) {
 }
 
 async function markSubagentSessions(sessions) {
-  const childPathLists = await Promise.all(sessions.map(async (session) => {
-    if (session.subagentChildPaths) return session.subagentChildPaths
-    return subagentChildPathsFromFile(session.path)
+  const metadata = await Promise.all(sessions.map(async (session) => {
+    if (session.subagentChildPaths) {
+      return {
+        childPaths: session.subagentChildPaths,
+        marked: session.isSubagentSession === true,
+      }
+    }
+    return subagentMetadataFromFile(session.path)
   }))
-  const subagentPaths = new Set(childPathLists.flat())
+  const subagentPaths = new Set(metadata.flatMap((item) => item.childPaths))
 
-  return sessions.map(({ subagentChildPaths, ...session }) => ({
+  return sessions.map(({ subagentChildPaths, ...session }, index) => ({
     ...session,
-    isSubagentSession: subagentPaths.has(session.path),
+    isSubagentSession: metadata[index].marked || subagentPaths.has(session.path),
   }))
 }
 
@@ -107,7 +113,7 @@ async function buildSessionInfo(filePath) {
       cwd: typeof header.cwd === 'string' ? header.cwd : '',
       name,
       parentSessionPath: header.parentSession,
-      isSubagentSession: false,
+      isSubagentSession: hasSubagentSessionMarker(entries, header.id),
       subagentChildPaths: subagentChildPaths(entries),
       created: new Date(header.timestamp),
       modified: sessionModifiedDate(entries, header, stats.mtime),
@@ -131,12 +137,24 @@ function parseSessionEntries(content) {
   return entries
 }
 
-async function subagentChildPathsFromFile(path) {
+async function subagentMetadataFromFile(path) {
   try {
-    return subagentChildPaths(parseSessionEntries(await readFile(path, 'utf8')))
+    const entries = parseSessionEntries(await readFile(path, 'utf8'))
+    return {
+      childPaths: subagentChildPaths(entries),
+      marked: hasSubagentSessionMarker(entries, entries[0]?.id),
+    }
   } catch {
-    return []
+    return { childPaths: [], marked: false }
   }
+}
+
+export function hasSubagentSessionMarker(entries, sessionId) {
+  return entries.some((entry) => {
+    return entry.type === 'custom'
+      && entry.customType === SUBAGENT_SESSION_CUSTOM_TYPE
+      && entry.data?.sessionId === sessionId
+  })
 }
 
 function subagentChildPaths(entries) {

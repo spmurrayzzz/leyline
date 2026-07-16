@@ -37,7 +37,11 @@ import {
   updateMemory,
 } from './memories.js'
 import { setRolloutFeedback } from './rollout-feedback.js'
-import { configuredSessionDir, listPersistedSessions } from './sessions.js'
+import {
+  configuredSessionDir,
+  listPersistedSessions,
+  SUBAGENT_SESSION_CUSTOM_TYPE,
+} from './sessions.js'
 import {
   copySessionSubagentOverrides,
   deleteSubagentModelOverride,
@@ -732,6 +736,10 @@ async function runSubagent({ task, cwd, parentSessionPath, model, thinkingLevel,
   }
 
   const childId = sessionManager.getSessionId()
+  sessionManager.appendCustomEntry(SUBAGENT_SESSION_CUSTOM_TYPE, {
+    sessionId: childId,
+    parentSessionPath: parentSessionPath || null,
+  })
 
   let session
   let abortSubagent
