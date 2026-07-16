@@ -106,6 +106,14 @@ const events = createEventHub({
 process.env.PI_CODING_AGENT ??= 'true'
 
 const ONE_AT_A_TIME = 'one-at-a-time'
+const SUBAGENT_THINKING_LEVELS = new Set([
+  'off',
+  'minimal',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+])
 
 function appendLeylineSystemPrompt(base) {
   if (!existsSync(BUNDLED_LEYLINE_SYSTEM_PROMPT)) return base
@@ -140,7 +148,10 @@ function preferBundledExtensions(result) {
   }
 }
 
-const createRuntime = async ({ cwd, sessionManager, sessionStartEvent }) => {
+async function createRuntimeResult(
+  { cwd, sessionManager, sessionStartEvent },
+  { model, thinkingLevel } = {},
+) {
   const services = await createAgentSessionServices({
     cwd,
     resourceLoaderOptions: {
@@ -153,11 +164,20 @@ const createRuntime = async ({ cwd, sessionManager, sessionStartEvent }) => {
       appendSystemPromptOverride: appendLeylineSystemPrompt,
     },
   })
+  const selectedModel = resolveSubagentModel(services.modelRegistry, model)
+  if (modelRequested(model) && !selectedModel) {
+    throw new Error(`Unknown subagent model: ${formatSubagentModel(model)}`)
+  }
+  if (selectedModel && !services.modelRegistry.hasConfiguredAuth(selectedModel)) {
+    throw new Error(`No API key for ${selectedModel.provider}/${selectedModel.id}`)
+  }
   const runtime = {
     ...(await createAgentSessionFromServices({
       services,
       sessionManager,
       sessionStartEvent,
+      model: selectedModel,
+      thinkingLevel,
     })),
     services,
     diagnostics: services.diagnostics,
@@ -165,6 +185,8 @@ const createRuntime = async ({ cwd, sessionManager, sessionStartEvent }) => {
   forceOneAtATime(runtime.session)
   return runtime
 }
+
+const createRuntime = (options) => createRuntimeResult(options)
 
 
 async function listSessions() {
@@ -695,10 +717,11 @@ async function exportSessionDetail(id) {
   return detail
 }
 
-async function runSubagent({ task, cwd, parentSessionPath, model, tools, systemPrompt, signal }) {
+async function runSubagent({ task, cwd, parentSessionPath, model, thinkingLevel, tools, systemPrompt, signal }) {
   if (!cwd) throw new Error('cwd is required')
   if (!task) throw new Error('task is required')
   if (signal?.aborted) throw new Error('Subagent cancelled')
+  const requestedThinkingLevel = normalizeSubagentThinkingLevel(thinkingLevel)
 
   const sessionManager = SessionManager.create(cwd, configuredSessionDir(cwd))
   const childPath = sessionManager.newSession({
@@ -713,7 +736,11 @@ async function runSubagent({ task, cwd, parentSessionPath, model, tools, systemP
   let session
   let abortSubagent
   try {
-    const runtime = await createAgentSessionRuntime(createRuntime, {
+    const createSubagentRuntime = (options) => createRuntimeResult(options, {
+      model,
+      thinkingLevel: requestedThinkingLevel,
+    })
+    const runtime = await createAgentSessionRuntime(createSubagentRuntime, {
       cwd,
       agentDir: getAgentDir(),
       sessionManager,
@@ -722,18 +749,6 @@ async function runSubagent({ task, cwd, parentSessionPath, model, tools, systemP
     if (signal?.aborted) throw new Error('Subagent cancelled')
     abortSubagent = () => session?.abort?.()
     signal?.addEventListener?.('abort', abortSubagent, { once: true })
-
-    const selectedModel = resolveSubagentModel(runtime.services.modelRegistry, model)
-    if (modelRequested(model) && !selectedModel) {
-      throw new Error(`Unknown subagent model: ${formatSubagentModel(model)}`)
-    }
-    if (selectedModel) {
-      if (!runtime.services.modelRegistry.hasConfiguredAuth(selectedModel)) {
-        throw new Error(`No API key for ${selectedModel.provider}/${selectedModel.id}`)
-      }
-      session.agent.state.model = selectedModel
-      session.sessionManager.appendModelChange(selectedModel.provider, selectedModel.id)
-    }
 
     if (tools?.length) {
       if (typeof session.setActiveToolsByName !== 'function') {
@@ -798,6 +813,7 @@ async function runSubagent({ task, cwd, parentSessionPath, model, tools, systemP
     }
 
     signal?.removeEventListener?.('abort', abortSubagent)
+    const effectiveThinkingLevel = session.thinkingLevel
     session.dispose()
 
     return {
@@ -805,6 +821,7 @@ async function runSubagent({ task, cwd, parentSessionPath, model, tools, systemP
       messages,
       usage,
       model: responseModel,
+      thinkingLevel: effectiveThinkingLevel,
       stopReason,
     }
   } catch (error) {
@@ -813,6 +830,12 @@ async function runSubagent({ task, cwd, parentSessionPath, model, tools, systemP
     if (signal?.aborted) throw new Error('Subagent cancelled')
     throw error
   }
+}
+
+function normalizeSubagentThinkingLevel(thinkingLevel) {
+  if (thinkingLevel === undefined || thinkingLevel === null) return undefined
+  if (SUBAGENT_THINKING_LEVELS.has(thinkingLevel)) return thinkingLevel
+  throw new Error(`Invalid subagent thinking level: ${String(thinkingLevel)}`)
 }
 
 function resolveSubagentModel(modelRegistry, model) {

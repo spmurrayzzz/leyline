@@ -81,7 +81,7 @@ export function deleteSubagentModelOverride({ agentKey, cwd, scope, sessionPath 
   }
 }
 
-export function resolveSubagentConfig({ agentKey, cwd, sessionPath, staticModel }) {
+export function resolveSubagentConfig({ agentKey, cwd, sessionPath, staticModel, staticThinking }) {
   const context = subagentContext(cwd, sessionPath)
   const agent = discoverAgents(context.cwd).find((item) => item.key === agentKey)
   const db = openDb()
@@ -97,6 +97,8 @@ export function resolveSubagentConfig({ agentKey, cwd, sessionPath, staticModel 
     return {
       model: match?.model || String(staticModel || '').trim() || undefined,
       modelSource: match?.scope || 'definition',
+      thinking: String(staticThinking || '').trim() || undefined,
+      thinkingSource: 'definition',
     }
   } finally {
     db.close()
@@ -173,6 +175,7 @@ function parseAgent(content, source, path) {
     source,
     path: canonicalPath,
     model: field(match[1], 'model') || '',
+    thinking: field(match[1], 'thinking') || '',
     tools: (field(match[1], 'tools') || '').split(',').map((item) => item.trim()).filter(Boolean),
   }
 }

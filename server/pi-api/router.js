@@ -343,6 +343,7 @@ async function piApiHandler(req, res) {
           cwd: body.cwd,
           sessionPath: body.sessionPath,
           staticModel: body.staticModel,
+          staticThinking: body.staticThinking,
         }))
       }
 
@@ -388,6 +389,7 @@ async function piApiHandler(req, res) {
             cwd: body.cwd,
             parentSessionPath: body.parentSessionPath,
             model: body.model,
+            thinkingLevel: body.thinkingLevel,
             tools: body.tools,
             systemPrompt: body.systemPrompt,
             signal: controller.signal,

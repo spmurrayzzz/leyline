@@ -2,15 +2,21 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
+import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import { readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
 
+const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"] as const;
+const THINKING_SETTINGS = ["inherit", ...THINKING_LEVELS] as const;
+type ThinkingLevel = typeof THINKING_LEVELS[number];
+
 interface AgentDef {
   name: string;
   description: string;
   model: string;
+  thinking: string;
   tools: string[];
   systemPrompt: string;
   source: "user" | "project" | "unknown";
@@ -22,6 +28,7 @@ interface SingleResult {
   agentSource: "user" | "project" | "unknown";
   task: string;
   requestedModel?: string;
+  requestedThinking?: string;
   childSession: { path: string; id: string; cwd?: string } | null;
   exitCode: number;
   messages: Array<{ role: string; content: string }>;
@@ -33,6 +40,7 @@ interface SingleResult {
     turns: number;
   };
   model?: string;
+  thinkingLevel?: ThinkingLevel;
   stopReason?: string;
   error?: string;
 }
@@ -84,6 +92,7 @@ function parseAgentDef(content: string, source: "user" | "project", path: string
   const name = extractField(frontmatter, "name");
   const description = extractField(frontmatter, "description");
   const model = extractField(frontmatter, "model") || "";
+  const thinking = extractField(frontmatter, "thinking") || "";
   const toolsRaw = extractField(frontmatter, "tools") || "";
   const tools = toolsRaw
     ? toolsRaw.split(",").map((t) => t.trim()).filter(Boolean)
@@ -93,7 +102,7 @@ function parseAgentDef(content: string, source: "user" | "project", path: string
 
   let canonicalPath = path;
   try { canonicalPath = realpathSync(path); } catch {}
-  return { name, description, model, tools, systemPrompt: body, source, key: `${source}:${canonicalPath}:${name}` };
+  return { name, description, model, thinking, tools, systemPrompt: body, source, key: `${source}:${canonicalPath}:${name}` };
 }
 
 function extractField(frontmatter: string, field: string): string | null {
@@ -149,13 +158,14 @@ async function resolveSubagentConfig(params: {
   cwd: string;
   parentSessionPath: string | null;
   signal?: AbortSignal;
-}): Promise<{ model?: string }> {
+}): Promise<{ model?: string; thinking?: string }> {
   return callLeylineApi("/subagents/resolve", {
     agentKey: params.agent.key,
     cwd: params.cwd,
     sessionPath: params.parentSessionPath,
     staticModel: params.agent.model,
-  }, params.signal) as Promise<{ model?: string }>;
+    staticThinking: params.agent.thinking,
+  }, params.signal) as Promise<{ model?: string; thinking?: string }>;
 }
 
 async function runSubagentViaApi(params: {
@@ -163,6 +173,7 @@ async function runSubagentViaApi(params: {
   cwd: string;
   parentSessionPath: string | null;
   model: string | { provider: string; id: string } | undefined;
+  thinkingLevel: ThinkingLevel | undefined;
   tools: string[];
   systemPrompt: string;
   signal?: AbortSignal;
@@ -171,6 +182,7 @@ async function runSubagentViaApi(params: {
   messages: Array<{ role: string; content: string }>;
   usage: { inputTokens: number; outputTokens: number; totalTokens: number; cost: number; turns: number };
   model?: string;
+  thinkingLevel?: ThinkingLevel;
   stopReason?: string;
 }> {
   return callLeylineApi("/subagent", {
@@ -178,6 +190,7 @@ async function runSubagentViaApi(params: {
     cwd: params.cwd,
     parentSessionPath: params.parentSessionPath,
     model: params.model || undefined,
+    thinkingLevel: params.thinkingLevel,
     tools: params.tools.length > 0 ? params.tools : undefined,
     systemPrompt: params.systemPrompt || undefined,
   }, params.signal) as Promise<any>;
@@ -207,6 +220,18 @@ function selectedAgentModel(
   if (!override) return agentModel(agent, ctx);
   if (override === "inherit") return ctx.model ? { provider: ctx.model.provider, id: ctx.model.id } : undefined;
   return override;
+}
+
+function selectedAgentThinking(
+  agent: AgentDef,
+  thinkingOverride: string | undefined,
+  parentThinkingLevel: ThinkingLevel,
+): ThinkingLevel | undefined {
+  const setting = thinkingOverride?.trim() || agent.thinking.trim();
+  if (!setting) return undefined;
+  if (setting === "inherit") return parentThinkingLevel;
+  if (THINKING_LEVELS.includes(setting as ThinkingLevel)) return setting as ThinkingLevel;
+  throw new Error(`Invalid subagent thinking level: ${setting}`);
 }
 
 export default function subagentExtension(pi: ExtensionAPI) {
@@ -253,9 +278,9 @@ export default function subagentExtension(pi: ExtensionAPI) {
     description:
       "Delegate tasks to specialized child agents with isolated context.\n" +
       "Modes:\n" +
-      "- single (default): { agent, task }\n" +
-      "- parallel: { tasks: [{ agent, task }] } — runs concurrently\n" +
-      "- chain: { chain: [{ agent, task }] } — sequential, {previous} replaced by prior output",
+      "- single (default): { agent, task, model?, thinking? }\n" +
+      "- parallel: { tasks: [{ agent, task, model?, thinking? }] } — runs concurrently\n" +
+      "- chain: { chain: [{ agent, task, model?, thinking? }] } — sequential, {previous} replaced by prior output",
     parameters: Type.Object({
       agent: Type.Optional(Type.String({
         description: "Agent name. From .md files in ~/.pi/agent/agents/ and .pi/agents/",
@@ -265,6 +290,9 @@ export default function subagentExtension(pi: ExtensionAPI) {
       })),
       model: Type.Optional(Type.String({
         description: "Optional model override for the child agent. Use 'inherit', a model id, or provider/model-id.",
+      })),
+      thinking: Type.Optional(StringEnum(THINKING_SETTINGS, {
+        description: "Optional thinking-level override for child agents. Use 'inherit' for the parent session's current level.",
       })),
       mode: Type.Optional(
         Type.Enum({
@@ -286,6 +314,7 @@ export default function subagentExtension(pi: ExtensionAPI) {
             agent: Type.String({ description: "Agent name" }),
             task: Type.String({ description: "Task for this agent" }),
             model: Type.Optional(Type.String({ description: "Optional model override for this child agent" })),
+            thinking: Type.Optional(StringEnum(THINKING_SETTINGS, { description: "Optional thinking-level override for this child agent" })),
             cwd: Type.Optional(Type.String({ description: "Working directory" })),
           }),
           { description: "For parallel mode: concurrent tasks" },
@@ -299,6 +328,7 @@ export default function subagentExtension(pi: ExtensionAPI) {
               description: "Task with {previous} replaced by prior step output",
             }),
             model: Type.Optional(Type.String({ description: "Optional model override for this child agent" })),
+            thinking: Type.Optional(StringEnum(THINKING_SETTINGS, { description: "Optional thinking-level override for this child agent" })),
             cwd: Type.Optional(Type.String({ description: "Working directory" })),
           }),
           { description: "For chain mode: sequential tasks" },
@@ -333,10 +363,14 @@ export default function subagentExtension(pi: ExtensionAPI) {
         throw new Error(`Unknown agent: "${params.agent}". Available: ${available}`);
       }
       const parentPath = getParentSessionPath(ctx);
+      const parentThinkingLevel = pi.getThinkingLevel();
       const baseCwd = params.cwd || ctx.cwd;
 
       if (mode === "single") {
-        const result = await executeSingle(agent!, params.task, baseCwd, parentPath, params.model, signal, ctx);
+        const result = await executeSingle(
+          agent!, params.task, baseCwd, parentPath, params.model, params.thinking,
+          parentThinkingLevel, signal, ctx,
+        );
         const output = resultOutput(result);
         return {
           content: [{ type: "text", text: output }],
@@ -374,7 +408,11 @@ export default function subagentExtension(pi: ExtensionAPI) {
                   error: `Unknown agent: ${t.agent}`,
                 } as SingleResult;
               }
-              return executeSingle(a, t.task, t.cwd || baseCwd, parentPath, t.model || params.model, signal, ctx);
+              return executeSingle(
+                a, t.task, t.cwd || baseCwd, parentPath,
+                t.model ?? params.model, t.thinking ?? params.thinking,
+                parentThinkingLevel, signal, ctx,
+              );
             }),
           );
           results.push(...batchResults);
@@ -422,7 +460,11 @@ export default function subagentExtension(pi: ExtensionAPI) {
           }
 
           const taskWithPrev = step.task.replace(/\{previous\}/g, previousOutput);
-          const result = await executeSingle(a, taskWithPrev, step.cwd || baseCwd, parentPath, step.model || params.model, signal, ctx);
+          const result = await executeSingle(
+            a, taskWithPrev, step.cwd || baseCwd, parentPath,
+            step.model ?? params.model, step.thinking ?? params.thinking,
+            parentThinkingLevel, signal, ctx,
+          );
           results.push(result);
           if (result.error || result.exitCode !== 0) {
             return {
@@ -475,20 +517,23 @@ async function executeSingle(
   cwd: string,
   parentSessionPath: string | null,
   modelOverride: string | undefined,
+  thinkingOverride: string | undefined,
+  parentThinkingLevel: ThinkingLevel,
   signal: AbortSignal | undefined,
   ctx: ExtensionContext,
 ): Promise<SingleResult> {
   const emptyUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0, cost: 0, turns: 0 };
 
   try {
-    const configured = modelOverride?.trim()
-      ? { model: modelOverride }
-      : await resolveSubagentConfig({ agent, cwd: ctx.cwd, parentSessionPath, signal });
+    const configured = await resolveSubagentConfig({ agent, cwd: ctx.cwd, parentSessionPath, signal });
+    const selectedModel = modelOverride?.trim() || configured.model;
+    const selectedThinking = thinkingOverride?.trim() || configured.thinking;
     const result = await runSubagentViaApi({
       task,
       cwd,
       parentSessionPath,
-      model: selectedAgentModel(agent, configured.model, ctx),
+      model: selectedAgentModel(agent, selectedModel, ctx),
+      thinkingLevel: selectedAgentThinking(agent, selectedThinking, parentThinkingLevel),
       tools: agent.tools,
       systemPrompt: agent.systemPrompt,
       signal,
@@ -500,11 +545,13 @@ async function executeSingle(
       agentSource: agent.source,
       task,
       requestedModel: modelOverride,
+      requestedThinking: thinkingOverride,
       childSession: data.childSession || null,
       exitCode: failedResult(data) ? 1 : 0,
       messages: data.messages || [],
       usage: data.usage || emptyUsage,
       model: data.model,
+      thinkingLevel: data.thinkingLevel,
       stopReason: data.stopReason,
       error: data.error,
     };
@@ -515,6 +562,7 @@ async function executeSingle(
       agentSource: agent.source,
       task,
       requestedModel: modelOverride,
+      requestedThinking: thinkingOverride,
       childSession: null,
       exitCode: 1,
       messages: [],
