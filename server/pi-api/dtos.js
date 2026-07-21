@@ -33,7 +33,7 @@ const HIDDEN_SLASH_COMMANDS = new Set([
   'share',
   'tree',
 ])
-const THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh']
+const THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']
 
 export function runtimeSessionDto(handle) {
   return {
@@ -48,21 +48,19 @@ export function runtimeSessionDto(handle) {
 export function activeSessionStateDto(handle) {
   return sessionStateDto(
     handle.runtime.session,
-    handle.runtime.services,
     handle.extensionUiState,
   )
 }
 
 export function sessionStateDto(
   session,
-  services,
   extensionUiState = emptyExtensionUiState(),
 ) {
   const activeToolNames = session.getActiveToolNames()
 
   return {
     model: modelDto(session.model),
-    availableModels: services.modelRegistry.getAvailable().map(modelDto),
+    availableModels: session.modelRuntime.getAvailableSnapshot().map(modelDto),
     thinkingLevel: session.thinkingLevel,
     availableThinkingLevels: session.getAvailableThinkingLevels(),
     isStreaming: session.isStreaming,
@@ -130,7 +128,7 @@ function modelThinkingLevels(model) {
   return THINKING_LEVELS.filter((level) => {
     const mapped = model.thinkingLevelMap?.[level]
     if (mapped === null) return false
-    if (level === 'xhigh') return mapped !== undefined
+    if (level === 'xhigh' || level === 'max') return mapped !== undefined
     return true
   })
 }

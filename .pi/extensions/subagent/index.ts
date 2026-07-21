@@ -8,7 +8,7 @@ import { readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
 
-const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"] as const;
+const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
 const THINKING_SETTINGS = ["inherit", ...THINKING_LEVELS] as const;
 type ThinkingLevel = typeof THINKING_LEVELS[number];
 

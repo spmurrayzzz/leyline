@@ -117,6 +117,7 @@ const SUBAGENT_THINKING_LEVELS = new Set([
   'medium',
   'high',
   'xhigh',
+  'max',
 ])
 
 function appendLeylineSystemPrompt(base) {
@@ -168,11 +169,11 @@ async function createRuntimeResult(
       appendSystemPromptOverride: appendLeylineSystemPrompt,
     },
   })
-  const selectedModel = resolveSubagentModel(services.modelRegistry, model)
+  const selectedModel = resolveSubagentModel(services.modelRuntime, model)
   if (modelRequested(model) && !selectedModel) {
     throw new Error(`Unknown subagent model: ${formatSubagentModel(model)}`)
   }
-  if (selectedModel && !services.modelRegistry.hasConfiguredAuth(selectedModel)) {
+  if (selectedModel && !services.modelRuntime.hasConfiguredAuth(selectedModel.provider)) {
     throw new Error(`No API key for ${selectedModel.provider}/${selectedModel.id}`)
   }
   const runtime = {
@@ -606,7 +607,7 @@ async function reloadSession(handle) {
 async function setSessionModel(handle, provider, id) {
   if (!provider || !id) throw new Error('provider and id are required')
 
-  const model = handle.runtime.services.modelRegistry.find(provider, id)
+  const model = handle.runtime.session.modelRuntime.getModel(provider, id)
   if (!model) throw new Error('Model not found')
   await handle.runtime.session.setModel(model)
 }
@@ -677,7 +678,7 @@ async function runtimeState(cwd) {
       path: result.session.sessionFile,
       cwd: targetCwd,
       diagnostics: result.diagnostics,
-      state: sessionStateDto(result.session, result.services),
+      state: sessionStateDto(result.session),
     }
   } finally {
     result.session.dispose()
@@ -846,22 +847,22 @@ function normalizeSubagentThinkingLevel(thinkingLevel) {
   throw new Error(`Invalid subagent thinking level: ${String(thinkingLevel)}`)
 }
 
-function resolveSubagentModel(modelRegistry, model) {
+function resolveSubagentModel(modelRuntime, model) {
   if (!model || model === 'inherit') return undefined
   if (typeof model === 'object' && model.provider && model.id) {
-    return modelRegistry.find(model.provider, model.id)
+    return modelRuntime.getModel(model.provider, model.id)
   }
   if (typeof model !== 'string') return undefined
 
   const providerSeparator = model.indexOf('/')
   if (providerSeparator > 0) {
-    return modelRegistry.find(
+    return modelRuntime.getModel(
       model.slice(0, providerSeparator),
       model.slice(providerSeparator + 1),
     )
   }
 
-  return modelRegistry.getAvailable().find((item) => item.id === model)
+  return modelRuntime.getAvailableSnapshot().find((item) => item.id === model)
 }
 
 function modelRequested(model) {

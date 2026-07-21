@@ -1049,7 +1049,7 @@ export function useSessionWorkspace({
     if (!levels.length) return 'off'
     if (levels.includes(level)) return level
 
-    const order = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh']
+    const order = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']
     const index = order.indexOf(level)
     if (index === -1) return levels[0]
 
