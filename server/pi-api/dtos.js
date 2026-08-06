@@ -173,6 +173,9 @@ function toSessionDetailFromManager(manager, session, contextUsage) {
     firstMessage = messageText(message.content || message.output || '')
   }
 
+  const contextTokens = contextUsage?.tokens
+    ?? contextTokensFromEntries(entries)
+
   const info = {
     ...session,
     id: manager.getSessionId(),
@@ -195,6 +198,7 @@ function toSessionDetailFromManager(manager, session, contextUsage) {
       cwd: info.cwd,
       sessionFile: info.path,
       messageCount: info.messageCount,
+      contextTokens,
       modified: info.modified,
       created: info.created,
       contextUsage,
@@ -251,6 +255,35 @@ export function toSessionDto(session) {
     firstMessage: truncate(session.firstMessage || '', 140),
     timestamp: session.created || timestampFromPath(session.path),
   }
+}
+
+function contextTokensFromEntries(entries) {
+  let latestCompaction = -1
+  for (let i = entries.length - 1; i >= 0; i--) {
+    if (entries[i].type === 'compaction') {
+      latestCompaction = i
+      break
+    }
+  }
+
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const entry = entries[i]
+    if (entry.type !== 'message') continue
+    const message = entry.message
+    if (message?.role !== 'assistant' || !message.usage) continue
+    if (message.stopReason === 'aborted' || message.stopReason === 'error') continue
+    const tokens = usageTokens(message.usage)
+    if (tokens <= 0) continue
+    if (latestCompaction !== -1 && i < latestCompaction) return null
+    return tokens
+  }
+  return null
+}
+
+function usageTokens(usage) {
+  if (typeof usage.totalTokens === 'number') return usage.totalTokens
+  return (usage.input || 0) + (usage.output || 0)
+    + (usage.cacheRead || 0) + (usage.cacheWrite || 0)
 }
 
 export function truncate(value, maxLength) {

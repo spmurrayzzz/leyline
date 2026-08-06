@@ -63,6 +63,7 @@ ${exportLogoSvg()}
 <div><dt>Project</dt><dd>${escapeHtml(projectLabel(session.cwd))}</dd></div>
 <div><dt>Path</dt><dd>${escapeHtml(session.cwd || '')}</dd></div>
 <div><dt>Messages</dt><dd>${escapeHtml(String(session.messageCount || 0))}</dd></div>
+<div><dt>Tokens</dt><dd>${escapeHtml(formatExportTokens(session.contextTokens))}</dd></div>
 <div><dt>Modified</dt><dd>${escapeHtml(formatExportDate(session.modified))}</dd></div>
 </dl>
 </div>
@@ -380,6 +381,18 @@ function projectLabel(cwd) {
   return basename(cwd)
 }
 
+function formatExportTokens(value) {
+  const count = Number(value)
+  if (!Number.isFinite(count) || count <= 0) return '—'
+  if (count >= 1_000_000) return `${trimNumber(count / 1_000_000)}M`
+  if (count >= 1_000) return `${trimNumber(count / 1_000)}K`
+  return String(count)
+}
+
+function trimNumber(value) {
+  return value.toFixed(1).replace(/\.0$/, '')
+}
+
 function formatExportDate(value) {
   if (!value) return 'unknown'
   const date = new Date(value)
@@ -610,7 +623,7 @@ button, input, textarea { color: inherit; font: inherit; }
   display: grid;
   flex: 1 1 auto;
   grid-template-columns: minmax(100px, 0.9fr) minmax(220px, 1.8fr)
-    minmax(90px, 0.7fr) minmax(150px, 1fr);
+    minmax(90px, 0.7fr) minmax(90px, 0.7fr) minmax(150px, 1fr);
   gap: 12px;
   margin: 0;
 }
