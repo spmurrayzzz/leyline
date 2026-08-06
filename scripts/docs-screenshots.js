@@ -367,6 +367,7 @@ try {
     ready: '.start-panel .start-composer',
     viewport: { width: 1503, height: 818 },
     scenario: 'home',
+    macWindow: true,
   })
   await capture({
     browser,
@@ -374,6 +375,7 @@ try {
     route: '/sessions/demo-session',
     ready: '.assistant-message .thinking-trigger',
     viewport: { width: 1503, height: 818 },
+    macWindow: true,
   })
 } finally {
   await browser.close()
@@ -535,6 +537,7 @@ async function capture({
   clipSelectors,
   padding = 0,
   preserveHover = false,
+  macWindow = false,
 }) {
   const runtime = runtimeFor(scenario)
   const context = await browser.newContext({
@@ -615,8 +618,129 @@ async function capture({
     const clip = clipSelectors
       ? await unionClip(page, clipSelectors, padding, viewport)
       : undefined
-    await page.screenshot({ path: file, clip, animations: 'disabled' })
+    if (macWindow) {
+      const image = await page.screenshot({ clip, animations: 'disabled' })
+      await saveMacWindowScreenshot({
+        browser,
+        file,
+        image,
+        contentSize: clip || viewport,
+      })
+    } else {
+      await page.screenshot({ path: file, clip, animations: 'disabled' })
+    }
     console.log(`Saved ${path.relative(process.cwd(), file)}`)
+  } finally {
+    await context.close()
+  }
+}
+
+async function saveMacWindowScreenshot({ browser, file, image, contentSize }) {
+  const frame = {
+    side: 104,
+    top: 56,
+    bottom: 104,
+    titlebar: 52,
+  }
+  const viewport = {
+    width: Math.ceil(contentSize.width + frame.side * 2),
+    height: Math.ceil(contentSize.height + frame.top + frame.titlebar + frame.bottom),
+  }
+  const context = await browser.newContext({
+    viewport,
+    deviceScaleFactor: 2,
+    colorScheme: 'dark',
+  })
+  const page = await context.newPage()
+
+  try {
+    await page.setContent(`
+      <style>
+        html, body {
+          width: 100%;
+          height: 100%;
+          margin: 0;
+          overflow: hidden;
+          background: transparent;
+        }
+
+        .window-frame {
+          position: absolute;
+          top: ${frame.top}px;
+          left: ${frame.side}px;
+          width: ${contentSize.width}px;
+          overflow: hidden;
+          border-radius: 20px;
+          background: #0d0d0d;
+          box-shadow:
+            0 0 0 1px rgba(255, 255, 255, 0.18),
+            0 44px 96px rgba(0, 0, 0, 0.58),
+            0 16px 36px rgba(0, 0, 0, 0.38),
+            0 3px 10px rgba(0, 0, 0, 0.28);
+        }
+
+        .window-titlebar {
+          position: relative;
+          display: flex;
+          height: ${frame.titlebar}px;
+          align-items: center;
+          justify-content: center;
+          border-bottom: 1px solid rgba(0, 0, 0, 0.72);
+          background: linear-gradient(180deg, #2a2a2d 0%, #202023 100%);
+          box-shadow: inset 0 1px rgba(255, 255, 255, 0.08);
+        }
+
+        .window-controls {
+          position: absolute;
+          left: 20px;
+          display: flex;
+          gap: 9px;
+        }
+
+        .window-control {
+          width: 14px;
+          height: 14px;
+          border-radius: 50%;
+          box-shadow:
+            inset 0 0 0 0.5px rgba(0, 0, 0, 0.4),
+            0 1px 1px rgba(0, 0, 0, 0.22);
+        }
+
+        .window-control:nth-child(1) { background: #ff5f57; }
+        .window-control:nth-child(2) { background: #febc2e; }
+        .window-control:nth-child(3) { background: #28c840; }
+
+        .window-title {
+          color: rgba(255, 255, 255, 0.68);
+          font: 500 15px/1 -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+          letter-spacing: -0.01em;
+          -webkit-font-smoothing: antialiased;
+        }
+
+        .window-content {
+          display: block;
+          width: ${contentSize.width}px;
+          height: ${contentSize.height}px;
+        }
+      </style>
+      <div class="window-frame">
+        <div class="window-titlebar">
+          <div class="window-controls">
+            <span class="window-control"></span>
+            <span class="window-control"></span>
+            <span class="window-control"></span>
+          </div>
+          <div class="window-title">Leyline</div>
+        </div>
+        <img class="window-content" alt="">
+      </div>
+    `)
+    const windowContent = page.locator('.window-content')
+    await windowContent.evaluate(async (element, source) => {
+      element.src = source
+      await element.decode()
+    }, `data:image/png;base64,${image.toString('base64')}`)
+    await page.screenshot({ path: file, animations: 'disabled', omitBackground: true })
   } finally {
     await context.close()
   }
