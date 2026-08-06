@@ -15,15 +15,31 @@
   min-height: 0;
   border-bottom: 1px solid var(--border-soft);
   background: var(--bg);
+  transition: grid-template-columns var(--motion-base) var(--ease-standard);
+}
+
+.sidebar-hidden .app-header {
+  grid-template-columns: 0 minmax(0, 1fr);
 }
 
 .app-header-brand {
   display: flex;
+  overflow: hidden;
   align-items: center;
   min-width: 0;
   border-right: 1px solid var(--border-soft);
   background: var(--sidebar);
   padding: 0 12px;
+  transition:
+    border-color var(--motion-base) var(--ease-standard),
+    opacity var(--motion-base) var(--ease-standard);
+}
+
+.sidebar-hidden .app-header-brand {
+  border-right-width: 0;
+  padding: 0;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .app-header-brand .brand-mark {
@@ -41,6 +57,10 @@
   gap: 14px;
   min-width: 0;
   padding: 0 16px;
+}
+
+.sidebar-header-reveal-button {
+  flex: none;
 }
 
 .crumb-project {

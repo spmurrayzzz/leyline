@@ -1802,6 +1802,13 @@ function closePickerMenus() {
       </div>
       <div class="app-header-main">
         <button
+          v-if="desktopSidebarHidden"
+          class="sidebar-collapse-button sidebar-header-reveal-button"
+          type="button"
+          aria-label="Show sessions"
+          @click="desktopSidebarHidden = false"
+        >›</button>
+        <button
           class="mobile-sidebar-button"
           type="button"
           aria-label="Open sessions"

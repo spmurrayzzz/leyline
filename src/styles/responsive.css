@@ -275,14 +275,18 @@
     width: 100vw;
   }
 
-  .app-header {
+  .app-header,
+  .leyline-app.sidebar-hidden .app-header {
     grid-template-columns: auto minmax(0, 1fr);
   }
 
-  .app-header-brand {
+  .app-header-brand,
+  .leyline-app.sidebar-hidden .app-header-brand {
     border-right: 0;
     background: transparent;
     padding: 0 4px 0 12px;
+    opacity: 1;
+    pointer-events: auto;
   }
 
   .app-header-main {
