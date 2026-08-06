@@ -460,8 +460,8 @@
   }
 
   textarea {
-    height: 86px;
-    padding: 14px 14px 6px;
+    height: 72px;
+    padding: 13px 14px 5px;
     font-size: 16px;
   }
 
@@ -476,7 +476,12 @@
     padding-left: 46px;
   }
 
-  .composer-bar,
+  .composer-bar {
+    gap: 0;
+    min-height: 0;
+    padding: 0;
+  }
+
   .start-composer-bar {
     gap: 9px;
     min-height: 42px;
@@ -484,13 +489,15 @@
   }
 
   .composer-primary-row {
-    gap: 8px;
+    gap: 0;
+    padding: 0 12px 8px 14px;
   }
 
   .composer-actions {
+    width: 100%;
     flex: 1 1 auto;
     justify-content: flex-end;
-    gap: 13px;
+    gap: 8px;
   }
 
   .composer-row-spacer {
@@ -498,13 +505,9 @@
   }
 
   .composer-context-row {
-    overflow-x: auto;
-    padding-top: 9px;
-    scrollbar-width: none;
-  }
-
-  .composer-context-row::-webkit-scrollbar {
-    display: none;
+    overflow: visible;
+    gap: 8px;
+    padding: 7px 12px 8px;
   }
 
   .model-picker,
@@ -513,9 +516,63 @@
     max-width: none;
   }
 
+  .composer-actions > .model-picker:first-child {
+    flex: 1 1 0;
+  }
+
+  .composer-actions > .small-picker {
+    flex: 0 0 auto;
+  }
+
   .model-picker-button,
   .composer-chip {
     max-width: none;
+  }
+
+  .composer-bar .composer-actions .model-picker-button {
+    overflow: hidden;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    height: 40px;
+    gap: 6px;
+  }
+
+  .composer-actions .model-label {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .composer-actions > .model-picker:first-child .model-menu {
+    left: -14px;
+  }
+
+  .composer-actions > .small-picker .model-menu {
+    right: 0;
+    left: auto;
+    width: min(190px, calc(100vw - 20px));
+    transform-origin: bottom right;
+  }
+
+  .composer-context-row .tool-menu {
+    width: min(260px, calc(100vw - 20px));
+  }
+
+  .composer-context-usage {
+    min-width: 0;
+    max-width: none;
+    flex: 1 1 auto;
+  }
+
+  .composer-context-usage > span {
+    overflow: hidden;
+    min-width: 0;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .composer-context-usage i {
+    display: none;
   }
 
   .composer-context-row > .composer-chip:nth-of-type(n + 2) {
