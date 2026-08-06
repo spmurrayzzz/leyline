@@ -14,6 +14,11 @@ const exportMarkdown = new MarkdownIt({
   breaks: false,
 })
 
+exportMarkdown.renderer.rules.table_open = () =>
+  '<div class="table-wrap"><table>'
+exportMarkdown.renderer.rules.table_close = () =>
+  '</table></div>'
+
 export function exportFilename(detail) {
   const session = detail.session
   const title = session.name || session.firstMessage || session.id
@@ -640,8 +645,13 @@ button, input, textarea { color: inherit; font: inherit; }
   color: #d9dbe3;
   font-size: 13px;
 }
-.transcript { display: grid; gap: 0; }
+.transcript {
+  display: grid;
+  gap: 0;
+  grid-template-columns: minmax(0, 1fr);
+}
 .message {
+  min-width: 0;
   width: min(var(--content-max), 100%);
   margin-right: auto;
   margin-left: auto;
@@ -656,6 +666,7 @@ button, input, textarea { color: inherit; font: inherit; }
   font-size: 11px;
   font-weight: 650;
   letter-spacing: 0.01em;
+  overflow-wrap: anywhere;
 }
 .message-meta-row { display: flex; align-items: center; gap: 7px; }
 .compact-message { margin-top: 14px; }
@@ -762,6 +773,10 @@ button, input, textarea { color: inherit; font: inherit; }
   color: #aeb2bd;
 }
 .entry-text { margin-bottom: 0 !important; }
+.markdown-body {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 .markdown-body p,
 .markdown-body ul,
 .markdown-body ol,
@@ -806,6 +821,32 @@ button, input, textarea { color: inherit; font: inherit; }
   background: transparent;
   padding: 0;
 }
+.markdown-body .table-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+  margin: 0 0 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+}
+.markdown-body .table-wrap > table {
+  width: 100%;
+  margin: 0;
+  border: 0;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.markdown-body th,
+.markdown-body td {
+  border: 1px solid var(--border-soft);
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+.markdown-body th {
+  background: #17181e;
+  color: var(--text);
+  font-weight: 700;
+}
 .markdown-body blockquote {
   border-left: 2px solid #4f5360;
   padding-left: 10px;
@@ -813,6 +854,7 @@ button, input, textarea { color: inherit; font: inherit; }
 }
 .markdown-body a { color: #bfb5ff; text-decoration: none; }
 .tool-card {
+  min-width: 0;
   width: min(var(--content-max), 100%);
   margin: 6px auto 0;
   border: 0;
@@ -834,9 +876,16 @@ button, input, textarea { color: inherit; font: inherit; }
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
   color: #85858c;
   font-size: 12px;
   font-weight: 650;
+}
+.tool-card-header > span:nth-child(2) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .tool-card-header > span:first-child {
   transition: color var(--motion-base) var(--ease-standard);
@@ -968,13 +1017,19 @@ button, input, textarea { color: inherit; font: inherit; }
 .hljs-bullet { color: var(--syntax-keyword); }
 .hljs-addition { color: var(--syntax-string); }
 .hljs-deletion { color: var(--syntax-variable); }
-.skill-summary-list { display: grid; gap: 8px; }
+.skill-summary-list {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr);
+}
 .skill-summary-list summary { list-style: none; cursor: pointer; }
 .skill-summary-list summary::-webkit-details-marker { display: none; }
 .skill-summary {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  max-width: 100%;
+  min-width: 0;
   width: fit-content;
   border: 1px solid rgb(124 92 255 / 22%);
   border-radius: 9px;
@@ -1016,7 +1071,7 @@ button, input, textarea { color: inherit; font: inherit; }
   margin: 0 auto;
   color: var(--muted);
 }
-@media (max-width: 760px) {
+@media (max-width: 820px) {
   .export-shell { padding: 16px 12px 42px; }
   .export-meta-row { align-items: flex-start; flex-wrap: wrap; }
   .export-header dl {
@@ -1067,6 +1122,7 @@ button, input, textarea { color: inherit; font: inherit; }
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
   color: #777;
   font-size: 12px;
   font-weight: 700;
@@ -1075,6 +1131,10 @@ button, input, textarea { color: inherit; font: inherit; }
 .subagent-icon { color: #bfb5ff; font-size: 15px; font-weight: 800; line-height: 1; }
 
 .subagent-agent-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: #d7d3ff;
   font-weight: 800;
   text-transform: uppercase;
@@ -1083,6 +1143,7 @@ button, input, textarea { color: inherit; font: inherit; }
 
 .subagent-header code {
   overflow: hidden;
+  min-width: 0;
   max-width: 320px;
   border: 1px solid var(--border-soft);
   border-radius: 7px;
@@ -1130,7 +1191,12 @@ button, input, textarea { color: inherit; font: inherit; }
   letter-spacing: 0.04em;
 }
 
-.subagent-detail-task { color: #999; font-size: 12px; }
+.subagent-detail-task {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #999;
+  font-size: 12px;
+}
 
 .subagent-detail-output {
   overflow: auto;
