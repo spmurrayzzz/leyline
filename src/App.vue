@@ -1746,6 +1746,7 @@ function closePickerMenus() {
     :class="{
       'sidebar-open': sidebarOpen,
       'sidebar-hidden': desktopSidebarHidden,
+      'transcript-view': !!selectedSession && !initializing,
       'start-state': !initializing && startFlowVisible,
       'new-session-transition': newSessionTransitionActive,
       'startup-composer-docking': startupComposerDocking || startupRevealHold,

@@ -13,13 +13,17 @@
   grid-template-columns: 248px minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
-  border-bottom: 1px solid var(--border-soft);
+  border-bottom: 1px solid transparent;
   background: var(--bg);
   transition: grid-template-columns var(--motion-base) var(--ease-standard);
 }
 
 .sidebar-hidden .app-header {
   grid-template-columns: 0 minmax(0, 1fr);
+}
+
+.leyline-app.transcript-view .app-header {
+  border-bottom-color: var(--border-soft);
 }
 
 .app-header-brand {
