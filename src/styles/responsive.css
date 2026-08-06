@@ -231,6 +231,7 @@
   .leyline-app.event-log-open,
   .leyline-app.sidebar-hidden.event-log-open {
     grid-template-columns: 1fr;
+    grid-template-rows: 50px minmax(0, 1fr);
     overflow: hidden;
   }
 
@@ -284,14 +285,25 @@
   .leyline-app.sidebar-hidden .app-header-brand {
     border-right: 0;
     background: transparent;
-    padding: 0 4px 0 12px;
+    padding: 0 2px 0 8px;
     opacity: 1;
     pointer-events: auto;
   }
 
+  .app-header-brand .brand-home {
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    flex: none;
+  }
+
+  .leyline-app.transcript-view .app-header-brand .brand-name {
+    display: none;
+  }
+
   .app-header-main {
-    gap: 10px;
-    padding: 0 12px;
+    gap: 6px;
+    padding: 0 8px 0 2px;
   }
 
   .crumb-project,
@@ -317,39 +329,61 @@
     display: grid;
     flex: 0 0 auto;
     place-items: center;
-    width: 34px;
-    height: 34px;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background: var(--panel-soft);
+    width: 32px;
+    height: 32px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
     color: var(--muted-strong);
+    padding: 0;
     font-size: 16px;
   }
 
+  .mobile-sidebar-button:active {
+    background: var(--panel-soft);
+    color: var(--text);
+  }
+
   .workbench-title-row {
+    overflow: hidden;
     flex: 1 1 auto;
   }
 
   .workbench-title-button,
   .workbench-title-input {
-    max-width: none;
     width: 100%;
+    max-width: none;
+    font-size: 14px;
+    line-height: 1.2;
   }
 
-  .topbar-meta {
-    gap: 6px;
-    overflow-x: auto;
-    flex: 0 1 auto;
-    max-width: 46vw;
-    scrollbar-width: none;
+  .workbench-title-button strong {
+    font-weight: 650;
+    letter-spacing: -0.012em;
   }
 
-  .topbar-meta::-webkit-scrollbar {
+  .workbench-title-glyph {
     display: none;
   }
 
-  .topbar-icon-button {
+  .topbar-meta {
+    gap: 2px;
+    overflow: visible;
     flex: 0 0 auto;
+    max-width: none;
+  }
+
+  .topbar-icon-button {
+    width: 30px;
+    min-width: 30px;
+    height: 30px;
+    flex: 0 0 auto;
+    border-radius: 8px;
+    padding: 0;
+  }
+
+  .topbar-icon-count {
+    display: none;
   }
 
   .memory-drawer-slot,
