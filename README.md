@@ -6,7 +6,7 @@ state, prompts, model controls, runtime events, and an embedded terminal.
 
 | Home View | Workbench |
 | --- | --- |
-| <a href="https://github.com/user-attachments/assets/ae22c31c-9f60-4142-ae58-308ff54309fd" target="_blank" rel="noopener noreferrer"><img width="760" alt="Home View" src="https://github.com/user-attachments/assets/ae22c31c-9f60-4142-ae58-308ff54309fd" /></a> | <a href="https://github.com/user-attachments/assets/ac8dfefe-2ef0-4b0b-8d24-e66dde7484e1" target="_blank" rel="noopener noreferrer"><img width="760" alt="Workbench" src="https://github.com/user-attachments/assets/ac8dfefe-2ef0-4b0b-8d24-e66dde7484e1" /></a> |
+| <a href="assets/readme/home.png"><img width="760" alt="Home View" src="assets/readme/home.png" /></a> | <a href="assets/readme/workbench.png"><img width="760" alt="Workbench" src="assets/readme/workbench.png" /></a> |
 
 
 ## Features
