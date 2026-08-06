@@ -42,6 +42,12 @@ export default defineConfig({
             text: 'Tools and thinking',
             link: '/user-guide/tools-and-thinking',
           },
+          { text: 'Memory', link: '/user-guide/memory' },
+          { text: 'Subagents', link: '/user-guide/subagents' },
+          {
+            text: 'Goals and events',
+            link: '/user-guide/goals-and-events',
+          },
           { text: 'Terminal', link: '/user-guide/terminal' },
           {
             text: 'Projects and search',
@@ -58,6 +64,10 @@ export default defineConfig({
           { text: 'Export', link: '/user-guide/export' },
           { text: 'Settings', link: '/user-guide/settings' },
           { text: 'Mobile layout', link: '/user-guide/mobile' },
+          {
+            text: 'Keyboard shortcuts',
+            link: '/user-guide/keyboard-shortcuts',
+          },
         ],
       },
       {
@@ -106,6 +116,8 @@ export default defineConfig({
           { text: 'Overview', link: '/integrations/' },
           { text: 'pi SDK integration', link: '/integrations/pi-sdk' },
           { text: 'Goal extension', link: '/integrations/goal-extension' },
+          { text: 'Memory', link: '/integrations/memory-integration' },
+          { text: 'Subagents', link: '/integrations/subagents' },
           {
             text: 'Terminal backend',
             link: '/integrations/terminal-backend',

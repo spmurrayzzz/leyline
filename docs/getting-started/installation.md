@@ -1,13 +1,16 @@
 # Installation
 
-Clone or open the Leyline project, then install dependencies:
+Open the Leyline repository. Then install the dependencies:
 
 ```bash
 npm install
 ```
 
-A successful install creates `node_modules/` and updates the local package lock if dependency versions change.
+A successful installation creates `node_modules/`. This repository does not
+include a package lock.
 
-No separate backend service is required in development. Vite mounts `server/pi-api.js` as middleware for `/api/pi/*`, and the frontend talks to those local routes.
+No separate backend process is necessary for browser development. Vite mounts
+`server/pi-api/index.js` for `/api/pi/*` routes and the terminal WebSocket.
 
-If installation fails, see [troubleshooting](../reference/troubleshooting#dev-server-does-not-start) and confirm your Node.js and native dependency toolchain.
+If installation fails, confirm that `node --version` returns `v22.19.0`. Then
+see [Troubleshooting](../reference/troubleshooting#the-dev-server-does-not-start).

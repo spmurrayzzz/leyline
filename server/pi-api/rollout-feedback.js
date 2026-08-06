@@ -139,5 +139,5 @@ function dbPath() {
 }
 
 function leylineDataDir() {
-  return join(homedir(), '.local', 'share', 'leyline')
+  return process.env.LEYLINE_MEMORY_DIR || join(homedir(), '.local', 'share', 'leyline')
 }

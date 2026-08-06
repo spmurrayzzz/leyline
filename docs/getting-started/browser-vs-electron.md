@@ -1,14 +1,20 @@
 # Browser vs Electron
 
-The browser/Vite path is the primary development workflow. Electron is an optional desktop shell around the same Vue app and backend integration.
+The browser and Vite workflow is the primary development workflow. Electron is
+an optional desktop shell around the same Vue app and API.
 
-| Area | Browser/Vite | Electron |
+| Area | Browser and Vite | Electron |
 | --- | --- | --- |
-| App serving | Vite dev server | Packaged static `dist/` server |
-| Backend | Vite middleware in `server/pi-api.js` | `server/leyline-server.js` plus pi API wiring |
-| Environment | Inherits the shell that launched Vite | Loads macOS login shell environment in the main process |
-| Terminal | WebSocket to local PTY backend | Same backend, with desktop shortcuts |
-| Window state | Browser-managed | Bounds, maximized state, and fullscreen persist |
-| Dictation | Supported (via Web Speech API in Chrome) | Disabled (Chromium in Electron lacks Google's speech recognition engines) |
+| App files | Vite dev server | Vite dev server or packaged `dist/` files |
+| API | `server/pi-api/index.js` as Vite middleware | `server/leyline-server.js` with `server/pi-api/` |
+| Environment | Inherits the environment that starts Vite | Loads the macOS login-shell environment |
+| Terminal | WebSocket connection to the local PTY | Same local PTY backend |
+| Windows | Browser-managed | Multiple native windows with saved state |
+| Dictation | Available when the browser supports the Web Speech API | Not supported |
 
-Use browser/Vite for day-to-day development and visual iteration. Use Electron to validate desktop packaging, environment loading, shortcuts, and window persistence.
+Use the browser for normal development and visual changes. Use Electron to test
+packaging, desktop shortcuts, shell environment loading, multiple windows, and
+saved window state.
+
+The packaged Electron app starts one local server. All Leyline windows in that
+app process use that server.

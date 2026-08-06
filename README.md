@@ -1,30 +1,38 @@
 # <img src="assets/icon.png" width="96" height="96" alt="Leyline icon" align="center"> Leyline
 
 Leyline is a local web UI for pi coding-agent sessions. It uses Vue 3 and Vite
-for the frontend, with Vite middleware that talks to the pi SDK for session
-state, prompts, model controls, runtime events, and an embedded terminal.
+for the frontend. A local backend uses the pi SDK for session state, prompts,
+model controls, runtime events, and an embedded terminal.
 
-| Home View | Workbench |
-| --- | --- |
-| <a href="assets/readme/home.png"><img width="760" alt="Home View" src="assets/readme/home.png" /></a> | <a href="assets/readme/workbench.png"><img width="760" alt="Workbench" src="assets/readme/workbench.png" /></a> |
+## Screenshots
+
+### Start screen
+
+<a href="assets/readme/home.png"><img alt="Leyline start screen with project and runtime controls" src="assets/readme/home.png" /></a>
+
+### Workbench
+
+<a href="assets/readme/workbench.png"><img alt="Leyline workbench with a sanitized agent session" src="assets/readme/workbench.png" /></a>
 
 
 ## Features
 
-Browse, search, create, and run pi sessions from a local web UI, with rendered
-transcripts, live runtime output, model/mode controls, and an embedded terminal.
+Browse, search, create, and run pi sessions from a local web UI. Leyline shows
+rendered transcripts, live runtime output, model controls, memory, subagents,
+runtime events, and an embedded terminal.
 
 For the reasoning behind the project, see [Motivations](docs/motivations.md).
 
 ## Requirements
 
 - macOS
-- Node.js
+- Node.js 22.19.0, as specified in `.nvmrc`
 - npm
 - A configured pi coding-agent environment
 
-Leyline is currently developed and tested on macOS only. Linux and Windows are
-not supported yet, and many things are expected to be broken there.
+Leyline is developed and tested on macOS only. Linux and Windows are not
+supported. The local Electron publish script currently expects an Apple silicon
+build named `Leyline-darwin-arm64`.
 
 ## Setup
 
@@ -44,9 +52,13 @@ Open the Vite URL shown in the terminal, usually:
 http://localhost:5173/
 ```
 
+The Vite server also serves the documentation at
+`http://localhost:5173/docs/`. To run only the documentation server, use
+`npm run docs:dev`.
+
 ## Optional Electron app
 
-The browser/Vite workflow is the primary development path, but Leyline can also
+The browser and Vite workflow is the primary development path. Leyline can also
 run as a local Electron desktop app.
 
 For Electron development, start Vite in one terminal:
@@ -67,9 +79,9 @@ To build a packaged desktop app:
 npm run electron:build
 ```
 
-The packaged app is written to `release/`. The build first creates the Vite
-`dist/` output, then packages Electron with the app icon from `assets/icon` and
-unpacks native terminal dependencies needed by `node-pty`.
+The packaged app is written to `release/`. The build creates the Vite `dist/`
+output and then packages Electron. It unpacks the native terminal files that
+`node-pty` needs.
 
 To install the packaged app locally and expose the `leyline` command:
 
@@ -77,34 +89,56 @@ To install the packaged app locally and expose the `leyline` command:
 npm run local-publish
 ```
 
-This copies `Leyline.app` to `/Applications/` and symlinks the CLI to
-`~/.local/bin/leyline`. Make sure `~/.local/bin` is on your `PATH`, then run:
+This command copies `Leyline.app` to `/Applications/`. It also links the CLI to
+`~/.local/bin/leyline`. Make sure that `~/.local/bin` is on your `PATH`.
 
 ```sh
 cd /path/to/project
 leyline
 ```
 
-The CLI opens or focuses the Electron app and creates a new session for the
-current shell directory. Use `leyline -n` to create that session in a new
-Leyline window.
+The CLI opens or focuses Leyline and creates a session for the current shell
+directory. Use `leyline -n` to create the session in a new Leyline window.
 
 ## Electron shortcuts
 
-- `cmd+n`: create a new session in the current window
-- `cmd+shift+n`: create a new session in a new window
-- `cmd+w`: close the current window
+- `Command+N`: create a session in the current window
+- `Command+Shift+N`: create a session in a new window
+- `Command+W`: close the current window
+- `Command+E`: show or hide the sidebar
+- `Command+Shift+E`: open Settings
+- `Command+Shift+M`: show or hide Memory
+- `Command+Shift+T`: show or hide the terminal
+- `Escape`: stop the active run and close open drawers, dialogs, and menus
+
+## Documentation
+
+- [Getting started](docs/getting-started/index.md)
+- [Sessions](docs/user-guide/sessions.md)
+- [Composer](docs/user-guide/composer.md)
+- [Memory](docs/user-guide/memory.md)
+- [Subagents](docs/user-guide/subagents.md)
+- [Goals and events](docs/user-guide/goals-and-events.md)
+- [Terminal](docs/user-guide/terminal.md)
+- [Electron](docs/electron/index.md)
+- [Commands](docs/reference/commands.md)
+- [Troubleshooting](docs/reference/troubleshooting.md)
 
 ## Useful commands
 
 ```sh
 npm run build
 npm run preview
+npm run docs:dev
+npm run docs:build
+npm run docs:screenshots
 npm run electron:dev
 npm run electron:build
 npm run local-publish
 npm run screenshot
+npm run video
 ```
 
-`npm run screenshot` expects the dev server to be running and writes the latest
-capture to `screenshots/current.png`.
+The capture commands require the dev server. `npm run screenshot` writes a
+live local capture to `screenshots/current.png`. `npm run docs:screenshots`
+refreshes sanitized tracked images with intercepted fixture data.

@@ -1,7 +1,32 @@
 # User guide
 
-Leyline is organized around a session workspace: the start screen, sidebar, workbench, composer, optional drawers, and terminal.
+Use Leyline to create, inspect, and control pi sessions.
 
-The sidebar groups pi sessions by project. The workbench shows selected transcript detail and live runtime output. The composer submits prompts, images, shell commands, steering, and runtime controls to the selected session.
+## Start a session
 
-Use the task pages in this section for details about each part of the interface.
+Use the [start screen](./start-screen) to select a project and send the first prompt.
+
+Use [projects and search](./projects-and-search) to find projects and manage their sessions.
+
+## Work in a session
+
+Use these pages for the main session tasks:
+
+- [Sessions](./sessions): select, rename, create, and delete sessions.
+- [Workbench](./workbench): use the header, transcript, drawers, and live output.
+- [Composer](./composer): send prompts, shell commands, images, steering messages, and follow-up messages.
+- [Runtime controls](./runtime-controls): select a model and thinking level, and inspect tools and context usage.
+- [Tools and thinking](./tools-and-thinking): inspect assistant thoughts, tools, skills, and rollout feedback.
+- [Editing, forking, resetting, and compaction](./editing-forking-compaction): change or branch session history.
+
+## Use additional surfaces
+
+- [Memory](./memory)
+- [Subagents](./subagents)
+- [Goals and events](./goals-and-events)
+- [Terminal](./terminal)
+- [Images and previews](./images-and-previews)
+- [Export](./export)
+- [Settings](./settings)
+- [Mobile layout](./mobile)
+- [Keyboard shortcuts](./keyboard-shortcuts)

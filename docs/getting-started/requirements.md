@@ -1,9 +1,23 @@
 # Requirements
 
-- Node.js compatible with the project `.nvmrc`.
-- npm for dependency installation and scripts.
-- A configured pi coding-agent environment.
-- Shell environment variables for any model providers, tools, and extensions used by pi.
-- A modern local browser for the Vite UI.
+## Supported system
 
-Electron is optional. Use it when you want a desktop shell, packaged app behavior, macOS shell environment loading, or Electron-only shortcuts.
+Leyline is developed and tested on macOS only. Linux and Windows are not
+supported.
+
+The local Electron publish script expects an Apple silicon package named
+`Leyline-darwin-arm64`. The browser workflow is the primary development path.
+
+## Required software
+
+- Node.js 22.19.0, as specified in `.nvmrc`
+- npm
+- A modern local browser
+- A configured pi coding-agent environment
+
+Your pi setup must include credentials for each model provider that you use.
+It must also include the environment variables required by your tools and
+extensions.
+
+Electron is optional. Use Electron to test the desktop package, desktop
+shortcuts, macOS login-shell environment loading, and window state.

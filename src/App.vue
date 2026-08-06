@@ -369,8 +369,7 @@ const {
   },
 })
 const currentMobileModelLabel = computed(() => {
-  const model = composerRuntime.value?.state?.model
-  return model?.id || modelChip(model)
+  return modelChip(composerRuntime.value?.state?.model)
 })
 const currentMobileThinkingLabel = computed(() => {
   const level = composerRuntime.value?.state?.thinkingLevel

@@ -17,30 +17,37 @@ hero:
       link: /developer-guide/
 
 features:
-  - title: Browse pi sessions
-    details: Review existing sessions grouped by project cwd and quickly switch between transcript detail views.
-  - title: Run in projects
-    details: Create sessions in project directories and submit prompts through the selected runtime session.
+  - title: Browse sessions and projects
+    details: Search sessions, group them by project, inspect project history, and move between parent and child sessions.
+  - title: Run and direct agents
+    details: Submit prompts, images, shell commands, steering messages, queued follow-ups, slash commands, and long-running goals.
   - title: Watch live work
-    details: Follow assistant text, tool rows, model output, and thinking traces while a run is active.
-  - title: Control runtime state
-    details: Adjust model and thinking level, stop work, reload pi resources, and monitor context and tool counts.
+    details: Follow assistant text, thinking, tool calls, runtime events, queues, context use, and goal progress.
+  - title: Manage durable memory
+    details: Inspect global, project, and session memory. Create, edit, archive, restore, or delete local records.
+  - title: Delegate to subagents
+    details: Run specialized child agents and set model overrides by global, project, or session scope.
+  - title: Review and revise history
+    details: Edit prompts, retry turns, fork sessions, reset a thread, label rollouts, and inspect rich file or diff previews.
   - title: Use a local terminal
-    details: Open the PTY-backed xterm drawer connected through the same local server.
+    details: Open the PTY-backed xterm drawer in the active project through the same local server.
   - title: Export transcripts
-    details: Save self-contained HTML exports with markdown, tools, thinking output, images, and previews.
+    details: Save portable HTML with Markdown, tools, thinking output, images, token data, previews, and optional share metadata.
 ---
+
+## Leyline workspace
+
+![Leyline workbench showing a sanitized pi session](/screenshots/workbench.png)
 
 ## Browser first, Electron optional
 
-The browser and Vite workflow is the primary path. Electron is an optional
-desktop shell around the same app for packaged use, desktop shortcuts, macOS
-shell environment loading, and window-state persistence.
+The browser and Vite workflow is the primary path. Electron is an optional desktop shell around the same app. It adds packaged use, desktop shortcuts, macOS shell environment loading, multiple windows, and saved window state.
 
 ## Quick links
 
 - [Install and run Leyline](/getting-started/)
-- [Read the motivations](/motivations)
 - [Learn the UI](/user-guide/)
+- [Read the motivations](/motivations)
 - [Understand the architecture](/developer-guide/)
+- [Review integrations](/integrations/)
 - [Review API routes](/reference/api)

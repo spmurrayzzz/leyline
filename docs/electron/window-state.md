@@ -1,26 +1,41 @@
-# Windows and State Management
+# Electron windows and state
 
-Leyline supports running multiple sessions across multiple Electron windows, with advanced single-instance handling, keyboard shortcuts, and window-state persistence.
+## Start from the CLI
 
-## Single Instance & CLI Launching
+After local publication, run this command in a project directory:
 
-When you launch the packaged app or run the `leyline` command in a terminal:
-1. **Single-Instance Lock**: The main process requests a single-instance lock. If an instance of Leyline is already running, the arguments (such as a target folder path or a new window flag) are forwarded to the running instance, and the second process exits gracefully.
-2. **IPC Dispatching**: The running instance intercepts these arguments. Depending on the flags passed:
-   - It will either dispatch a `leyline:new-session` event to the active window to open the new session in the current window.
-   - Or, if `--leyline-new-window` (`leyline -n`) is specified, it will instantiate a brand-new BrowserWindow.
+```bash
+leyline
+```
 
-## Multi-Window & Shortcuts
+Leyline opens or focuses the app. It creates a session for the current shell
+directory in the active window.
 
-Leyline uses native keyboard-shortcut listening in the main process to facilitate fast multi-window management:
+Use the only supported CLI option to request a new window:
 
-- **New Session (`Cmd+N`)**: Triggers a new session in the current, active window.
-- **New Session in New Window (`Cmd+Shift+N`)**: Queries the active window's current working directory via `window.__leylineCurrentCwd` and launches a new Electron window opened to that same workspace.
-- **Close Window (`Cmd+W`)**: Closes the current, active window.
+```bash
+leyline -n
+```
 
-## Window State Persistence
+The CLI accepts no path argument. Set `LEYLINE_CWD` when the target directory
+must differ from the current shell directory.
 
-Electron persists window bounds, maximized state, and fullscreen state under `app.getPath('userData')` in a file named `window-state.json`.
+## Use multiple windows
 
-Default bounds are used when no valid saved state exists. Saved bounds are validated before use so stale or invalid monitor layouts do not strand the window.
+Electron uses one app instance. A later CLI launch sends its request to the
+running instance and then exits.
 
+A normal `leyline` request uses the active window. A `leyline -n` request creates
+a window. `Command+Shift+N` also creates a window and uses the active window's
+current project directory when one is available.
+
+All windows use one packaged local server in the Electron main process.
+
+## Saved window state
+
+Electron saves window bounds, maximized state, and full-screen state in
+`window-state.json` under Electron's `app.getPath('userData')` directory.
+
+Each new window reads the saved state. Electron validates the saved size and
+position before use. The default size is 1320 by 900 pixels, and the minimum
+size is 900 by 640 pixels.

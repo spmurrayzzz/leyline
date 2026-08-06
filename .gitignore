@@ -4,6 +4,6 @@ dist/
 .env
 .env.*
 !.env.example
-screenshots/
-MEMORY.md
+/screenshots/
+/MEMORY.md
 release/

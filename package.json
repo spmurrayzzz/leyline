@@ -18,6 +18,7 @@
     "electron:dev": "LEYLINE_DEV_SERVER_URL=http://localhost:5173 electron .",
     "electron:build": "./scripts/electron-build.sh",
     "screenshot": "node scripts/screenshot.js",
+    "docs:screenshots": "node scripts/docs-screenshots.js",
     "video": "node scripts/video.js",
     "video:mp4": "node scripts/video-mp4.js"
   },

@@ -71,13 +71,13 @@ async function showTranscriptDetails() {
 }
 
 async function showPanels() {
-  await clickIfVisible('button:has-text("Events")')
+  await clickIfVisible('button[aria-label="Events"]')
   await pause(600)
-  await clickIfVisible('.event-log-header button')
-  await clickIfVisible('button:has-text("Terminal")')
+  await clickIfVisible('.event-log-drawer-header button')
+  await clickIfVisible('button[aria-label="Open terminal"]')
   await pause(1000)
   await clickIfVisible('.terminal-header button')
-  await clickIfVisible('.settings-button')
+  await clickIfVisible('button[aria-label="Open settings"]')
   await pause(1000)
   await clickIfVisible('.settings-drawer-header button')
 }
@@ -87,8 +87,10 @@ async function showStartState() {
     await clickIfVisible('.brand-home')
   }
 
-  await clickIfVisible('.start-project-button')
-  await pause(1000)
+  if (await clickIfVisible('.start-project-button')) {
+    await pause(1000)
+    await clickIfVisible('.start-project-button')
+  }
 }
 
 await page.goto(url, { waitUntil: 'domcontentloaded' })

@@ -1,27 +1,95 @@
 # Styling and motion
 
-Leyline's visual direction is dense, restrained, professional, and subtly purple-black: deep purple panels and borders, restrained violet accents, neutral charcoal transcript surfaces, warmer sidebar tones, and no decorative gradients.
+Leyline uses plain CSS modules under `src/styles/`. `src/style.css` is an imports-only entry file.
 
-Assistant labels use `Agent`, not `Leyline`.
+## Visual direction
 
-Motion should feel like restrained desktop-app microinteraction. Prefer explicit transitions over `transition: all`, and animate opacity, transform, color, border, and background instead of layout.
+Use neutral near-black backgrounds and charcoal surfaces. Use the purple accent for selection, focus, and small status details.
 
-## Transcript Message Animations
+Keep panels quiet and borders low contrast. Do not turn the workspace into a purple dashboard.
 
-To elevate the feel of the session stream without adding noisy distraction, the transcript uses structured transitions for message arrivals:
+Use `Agent` for assistant labels. Do not use `Leyline` as the speaker label.
 
-- **Persisted Message Entrance (`message-enter`)**: When newly added entries arrive in the persisted timeline of an active session, they animate in using a 260ms `ease-emphasized` (`cubic-bezier(0.16, 1, 0.3, 1)`) transition. This translates the message up slightly (`translateY(6px` to `0`) and fades in its opacity. To avoid a bulk flash, this animation is bypassed during session switching and initial load.
-- **Live-Turn Handoff Choreography**: Submitted prompts undergo a synchronized animation flow to make the transition between user entry and agent response seamless:
-  - `live-user-handoff`: Subtle, instant reaction upon committing the prompt.
-  - `live-assistant-wake`: Gentle fade-and-slide as the assistant begins streaming thoughts or text.
-  - `live-tool-edge` & `live-tool-settle`: Snappy slide-and-snap transitions for tool executions.
-- **Reduced Motion**: All animations respect the user's system preferences and are disabled/flattened when `prefers-reduced-motion: reduce` is active.
+Avoid decorative glow, gradients, and extra panels. Existing gradients serve fades, masks, previews, or compact visual structure.
 
-## Loading Skeleton Alignments
+## Style module ownership
 
-Skeletons represent destination content structure rather than generic progress bars:
-- **Spatial Alignment**: The initialization/loading skeleton (`.transcript-skeleton-panel`) is top-aligned and centers exactly to the transcript column, mirroring the actual message and tool container geometry.
-- **Visual Design**: The skeleton includes user-shaped, assistant-shaped, and tool-shaped rows with high-to-low progressive opacity decay and a vertical `mask-image` fade so only the top section is prominent.
-- **Desynchronized Shimmer**: Shimmer waves are desynchronized across different rows to make the loading state feel more natural and organic.
-- **State Guards**: Loading skeletons are strictly guarded. Startup prompt execution does not trigger the in-project empty skeleton, avoiding layered skeleton visuals.
+| File | Ownership |
+| --- | --- |
+| `tokens.css` | Color, syntax, type, dimensions, easing, and duration tokens |
+| `motion.css` | Shared keyframes |
+| `shell.css` | App grid, header, sidebar, and start shell |
+| `topbar.css` | Runtime chrome and workbench header |
+| `workbench.css` | Workbench layout, loading, start, and empty states |
+| `transcript.css` | Messages, Markdown, thinking, feedback, and entry actions |
+| `tools.css` | Tools, skills, subagents, files, diffs, and fullscreen previews |
+| `composer.css` | Composer, menus, attachments, context, and send states |
+| `memory.css` | Memory Inspector |
+| `settings.css` | Settings, Runtime Events, and subagent configuration |
+| `modals.css` | Project browser and confirmation dialogs |
+| `terminal.css` | Terminal drawer |
+| `responsive.css` | Reduced-motion and viewport overrides |
 
+Put a rule in the narrowest owning module. Keep `src/style.css` free of component rules.
+
+## Tokens
+
+Add shared values to `tokens.css` only when more than one surface needs them. Prefer existing `--motion-*`, `--ease-*`, and color tokens.
+
+Do not add a token to avoid one clear local value. Do not duplicate syntax colors between app modules.
+
+The current base colors are neutral. The primary accent is `--accent: #8a78ff`.
+
+## Motion
+
+Motion must explain state change. Use short opacity and transform changes for entry, drawer, picker, and handoff states.
+
+Use explicit transition properties. Do not use `transition: all`.
+
+Prefer opacity, transform, color, border color, and background color. Avoid animating layout unless the motion explains docking, resizing, or reserved space.
+
+The current motion families include:
+
+- session shell and composer docking
+- optimistic user-message handoff
+- live assistant start
+- live tool progress and settle
+- drawer and picker entry
+- loading skeleton reveal
+
+`App.vue` tracks newly persisted entry IDs for 300 ms. The current stylesheet does not apply a normal-motion entry animation to that class.
+
+## Reduced motion
+
+`responsive.css` starts with the `prefers-reduced-motion: reduce` rules. These rules shorten transitions and remove keyframe animation.
+
+Add every new animation to this section. Preserve state visibility when motion is removed.
+
+JavaScript scrolling also checks the reduced-motion preference. Do not rely only on CSS for scripted motion.
+
+## Transcript and export synchronization
+
+The app transcript uses `src/styles/transcript.css` and `src/styles/tools.css`. Shared colors and syntax tokens come from `src/styles/tokens.css`.
+
+HTML export cannot import the app style modules. `server/pi-api/export-renderer.js` contains a separate `exportCss()` string.
+
+When transcript visuals change, compare and update both implementations. Check these areas:
+
+- user and assistant messages
+- thinking blocks
+- summary cards
+- Markdown and code blocks
+- syntax colors
+- tool, skill, and subagent rows
+- image, file, patch, and diff previews
+- responsive and reduced-motion behavior
+
+The export has extra header and standalone-page rules. It does not need to match the application shell.
+
+## Visual validation
+
+Run the browser app at `http://localhost:5173/`. Use `npm run screenshot` for a local visual check.
+
+Inspect the live workbench and an HTML export when transcript CSS changes. The screenshot command does not validate export CSS.
+
+Do not promote a local capture into documentation without a privacy and currency review.

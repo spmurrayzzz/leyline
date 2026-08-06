@@ -1,28 +1,65 @@
 # Commands
 
+## Install dependencies
+
 | Command | Purpose |
 | --- | --- |
-| `npm install` | Install dependencies. |
-| `npm run dev` | Start the Vite app. |
-| `npm run build` | Build the app and VitePress docs. |
-| `npm run preview` | Preview the built app. |
-| `npm run docs:dev` | Start the VitePress docs server. |
-| `npm run electron:dev` | Launch Electron against Vite. |
-| `npm run electron:build` | Package Electron app. |
-| `npm run screenshot` | Capture `screenshots/current.png`. |
-| `npm run video` | Record `screenshots/walkthrough.webm`. |
-| `npm run video:mp4` | Convert walkthrough to MP4. |
-| `npm run local-publish` | Run the local publish helper. |
+| `npm install` | Install project dependencies in `node_modules/`. |
 
-## CLI Commands
+The repository does not include a package lock.
 
-After running `npm run local-publish` to install the app and link the CLI, the following global command becomes available:
+## Run the app and documentation
 
-### `leyline`
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Start Vite, the pi API middleware, and the VitePress middleware. |
+| `npm run build` | Build the Vue app and the VitePress site. |
+| `npm run preview` | Preview the built Vue app. |
+| `npm run docs:dev` | Start the VitePress development server. |
+| `npm run docs:build` | Build only the VitePress site. |
+| `npm run docs:preview` | Preview the built VitePress site. |
 
-Opens or focuses the Electron app and creates a new pi session for the current shell directory (`$PWD`).
+`npm run build` writes the Vue app to `dist/` and the documentation to
+`dist/docs/`. `npm run preview` does not mount the pi API or terminal backend.
 
-- **Arguments/Flags**:
-  - `leyline` - Create/reveal a session for the current folder.
-  - `leyline -n` or `leyline --new-window` - Create and open the session in a brand-new Electron window.
+## Run and package Electron
 
+| Command | Purpose |
+| --- | --- |
+| `npm run electron:dev` | Open Electron at `http://localhost:5173`. Start Vite first. |
+| `npm run electron:build` | Build the app and documentation, then package Electron in `release/`. |
+| `npm run local-publish` | Build the Apple silicon app, copy it to `/Applications/`, and link the CLI. |
+
+## Capture screenshots and video
+
+| Command | Purpose |
+| --- | --- |
+| `npm run screenshot` | Save a live browser capture to `screenshots/current.png` by default. |
+| `npm run docs:screenshots` | Refresh sanitized VitePress and README product images. |
+| `npm run video` | Save a browser walkthrough to `screenshots/walkthrough.webm` by default. |
+| `npm run video:mp4` | Use `ffmpeg` to convert the walkthrough to MP4. |
+
+The screenshot and video commands require a running app. The documentation
+capture uses intercepted fixture data. See [Environment variables](./environment#capture-variables)
+for URL, path, and video size overrides.
+
+## Use the packaged CLI
+
+Run `npm run local-publish` before you use the global command.
+
+```bash
+leyline
+```
+
+This command opens or focuses Electron. It creates a pi session for the current
+shell directory in the active window.
+
+```bash
+leyline -n
+```
+
+The `-n` option creates the session in a new Electron window. It is the only
+supported CLI option. The CLI does not accept a directory argument.
+
+Set `LEYLINE_CWD` to select a different directory. Set `LEYLINE_APP` to select a
+different app package. See [Environment variables](./environment#cli-variables).

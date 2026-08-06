@@ -302,5 +302,7 @@ function openDb() {
 }
 
 function dbPath() {
-  return join(homedir(), '.local', 'share', 'leyline', 'memory.sqlite')
+  const dir = process.env.LEYLINE_MEMORY_DIR
+    || join(homedir(), '.local', 'share', 'leyline')
+  return join(dir, 'memory.sqlite')
 }

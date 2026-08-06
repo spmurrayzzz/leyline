@@ -1,192 +1,957 @@
 # API reference
 
-Routes return JSON unless otherwise noted. Important errors include missing sessions, invalid request bodies, unavailable runtime state, provider or pi SDK failures, and unsafe operations while streaming or compacting.
+Leyline serves the API under `/api/pi`. The API is a local application interface. It has no authentication or cross-user access control.
+
+All implemented HTTP routes are listed below. Successful HTTP requests return `200`. The API does not currently return `201` or `202`.
+
+## Conventions and status behavior
+
+JSON requests use `Content-Type: application/json`. Extra request fields are ignored. A field marked `?` can be omitted. JSON serialization omits object properties whose value is `undefined`. The current JSON reader has no explicit body-size limit.
+
+Most errors have this envelope:
+
+```json
+{ "error": "Error message" }
+```
+
+Status behavior is:
+
+- `400` is used only when `GET /sessions/by-path` has no `path` query.
+- `404` is used for an unknown route, a missing detail session, a missing activation session, or a missing scoped runtime session.
+- `405` is used when a known route receives an unsupported method.
+- `500` is used for thrown errors. This includes malformed JSON, most validation errors, SDK errors, missing memories, and some missing sessions.
+
+The current status codes do not distinguish all client errors from server errors. Clients must read the `error` value.
+
+## Common response objects
+
+### Session summary
+
+```text
+SessionSummary = {
+  id: string,
+  path: string,
+  cwd: string,
+  name?: string,
+  parentSessionPath?: string,
+  isSubagentSession: boolean,
+  firstMessage: string,
+  timestamp?: string
+}
+```
+
+`timestamp` is the session creation time as an ISO string. `firstMessage` is limited to 140 characters.
+
+### Session detail
+
+```text
+SessionDetail = {
+  session: SessionSummary & {
+    sessionFile: string,
+    messageCount: number,
+    contextTokens: number | null,
+    modified: string,
+    created: string,
+    contextUsage?: object
+  },
+  entries: TranscriptEntry[]
+}
+```
+
+A transcript entry is a projected `message`, `tool`, `event`, or `summary` object. Each entry has `id`, `type`, `timestamp`, `copyText`, `rolloutFeedback`, and `rolloutFeedbackText` where applicable. Message entries include role, text, and text, image, or thinking blocks. Tool entries can include file, diff, patch, image, bash, and subagent data.
+
+### Active runtime
+
+```text
+Active = {
+  id: string,
+  path: string,
+  cwd: string,
+  diagnostics: object[],
+  state: {
+    model?: Model,
+    availableModels: Model[],
+    thinkingLevel: string,
+    availableThinkingLevels: string[],
+    isStreaming: boolean,
+    isCompacting: boolean,
+    pendingToolCalls: object[],
+    steeringMode: string,
+    followUpMode: string,
+    activeToolCount: number,
+    activeToolNames: string[],
+    contextUsage?: object,
+    slashCommands: SlashCommand[],
+    queuedMessages: { steering: object[], followUp: object[] },
+    extensionUi: {
+      statuses: object,
+      widgets: object,
+      notifications: object[]
+    },
+    goal: Goal | null
+  }
+}
 
-## `GET /api/pi/sessions`
+Model = {
+  id: string,
+  name: string,
+  provider: string,
+  supportsImages: boolean,
+  availableThinkingLevels: string[]
+}
 
-List sessions.
+SlashCommand = {
+  name: string,
+  description?: string,
+  source: "command" | "extension" | "prompt" | "skill"
+}
 
-- Request body: None.
-- Response: Array of session summaries plus active runtime merge where applicable.
+Goal = {
+  objective: string,
+  status: string,
+  tokenBudget: number | null,
+  continuationLimit: number,
+  continuationsUsed: number,
+  tokensUsed: number,
+  timeUsedSeconds: number,
+  createdAt: number,
+  updatedAt: number
+}
+```
 
-## `POST /api/pi/sessions`
+The extension UI objects contain status strings, widget line arrays, and notification records from bundled extensions.
 
-Create a session in a cwd.
+## Session routes
 
-- Request body: `{ cwd, prompt?, images?, model?, thinking? }`.
-- Response: Created session summary and runtime state.
+### `GET /api/pi/sessions`
 
-## `GET /api/pi/sessions/:id`
+**Designation:** Browser route.
 
-Load transcript detail.
+Response:
 
-- Request body: None.
-- Response: Session detail with current branch entries.
+```text
+{ sessions: SessionSummary[] }
+```
 
-## `DELETE /api/pi/sessions/:id`
+The list includes persisted sessions and open runtimes that are not yet in the persisted list.
 
-Trash a session.
+### `POST /api/pi/sessions`
 
-- Request body: None.
-- Response: Success response.
+**Designation:** Browser route.
 
-## `POST /api/pi/active-session`
+Request:
 
-Activate runtime for a session.
+```text
+{ cwd: string }
+```
 
-- Request body: `{ id }`.
-- Response: Runtime/session state.
+Response:
 
-## `GET /api/pi/state?cwd=...`
+```text
+{ active: Active, detail: SessionDetail }
+```
 
-Read runtime state for a cwd.
+The route creates the directory if necessary, creates a pi session, loads a runtime, and makes it active. Missing `cwd` produces `500`.
 
-- Request body: Query string cwd.
-- Response: Runtime state without switching active session.
+### `GET /api/pi/sessions/:id`
 
-## `GET /api/pi/fs?path=...`
+**Designation:** Browser route.
 
-List folder browser entries.
+Query:
 
-- Request body: Query string path.
-- Response: Directory children.
+```text
+path?: string
+```
 
-## `GET /api/pi/events`
+Response: `SessionDetail` without an outer envelope.
 
-Open SSE runtime events.
+If `path` is present, Leyline opens that file and verifies that its session ID equals `:id`. A missing session returns `404`. An ID and path mismatch returns `500`.
 
-- Request body: None.
-- Response: Event stream.
+### `GET /api/pi/sessions/by-path`
 
-## `POST /api/pi/prompt`
+**Designation:** Browser route used for parent and child navigation.
 
-Legacy active-session prompt.
+Query:
 
-- Request body: `{ prompt, images? }`.
-- Response: Accepted/submitted response.
+```text
+path: string
+```
 
-## `POST /api/pi/sessions/:id/prompt`
+Response: `SessionDetail` without an outer envelope.
 
-Scoped prompt.
+A missing query returns `400`. A session that cannot be resolved returns `404`.
 
-- Request body: `{ prompt, images? }`.
-- Response: Accepted/submitted response.
+### `PATCH /api/pi/sessions/:id`
 
-## `POST /api/pi/bash`
+**Designation:** Browser route.
 
-Legacy active-session shell command.
+Request:
 
-- Request body: `{ command }`.
-- Response: Execution accepted response.
+```text
+{ name: string }
+```
 
-## `POST /api/pi/sessions/:id/bash`
+Response:
 
-Scoped shell command.
+```text
+{ ok: true, detail: SessionDetail, session: SessionDetail.session }
+```
 
-- Request body: `{ command }`.
-- Response: Execution accepted response.
+Leyline collapses whitespace in `name`. A non-string value becomes an empty name. An unknown session currently returns `500`.
 
-## `POST /api/pi/compact`
+### `DELETE /api/pi/sessions/:id`
 
-Legacy active-session compaction.
+**Designation:** Browser route.
 
-- Request body: `{ instructions? }`.
-- Response: Compaction accepted response.
+Request body: none.
 
-## `POST /api/pi/sessions/:id/compact`
+Response:
 
-Scoped compaction.
+```text
+{ ok: true, trashed: { path: string | null } }
+```
 
-- Request body: `{ instructions? }`.
-- Response: Compaction accepted response.
+The route moves the JSONL file to a `leyline-trash` directory near the configured session directory. `path` is `null` when no file exists for an open runtime. Streaming or compacting sessions and unknown sessions currently return `500`.
 
-## `POST /api/pi/interrupt`
+### `POST /api/pi/active-session`
 
-Legacy active-session stop.
+**Designation:** Browser route.
 
-- Request body: None.
-- Response: Success response.
+Request:
 
-## `POST /api/pi/sessions/:id/interrupt`
+```text
+{ id?: string, path?: string, cwd?: string }
+```
 
-Scoped stop.
+Response:
 
-- Request body: None.
-- Response: Success response.
+```text
+{ active: Active }
+```
 
-## `POST /api/pi/reload`
+A missing resolved session returns `404`. Runtime load errors return `500`.
 
-Legacy active-session reload.
+### `GET /api/pi/state`
 
-- Request body: None.
-- Response: Reload state.
+**Designation:** Browser route for start-screen runtime options.
 
-## `POST /api/pi/sessions/:id/reload`
+Query:
 
-Scoped reload.
+```text
+cwd?: string
+```
 
-- Request body: None.
-- Response: Reload state.
+Response:
 
-## `POST /api/pi/model`
+```text
+{ active: Active }
+```
 
-Legacy active-session model switch.
+For a different `cwd`, Leyline creates a temporary, unpersisted runtime state and then disposes it. If `cwd` is absent, it uses the active runtime directory or the server process directory.
 
-- Request body: `{ model }`.
-- Response: Selected model state.
+## Filesystem route
 
-## `POST /api/pi/sessions/:id/model`
+### `GET /api/pi/fs`
 
-Scoped model switch.
+**Designation:** Browser route.
 
-- Request body: `{ model }`.
-- Response: Selected model state.
+Query:
 
-## `POST /api/pi/thinking`
+```text
+path?: string
+cwd?: string
+```
 
-Legacy active-session thinking switch.
+Response:
 
-- Request body: `{ thinking }`.
-- Response: Selected thinking state.
+```text
+{
+  parentPath: string,
+  path: string,
+  parent: string,
+  home: string,
+  entries: DirectoryEntry[],
+  directories: DirectoryEntry[],
+  root: string
+}
 
-## `POST /api/pi/sessions/:id/thinking`
+DirectoryEntry = {
+  name: string,
+  fullPath: string,
+  path: string,
+  hidden: boolean
+}
+```
 
-Scoped thinking switch.
+`entries` and `directories` contain the same directory list. The default `path` is `~/`. Paths that start with `./` or `../` require `cwd`. Other relative paths resolve from the server process directory. Invalid paths return `500`.
 
-- Request body: `{ thinking }`.
-- Response: Selected thinking state.
+## Runtime action routes
 
-## `POST /api/pi/edit-prompt`
+The scoped routes act on `:id`. They do not change the selected active session. If the runtime is not open, Leyline loads it. An unknown `:id` returns `404`.
 
-Edit active prompt.
+The matching top-level routes act on the selected active session. They are legacy routes. If no session is active, they return `500` with `No active session`.
 
-- Request body: `{ entryId, prompt, images? }`.
-- Response: Accepted/submitted response.
+### Prompt
 
-## `POST /api/pi/fork`
+| Route | Designation |
+| --- | --- |
+| `POST /api/pi/sessions/:id/prompt` | Scoped browser route |
+| `POST /api/pi/prompt` | Legacy active-session route |
 
-Fork active session at an entry.
+Request:
 
-- Request body: `{ entryId }`.
-- Response: Forked session summary.
+```text
+{
+  text: string,
+  images?: Array<{ type: "image", data: string, mimeType: string }>,
+  streamingBehavior?: "steer" | "followUp"
+}
+```
 
-## `GET /api/pi/sessions/:id/export`
+Response:
 
-Export self-contained transcript HTML.
+```text
+{ ok: true, active: Active }
+```
 
-- Request body: None.
-- Response: HTML document.
+The response means prompt preflight succeeded. The model response can continue through SSE. Empty text is valid only when at least one valid image is present. Supported MIME types are PNG, JPEG, GIF, and WebP.
 
-## `POST /api/pi/mode`
+### Shell command
 
-No-op that reapplies one-at-a-time mode.
+| Route | Designation |
+| --- | --- |
+| `POST /api/pi/sessions/:id/bash` | Scoped browser route |
+| `POST /api/pi/bash` | Legacy active-session route |
 
-- Request body: Optional mode body.
-- Response: Success response.
+Request:
 
-## `WS /api/pi/terminal`
+```text
+{ command: string, excludeFromContext?: boolean }
+```
 
-PTY terminal.
+Response:
 
-- Request body: WebSocket messages.
-- Response: Terminal stream.
+```text
+{ ok: true, active: Active, detail: SessionDetail }
+```
+
+The response is sent after the shell action finishes. An empty command or a concurrent shell command returns `500`.
+
+### Compaction
+
+| Route | Designation |
+| --- | --- |
+| `POST /api/pi/sessions/:id/compact` | Scoped browser route |
+| `POST /api/pi/compact` | Legacy active-session route |
+
+Request:
+
+```text
+{ customInstructions?: string }
+```
+
+Response:
+
+```text
+{ ok: true, active: Active, detail: SessionDetail }
+```
+
+The response is sent after compaction finishes. Active streaming, active compaction, or fewer than two message entries returns `500`.
+
+### Edit prompt
+
+| Route | Designation |
+| --- | --- |
+| `POST /api/pi/sessions/:id/edit-prompt` | Scoped browser route |
+| `POST /api/pi/edit-prompt` | Legacy active-session route |
+
+Request:
+
+```text
+{
+  entryId: string,
+  text: string,
+  images?: Array<{ type: "image", data: string, mimeType: string }>
+}
+```
+
+Response:
+
+```text
+{ ok: true, active: Active }
+```
+
+The entry must be a user message. Leyline moves the active tree position and submits the replacement prompt. The response means prompt preflight succeeded.
+
+### Interrupt
+
+| Route | Designation |
+| --- | --- |
+| `POST /api/pi/sessions/:id/interrupt` | Scoped browser route |
+| `POST /api/pi/interrupt` | Legacy active-session route |
+
+Request body: none.
+
+Response:
+
+```text
+{ ok: true, active: Active }
+```
+
+### Reload resources
+
+| Route | Designation |
+| --- | --- |
+| `POST /api/pi/sessions/:id/reload` | Scoped browser route |
+| `POST /api/pi/reload` | Legacy active-session route |
+
+Request body: none.
+
+Response:
+
+```text
+{ ok: true, active: Active }
+```
+
+Reload recreates the runtime at the current leaf. Streaming or compaction returns `500`.
+
+### Select model
+
+| Route | Designation |
+| --- | --- |
+| `POST /api/pi/sessions/:id/model` | Scoped browser route |
+| `POST /api/pi/model` | Legacy active-session route |
+
+Request:
+
+```text
+{ provider: string, id: string }
+```
+
+Response:
+
+```text
+{ ok: true, active: Active }
+```
+
+Missing fields, an unknown model, or a provider failure returns `500`.
+
+### Select thinking level
+
+| Route | Designation |
+| --- | --- |
+| `POST /api/pi/sessions/:id/thinking` | Scoped browser route |
+| `POST /api/pi/thinking` | Legacy active-session route |
+
+Request:
+
+```text
+{ level: string }
+```
+
+Response:
+
+```text
+{ ok: true, active: Active }
+```
+
+The level must occur in `active.state.availableThinkingLevels`.
+
+## Active-session history routes
+
+These actions currently have no scoped equivalent.
+
+### `POST /api/pi/fork`
+
+**Designation:** Active-session browser route.
+
+Request:
+
+```text
+{ entryId: string }
+```
+
+Response:
+
+```text
+{ ok: true, active: Active, detail: SessionDetail }
+```
+
+The route forks at the specified entry, changes the runtime session ID, and selects the fork. It also copies session-level subagent model overrides. Streaming or compaction returns `500`.
+
+### `POST /api/pi/reset-to-entry`
+
+**Designation:** Active-session browser route. This route is destructive.
+
+Request:
+
+```text
+{ entryId: string }
+```
+
+Response:
+
+```text
+{ ok: true, active: Active, detail: SessionDetail }
+```
+
+The entry must be on the active branch. The route rewrites the JSONL file so that it ends at that entry. It does not keep later branch records.
+
+### `POST /api/pi/mode`
+
+**Designation:** Legacy compatibility route.
+
+Request: Any JSON object or no body.
+
+Response:
+
+```text
+{ ok: true, active: Active }
+```
+
+The route ignores the request body and reapplies `one-at-a-time` steering and follow-up modes.
+
+## Rollout feedback route
+
+### `POST /api/pi/sessions/:id/feedback`
+
+**Designation:** Browser route backed by local SQLite metadata.
+
+Request:
+
+```text
+{
+  cwd: string,
+  entryId: string,
+  feedbackText?: string,
+  label?: "helpful" | "unhelpful" | "",
+  sessionPath: string
+}
+```
+
+Response when a label is set:
+
+```text
+{
+  ok: true,
+  feedback: {
+    cwd: string,
+    sessionId: string,
+    sessionPath: string,
+    entryId: string,
+    label: "helpful" | "unhelpful",
+    feedbackText: string,
+    updatedAt: number
+  }
+}
+```
+
+Response when `label` is empty:
+
+```text
+{ ok: true, feedback: null }
+```
+
+The `:id` value becomes `sessionId`. The route does not verify the session or entry against JSONL data. Missing fields and invalid labels return `500`.
+
+## Memory Inspector routes
+
+These browser routes use `memory.sqlite` in `LEYLINE_MEMORY_DIR`. Without that variable, they use `~/.local/share/leyline/memory.sqlite`. `cwd` is required for all operations. `sessionPath` is optional, but session scope requires it.
+
+```text
+MemoryContext = {
+  cwd: string,
+  projectId: string,
+  projectName: string,
+  projectRoot: string,
+  sessionAvailable: boolean,
+  sessionFile: string | null,
+  sessionId: string | null
+}
+
+Memory = {
+  id: string,
+  scope: "global" | "project" | "session",
+  projectId: string | null,
+  projectRoot: string | null,
+  projectName: string | null,
+  sessionId: string | null,
+  sessionFile: string | null,
+  cwd: string | null,
+  contentMd: string,
+  reasonMd: string,
+  tags: string[],
+  status: "active" | "archived",
+  source: "agent" | "user" | "system" | "import",
+  createdAt: number,
+  updatedAt: number,
+  archivedAt: number | null,
+  lastAccessedAt: number | null
+}
+```
+
+### `GET /api/pi/memories`
+
+Query:
+
+```text
+cwd: string
+sessionPath?: string
+```
+
+Response:
+
+```text
+{
+  context: MemoryContext,
+  memories: Memory[],
+  counts: {
+    active: number,
+    archived: number,
+    scopes: {
+      global: { active: number, archived: number },
+      project: { active: number, archived: number },
+      session: { active: number, archived: number }
+    }
+  }
+}
+```
+
+The result includes visible active and archived records, newest update first.
+
+### `POST /api/pi/memories`
+
+Request:
+
+```text
+{
+  cwd: string,
+  sessionPath?: string,
+  scope: "global" | "project" | "session",
+  contentMd: string,
+  tags?: string[]
+}
+```
+
+Response:
+
+```text
+{ ok: true, memory: Memory }
+```
+
+The created record has `source: "user"`, `status: "active"`, and an empty `reasonMd`.
+
+### `PATCH /api/pi/memories/:id`
+
+Request:
+
+```text
+{
+  cwd: string,
+  sessionPath?: string,
+  contentMd: string,
+  tags?: string[]
+}
+```
+
+Response:
+
+```text
+{ ok: true, memory: Memory }
+```
+
+The route does not change scope, source, reason, or status.
+
+### `POST /api/pi/memories/status`
+
+Request:
+
+```text
+{
+  cwd: string,
+  sessionPath?: string,
+  ids: string[],
+  status: "active" | "archived"
+}
+```
+
+Response:
+
+```text
+{ ok: true, memories: Memory[] }
+```
+
+The response contains all visible records after the transaction. Setting `active` restores archived records.
+
+### `DELETE /api/pi/memories`
+
+Request:
+
+```text
+{ cwd: string, sessionPath?: string, ids: string[] }
+```
+
+Response:
+
+```text
+{ ok: true, memories: Memory[] }
+```
+
+The route permanently deletes all specified visible records in one transaction.
+
+### `DELETE /api/pi/memories/:id`
+
+Request:
+
+```text
+{ cwd: string, sessionPath?: string }
+```
+
+Response:
+
+```text
+{ ok: true, memories: Memory[] }
+```
+
+The route permanently deletes one visible record.
+
+## Subagent routes
+
+### `GET /api/pi/subagents`
+
+**Designation:** Browser configuration route.
+
+Query:
+
+```text
+cwd: string
+sessionPath?: string
+```
+
+Response:
+
+```text
+{
+  context: {
+    cwd: string,
+    projectId: string,
+    projectName: string,
+    projectRoot: string,
+    sessionAvailable: boolean,
+    sessionFile: string | null,
+    sessionId: string | null
+  },
+  agents: Array<{
+    key: string,
+    name: string,
+    description: string,
+    source: "user" | "project",
+    path: string,
+    model: string,
+    thinking: string,
+    tools: string[],
+    overrides: { global?: string, project?: string, session?: string },
+    effectiveModel: string,
+    modelSource: "session" | "project" | "global" | "definition"
+  }>
+}
+```
+
+### `PUT /api/pi/subagents/:agentKey/model`
+
+**Designation:** Browser configuration route.
+
+URL-encode `:agentKey`. Agent keys contain a source, canonical file path, and agent name.
+
+Request:
+
+```text
+{
+  cwd: string,
+  sessionPath?: string,
+  scope: "global" | "project" | "session",
+  model: string
+}
+```
+
+Response: The same object as `GET /api/pi/subagents`.
+
+The model must be nonempty. The route verifies the agent definition, but it does not verify that the model exists.
+
+### `DELETE /api/pi/subagents/:agentKey/model`
+
+**Designation:** Browser configuration route.
+
+Request:
+
+```text
+{
+  cwd: string,
+  sessionPath?: string,
+  scope: "global" | "project" | "session"
+}
+```
+
+Response: The same object as `GET /api/pi/subagents`.
+
+### `POST /api/pi/subagents/resolve`
+
+**Designation:** Internal bundled-extension route.
+
+Request:
+
+```text
+{
+  agentKey: string,
+  cwd: string,
+  sessionPath?: string,
+  staticModel?: string,
+  staticThinking?: string
+}
+```
+
+Response:
+
+```text
+{
+  model?: string,
+  modelSource: "session" | "project" | "global" | "definition",
+  thinking?: string,
+  thinkingSource: "definition"
+}
+```
+
+Stored model precedence is session, project, global, then `staticModel`. Thinking currently comes only from `staticThinking`.
+
+### `POST /api/pi/subagent`
+
+**Designation:** Internal bundled-extension execution route.
+
+Request:
+
+```text
+{
+  task: string,
+  cwd: string,
+  parentSessionPath?: string,
+  model?: string | { provider: string, id: string },
+  thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max",
+  tools?: string[],
+  systemPrompt?: string
+}
+```
+
+Success response:
+
+```text
+{
+  childSession: { path: string, id: string, cwd: string },
+  messages: Array<{ role: string, content: string }>,
+  usage: {
+    inputTokens: number,
+    outputTokens: number,
+    totalTokens: number,
+    cost: number,
+    turns: number
+  },
+  model?: string,
+  thinkingLevel?: string,
+  stopReason?: string
+}
+```
+
+The route waits for completion. It returns `500` with `{ error }` for child setup or execution failure. If the HTTP connection closes first, the server aborts the child run.
+
+## Export route
+
+### `GET /api/pi/sessions/:id/export`
+
+**Designation:** Browser route.
+
+Query:
+
+```text
+disposition?: "inline" | string
+```
+
+Response: An HTML document with `Content-Type: text/html; charset=utf-8`.
+
+`disposition=inline` sets `Content-Disposition: inline`. All other values use `attachment`. Both forms include a sanitized export filename. An unknown session currently returns `500`.
+
+## Server-sent events
+
+### `GET /api/pi/events`
+
+**Designation:** Browser runtime stream.
+
+Response headers include `Content-Type: text/event-stream`, `Cache-Control: no-cache, no-transform`, and `Connection: keep-alive`.
+
+The stream starts with:
+
+```text
+: connected
+```
+
+It then sends one `active_session` event for each open runtime. Event frames use this format:
+
+```text
+event: <event name>
+data: <JSON value>
+```
+
+Implemented event names and data are:
+
+```text
+active_session: Active
+
+runtime_event: {
+  activeSessionId: string,
+  event: object
+}
+
+extension_ui: {
+  activeSessionId: string,
+  state: Active.state.extensionUi,
+  goal: Goal | null
+}
+
+extension_error: {
+  activeSessionId: string,
+  error: unknown
+}
+```
+
+`runtime_event.event` is the pi SDK runtime event. Its nested fields depend on the event type. The connection stays open until the client or server closes it.
+
+## Terminal WebSocket
+
+### `WS /api/pi/terminal`
+
+**Designation:** Browser and Electron terminal transport.
+
+The server accepts an HTTP WebSocket upgrade only at this exact path. It requires an active runtime with an existing working directory.
+
+Client messages:
+
+```json
+{ "type": "input", "data": "ls\r" }
+```
+
+```json
+{ "type": "resize", "cols": 120, "rows": 32 }
+```
+
+Malformed JSON and unknown message types are ignored. Missing resize values use 100 columns and 24 rows.
+
+Server messages:
+
+```text
+{ type: "ready", cwd: string, shell: string, pty: true }
+{ type: "data", data: string }
+{ type: "exit", exitCode: number }
+{ type: "error", message: string }
+```
+
+The first successful message is `ready`. Terminal output uses `data`. A PTY exit sends `exit` and then closes the socket.
+
+If no active session exists, the server sends `{"type":"error","message":"No active session"}` and closes the socket. An invalid working directory or PTY start failure also sends an error and closes the socket. Closing the client socket kills a running PTY.

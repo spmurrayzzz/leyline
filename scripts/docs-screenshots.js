@@ -1,0 +1,809 @@
+import fs from 'node:fs/promises'
+import os from 'node:os'
+import path from 'node:path'
+import { chromium } from 'playwright'
+import { renderSessionExportHtml } from '../server/pi-api/export-renderer.js'
+
+const baseUrl = process.env.DOCS_SCREENSHOT_URL || 'http://localhost:5173/'
+const docsOutputDir = path.resolve('docs/public/screenshots')
+const readmeOutputDir = path.resolve('assets/readme')
+const fixedNow = Date.parse('2026-08-06T16:00:00.000Z')
+const model = {
+  provider: 'local',
+  id: 'minimax-m2.7',
+  name: 'MiniMax M2.7',
+  supportsImages: true,
+  availableThinkingLevels: ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'],
+}
+const availableModels = [
+  model,
+  {
+    provider: 'anthropic',
+    id: 'claude-sonnet-4-6',
+    name: 'Claude Sonnet 4.6',
+    supportsImages: true,
+    availableThinkingLevels: ['off', 'low', 'medium', 'high'],
+  },
+  {
+    provider: 'openai',
+    id: 'gpt-5.4',
+    name: 'GPT-5.4',
+    supportsImages: true,
+    availableThinkingLevels: ['off', 'low', 'medium', 'high'],
+  },
+]
+
+const sessions = [
+  session('demo-session', 'Review the release flow', '2026-08-06T15:42:00.000Z'),
+  session('release-checks', 'Add release verification', '2026-08-06T14:25:00.000Z'),
+  session('api-review', 'Review API error handling', '2026-08-05T18:10:00.000Z'),
+  session('docs-navigation', 'Update documentation navigation', '2026-08-05T12:30:00.000Z'),
+  session('terminal-resize', 'Fix terminal resize behavior', '2026-08-04T16:20:00.000Z'),
+  session('mobile-header', 'Refine the mobile header', '2026-08-03T11:45:00.000Z'),
+  session('export-layout', 'Check transcript export layout', '2026-08-02T09:15:00.000Z'),
+  session('landing-copy', 'Tighten the landing page copy', '2026-08-01T13:20:00.000Z', '/workspace/field-notes'),
+  session('search-state', 'Preserve project search state', '2026-07-31T17:05:00.000Z', '/workspace/field-notes'),
+]
+
+const baseEntries = [
+  messageEntry({
+    id: 'user-1',
+    role: 'user',
+    label: 'You',
+    text: 'Review `scripts/release.js` and make validation run before publication.',
+    timestamp: '2026-08-06T15:43:00.000Z',
+  }),
+  messageEntry({
+    id: 'assistant-1',
+    role: 'assistant',
+    label: 'Agent',
+    text: 'The script publishes before it checks the build. I will reverse those operations and keep failures visible.',
+    thinking: 'I need to inspect the release order, preserve the existing error path, and make the smallest safe change.',
+    timestamp: '2026-08-06T15:44:00.000Z',
+  }),
+  toolEntry({
+    id: 'tool-read',
+    label: 'Read',
+    code: 'scripts/release.js',
+    toolName: 'read',
+    text: "export async function release() {\n  await publish()\n  await verify()\n}",
+    preview: {
+      kind: 'file',
+      path: 'scripts/release.js',
+      content: "export async function release() {\n  await publish()\n  await verify()\n}\n",
+    },
+    timestamp: '2026-08-06T15:45:00.000Z',
+  }),
+  toolEntry({
+    id: 'tool-edit',
+    label: 'Edit',
+    code: 'scripts/release.js',
+    toolName: 'edit',
+    text: 'Moved verification before publication.',
+    preview: {
+      kind: 'diff',
+      path: 'scripts/release.js',
+      oldText: "export async function release() {\n  await publish()\n  await verify()\n}\n",
+      newText: "export async function release() {\n  await verify()\n  await publish()\n}\n",
+    },
+    timestamp: '2026-08-06T15:46:00.000Z',
+  }),
+  messageEntry({
+    id: 'assistant-2',
+    role: 'assistant',
+    label: 'Agent',
+    text: 'Updated `scripts/release.js`. Verification now finishes before publication begins.',
+    timestamp: '2026-08-06T15:47:00.000Z',
+    rolloutFeedback: 'helpful',
+  }),
+]
+
+const shellEntries = [
+  ...baseEntries,
+  toolEntry({
+    id: 'tool-bash-context',
+    label: 'Bash',
+    code: 'npm run docs:build',
+    toolName: 'bash',
+    text: 'documentation build complete',
+    contextLabel: 'in context',
+    timestamp: '2026-08-06T15:48:00.000Z',
+  }),
+  toolEntry({
+    id: 'tool-bash-hidden',
+    label: 'Bash',
+    code: 'git status --short',
+    toolName: 'bash',
+    text: 'working tree clean',
+    contextLabel: 'not in context',
+    excludeFromContext: true,
+    timestamp: '2026-08-06T15:49:00.000Z',
+  }),
+]
+
+const memoryPayload = {
+  context: {
+    cwd: '/workspace/harbor',
+    projectId: 'project_harbor',
+    projectName: 'harbor',
+    projectRoot: '/workspace/harbor',
+    sessionAvailable: true,
+    sessionFile: '/workspace/harbor/sessions/demo-session.jsonl',
+    sessionId: 'session_demo',
+  },
+  memories: [
+    memory('mem_project', 'project', 'Run release verification before publication.', ['release', 'safety']),
+    memory('mem_session', 'session', 'Keep the current change limited to the release script.', ['scope']),
+    memory('mem_global', 'global', 'Use concise technical English in project documentation.', ['docs']),
+    memory('mem_archived', 'project', 'The old release job used a manual approval step.', ['archive'], 'archived'),
+  ],
+  counts: {
+    active: 3,
+    archived: 1,
+    scopes: {
+      project: { active: 1, archived: 1 },
+      session: { active: 1, archived: 0 },
+      global: { active: 1, archived: 0 },
+    },
+  },
+}
+
+const subagentPayload = {
+  context: memoryPayload.context,
+  agents: [
+    {
+      key: 'project:/workspace/harbor/.pi/agents/reviewer.md:reviewer',
+      name: 'reviewer',
+      description: 'Reviews implementation changes for release risks.',
+      source: 'project',
+      path: '/workspace/harbor/.pi/agents/reviewer.md',
+      model: 'inherit',
+      thinking: 'high',
+      tools: ['read', 'grep'],
+      overrides: { session: 'local/minimax-m2.7' },
+      effectiveModel: 'local/minimax-m2.7',
+      modelSource: 'session',
+    },
+    {
+      key: 'user:/workspace/agents/researcher.md:researcher',
+      name: 'researcher',
+      description: 'Finds source evidence before implementation begins.',
+      source: 'user',
+      path: '/workspace/agents/researcher.md',
+      model: 'local/minimax-m2.7',
+      thinking: 'medium',
+      tools: ['read', 'grep', 'bash'],
+      overrides: { project: 'local/minimax-m2.7' },
+      effectiveModel: 'local/minimax-m2.7',
+      modelSource: 'project',
+    },
+  ],
+}
+
+const goal = {
+  objective: 'Prepare a safe release candidate',
+  status: 'active',
+  tokenBudget: 50000,
+  continuationLimit: 8,
+  continuationsUsed: 2,
+  tokensUsed: 12480,
+  timeUsedSeconds: 420,
+  createdAt: fixedNow - 480000,
+  updatedAt: fixedNow,
+}
+
+await ensureServer()
+await fs.mkdir(docsOutputDir, { recursive: true })
+await fs.mkdir(readmeOutputDir, { recursive: true })
+
+const browser = await chromium.launch()
+try {
+  await capture({
+    browser,
+    file: path.join(docsOutputDir, 'home.png'),
+    route: '/',
+    ready: '.start-panel .start-composer',
+    scenario: 'home',
+  })
+  await capture({
+    browser,
+    file: path.join(docsOutputDir, 'workbench.png'),
+    route: '/sessions/demo-session',
+    ready: '.assistant-message .thinking-trigger',
+  })
+  await capture({
+    browser,
+    file: path.join(docsOutputDir, 'project-details.png'),
+    route: '/sessions/demo-session',
+    ready: '.assistant-message',
+    interact: async (page) => {
+      const project = page.locator('.project').filter({ hasText: 'harbor' }).first()
+      await project.hover()
+      await project.getByRole('button', { name: 'Project details' }).click()
+      const drawer = page.locator('aside[aria-label="Project details"]')
+      await drawer.waitFor()
+      await drawer.locator('input').fill('release')
+      await drawer.locator('.project-session-card').first().waitFor()
+    },
+  })
+  await capture({
+    browser,
+    file: path.join(docsOutputDir, 'composer-controls.png'),
+    route: '/sessions/demo-session',
+    ready: '.composer .composer-context-usage',
+    clipSelectors: ['.composer'],
+    padding: 18,
+  })
+  await capture({
+    browser,
+    file: path.join(docsOutputDir, 'composer-queue.png'),
+    route: '/sessions/demo-session',
+    ready: '.queued-message-drawer',
+    scenario: 'queue',
+    clipSelectors: ['.composer', '.queued-message-drawer'],
+    padding: 18,
+  })
+  await capture({
+    browser,
+    file: path.join(docsOutputDir, 'composer-shell.png'),
+    route: '/sessions/demo-session',
+    ready: '.tool-context-pill',
+    scenario: 'shell',
+    interact: async (page) => {
+      await page.locator('.composer textarea').fill('!! git status --short')
+      await page.locator('.hidden-shell-mode-composer .hidden-shell-mode-chip').waitFor()
+      await page.locator('.workbench').evaluate((element) => {
+        element.scrollTop = element.scrollHeight
+      })
+    },
+  })
+  await capture({
+    browser,
+    file: path.join(docsOutputDir, 'transcript-actions.png'),
+    route: '/sessions/demo-session',
+    ready: '.transcript-message.user-message',
+    interact: async (page) => {
+      const message = page.locator('.transcript-message.user-message').first()
+      await message.hover()
+      await message.getByTitle('Edit message').waitFor()
+    },
+    clipSelectors: ['.transcript-message.user-message'],
+    padding: 22,
+    preserveHover: true,
+  })
+  await capture({
+    browser,
+    file: path.join(docsOutputDir, 'preview-fullscreen.png'),
+    route: '/sessions/demo-session',
+    ready: '.transcript-tool',
+    interact: async (page) => {
+      const tool = page.locator('.transcript-tool').filter({ hasText: 'scripts/release.js' }).last()
+      await tool.getByTitle('Open full screen').click()
+      await page.locator('.tool-fullscreen .pierre-preview-inner > *').waitFor()
+      await page.locator('.app-header').evaluate((element) => {
+        element.style.visibility = 'hidden'
+      })
+    },
+    clipSelectors: ['.tool-fullscreen-header', '.tool-fullscreen .pierre-preview-inner'],
+  })
+  await capture({
+    browser,
+    file: path.join(docsOutputDir, 'memory-inspector.png'),
+    route: '/sessions/demo-session',
+    ready: '.assistant-message',
+    interact: async (page) => {
+      await page.getByRole('button', { name: 'Memory' }).click()
+      await page.locator('aside[aria-label="Memory Inspector"] .memory-card').first().waitFor()
+    },
+  })
+  await capture({
+    browser,
+    file: path.join(docsOutputDir, 'subagents.png'),
+    route: '/sessions/demo-session',
+    ready: '.assistant-message',
+    interact: async (page) => {
+      await page.getByRole('button', { name: 'Open settings' }).click()
+      await page.locator('.settings-action-row').click()
+      await page.locator('aside[aria-label="Subagents"] .subagent-config-card').first().waitFor()
+    },
+  })
+  await capture({
+    browser,
+    file: path.join(docsOutputDir, 'goal-events.png'),
+    route: '/sessions/demo-session',
+    ready: '.goal-control-plane',
+    scenario: 'goal',
+    interact: async (page) => {
+      await page.getByRole('button', { name: 'Events' }).click()
+      await page.locator('aside[aria-label="Runtime events"] .event-log-row').first().waitFor()
+    },
+  })
+  await capture({
+    browser,
+    file: path.join(docsOutputDir, 'terminal.png'),
+    route: '/sessions/demo-session',
+    ready: '.assistant-message',
+    terminal: true,
+    interact: async (page) => {
+      await page.getByRole('button', { name: 'Open terminal' }).click()
+      await page.locator('.terminal-panel .xterm-rows').waitFor()
+      await page.waitForFunction(() => {
+        return document.querySelector('.xterm-rows')?.textContent?.includes('documentation build complete')
+      })
+      await page.locator('.terminal-resize-handle').focus()
+      await page.keyboard.press('ArrowUp')
+      await page.keyboard.press('ArrowUp')
+    },
+  })
+  await capture({
+    browser,
+    file: path.join(docsOutputDir, 'export.png'),
+    route: '/api/pi/sessions/demo-session/export?disposition=inline',
+    ready: '.export-shell .transcript',
+    exportPage: true,
+  })
+  await capture({
+    browser,
+    file: path.join(docsOutputDir, 'mobile-session.png'),
+    route: '/sessions/demo-session',
+    ready: '.composer .mobile-label',
+    viewport: { width: 390, height: 844 },
+  })
+  await capture({
+    browser,
+    file: path.join(docsOutputDir, 'mobile-sidebar.png'),
+    route: '/sessions/demo-session',
+    ready: '.composer .mobile-label',
+    viewport: { width: 390, height: 844 },
+    interact: async (page) => {
+      await page.getByRole('button', { name: 'Open sessions' }).click()
+      await page.locator('.leyline-app.sidebar-open .sidebar').waitFor()
+    },
+  })
+  await capture({
+    browser,
+    file: path.join(readmeOutputDir, 'home.png'),
+    route: '/',
+    ready: '.start-panel .start-composer',
+    viewport: { width: 1503, height: 818 },
+    scenario: 'home',
+  })
+  await capture({
+    browser,
+    file: path.join(readmeOutputDir, 'workbench.png'),
+    route: '/sessions/demo-session',
+    ready: '.assistant-message .thinking-trigger',
+    viewport: { width: 1503, height: 818 },
+  })
+} finally {
+  await browser.close()
+}
+
+console.log('Saved documentation and README screenshots')
+
+function session(id, name, timestamp, cwd = '/workspace/harbor') {
+  return {
+    id,
+    path: `${cwd}/sessions/${id}.jsonl`,
+    cwd,
+    name,
+    parentSessionPath: null,
+    isSubagentSession: false,
+    firstMessage: name,
+    timestamp,
+  }
+}
+
+function messageEntry({ id, role, label, text, thinking = '', timestamp, rolloutFeedback = '' }) {
+  const blocks = []
+  if (thinking) blocks.push({ type: 'thinking', text: thinking })
+  blocks.push({ type: 'text', text })
+  return {
+    id,
+    type: 'message',
+    role,
+    label,
+    text,
+    blocks,
+    copyText: [thinking, text].filter(Boolean).join('\n\n'),
+    timestamp,
+    rolloutFeedback,
+    rolloutFeedbackText: '',
+  }
+}
+
+function toolEntry({
+  id,
+  label,
+  code,
+  toolName,
+  text,
+  preview,
+  contextLabel,
+  excludeFromContext = false,
+  timestamp,
+}) {
+  return {
+    id,
+    type: 'tool',
+    label,
+    code,
+    toolName,
+    text,
+    preview,
+    contextLabel,
+    excludeFromContext,
+    isError: false,
+    copyText: text,
+    timestamp,
+    rolloutFeedback: '',
+    rolloutFeedbackText: '',
+  }
+}
+
+function memory(id, scope, contentMd, tags, status = 'active') {
+  const scoped = scope !== 'global'
+  const sessionScoped = scope === 'session'
+  return {
+    id,
+    scope,
+    projectId: scoped ? 'project_harbor' : null,
+    projectRoot: scoped ? '/workspace/harbor' : null,
+    projectName: scoped ? 'harbor' : null,
+    sessionId: sessionScoped ? 'session_demo' : null,
+    sessionFile: sessionScoped ? '/workspace/harbor/sessions/demo-session.jsonl' : null,
+    cwd: scoped ? '/workspace/harbor' : null,
+    contentMd,
+    reasonMd: '',
+    tags,
+    status,
+    source: 'user',
+    createdAt: fixedNow - 86400000,
+    updatedAt: fixedNow - 3600000,
+    archivedAt: status === 'archived' ? fixedNow - 1800000 : null,
+    lastAccessedAt: null,
+  }
+}
+
+function runtimeFor(scenario) {
+  const queued = scenario === 'queue'
+  return {
+    id: 'demo-session',
+    path: '/workspace/harbor/sessions/demo-session.jsonl',
+    cwd: '/workspace/harbor',
+    diagnostics: [],
+    state: {
+      model,
+      availableModels,
+      thinkingLevel: 'high',
+      availableThinkingLevels: model.availableThinkingLevels,
+      isStreaming: queued,
+      isCompacting: false,
+      pendingToolCalls: [],
+      steeringMode: 'one-at-a-time',
+      followUpMode: 'one-at-a-time',
+      activeToolCount: 4,
+      activeToolNames: ['read', 'grep', 'bash', 'edit'],
+      contextUsage: { tokens: 12480, contextWindow: 200000, percent: 6.24 },
+      slashCommands: [
+        { name: 'compact', description: 'Compact context', source: 'command' },
+        { name: 'goal', description: 'Start or manage a goal', source: 'extension' },
+        { name: 'skill:review', description: 'Load the review skill', source: 'skill' },
+      ],
+      queuedMessages: queued
+        ? {
+            steering: ['Check the failure path before you finish.'],
+            followUp: ['Summarize the release risk after the change.'],
+          }
+        : { steering: [], followUp: [] },
+      extensionUi: {
+        statuses: scenario === 'goal' ? { goal: 'goal: active' } : {},
+        widgets: {},
+        notifications: [],
+      },
+      goal: scenario === 'goal' ? goal : null,
+    },
+  }
+}
+
+function detailFor(scenario) {
+  const summary = sessions[0]
+  return {
+    session: {
+      ...summary,
+      sessionFile: summary.path,
+      messageCount: scenario === 'shell' ? shellEntries.length : baseEntries.length,
+      contextTokens: 12480,
+      modified: '2026-08-06T15:49:00.000Z',
+      created: '2026-08-06T15:42:00.000Z',
+      contextUsage: { tokens: 12480, contextWindow: 200000, percent: 6.24 },
+    },
+    entries: scenario === 'shell' ? shellEntries : baseEntries,
+  }
+}
+
+async function capture({
+  browser,
+  file,
+  route,
+  ready,
+  viewport = { width: 1440, height: 900 },
+  scenario = 'default',
+  terminal = false,
+  exportPage = false,
+  interact,
+  clipSelectors,
+  padding = 0,
+  preserveHover = false,
+}) {
+  const runtime = runtimeFor(scenario)
+  const context = await browser.newContext({
+    viewport,
+    deviceScaleFactor: 2,
+    colorScheme: 'dark',
+    locale: 'en-US',
+    timezoneId: 'UTC',
+    reducedMotion: 'reduce',
+  })
+  await context.addInitScript(initBrowser, {
+    fixedNow,
+    runtime,
+    goal: scenario === 'goal' ? goal : null,
+    terminal,
+    emitRuntimeEvents: scenario !== 'home',
+  })
+  const page = await context.newPage()
+  const unexpected = []
+  page.on('console', (message) => {
+    if (message.type() === 'error' && !message.text().includes('esm.sh')) {
+      unexpected.push(`console: ${message.text()}`)
+    }
+  })
+  page.on('pageerror', (error) => unexpected.push(`page: ${error.message}`))
+  await page.route('https://esm.sh/**', (request) => request.fulfill({
+    status: 200,
+    contentType: 'application/javascript',
+    body: `
+      export const DIFFS_TAG_NAME = 'div'
+      export class File { render() {} cleanUp() {} }
+      export class FileDiff { render() {} cleanUp() {} }
+      export function parsePatchFiles() { return [] }
+    `,
+  }))
+  await page.route('**/api/pi/**', async (request) => {
+    const req = request.request()
+    const url = new URL(req.url())
+    const method = req.method()
+    const key = `${method} ${url.pathname}`
+    const json = (body) => request.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(body),
+    })
+
+    if (key === 'GET /api/pi/sessions') return json({ sessions })
+    if (key === 'GET /api/pi/state') return json({ active: runtime })
+    if (key === 'POST /api/pi/active-session') return json({ active: runtime })
+    if (key === 'GET /api/pi/sessions/demo-session') return json(detailFor(scenario))
+    if (key === 'GET /api/pi/memories') return json(memoryPayload)
+    if (key === 'GET /api/pi/subagents') return json(subagentPayload)
+    if (key === 'GET /api/pi/sessions/demo-session/export') {
+      const html = await renderSessionExportHtml(detailFor(scenario))
+      return request.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: html })
+    }
+
+    unexpected.push(`request: ${key}${url.search}`)
+    return request.abort()
+  })
+
+  try {
+    const url = new URL(route, baseUrl).toString()
+    await page.goto(url, { waitUntil: 'domcontentloaded' })
+    await page.locator(ready).first().waitFor({ state: 'visible', timeout: 15000 })
+    if (interact) await interact(page)
+    await page.evaluate(async () => {
+      await document.fonts.ready
+    })
+    await disableMotion(page)
+    if (!preserveHover) {
+      await page.mouse.move(viewport.width - 2, viewport.height - 2)
+      await page.evaluate(() => document.activeElement?.blur?.())
+    }
+    await assertPrivateDataAbsent(page)
+    if (!exportPage) await assertModelLabel(page)
+    if (unexpected.length) throw new Error(unexpected.join('\n'))
+    const clip = clipSelectors
+      ? await unionClip(page, clipSelectors, padding, viewport)
+      : undefined
+    await page.screenshot({ path: file, clip, animations: 'disabled' })
+    console.log(`Saved ${path.relative(process.cwd(), file)}`)
+  } finally {
+    await context.close()
+  }
+}
+
+async function ensureServer() {
+  try {
+    const response = await fetch(baseUrl, { signal: AbortSignal.timeout(3000) })
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+  } catch (error) {
+    throw new Error(`Leyline is not available at ${baseUrl}: ${error.message}`)
+  }
+}
+
+async function disableMotion(page) {
+  await page.addStyleTag({
+    content: `
+      *, *::before, *::after {
+        animation: none !important;
+        scroll-behavior: auto !important;
+        transition: none !important;
+      }
+      input, textarea, [contenteditable="true"] { caret-color: transparent !important; }
+      .xterm-cursor, .xterm-cursor-layer { visibility: hidden !important; }
+    `,
+  })
+  await page.evaluate(() => new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(resolve))
+  }))
+}
+
+async function assertPrivateDataAbsent(page) {
+  const text = await page.locator('body').innerText()
+  const forbidden = [
+    '/Users/',
+    os.homedir(),
+    os.userInfo().username,
+    process.cwd(),
+  ].filter((value) => value && value.length > 2)
+  const found = forbidden.find((value) => text.includes(value))
+  if (found) throw new Error(`Private text found before capture: ${found}`)
+  if (/\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b/.test(text)) {
+    throw new Error('Email address found before capture')
+  }
+  if (/\b(?:sk-|ghp_|xox[baprs]-|AKIA)[A-Za-z0-9_-]{8,}\b/.test(text)) {
+    throw new Error('Credential-like text found before capture')
+  }
+  const fixturePaths = text.match(/\/workspace\/[A-Za-z0-9_./-]+/g) || []
+  if (fixturePaths.some((value) => !value.startsWith('/workspace/'))) {
+    throw new Error('Unexpected fixture path found before capture')
+  }
+}
+
+async function assertModelLabel(page) {
+  const buttons = page.locator('.model-picker:not(.small-picker):not(.tool-picker) > .model-picker-button:visible')
+  const count = await buttons.count()
+  if (!count) throw new Error('No visible model selector found')
+  for (let index = 0; index < count; index += 1) {
+    const label = buttons.nth(index).locator('.model-label:visible').first()
+    const value = (await label.innerText()).trim()
+    if (value !== 'local/minimax-m2.7') {
+      throw new Error(`Unexpected model selector label: ${value}`)
+    }
+  }
+}
+
+async function unionClip(page, selectors, padding, viewport) {
+  const boxes = []
+  for (const selector of selectors) {
+    const box = await page.locator(selector).first().boundingBox()
+    if (!box) throw new Error(`Cannot calculate capture bounds for ${selector}`)
+    boxes.push(box)
+  }
+  const left = Math.max(0, Math.min(...boxes.map((box) => box.x)) - padding)
+  const top = Math.max(0, Math.min(...boxes.map((box) => box.y)) - padding)
+  const right = Math.min(viewport.width, Math.max(...boxes.map((box) => box.x + box.width)) + padding)
+  const bottom = Math.min(viewport.height, Math.max(...boxes.map((box) => box.y + box.height)) + padding)
+  return { x: left, y: top, width: right - left, height: bottom - top }
+}
+
+function initBrowser({ fixedNow: now, runtime, goal: activeGoal, terminal, emitRuntimeEvents }) {
+  const NativeDate = Date
+  let tick = 0
+  class FixedDate extends NativeDate {
+    constructor(...args) {
+      super(...(args.length ? args : [now + tick++]))
+    }
+    static now() {
+      return now
+    }
+  }
+  FixedDate.parse = NativeDate.parse
+  FixedDate.UTC = NativeDate.UTC
+  window.Date = FixedDate
+
+  class MockSpeechRecognition {
+    start() {}
+    stop() {
+      this.onend?.()
+    }
+  }
+  window.SpeechRecognition = MockSpeechRecognition
+  window.webkitSpeechRecognition = MockSpeechRecognition
+
+  class MockEventSource extends EventTarget {
+    constructor(url) {
+      super()
+      this.url = url
+      this.readyState = 0
+      setTimeout(() => {
+        if (this.readyState === 2) return
+        this.readyState = 1
+        this.onopen?.(new Event('open'))
+        this.dispatchEvent(new MessageEvent('active_session', {
+          data: JSON.stringify(runtime),
+        }))
+        const events = [
+          { activeSessionId: 'demo-session', event: { type: 'session_start' } },
+          { activeSessionId: 'demo-session', event: { type: 'tool_execution_start', toolName: 'read' } },
+          { activeSessionId: 'demo-session', event: { type: 'tool_execution_end', toolName: 'read' } },
+          ...(!runtime.state.isStreaming
+            ? [{ activeSessionId: 'demo-session', event: { type: 'agent_end' } }]
+            : []),
+        ]
+        if (emitRuntimeEvents) {
+          for (const data of events) {
+            this.dispatchEvent(new MessageEvent('runtime_event', {
+              data: JSON.stringify(data),
+            }))
+          }
+        }
+        if (activeGoal) {
+          this.dispatchEvent(new MessageEvent('extension_ui', {
+            data: JSON.stringify({
+              activeSessionId: 'demo-session',
+              state: {
+                statuses: { goal: 'goal: active' },
+                widgets: {},
+                notifications: [],
+              },
+              goal: activeGoal,
+            }),
+          }))
+        }
+      }, 0)
+    }
+    close() {
+      this.readyState = 2
+    }
+  }
+  window.EventSource = MockEventSource
+
+  if (terminal) {
+    class MockWebSocket extends EventTarget {
+      static CONNECTING = 0
+      static OPEN = 1
+      static CLOSING = 2
+      static CLOSED = 3
+      constructor(url) {
+        super()
+        this.url = url
+        this.readyState = MockWebSocket.CONNECTING
+        setTimeout(() => {
+          this.readyState = MockWebSocket.OPEN
+          this.dispatchEvent(new Event('open'))
+          this.dispatchEvent(new MessageEvent('message', {
+            data: JSON.stringify({
+              type: 'ready',
+              cwd: '/workspace/harbor',
+              shell: '/bin/zsh',
+              pty: true,
+            }),
+          }))
+          this.dispatchEvent(new MessageEvent('message', {
+            data: JSON.stringify({
+              type: 'data',
+              data: '$ npm run docs:build\r\n✓ documentation build complete\r\n',
+            }),
+          }))
+        }, 20)
+      }
+      send() {}
+      close() {
+        this.readyState = MockWebSocket.CLOSED
+        this.dispatchEvent(new Event('close'))
+      }
+    }
+    window.WebSocket = MockWebSocket
+  }
+}
