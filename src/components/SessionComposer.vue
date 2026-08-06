@@ -392,6 +392,13 @@ function updateDraft(event) {
       </div>
       <div class="composer-context-row">
         <span
+          v-if="compacting || agentRunning"
+          class="composer-status"
+        >
+          <i aria-hidden="true"></i>
+          {{ compacting ? 'compacting' : 'running' }}
+        </span>
+        <span
           v-if="shellMode"
           class="composer-chip shell-mode-chip"
           :class="{ 'hidden-shell-mode-chip': hiddenShellMode }"

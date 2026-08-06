@@ -77,8 +77,6 @@ const emit = defineEmits([
   'cancel-rename-session',
   'commit-rename-session',
   'create-session',
-  'hide',
-  'navigate-home',
   'open-project-browser',
   'open-project-detail',
   'open-settings',
@@ -173,26 +171,6 @@ const onAfterLeave = (el) => {
 
 <template>
   <aside class="sidebar">
-    <div class="brand-row">
-      <button
-        class="brand-home"
-        type="button"
-        aria-label="Go to home"
-        @click="emit('navigate-home')"
-      >
-        <img class="brand-mark" src="/brand-mark.svg" alt="" />
-        <span class="brand-name">
-          <strong>Leyline</strong>
-        </span>
-      </button>
-      <button
-        class="sidebar-collapse-button"
-        type="button"
-        aria-label="Hide sessions"
-        @click="emit('hide')"
-      >‹</button>
-    </div>
-
     <label class="search-field">
       <span>⌕</span>
       <input
@@ -259,13 +237,25 @@ const onAfterLeave = (el) => {
         <div class="project-title">
           <button @click="emit('toggle-project', project)">
             <span class="project-label">
-              <span
+              <svg
                 class="project-caret"
                 :class="{ expanded: expandedProject(project) }"
-              >›</span>
+                viewBox="0 0 16 16"
+                aria-hidden="true"
+              >
+                <path d="M6 4l4 4-4 4"></path>
+              </svg>
+              <svg
+                class="project-folder"
+                viewBox="0 0 16 16"
+                aria-hidden="true"
+              >
+                <path
+                  d="M2.2 5.2c0-1 .8-1.8 1.8-1.8h2l1.6 1.8h4.6c1 0 1.8.8 1.8 1.8v4.6c0 1-.8 1.8-1.8 1.8H4c-1 0-1.8-.8-1.8-1.8z"
+                ></path>
+              </svg>
               <span v-html="highlightedText(project.name)"></span>
             </span>
-            <time>{{ project.sessions.length }}</time>
           </button>
           <button
             class="project-detail-button"

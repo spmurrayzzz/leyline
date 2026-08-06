@@ -85,11 +85,11 @@
 .start-panel h2,
 .empty-session-panel h2 {
   margin: 0 0 30px;
-  color: #ececf3;
-  font-size: 32px;
-  font-weight: 680;
-  letter-spacing: -0.04em;
-  line-height: 1.1;
+  color: var(--text);
+  font-size: 30px;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
 }
 
 .empty-session-panel {
@@ -124,15 +124,10 @@
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  min-height: 187px;
-  border: 1px solid #35323f;
-  border-radius: 22px;
-  background: #17161d;
-  box-shadow:
-    0 1px 0 rgb(255 255 255 / 3%) inset,
-    0 2px 6px -3px rgb(0 0 0 / 45%),
-    0 14px 34px -18px rgb(0 0 0 / 32%),
-    0 28px 70px -42px rgb(20 16 32 / 34%);
+  min-height: 132px;
+  border: 1px solid transparent;
+  border-radius: 24px;
+  background: var(--panel-soft);
   transition:
     border-color var(--motion-base) var(--ease-standard),
     background-color var(--motion-base) var(--ease-standard),
@@ -143,7 +138,7 @@
 }
 
 .start-composer:focus-within {
-  border-color: #4a415f;
+  background: #242425;
 }
 
 .startup-init-panel {
@@ -296,14 +291,14 @@
 }
 
 .start-composer textarea {
-  height: 78px;
-  padding: 17px 20px 4px;
-  color: #e5e6ec;
+  height: 64px;
+  padding: 16px 20px 4px;
+  color: var(--text);
   font-size: 15px;
 }
 
 .start-composer textarea::placeholder {
-  color: #605b6c;
+  color: var(--muted);
 }
 
 .slash-picker {
@@ -537,11 +532,11 @@
   width: 34px;
   height: 28px;
   margin-left: auto;
-  border: 1px solid #312d3d;
+  border: 1px solid transparent;
   border-radius: 9px;
-  background: #1a1722;
+  background: #2b2b2c;
   padding: 0;
-  color: #c8c9d2;
+  color: var(--muted-strong);
   line-height: 1;
   transition:
     border-color var(--motion-base) var(--ease-decelerate),
@@ -579,12 +574,42 @@
     background-color var(--motion-base) var(--ease-standard);
 }
 
+.composer-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+  padding: 0 4px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.composer-status i {
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: composer-status-pulse 1.6s var(--ease-standard) infinite;
+}
+
+@keyframes composer-status-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.35;
+  }
+}
+
 .start-composer-chip {
   overflow: hidden;
   min-width: 0;
   height: 28px;
-  border-color: #312d3d;
-  background: #1a1722;
+  border-color: transparent;
+  background: #2b2b2c;
   padding: 7px 10px;
   color: var(--muted-strong);
 }
@@ -619,12 +644,12 @@
   min-width: 0;
   max-width: none;
   height: 28px;
-  border-color: #312d3d;
+  border-color: transparent;
   border-radius: 999px;
-  background: #1a1722;
+  background: #2b2b2c;
   padding: 0 10px;
   font-size: 12px;
-  font-weight: 750;
+  font-weight: 600;
   line-height: 1;
 }
 

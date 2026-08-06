@@ -656,24 +656,21 @@ button, input, textarea { color: inherit; font: inherit; }
     transform var(--motion-base) var(--ease-standard);
 }
 .assistant-message {
-  background: #14131a;
-  padding: 8px 12px;
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 2.5%);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 2.4%);
+  padding: 12px 14px;
   color: #dedee2;
 }
 .assistant-message .message-meta { color: var(--muted); }
 .thinking-block {
   margin: 0 0 8px;
-  border: 1px solid #2b2d36;
+  border: 0;
   border-radius: 9px;
-  background: #15161b;
-  transition:
-    border-color var(--motion-base) var(--ease-standard),
-    background-color var(--motion-base) var(--ease-standard);
+  background: rgb(255 255 255 / 2%);
+  transition: background-color var(--motion-base) var(--ease-standard);
 }
 .thinking-block.is-expanded {
-  border-color: #353740;
-  background: #181a20;
+  background: rgb(255 255 255 / 3.5%);
 }
 .thinking-trigger {
   display: flex;
@@ -727,13 +724,12 @@ button, input, textarea { color: inherit; font: inherit; }
 .thinking-block + .assistant-text-block { margin-top: 8px; }
 .user-message {
   margin-top: 22px;
-  border: 1px solid var(--accent-border);
-  border-radius: 10px;
-  background: var(--accent-soft);
-  padding: 10px 12px;
-  box-shadow: 0 1px 0 rgb(255 255 255 / 4%) inset;
+  border: 0;
+  border-radius: 14px;
+  background: #242424;
+  padding: 10px 14px;
 }
-.user-message .message-meta { color: #bfb5ff; }
+.user-message .message-meta { color: var(--muted-strong); }
 .message-images {
   display: flex;
   flex-wrap: wrap;
@@ -805,11 +801,11 @@ button, input, textarea { color: inherit; font: inherit; }
 .markdown-body a { color: #bfb5ff; text-decoration: none; }
 .tool-card {
   width: min(var(--content-max), 100%);
-  margin: 8px auto 0;
-  border: 1px solid var(--border-soft);
-  border-radius: 9px;
-  background: rgb(255 255 255 / 1.5%);
-  padding: 8px 10px;
+  margin: 6px auto 0;
+  border: 0;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 2.2%);
+  padding: 9px 10px;
   color: #bdbdbd;
   font-size: 13px;
   cursor: pointer;
@@ -844,16 +840,13 @@ button, input, textarea { color: inherit; font: inherit; }
   transform: rotate(90deg);
 }
 .transcript-tool.is-expanded {
-  border-color: var(--border);
-  background: rgb(255 255 255 / 3%);
-}
-.transcript-tool.is-expanded:hover {
-  border-color: #3b3b40;
   background: rgb(255 255 255 / 4%);
 }
+.transcript-tool.is-expanded:hover {
+  background: rgb(255 255 255 / 5%);
+}
 .transcript-tool:hover {
-  border-color: var(--border);
-  background: rgb(255 255 255 / 3%);
+  background: rgb(255 255 255 / 3.4%);
   transition-duration: var(--motion-quick);
   transition-timing-function: var(--ease-accelerate);
 }

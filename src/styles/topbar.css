@@ -4,7 +4,7 @@
   grid-template-rows: auto 1fr;
   min-width: 0;
   min-height: 0;
-  background: #0c0c0e;
+  background: var(--bg);
 }
 
 .leyline-app.start-state:not(.new-session-transition) .main-pane {
@@ -16,24 +16,11 @@
   z-index: 3;
   grid-row: 1;
   min-width: 0;
-  border-bottom: 1px solid var(--border-soft);
-  background: rgb(16 16 18 / 94%);
-  backdrop-filter: blur(16px);
+  background: transparent;
 }
 
 .new-session-transition .runtime-chrome {
   animation: session-chrome-enter 520ms var(--ease-emphasized) both;
-}
-
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  min-width: 0;
-  min-height: 46px;
-  background: transparent;
-  padding: 0 max(32px, calc((100% - var(--content-max)) / 2));
 }
 
 .composer-bar {
@@ -48,33 +35,6 @@ h1 {
   margin: 0;
   color: var(--text);
   font-size: 15px;
-  line-height: 1;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.topbar-project {
-  display: grid;
-  min-width: 0;
-  gap: 3px;
-}
-
-.topbar-project strong {
-  overflow: hidden;
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  line-height: 1;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.topbar-project > span {
-  overflow: hidden;
-  max-width: 560px;
-  color: var(--muted);
-  font-size: 11px;
   line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -121,7 +81,10 @@ h1 {
 }
 
 .workbench-title-button strong {
+  overflow: hidden;
   min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .workbench-title-glyph {
@@ -193,49 +156,57 @@ h1 {
   align-items: center;
   gap: 10px;
   flex: none;
+  margin-left: auto;
   color: var(--muted);
   font-size: 12px;
   white-space: nowrap;
 }
 
-.running-pill,
-.topbar-runtime-pill,
-.goal-pill {
+.topbar-icon-button {
   display: inline-flex;
   align-items: center;
-  min-height: 24px;
+  justify-content: center;
+  gap: 5px;
+  height: 28px;
+  min-width: 28px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  padding: 0 6px;
+  color: var(--muted);
+  text-decoration: none;
+  transition:
+    background-color var(--motion-base) var(--ease-decelerate),
+    color var(--motion-base) var(--ease-decelerate);
+}
+
+.topbar-icon-button svg {
+  display: block;
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.4;
+}
+
+.topbar-icon-count {
+  color: var(--muted);
+  font-size: 11px;
   line-height: 1;
 }
 
-.running-pill {
-  border: 1px solid var(--accent-border);
-  border-radius: 6px;
-  background: var(--accent-soft);
-  padding: 2px 7px;
-  color: #bfb5ff;
-  font-size: 11px;
-  font-weight: 800;
+.topbar-icon-button:hover:not(:disabled) {
+  background: var(--panel-soft);
+  color: var(--text);
+  transition-duration: var(--motion-quick);
+  transition-timing-function: var(--ease-accelerate);
 }
 
-.topbar-runtime-pill {
-  overflow: hidden;
-  max-width: 180px;
-  border: 1px solid var(--border-soft);
-  border-radius: 6px;
-  background: #161618;
-  padding: 3px 8px;
-  color: #a3a3a3;
-  text-overflow: ellipsis;
-}
-
-.goal-pill {
-  border: 1px solid rgba(125, 211, 252, 0.28);
-  border-radius: 999px;
-  background: rgba(14, 116, 144, 0.16);
-  padding: 3px 8px;
-  color: #9bdcf5;
-  font-size: 11px;
-  font-weight: 800;
+.topbar-icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
 }
 
 .context-usage-pill {
@@ -275,21 +246,6 @@ h1 {
   color: var(--text);
   transition-duration: var(--motion-quick);
   transition-timing-function: var(--ease-accelerate);
-}
-
-.event-log-button,
-.delete-session-button {
-  border: 1px solid var(--border-soft);
-  border-radius: 6px;
-  background: transparent;
-  padding: 3px 8px;
-  color: var(--muted-strong);
-  font-size: 11px;
-  font-weight: 800;
-}
-
-.event-log-button {
-  text-decoration: none;
 }
 
 .goal-control-plane {
@@ -365,23 +321,6 @@ h1 {
   width: 25px;
   height: 24px;
   padding: 0;
-}
-
-.event-log-button:hover,
-.delete-session-button:hover {
-  border-color: var(--accent-border);
-  color: #e2e3e8;
-  transition-duration: var(--motion-quick);
-  transition-timing-function: var(--ease-accelerate);
-}
-
-.delete-session-button:hover {
-  border-color: rgb(248 113 113 / 44%);
-  color: #fca5a5;
-}
-
-.delete-session-button:disabled {
-  opacity: 0.6;
 }
 
 .event-log-row {

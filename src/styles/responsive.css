@@ -275,10 +275,24 @@
     width: 100vw;
   }
 
-  .topbar {
+  .app-header {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .app-header-brand {
+    border-right: 0;
+    background: transparent;
+    padding: 0 4px 0 12px;
+  }
+
+  .app-header-main {
     gap: 10px;
-    min-height: 56px;
     padding: 0 12px;
+  }
+
+  .crumb-project,
+  .crumb-sep {
+    display: none;
   }
 
   .goal-control-plane {
@@ -308,12 +322,8 @@
     font-size: 16px;
   }
 
-  .topbar-project {
+  .workbench-title-row {
     flex: 1 1 auto;
-  }
-
-  .topbar-project > span {
-    max-width: none;
   }
 
   .workbench-title-button,
@@ -334,13 +344,8 @@
     display: none;
   }
 
-  .topbar-meta > span:not(.running-pill) {
-    display: none;
-  }
-
-  .event-log-button {
+  .topbar-icon-button {
     flex: 0 0 auto;
-    padding: 4px 8px;
   }
 
   .memory-drawer-slot,

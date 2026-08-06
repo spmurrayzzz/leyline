@@ -1,10 +1,10 @@
 .tool-card {
   width: min(var(--content-max), 100%);
-  margin: 12px auto 0;
-  border: 1px solid var(--border-soft);
-  border-radius: 9px;
-  background: rgb(255 255 255 / 1.5%);
-  padding: 11px 13px;
+  margin: 6px auto 0;
+  border: 0;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 2.2%);
+  padding: 9px 10px;
   color: #bdbdbd;
   font-size: 13px;
   transition:
@@ -79,25 +79,22 @@
 }
 
 .transcript-tool {
-  margin-top: 8px;
-  padding: 8px 10px;
-  background: rgb(255 255 255 / 1.5%);
+  margin-top: 6px;
+  padding: 9px 10px;
+  background: rgb(255 255 255 / 2.2%);
   cursor: pointer;
 }
 
 .transcript-tool.is-expanded {
-  border-color: var(--border);
-  background: rgb(255 255 255 / 3%);
-}
-
-.transcript-tool.is-expanded:hover {
-  border-color: #3b3b40;
   background: rgb(255 255 255 / 4%);
 }
 
+.transcript-tool.is-expanded:hover {
+  background: rgb(255 255 255 / 5%);
+}
+
 .transcript-tool:hover {
-  border-color: var(--border);
-  background: rgb(255 255 255 / 3%);
+  background: rgb(255 255 255 / 3.4%);
   transition-duration: var(--motion-quick);
   transition-timing-function: var(--ease-accelerate);
 }
@@ -106,8 +103,7 @@
   position: relative;
   min-height: 42px;
   overflow: hidden;
-  border-color: var(--accent-border);
-  background: rgb(124 92 255 / 7%);
+  background: rgb(124 92 255 / 6%);
   cursor: default;
 }
 
@@ -135,8 +131,7 @@
 }
 
 .live-tool-card.is-completed {
-  border-color: #292b34;
-  background: #131419;
+  background: rgb(255 255 255 / 2.2%);
   animation: live-tool-settle 260ms var(--ease-decelerate) both;
 }
 

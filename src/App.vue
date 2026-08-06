@@ -21,7 +21,6 @@ import { useWorkbenchScroll } from './composables/useWorkbenchScroll'
 import { fuzzyScore } from './lib/fuzzy'
 import {
   eventTime,
-  formatDate,
   formatMode,
   modelChip,
   projectName,
@@ -437,13 +436,6 @@ const goalWidgetLines = computed(() => {
   const ui = activeRuntimeSession.value?.state?.extensionUi
   return ui?.widgets?.goal?.lines || []
 })
-const goalPillLabel = computed(() => {
-  const status = activeGoal.value?.status
-  if (!status) return ''
-  if (status === 'budget_limited') return 'goal: budget'
-  if (status === 'continuation_limited') return 'goal: limit'
-  return `goal: ${formatMode(status)}`
-})
 const goalBudgetLabel = computed(() => {
   const goal = activeGoal.value
   if (!goal) return ''
@@ -488,10 +480,6 @@ const topbarTitle = computed(() => {
   if (initializing.value) return 'Loading workspace'
   if (selectedSession.value) return projectName(selectedSession.value.cwd)
   return 'Leyline'
-})
-const topbarSubtitle = computed(() => {
-  if (initializing.value) return 'Reading local pi state'
-  return selectedSession.value?.cwd || 'Choose a session or start fresh'
 })
 const isEmptySelectedSession = computed(() => {
   return Boolean(selectedSession.value)
@@ -1783,14 +1771,6 @@ function closePickerMenus() {
       @click="sidebarOpen = false"
     ></button>
 
-    <button
-      v-if="desktopSidebarHidden"
-      class="sidebar-reveal-button"
-      type="button"
-      aria-label="Show sessions"
-      @click="desktopSidebarHidden = false"
-    >›</button>
-
     <ProjectBrowser
       v-if="projectBrowserOpen"
       :active-cwd="selectedSession?.cwd || ''"
@@ -1799,6 +1779,126 @@ function closePickerMenus() {
       @close="closeProjectBrowser"
       @select="createSessionForCwd"
     />
+
+    <header class="app-header">
+      <div class="app-header-brand">
+        <button
+          class="brand-home"
+          type="button"
+          aria-label="Go to home"
+          @click="navigateHome"
+        >
+          <img class="brand-mark" src="/brand-mark.svg" alt="" />
+          <span class="brand-name">
+            <strong>Leyline</strong>
+          </span>
+        </button>
+        <button
+          class="sidebar-collapse-button"
+          type="button"
+          :aria-label="desktopSidebarHidden ? 'Show sessions' : 'Hide sessions'"
+          @click="desktopSidebarHidden = !desktopSidebarHidden"
+        >{{ desktopSidebarHidden ? '›' : '‹' }}</button>
+      </div>
+      <div class="app-header-main">
+        <button
+          class="mobile-sidebar-button"
+          type="button"
+          aria-label="Open sessions"
+          @click="sidebarOpen = true"
+        >☰</button>
+        <div v-if="selectedSession" class="workbench-title-row">
+          <button
+            v-if="selectedSession.isSubagentSession
+              && selectedSession.parentSessionPath"
+            class="parent-session-button"
+            type="button"
+            @click="navigateParentSession"
+          >← parent session</button>
+          <span class="crumb-project">
+            {{ projectName(selectedSession.cwd) }}
+          </span>
+          <span class="crumb-sep" aria-hidden="true">/</span>
+          <input
+            v-if="renamingSessionId === selectedSession.id
+              && renamingSessionSource === 'workbench'"
+            v-focus-select
+            class="workbench-title-input"
+            :value="renameDraft"
+            aria-label="Session name"
+            :disabled="renamingSessionSavingId === selectedSession.id"
+            @input="renameDraft = $event.target.value"
+            @keydown.enter.stop.prevent="commitRenameSession(selectedSession)"
+            @keydown.esc.stop.prevent="cancelRenameSession"
+            @blur="renamingSessionId === selectedSession.id
+              && renamingSessionSource === 'workbench'
+              && commitRenameSession(selectedSession)"
+          />
+          <button
+            v-else
+            class="workbench-title-button"
+            type="button"
+            title="Rename session"
+            @click="beginRenameSession(selectedSession, 'workbench')"
+          >
+            <strong>{{ sessionTitle(selectedSession) }}</strong>
+            <span class="workbench-title-glyph" aria-hidden="true">
+              <svg viewBox="0 0 16 16">
+                <path d="M10.8 2.8l2.4 2.4"></path>
+                <path d="M4 12l2.1-.4 6.2-6.2-1.7-1.7-6.2 6.2z"></path>
+              </svg>
+            </span>
+          </button>
+        </div>
+        <div v-if="selectedSession" class="topbar-meta">
+          <button
+            class="topbar-icon-button"
+            type="button"
+            title="Memory"
+            aria-label="Memory"
+            :disabled="!memoryEnabled"
+            @click="toggleMemoryPanel"
+          >
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <ellipse cx="8" cy="4" rx="5" ry="2.2"></ellipse>
+              <path d="M3 4v8c0 1.2 2.2 2.2 5 2.2s5-1 5-2.2V4"></path>
+              <path d="M3 8c0 1.2 2.2 2.2 5 2.2s5-1 5-2.2"></path>
+            </svg>
+            <span v-if="memoryActiveCount" class="topbar-icon-count">
+              {{ memoryActiveCount }}
+            </span>
+          </button>
+          <template v-if="!isEmptySelectedSession">
+            <button
+              class="topbar-icon-button"
+              type="button"
+              title="Events"
+              aria-label="Events"
+              @click="toggleEventDrawer"
+            >
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M1.5 8h3l1.8-4 3.4 8 1.8-4h3"></path>
+              </svg>
+              <span v-if="runtimeEvents.length" class="topbar-icon-count">
+                {{ runtimeEvents.length }}
+              </span>
+            </button>
+            <a
+              class="topbar-icon-button"
+              title="Export transcript"
+              aria-label="Export transcript"
+              :href="selectedSessionExportUrl"
+            >
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M8 2.5v7"></path>
+                <path d="M5 6.5l3 3 3-3"></path>
+                <path d="M3 11v1.5c0 .8.7 1.5 1.5 1.5h7c.8 0 1.5-.7 1.5-1.5V11"></path>
+              </svg>
+            </a>
+          </template>
+        </div>
+      </div>
+    </header>
 
     <SessionSidebar
       v-model:query="sessionQuery"
@@ -1824,8 +1924,6 @@ function closePickerMenus() {
       @cancel-rename-session="cancelRenameSession"
       @commit-rename-session="commitRenameSession"
       @create-session="createSession"
-      @hide="desktopSidebarHidden = true"
-      @navigate-home="navigateHome"
       @open-project-browser="openProjectBrowser"
       @open-project-detail="openProjectDetail"
       @open-settings="toggleSettingsDrawer"
@@ -1838,105 +1936,6 @@ function closePickerMenus() {
 
     <section class="main-pane">
       <div v-if="runtimeChromeVisible" class="runtime-chrome">
-        <header class="topbar">
-        <button
-          class="mobile-sidebar-button"
-          type="button"
-          aria-label="Open sessions"
-          @click="sidebarOpen = true"
-        >☰</button>
-        <div class="topbar-project">
-          <div v-if="selectedSession" class="workbench-title-row">
-            <button
-              v-if="selectedSession.isSubagentSession && selectedSession.parentSessionPath"
-              class="parent-session-button"
-              type="button"
-              @click="navigateParentSession"
-            >← parent session</button>
-            <input
-              v-if="renamingSessionId === selectedSession.id
-                && renamingSessionSource === 'workbench'"
-              v-focus-select
-              class="workbench-title-input"
-              :value="renameDraft"
-              aria-label="Session name"
-              :disabled="renamingSessionSavingId === selectedSession.id"
-              @input="renameDraft = $event.target.value"
-              @keydown.enter.stop.prevent="commitRenameSession(selectedSession)"
-              @keydown.esc.stop.prevent="cancelRenameSession"
-              @blur="renamingSessionId === selectedSession.id
-                && renamingSessionSource === 'workbench'
-                && commitRenameSession(selectedSession)"
-            />
-            <button
-              v-else
-              class="workbench-title-button"
-              type="button"
-              title="Rename session"
-              @click="beginRenameSession(selectedSession, 'workbench')"
-            >
-              <strong>{{ sessionTitle(selectedSession) }}</strong>
-              <span class="workbench-title-glyph" aria-hidden="true">
-                <svg viewBox="0 0 16 16">
-                  <path d="M10.8 2.8l2.4 2.4"></path>
-                  <path d="M4 12l2.1-.4 6.2-6.2-1.7-1.7-6.2 6.2z"></path>
-                </svg>
-              </span>
-            </button>
-          </div>
-          <strong v-else>{{ topbarTitle }}</strong>
-          <span>{{ topbarSubtitle }}</span>
-        </div>
-        <div v-if="selectedSession" class="topbar-meta">
-          <span v-if="compactingContext" class="running-pill">compacting</span>
-          <span v-else-if="agentRunning" class="running-pill">running</span>
-          <span v-if="goalPillLabel" class="goal-pill">
-            {{ goalPillLabel }}
-          </span>
-          <span class="topbar-runtime-pill">{{ currentModelLabel }}</span>
-          <span class="topbar-runtime-pill">{{ currentThinkingLabel }}</span>
-          <button
-            class="event-log-button"
-            type="button"
-            :disabled="!memoryEnabled"
-            @click="toggleMemoryPanel"
-          >
-            Memory {{ memoryActiveCount || '' }}
-          </button>
-          <template v-if="!isEmptySelectedSession">
-            <button
-              class="event-log-button"
-              type="button"
-              @click="toggleEventDrawer"
-            >
-              Events {{ runtimeEvents.length }}
-            </button>
-            <a
-              class="event-log-button"
-              :href="selectedSessionExportUrl"
-            >Export</a>
-            <button
-              class="delete-session-button"
-              type="button"
-              title="Delete session"
-              aria-label="Delete session"
-              :disabled="deletingSessionId === selectedSession.id"
-              @click="requestDeleteSession(selectedSession)"
-            >
-              <span v-if="deletingSessionId === selectedSession.id">…</span>
-              <svg v-else viewBox="0 0 16 16" aria-hidden="true">
-                <path d="M3.5 4.5h9"></path>
-                <path d="M6.5 4.5v-2h3v2"></path>
-                <path d="M5 6.5l.5 6h5l.5-6"></path>
-                <path d="M7 7.5v4"></path>
-                <path d="M9 7.5v4"></path>
-              </svg>
-            </button>
-            <span>{{ selectedSession.messageCount }} messages</span>
-            <span>modified {{ formatDate(selectedSession.modified) }}</span>
-          </template>
-        </div>
-        </header>
 
         <section v-if="activeGoal" class="goal-control-plane">
           <div class="goal-control-main">
