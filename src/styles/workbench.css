@@ -65,6 +65,7 @@
   width: auto;
   background: #111217;
   pointer-events: none;
+  animation: startup-overlay-exit 180ms var(--ease-accelerate) both;
 }
 
 .start-headline-text,
@@ -173,19 +174,14 @@
 .startup-composer-docking .start-composer {
   position: fixed;
   bottom: 22px;
-  left: calc(276px + (100vw - 276px) / 2);
+  left: var(--startup-composer-dock-left);
   width: var(--docked-composer-width);
   min-width: 0;
   opacity: 0.96;
-  transform: translateX(-50%);
   animation: startup-composer-dock 980ms var(--ease-dock) both;
   box-shadow:
     0 1px 0 rgb(255 255 255 / 3%) inset,
     0 10px 30px -18px rgb(0 0 0 / 52%);
-}
-
-.sidebar-hidden.startup-composer-docking .start-composer {
-  left: 50vw;
 }
 
 .start-composer.shell-mode-composer,

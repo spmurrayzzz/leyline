@@ -42,6 +42,7 @@ export function useSessionWorkspace({
   const runtimeSessionsById = ref({})
   const startupRun = ref(null)
   const sessionHandoff = ref(null)
+  const sessionHandoffSettling = ref(false)
   const switchingModel = ref(false)
   const switchingThinking = ref(false)
   const reloadingSession = ref(false)
@@ -110,6 +111,7 @@ export function useSessionWorkspace({
   let sessionSelectionToken = 0
   let sessionActivationQueue = Promise.resolve()
   let refreshTimer
+  let sessionHandoffSettlingTimer
 
   async function loadSessions({
     routeSessionId = '',
@@ -203,7 +205,10 @@ export function useSessionWorkspace({
         : await createPiSession(targetCwd)
 
       if (handoff) setSessionHandoffPhase(handoff, 'loading')
-      await loadSessions({ selectFirst: false, showLoading: false })
+      sessions.value = [
+        data.detail.session,
+        ...sessions.value.filter((session) => session.id !== data.detail.session.id),
+      ]
       setSelectedSessionData(data.detail, data.active)
       newSessionCwd.value = ''
       await scrollToLatest?.()
@@ -263,6 +268,8 @@ export function useSessionWorkspace({
     sessionDetail.value = null
     sessionError.value = ''
     sessionHandoff.value = null
+    sessionHandoffSettling.value = false
+    clearTimeout(sessionHandoffSettlingTimer)
     activeRuntimeSession.value = null
     finishStartupRun()
     liveTurn?.reset?.()
@@ -820,6 +827,8 @@ export function useSessionWorkspace({
   }
 
   function beginSessionHandoff(cwd) {
+    clearTimeout(sessionHandoffSettlingTimer)
+    sessionHandoffSettling.value = false
     const handoff = {
       id: `${Date.now()}-${Math.random()}`,
       cwd,
@@ -864,7 +873,13 @@ export function useSessionWorkspace({
   }
 
   function finishSessionHandoff(handoff) {
-    if (sessionHandoff.value?.id === handoff.id) sessionHandoff.value = null
+    if (sessionHandoff.value?.id !== handoff.id) return
+    sessionHandoff.value = null
+    sessionHandoffSettling.value = true
+    clearTimeout(sessionHandoffSettlingTimer)
+    sessionHandoffSettlingTimer = setTimeout(() => {
+      sessionHandoffSettling.value = false
+    }, 240)
   }
 
   function setStartupPhase(phase) {
@@ -1068,6 +1083,7 @@ export function useSessionWorkspace({
 
   function dispose() {
     clearTimeout(refreshTimer)
+    clearTimeout(sessionHandoffSettlingTimer)
   }
 
   return {
@@ -1130,6 +1146,7 @@ export function useSessionWorkspace({
     sessionDetail,
     sessionError,
     sessionHandoff,
+    sessionHandoffSettling,
     sessionIdFromRoute,
     sessionLoading,
     sessionQuery,

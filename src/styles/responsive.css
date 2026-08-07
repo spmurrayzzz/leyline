@@ -203,6 +203,8 @@
   .skeleton-line::after,
   .startup-init-panel,
   .in-project-init-panel,
+  .session-handoff-init-panel,
+  .startup-reveal-hold .start-panel,
   .thought-ellipsis span,
   .live-tool-spinner,
   .live-user-item > .message,
@@ -214,6 +216,12 @@
   .composer.composer-committing .composer-input-shell,
   .composer.composer-committing .send-button:not(.stop-button) {
     animation: none;
+  }
+
+  .startup-reveal-hold .start-panel,
+  .session-handoff-init-panel.is-settling,
+  .in-project-init-panel.is-settling {
+    opacity: 0;
   }
 }
 
@@ -473,14 +481,21 @@
 
   .startup-composer-docking .start-composer {
     bottom: 10px;
-    left: 50vw;
     width: calc(100vw - 20px);
   }
 
   .in-project-composer-docking .composer.empty-session-composer {
-    bottom: 10px;
+    top: calc(100% - var(--composer-height) - 10px);
+    bottom: auto;
     width: calc(100vw - 20px);
     max-width: none;
+  }
+
+  .terminal-open.in-project-composer-docking
+    .composer.empty-session-composer {
+    top: calc(
+      100% - var(--terminal-drawer-height) - var(--composer-height) - 10px
+    );
   }
 
   .composer {

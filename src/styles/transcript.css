@@ -285,11 +285,15 @@
 .new-session-transition:not(.start-state) .workbench > .message,
 .new-session-transition:not(.start-state) .workbench > .tool-card,
 .new-session-transition:not(.start-state) .workbench > .live-stack,
-.new-session-transition:not(.start-state) .workbench > .empty-session-panel,
 .in-project-new-session-transition .workbench > .message,
 .in-project-new-session-transition .workbench > .tool-card,
 .in-project-new-session-transition .workbench > .live-stack {
   animation: session-content-enter 560ms var(--ease-emphasized) both;
+}
+
+.new-session-transition:not(.start-state)
+  .workbench > .empty-session-panel {
+  animation: session-centered-content-enter 560ms var(--ease-emphasized) both;
 }
 
 .session-handoff-workbench > .message,
@@ -846,6 +850,15 @@
   top: 20px;
   z-index: 3;
   margin: 0 auto;
+  animation: loading-panel-enter 240ms var(--ease-decelerate) both;
+}
+
+.session-handoff-init-panel.is-settling {
+  animation: handoff-panel-exit 240ms var(--ease-accelerate) both;
+}
+
+.in-project-init-panel.is-settling {
+  animation: loading-panel-exit 240ms var(--ease-accelerate) both;
 }
 
 .activity-scanning-composer {

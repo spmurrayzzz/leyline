@@ -115,6 +115,7 @@ const emit = defineEmits([
   'update:startProjectQuery',
 ])
 
+const form = ref(null)
 const textarea = ref(null)
 const shellMode = computed(() => props.draft.trimStart().startsWith('!'))
 const hiddenShellMode = computed(() => props.draft.trimStart().startsWith('!!'))
@@ -157,10 +158,13 @@ function updateDraft(event) {
   emit('update:draft', event.target.value)
   emit('show-slash-picker')
 }
+
+defineExpose({ form })
 </script>
 
 <template>
   <form
+    ref="form"
     class="start-composer"
     :class="{
       'shell-mode-composer': shellMode,

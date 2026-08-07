@@ -36,6 +36,20 @@
   }
 }
 
+@keyframes session-centered-content-enter {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(16px) scale(0.992);
+    filter: blur(3px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
 @keyframes session-composer-enter {
   from {
     opacity: 0;
@@ -172,19 +186,10 @@
 @keyframes startup-composer-dock {
   from {
     width: var(--start-composer-width);
-    transform: translate(-50%, -34vh);
-  }
-
-  to {
-    width: var(--docked-composer-width);
-    transform: translate(-50%, 0);
-  }
-}
-
-@keyframes in-project-composer-dock {
-  from {
-    width: var(--empty-session-composer-width);
-    transform: translate(-50%, -40vh);
+    transform: translate(
+      calc(-50% + var(--startup-composer-dock-x)),
+      var(--startup-composer-dock-y)
+    );
   }
 
   to {
@@ -209,6 +214,54 @@
     opacity: 1;
     transform: translate(var(--skeleton-x, 0), 0);
     filter: blur(0);
+  }
+}
+
+@keyframes loading-panel-enter {
+  from {
+    opacity: 0;
+    filter: blur(3px);
+  }
+
+  to {
+    opacity: 0.82;
+    filter: blur(0);
+  }
+}
+
+@keyframes handoff-panel-exit {
+  from {
+    opacity: 0.82;
+    filter: blur(0);
+  }
+
+  to {
+    opacity: 0;
+    filter: blur(2px);
+  }
+}
+
+@keyframes loading-panel-exit {
+  from {
+    opacity: 1;
+    transform: translate(var(--skeleton-x, 0), 0);
+    filter: blur(0);
+  }
+
+  to {
+    opacity: 0;
+    transform: translate(var(--skeleton-x, 0), 0);
+    filter: blur(2px);
+  }
+}
+
+@keyframes startup-overlay-exit {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
   }
 }
 

@@ -68,6 +68,10 @@ const editingEntry = ref(null)
 const seenEntryIds = ref(new Set())
 const animatingEntryIds = ref(new Set())
 const composerRef = ref(null)
+const startComposerRef = ref(null)
+const startupComposerDockLeft = ref('50%')
+const startupComposerDockX = ref('0px')
+const startupComposerDockY = ref('0px')
 const modelPickerOpen = ref(false)
 const thinkingPickerOpen = ref(false)
 const toolsPickerOpen = ref(false)
@@ -237,6 +241,7 @@ const {
   sessionDetail,
   sessionError,
   sessionHandoff,
+  sessionHandoffSettling,
   sessionIdFromRoute,
   sessionLoading,
   sessionQuery,
@@ -508,7 +513,7 @@ const startupShellVisible = computed(() => {
   return Boolean(startupRun.value || startupRevealHold.value)
 })
 const startupLoadingVisible = computed(() => {
-  return Boolean(startupComposerDocking.value || startupRevealHold.value)
+  return startupComposerDocking.value
 })
 const startFlowVisible = computed(() => {
   if (startupRun.value) return true
@@ -1637,6 +1642,22 @@ function handleStartComposerKeydown(event) {
   submitStartDraft()
 }
 
+function measureStartupComposerDock() {
+  const form = startComposerRef.value?.form
+  const pane = form?.closest('.main-pane')
+  if (!form || !pane) return
+
+  const formRect = form.getBoundingClientRect()
+  const paneRect = pane.getBoundingClientRect()
+  const bottom = window.matchMedia('(max-width: 760px)').matches ? 10 : 22
+  const dockLeft = paneRect.left + paneRect.width / 2
+  const dockTop = paneRect.bottom - bottom - formRect.height
+  startupComposerDockLeft.value = `${dockLeft}px`
+  startupComposerDockX.value = `${formRect.left
+    - (dockLeft - formRect.width / 2)}px`
+  startupComposerDockY.value = `${formRect.top - dockTop}px`
+}
+
 async function submitStartDraft() {
   const text = draft.value.trim()
   const model = startSelectedModel.value
@@ -1647,10 +1668,13 @@ async function submitStartDraft() {
 
   clearTimeout(startupDockTimer)
   startupComposerDocking.value = false
+  if (hasPrompt) measureStartupComposerDock()
   beginStartupRun(targetCwd, { hasPrompt, model, thinkingLevel })
-  startupDockTimer = window.setTimeout(() => {
-    startupComposerDocking.value = true
-  }, 320)
+  if (hasPrompt) {
+    startupDockTimer = window.setTimeout(() => {
+      startupComposerDocking.value = true
+    }, 320)
+  }
 
   try {
     await wait(startupAcceptedFloorMs)
@@ -1669,15 +1693,16 @@ async function submitStartDraft() {
     clearTimeout(startupDockTimer)
     clearTimeout(startupRevealTimer)
     const shouldRevealSession = Boolean(selectedSession.value)
-    startupRevealHold.value = shouldRevealSession
-    startupRevealSettling.value = shouldRevealSession
+    startupRevealHold.value = shouldRevealSession && hasPrompt
+    startupRevealSettling.value = shouldRevealSession && hasPrompt
     startupRevealCwd.value = targetCwd
     newSessionSettling.value = true
     finishStartupRun()
-    startupComposerDocking.value = false
+    startupComposerDocking.value = shouldRevealSession && hasPrompt
     startupRevealTimer = window.setTimeout(() => {
       startupRevealHold.value = false
       startupRevealCwd.value = ''
+      startupComposerDocking.value = false
     }, 180)
     clearTimeout(newSessionSettlingTimer)
     newSessionSettlingTimer = window.setTimeout(() => {
@@ -1749,7 +1774,7 @@ function closePickerMenus() {
       'transcript-view': !!selectedSession && !initializing,
       'start-state': !initializing && startFlowVisible,
       'new-session-transition': newSessionTransitionActive,
-      'startup-composer-docking': startupComposerDocking || startupRevealHold,
+      'startup-composer-docking': startupComposerDocking,
       'startup-reveal-hold': startupRevealHold,
       'startup-reveal-settling': startupRevealSettling,
       'in-project-new-session-transition': inProjectTransitionActive,
@@ -1760,7 +1785,11 @@ function closePickerMenus() {
       'memory-open': memoryOpen,
     }"
     :style="{
+      '--composer-height': `${composerHeight}px`,
       '--composer-reserved-height': composerReservedHeight,
+      '--startup-composer-dock-left': startupComposerDockLeft,
+      '--startup-composer-dock-x': startupComposerDockX,
+      '--startup-composer-dock-y': startupComposerDockY,
       '--terminal-drawer-height': `${terminalDrawerHeight}px`,
     }"
   >
@@ -2018,8 +2047,9 @@ function closePickerMenus() {
           </div>
         </div>
         <div
-          v-else-if="sessionHandoff"
+          v-else-if="sessionHandoff || sessionHandoffSettling"
           class="init-panel transcript-skeleton-panel session-handoff-init-panel"
+          :class="{ 'is-settling': sessionHandoffSettling }"
           aria-label="Starting new session"
           aria-hidden="true"
         >
@@ -2082,6 +2112,7 @@ function closePickerMenus() {
             </div>
           </div>
           <StartComposer
+            ref="startComposerRef"
             v-model:draft="draft"
             :class="{ 'activity-scanning-composer': startupShellVisible }"
             v-model:start-project-query="startProjectQuery"
@@ -2135,8 +2166,11 @@ function closePickerMenus() {
           <h2>What should we work on in {{ topbarTitle }}?</h2>
         </div>
         <div
-          v-if="inProjectNewSessionRun && !startupRun && !startupRevealHold"
+          v-if="(inProjectNewSessionRun || inProjectNewSessionSettling)
+            && !startupRun
+            && !startupRevealHold"
           class="init-panel transcript-skeleton-panel in-project-init-panel"
+          :class="{ 'is-settling': !inProjectNewSessionRun }"
           aria-label="Starting new session"
           aria-hidden="true"
         >

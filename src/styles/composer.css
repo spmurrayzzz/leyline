@@ -30,15 +30,16 @@
 }
 
 .in-project-composer-docking .composer.empty-session-composer {
-  top: auto;
-  bottom: 22px;
+  top: calc(100% - var(--composer-height) - 22px);
+  bottom: auto;
   width: var(--docked-composer-width);
   max-width: calc(100% - 88px);
-  animation: in-project-composer-dock 980ms var(--ease-dock) both;
 }
 
 .terminal-open.in-project-composer-docking .composer.empty-session-composer {
-  bottom: calc(var(--terminal-drawer-height) + 22px);
+  top: calc(
+    100% - var(--terminal-drawer-height) - var(--composer-height) - 22px
+  );
 }
 
 .composer.empty-session-composer .slash-picker {
@@ -83,6 +84,8 @@
   bottom: 22px;
   left: 50%;
   transition:
+    top 980ms var(--ease-dock),
+    width 980ms var(--ease-dock),
     bottom var(--motion-base) var(--ease-standard),
     border-color var(--motion-base) var(--ease-standard),
     background-color var(--motion-base) var(--ease-standard),
