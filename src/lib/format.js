@@ -31,10 +31,12 @@ export function eventTime(item) {
 }
 
 export function sessionTime(session) {
-  if (!session.timestamp) return ''
+  const timestamp = session.modified || session.timestamp
+  if (!timestamp) return ''
 
-  const then = new Date(session.timestamp).getTime()
-  const diff = Date.now() - then
+  const then = new Date(timestamp).getTime()
+  if (Number.isNaN(then)) return ''
+  const diff = Math.max(0, Date.now() - then)
   const minute = 60 * 1000
   const hour = 60 * minute
   const day = 24 * hour

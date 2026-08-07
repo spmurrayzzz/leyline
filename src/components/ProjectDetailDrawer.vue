@@ -98,7 +98,9 @@ const vFocusSelect = {
 }
 
 function sessionTimestamp(session) {
-  const time = new Date(session?.timestamp || 0).getTime()
+  const time = new Date(
+    session?.modified || session?.timestamp || 0,
+  ).getTime()
   return Number.isNaN(time) ? 0 : time
 }
 

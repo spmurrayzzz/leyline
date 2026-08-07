@@ -253,6 +253,8 @@ export function toSessionDto(session) {
     parentSessionPath: session.parentSessionPath,
     isSubagentSession: session.isSubagentSession === true,
     firstMessage: truncate(session.firstMessage || '', 140),
+    messageCount: session.messageCount ?? 0,
+    modified: session.modified || session.created || timestampFromPath(session.path),
     timestamp: session.created || timestampFromPath(session.path),
   }
 }

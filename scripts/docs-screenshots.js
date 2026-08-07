@@ -34,15 +34,15 @@ const availableModels = [
 ]
 
 const sessions = [
-  session('demo-session', 'Review the release flow', '2026-08-06T15:42:00.000Z'),
-  session('release-checks', 'Add release verification', '2026-08-06T14:25:00.000Z'),
-  session('api-review', 'Review API error handling', '2026-08-05T18:10:00.000Z'),
-  session('docs-navigation', 'Update documentation navigation', '2026-08-05T12:30:00.000Z'),
-  session('terminal-resize', 'Fix terminal resize behavior', '2026-08-04T16:20:00.000Z'),
-  session('mobile-header', 'Refine the mobile header', '2026-08-03T11:45:00.000Z'),
-  session('export-layout', 'Check transcript export layout', '2026-08-02T09:15:00.000Z'),
-  session('landing-copy', 'Tighten the landing page copy', '2026-08-01T13:20:00.000Z', '/workspace/field-notes'),
-  session('search-state', 'Preserve project search state', '2026-07-31T17:05:00.000Z', '/workspace/field-notes'),
+  session('demo-session', 'Review the release flow', '2026-08-06T15:42:00.000Z', 5),
+  session('release-checks', 'Add release verification', '2026-08-06T14:25:00.000Z', 18),
+  session('api-review', 'Review API error handling', '2026-08-05T18:10:00.000Z', 12),
+  session('docs-navigation', 'Update documentation navigation', '2026-08-05T12:30:00.000Z', 9),
+  session('terminal-resize', 'Fix terminal resize behavior', '2026-08-04T16:20:00.000Z', 7),
+  session('mobile-header', 'Refine the mobile header', '2026-08-03T11:45:00.000Z', 14),
+  session('export-layout', 'Check transcript export layout', '2026-08-02T09:15:00.000Z', 11),
+  session('landing-copy', 'Tighten the landing page copy', '2026-08-01T13:20:00.000Z', 8, '/workspace/field-notes'),
+  session('search-state', 'Preserve project search state', '2026-07-31T17:05:00.000Z', 6, '/workspace/field-notes'),
 ]
 
 const baseEntries = [
@@ -383,7 +383,13 @@ try {
 
 console.log('Saved documentation and README screenshots')
 
-function session(id, name, timestamp, cwd = '/workspace/harbor') {
+function session(
+  id,
+  name,
+  timestamp,
+  messageCount,
+  cwd = '/workspace/harbor',
+) {
   return {
     id,
     path: `${cwd}/sessions/${id}.jsonl`,
@@ -392,6 +398,8 @@ function session(id, name, timestamp, cwd = '/workspace/harbor') {
     parentSessionPath: null,
     isSubagentSession: false,
     firstMessage: name,
+    messageCount,
+    modified: timestamp,
     timestamp,
   }
 }

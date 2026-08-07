@@ -1,6 +1,6 @@
 .leyline-app {
   display: grid;
-  grid-template-columns: 248px minmax(0, 1fr) 0;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr) 0;
   grid-template-rows: 53px minmax(0, 1fr);
   height: 100vh;
   background: var(--bg);
@@ -10,7 +10,7 @@
 .app-header {
   display: grid;
   grid-column: 1 / -1;
-  grid-template-columns: 248px minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
   border-bottom: 1px solid transparent;
@@ -84,7 +84,7 @@
 }
 
 .leyline-app.event-log-open {
-  grid-template-columns: 248px minmax(0, 1fr) 0;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr) 0;
 }
 
 .sidebar-scrim {
@@ -144,8 +144,8 @@
   display: flex;
   overflow: hidden;
   flex-direction: column;
-  width: 248px;
-  min-width: 248px;
+  width: var(--sidebar-width);
+  min-width: var(--sidebar-width);
   min-height: 0;
   border-right: 1px solid var(--border-soft);
   background: var(--sidebar);
@@ -487,14 +487,12 @@ kbd {
 }
 
 .session {
-  display: flex;
+  display: block;
   position: relative;
-  align-items: center;
-  justify-content: space-between;
-  width: calc(100% - 23px);
-  margin-left: 23px;
-  gap: 8px;
-  padding: 6px 50px 6px 8px;
+  width: 100%;
+  min-height: 50px;
+  margin-left: 0;
+  padding: 7px 9px 8px 41px;
   color: #9c9c9c;
   font-size: 13px;
   font-weight: 400;
@@ -508,15 +506,44 @@ kbd {
 }
 
 .session-title {
+  display: block;
   overflow: hidden;
   min-width: 0;
-  flex: 1;
+  line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.session-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.session-meta-details {
+  display: flex;
+  overflow: hidden;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  max-width: calc(100% - 48px);
+  white-space: nowrap;
+}
+
+.session-meta-separator {
+  color: #555;
+}
+
 .session.is-renaming {
-  padding-right: 9px;
+  display: flex;
+  align-items: center;
+  padding: 7px 9px;
   cursor: default;
 }
 
@@ -538,11 +565,16 @@ kbd {
 
 .session-status {
   display: inline-flex;
+  overflow: hidden;
   align-items: center;
-  flex: none;
+  min-width: 0;
+  margin-left: auto;
   color: var(--muted);
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: opacity var(--motion-fast) var(--ease-decelerate);
 }
 
 .status-running {
@@ -567,17 +599,16 @@ kbd {
 
 .session time {
   flex: none;
-  color: var(--muted);
-  transition: opacity var(--motion-fast) var(--ease-decelerate);
+  color: inherit;
 }
 
 .session-list-toggle {
-  width: calc(100% - 24px);
-  margin: 3px 0 0 24px;
+  width: 100%;
+  margin: 3px 0 0;
   border: 0;
   border-radius: 8px;
   background: transparent;
-  padding: 5px 9px;
+  padding: 5px 9px 5px 42px;
   color: var(--muted);
   font-size: 12px;
   font-weight: 500;
@@ -594,11 +625,23 @@ kbd {
   transition-timing-function: var(--ease-accelerate);
 }
 
+.session-actions {
+  display: flex;
+  position: absolute;
+  right: 7px;
+  bottom: 5px;
+  gap: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(1px);
+  transition:
+    opacity var(--motion-base) var(--ease-decelerate),
+    transform var(--motion-base) var(--ease-decelerate);
+}
+
 .session-rename-button,
 .session-delete-button {
   display: grid;
-  position: absolute;
-  top: 50%;
   place-items: center;
   width: 18px;
   height: 18px;
@@ -608,20 +651,7 @@ kbd {
   background: transparent;
   color: var(--muted);
   line-height: 1;
-  opacity: 0;
-  transform: translateY(-50%) scale(0.92);
-  transition:
-    color var(--motion-base) var(--ease-decelerate),
-    opacity var(--motion-base) var(--ease-decelerate),
-    transform var(--motion-base) var(--ease-decelerate);
-}
-
-.session-rename-button {
-  right: 30px;
-}
-
-.session-delete-button {
-  right: 8px;
+  transition: color var(--motion-base) var(--ease-decelerate);
 }
 
 .session-rename-button svg,
@@ -636,16 +666,15 @@ kbd {
   stroke-width: 1.5;
 }
 
-.session:hover .session-rename-button,
-.session:focus-within .session-rename-button,
-.session:hover .session-delete-button,
-.session:focus-within .session-delete-button {
+.session:hover .session-actions,
+.session:focus-within .session-actions {
   opacity: 1;
-  transform: translateY(-50%) scale(1);
+  pointer-events: auto;
+  transform: translateY(0);
 }
 
-.session:hover time,
-.session:focus-within time {
+.session:hover .session-status,
+.session:focus-within .session-status {
   opacity: 0;
 }
 

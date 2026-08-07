@@ -18,6 +18,8 @@
   .session,
   .session-list-toggle,
   .session time,
+  .session-actions,
+  .session-status,
   .session-rename-button,
   .session-delete-button,
   .workbench-title-glyph,

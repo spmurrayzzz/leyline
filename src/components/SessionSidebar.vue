@@ -145,6 +145,12 @@ function beginRename(session) {
   emit('begin-rename-session', session, 'sidebar')
 }
 
+function sessionMessageLabel(session) {
+  const count = Number(session?.messageCount)
+  if (!Number.isFinite(count)) return ''
+  return `${count} ${count === 1 ? 'message' : 'messages'}`
+}
+
 const onEnter = (el) => {
   el.style.maxHeight = '0'
   el.offsetHeight
@@ -317,55 +323,62 @@ const onAfterLeave = (el) => {
                 @blur="isRenaming(session)
                   && emit('commit-rename-session', session)"
               />
-              <span
-                v-else
-                class="session-title"
-                @dblclick.stop="beginRename(session)"
-                v-html="highlightedText(sessionTitle(session))"
-              ></span>
-              <span
-                v-if="!isRenaming(session) && sessionStatus(session.id).label"
-                class="session-status"
-                :class="`status-${sessionStatus(session.id).tone}`"
-              >
-                {{ sessionStatus(session.id).label }}
-              </span>
-              <time v-else-if="!isRenaming(session)">
-                {{ sessionTime(session) }}
-              </time>
-              <button
-                v-if="!isRenaming(session)"
-                class="session-rename-button"
-                type="button"
-                title="Rename session"
-                aria-label="Rename session"
-                :disabled="renamingSessionSavingId === session.id"
-                @click.stop="beginRename(session)"
-              >
-                <span v-if="renamingSessionSavingId === session.id">…</span>
-                <svg v-else viewBox="0 0 16 16" aria-hidden="true">
-                  <path d="M10.8 2.8l2.4 2.4"></path>
-                  <path d="M4 12l2.1-.4 6.2-6.2-1.7-1.7-6.2 6.2z"></path>
-                </svg>
-              </button>
-              <button
-                v-if="!isRenaming(session)"
-                class="session-delete-button"
-                type="button"
-                title="Delete session"
-                aria-label="Delete session"
-                :disabled="deletingSessionId === session.id"
-                @click.stop="emit('request-delete-session', session)"
-              >
-                <span v-if="deletingSessionId === session.id">…</span>
-                <svg v-else viewBox="0 0 16 16" aria-hidden="true">
-                  <path d="M3.5 4.5h9"></path>
-                  <path d="M6.5 4.5v-2h3v2"></path>
-                  <path d="M5 6.5l.5 6h5l.5-6"></path>
-                  <path d="M7 7.5v4"></path>
-                  <path d="M9 7.5v4"></path>
-                </svg>
-              </button>
+              <template v-else>
+                <span
+                  class="session-title"
+                  @dblclick.stop="beginRename(session)"
+                  v-html="highlightedText(sessionTitle(session))"
+                ></span>
+                <div class="session-meta">
+                  <span class="session-meta-details">
+                    <span>{{ sessionMessageLabel(session) }}</span>
+                    <span class="session-meta-separator" aria-hidden="true">
+                      ·
+                    </span>
+                    <time>{{ sessionTime(session) }}</time>
+                  </span>
+                  <span
+                    v-if="sessionStatus(session.id).label"
+                    class="session-status"
+                    :class="`status-${sessionStatus(session.id).tone}`"
+                  >
+                    {{ sessionStatus(session.id).label }}
+                  </span>
+                </div>
+                <div class="session-actions">
+                  <button
+                    class="session-rename-button"
+                    type="button"
+                    title="Rename session"
+                    aria-label="Rename session"
+                    :disabled="renamingSessionSavingId === session.id"
+                    @click.stop="beginRename(session)"
+                  >
+                    <span v-if="renamingSessionSavingId === session.id">…</span>
+                    <svg v-else viewBox="0 0 16 16" aria-hidden="true">
+                      <path d="M10.8 2.8l2.4 2.4"></path>
+                      <path d="M4 12l2.1-.4 6.2-6.2-1.7-1.7-6.2 6.2z"></path>
+                    </svg>
+                  </button>
+                  <button
+                    class="session-delete-button"
+                    type="button"
+                    title="Delete session"
+                    aria-label="Delete session"
+                    :disabled="deletingSessionId === session.id"
+                    @click.stop="emit('request-delete-session', session)"
+                  >
+                    <span v-if="deletingSessionId === session.id">…</span>
+                    <svg v-else viewBox="0 0 16 16" aria-hidden="true">
+                      <path d="M3.5 4.5h9"></path>
+                      <path d="M6.5 4.5v-2h3v2"></path>
+                      <path d="M5 6.5l.5 6h5l.5-6"></path>
+                      <path d="M7 7.5v4"></path>
+                      <path d="M9 7.5v4"></path>
+                    </svg>
+                  </button>
+                </div>
+              </template>
             </div>
             <button
               v-if="canToggleSessionList(project)"
