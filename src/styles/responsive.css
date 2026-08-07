@@ -69,6 +69,7 @@
   .tool-fullscreen-header button,
   .start-composer,
   .composer,
+  .jump-latest-button,
   .shell-prompt-glyph,
   .shell-glyph-enter-active,
   .shell-glyph-leave-active,
@@ -124,6 +125,7 @@
   .tool-fullscreen-header button:hover,
   .attachment-chip button:hover,
   .composer-bar .terminal-toggle-button:hover,
+  .jump-latest-button:hover,
   .start-project-button:hover,
   .start-composer-chip:hover,
   .editing-banner button:hover,
@@ -669,7 +671,6 @@
   }
 
   .jump-latest-button {
-    right: 16px;
     bottom: 214px;
   }
 

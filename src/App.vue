@@ -2310,10 +2310,14 @@ function closePickerMenus() {
         v-if="hasNewOutput"
         class="jump-latest-button"
         type="button"
+        title="Jump to latest"
+        aria-label="Jump to latest"
         @click="jumpToLatest"
       >
-        <strong>Jump to latest</strong>
-        <span aria-hidden="true">↓</span>
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M8 2.5v9"></path>
+          <path d="m4.5 8 3.5 3.5L11.5 8"></path>
+        </svg>
       </button>
 
       <Transition name="terminal-drawer">
