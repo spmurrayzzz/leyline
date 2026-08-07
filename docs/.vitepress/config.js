@@ -1,8 +1,13 @@
 import { defineConfig } from 'vitepress'
 
+const base = process.env.VITEPRESS_BASE || '/docs/'
+
 export default defineConfig({
-  base: process.env.VITEPRESS_BASE || '/docs/',
+  base,
   outDir: '../dist/docs',
+  head: [
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: `${base}favicon.svg` }],
+  ],
   cacheDir: '../node_modules/.vitepress-cache',
   title: 'Leyline',
   description: 'UI for your pi coding agent sessions',
