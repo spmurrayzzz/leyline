@@ -609,28 +609,14 @@
   padding-left: 28px;
 }
 
-.subagent-card {
-  border-color: rgb(124 92 255 / 20%);
-  background: rgb(124 92 255 / 4%);
-}
-
-.subagent-card:hover {
-  border-color: rgb(124 92 255 / 32%);
-  background: rgb(124 92 255 / 7%);
-}
-
-.subagent-card.is-expanded {
-  border-color: rgb(124 92 255 / 42%);
-  background: rgb(124 92 255 / 10%);
-}
-
 .subagent-header {
   display: flex;
   align-items: center;
   gap: 10px;
-  color: #777;
+  min-width: 0;
+  color: #85858c;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 650;
 }
 
 .subagent-header .chevron {
@@ -645,29 +631,41 @@
 }
 
 .subagent-icon {
-  color: #bfb5ff;
-  font-size: 15px;
-  font-weight: 800;
-  line-height: 1;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  color: var(--accent);
 }
 
-.subagent-agent-name {
-  color: #d7d3ff;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+.subagent-icon svg {
+  width: 100%;
+  height: 100%;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
+.subagent-label {
+  flex: 0 0 auto;
+  color: #929299;
+  font-weight: 650;
 }
 
 .subagent-header code {
+  overflow: hidden;
+  min-width: 0;
+  max-width: 320px;
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: 6px;
   background: var(--panel-soft);
   padding: 2px 6px;
-  color: #cfcfcf;
+  color: #bfc0c5;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 12px;
-  max-width: 320px;
-  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -679,44 +677,50 @@
   font-size: 12px;
 }
 
-.subagent-status {
+.subagent-header em {
+  flex: 0 0 auto;
   margin-left: auto;
-  font-size: 11px;
+  font-size: 10px;
   font-style: normal;
-  font-weight: 700;
+  font-weight: 650;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
-.subagent-status.status-completed {
-  color: #82d69a;
+.subagent-header em.status-completed {
+  color: #78bd8b;
 }
 
-.subagent-status.status-running {
-  color: #bfb5ff;
+.subagent-header em.status-running {
+  color: #a99cff;
 }
 
-.subagent-status.status-error {
+.subagent-header em.status-error {
   color: #d88a96;
 }
 
 .subagent-results {
-  margin-top: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  display: grid;
+  margin: 9px 0 0 39px;
+  border-top: 1px solid rgb(255 255 255 / 5%);
 }
 
 .subagent-result-item {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(64px, auto) minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px;
-  padding: 5px 8px;
-  border-radius: 6px;
-  background: #0f1014;
+  gap: 10px;
+  min-width: 0;
+  border-bottom: 1px solid rgb(255 255 255 / 5%);
+  border-radius: 4px;
+  padding: 7px 6px;
+  background: transparent;
   font-size: 12px;
-  transition:
-    background-color var(--motion-quick) var(--ease-standard),
-    border-color var(--motion-quick) var(--ease-standard);
+  transition: background-color var(--motion-quick) var(--ease-standard);
+}
+
+.subagent-result-item:last-child {
+  border-bottom: 0;
 }
 
 .subagent-result-item.has-session {
@@ -724,72 +728,84 @@
 }
 
 .subagent-result-item.has-session:hover {
-  background: #16171d;
+  background: rgb(255 255 255 / 2.4%);
 }
 
 .subagent-result-agent {
-  color: #bfb5ff;
-  font-weight: 700;
-  text-transform: uppercase;
+  overflow: hidden;
+  max-width: 150px;
+  color: #aaa;
   font-size: 11px;
-  letter-spacing: 0.04em;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .subagent-result-task {
-  color: #999;
-  font-size: 12px;
   overflow: hidden;
+  min-width: 0;
+  color: #8f8f95;
+  font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .subagent-child-link {
-  margin-left: auto;
-  color: #7c8cff;
+  color: #9a8cff;
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .subagent-expanded {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 0;
+  margin-left: 39px;
 }
 
 .subagent-detail-block {
-  border: 1px solid var(--border-soft);
-  border-radius: 8px;
-  background: #0f1014;
-  padding: 8px 10px;
+  border: 0;
+  border-bottom: 1px solid rgb(255 255 255 / 5%);
+  border-radius: 0;
+  background: transparent;
+  padding: 10px 0;
+}
+
+.subagent-detail-block:last-child {
+  border-bottom: 0;
 }
 
 .subagent-detail-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 4px;
+  margin-bottom: 7px;
 }
 
 .subagent-detail-header strong {
-  color: #bfb5ff;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  color: #aaa;
+  font-size: 11px;
+  font-weight: 650;
 }
 
 .subagent-detail-task {
-  color: #999;
+  overflow: hidden;
+  min-width: 0;
+  color: #8f8f95;
   font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .subagent-detail-output {
   overflow: auto;
   max-height: 200px;
   margin: 0;
-  padding: 8px;
+  border: 1px solid var(--border-soft);
   border-radius: 6px;
-  background: #131419;
+  background: rgb(0 0 0 / 20%);
+  padding: 8px;
   color: #b8b8b8;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 12px;
@@ -798,7 +814,7 @@
 }
 
 .subagent-child-meta {
-  margin-top: 4px;
+  margin-top: 5px;
   color: #666;
   font-size: 11px;
 }

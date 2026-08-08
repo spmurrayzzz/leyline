@@ -198,7 +198,7 @@ function renderExportSubagent(entry, index) {
   const results = details?.results || []
   const hasErroredResult = results.some((result) => result.error || result.exitCode !== 0)
   const status = details?.background ? 'running' : (entry.isError || hasErroredResult ? 'error' : 'completed')
-  const agentName = entry.label.replace('Subagent · ', '')
+  const target = exportSubagentTarget(entry)
 
   let resultsHtml = ''
   for (const result of results) {
@@ -216,15 +216,26 @@ ${output ? `<pre class="subagent-detail-output">${escapeHtml(output)}</pre>` : '
   return `<details class="tool-card subagent-card transcript-tool${entry.isError ? ' error-card' : ''}">
 <summary class="subagent-header">
 <span class="chevron tool-chevron">›</span>
-<span class="subagent-icon">↳</span>
-<span class="subagent-agent-name">${escapeHtml(agentName)}</span>
-${entry.code ? `<code>${escapeHtml(entry.code)}</code>` : ''}
-<span class="subagent-status status-${status}">${status}</span>
+<span class="subagent-icon" aria-hidden="true">
+<svg viewBox="0 0 16 16" fill="none">
+<path d="M3 2.5v4A3.5 3.5 0 0 0 6.5 10H13"></path>
+<path d="m10 7 3 3-3 3"></path>
+</svg>
+</span>
+<span class="subagent-label">Subagent</span>
+${target ? `<code>${escapeHtml(target)}</code>` : ''}
+<em class="subagent-status status-${status}">${status}</em>
 </summary>
-<div class="tool-expanded-body subagent-expanded" data-tool-index="${index}">
+<div class="tool-expanded-body subagent-expanded" data-tool-index="${index}" data-rendered="true">
 ${resultsHtml || '<div class="tool-lazy-placeholder">Open to render details</div>'}
 </div>
 </details>`
+}
+
+function exportSubagentTarget(entry) {
+  const agent = entry.label.replace(/^Subagent · /, '')
+  if (agent && agent !== 'subagent' && agent !== entry.code) return agent
+  return entry.code || ''
 }
 
 function subagentFinalOutput(result) {
@@ -1099,11 +1110,6 @@ button, input, textarea { color: inherit; font: inherit; }
   }
 }
 
-.subagent-card {
-  border-color: rgb(124 92 255 / 20%);
-  background: rgb(124 92 255 / 4%);
-}
-
 .subagent-card summary { list-style: none; cursor: pointer; }
 .subagent-card summary::-webkit-details-marker { display: none; }
 
@@ -1112,22 +1118,34 @@ button, input, textarea { color: inherit; font: inherit; }
   align-items: center;
   gap: 10px;
   min-width: 0;
-  color: #777;
+  color: #85858c;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 650;
 }
 
-.subagent-icon { color: #bfb5ff; font-size: 15px; font-weight: 800; line-height: 1; }
+.subagent-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  color: var(--accent);
+}
 
-.subagent-agent-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: #d7d3ff;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+.subagent-icon svg {
+  width: 100%;
+  height: 100%;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
+.subagent-label {
+  flex: 0 0 auto;
+  color: #929299;
+  font-weight: 650;
 }
 
 .subagent-header code {
@@ -1145,45 +1163,56 @@ button, input, textarea { color: inherit; font: inherit; }
   white-space: nowrap;
 }
 
-.subagent-status { margin-left: auto; font-size: 11px; font-style: normal; font-weight: 700; text-transform: uppercase; }
-.subagent-status.status-completed { color: #82d69a; }
-.subagent-status.status-running { color: #bfb5ff; }
-.subagent-status.status-error { color: #fca5a5; }
+.subagent-header em {
+  flex: 0 0 auto;
+  margin-left: auto;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.subagent-header em.status-completed { color: #78bd8b; }
+.subagent-header em.status-running { color: #a99cff; }
+.subagent-header em.status-error { color: #fca5a5; }
 
 .subagent-expanded {
-  margin-top: 9px;
-  border-top: 1px solid var(--border-soft);
-  padding-top: 9px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 0;
+  margin: 9px 0 0 39px;
+  border-top: 1px solid var(--border-soft);
+  padding-top: 9px;
 }
 
 .subagent-detail-block {
-  border: 1px solid var(--border-soft);
-  border-radius: 8px;
-  background: #0f1014;
-  padding: 8px 10px;
+  border: 0;
+  border-bottom: 1px solid rgb(255 255 255 / 5%);
+  border-radius: 0;
+  background: transparent;
+  padding: 10px 0;
 }
+
+.subagent-detail-block:last-child { border-bottom: 0; }
 
 .subagent-detail-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 4px;
+  margin-bottom: 7px;
 }
 
 .subagent-detail-header strong {
-  color: #bfb5ff;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  color: #aaa;
+  font-size: 11px;
+  font-weight: 650;
 }
 
 .subagent-detail-task {
   min-width: 0;
   overflow-wrap: anywhere;
-  color: #999;
+  color: #8f8f95;
   font-size: 12px;
 }
 
@@ -1191,9 +1220,10 @@ button, input, textarea { color: inherit; font: inherit; }
   overflow: auto;
   max-height: 200px;
   margin: 0;
-  padding: 8px;
+  border: 1px solid var(--border-soft);
   border-radius: 6px;
-  background: #131419;
+  background: rgb(0 0 0 / 20%);
+  padding: 8px;
   color: #b8b8b8;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 12px;

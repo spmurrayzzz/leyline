@@ -911,8 +911,10 @@ function isLiveSubagentTool(item) {
   return item.toolName === 'subagent'
 }
 
-function liveSubagentAgent(item) {
-  return item.label?.replace('Subagent · ', '') || 'subagent'
+function liveSubagentTarget(item) {
+  const agent = item.label?.replace(/^Subagent · /, '') || ''
+  if (agent && agent !== 'subagent' && agent !== item.code) return agent
+  return item.code || ''
 }
 
 function liveItemClass(item) {
@@ -2509,9 +2511,14 @@ function closePickerMenus() {
             >
               <div v-if="isLiveSubagentTool(item)" class="subagent-header">
                 <span class="live-tool-spinner"></span>
-                <span class="subagent-icon">↳</span>
-                <span class="subagent-agent-name">{{ liveSubagentAgent(item) }}</span>
-                <code v-if="item.code">{{ item.code }}</code>
+                <span class="subagent-icon" aria-hidden="true">
+                  <svg viewBox="0 0 16 16" fill="none">
+                    <path d="M3 2.5v4A3.5 3.5 0 0 0 6.5 10H13" />
+                    <path d="m10 7 3 3-3 3" />
+                  </svg>
+                </span>
+                <span class="subagent-label">Subagent</span>
+                <code v-if="liveSubagentTarget(item)">{{ liveSubagentTarget(item) }}</code>
                 <em>{{ liveToolStatus(item) }}</em>
               </div>
               <div v-else class="tool-card-header">

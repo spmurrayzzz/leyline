@@ -138,6 +138,12 @@ function subagentFinalOutput(result) {
   return ''
 }
 
+function subagentTarget(entry) {
+  const agent = entry.label.replace(/^Subagent · /, '')
+  if (agent && agent !== 'subagent' && agent !== entry.code) return agent
+  return entry.code || ''
+}
+
 function navigateChildSession(childSession) {
   if (!childSession) return
   emit('navigate-child-session', childSession)
@@ -166,15 +172,20 @@ function navigateChildSession(childSession) {
   >
     <div class="subagent-header">
       <span class="chevron">›</span>
-      <span class="subagent-icon">↳</span>
-      <span class="subagent-agent-name">{{ entry.label.replace('Subagent · ', '') }}</span>
-      <code v-if="entry.code">{{ entry.code }}</code>
-      <span
+      <span class="subagent-icon" aria-hidden="true">
+        <svg viewBox="0 0 16 16" fill="none">
+          <path d="M3 2.5v4A3.5 3.5 0 0 0 6.5 10H13" />
+          <path d="m10 7 3 3-3 3" />
+        </svg>
+      </span>
+      <span class="subagent-label">Subagent</span>
+      <code v-if="subagentTarget(entry)">{{ subagentTarget(entry) }}</code>
+      <em
         class="subagent-status"
         :class="`status-${entrySubagentStatus(entry)}`"
       >
         {{ entrySubagentStatus(entry) }}
-      </span>
+      </em>
       <button
         class="copy-button"
         type="button"
