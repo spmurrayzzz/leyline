@@ -1,3 +1,4 @@
+import { backendConnectionsHandler } from '../backend-connections.js'
 import { createPiRuntimeApi } from './runtime.js'
 import { createPiApiHandler } from './router.js'
 import {
@@ -11,6 +12,7 @@ export function piApi() {
     name: 'pi-api',
     configureServer(server) {
       configurePiWebSocketServer(server.httpServer)
+      server.middlewares.use('/api/leyline', backendConnectionsHandler)
       server.middlewares.use('/api/pi', (req, res, next) => {
         if (req.headers.host) process.env.LEYLINE_SERVER_URL = `http://${req.headers.host}`
         piApiHandler(req, res, next)

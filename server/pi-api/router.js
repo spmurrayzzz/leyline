@@ -1,3 +1,5 @@
+import { setCorsHeaders } from './cors.js'
+
 export function createPiApiHandler(api) {
   const {
     activeSessionDto,
@@ -47,9 +49,33 @@ export function createPiApiHandler(api) {
   } = api
 
 async function piApiHandler(req, res) {
+    if (!setCorsHeaders(req, res)) {
+      return json(res, { error: 'Cross-origin request denied' }, 403)
+    }
+    if (req.method === 'OPTIONS') {
+      res.statusCode = 204
+      return res.end()
+    }
+
     const url = new URL(req.url, 'http://localhost')
   
     try {
+      if (url.pathname === '/info') {
+        if (req.method !== 'GET') {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+        return json(res, {
+          name: 'Leyline',
+          version: process.env.npm_package_version || '0.0.0',
+          apiVersion: 1,
+          capabilities: {
+            events: true,
+            exports: true,
+            terminal: true,
+          },
+        })
+      }
+
       if (url.pathname === '/sessions') {
         if (req.method === 'GET') {
           const sessions = await listSessions()
@@ -548,8 +574,6 @@ async function piApiHandler(req, res) {
       return json(res, { error: error.message }, 500)
     }
   }
-  
-  
 
   return piApiHandler
 }

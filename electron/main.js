@@ -17,7 +17,7 @@ if (!gotSingleInstanceLock) app.quit()
 app.on('second-instance', (_event, argv) => {
   const command = nativeCommandFromArgv(argv)
   if (command?.newWindow) {
-    void createWindow(command)
+    void createWindowFromSource(command, activeWindow())
     return
   }
 
@@ -156,8 +156,17 @@ function sendWindowCommand(window, name, detail = null) {
 }
 
 async function createNewSessionWindow(sourceWindow) {
-  const cwd = await currentWindowCwd(sourceWindow)
-  await createWindow(cwd ? newSessionCommand(cwd, { newWindow: true }) : null)
+  const [cwd, backendConnectionId] = await Promise.all([
+    currentWindowCwd(sourceWindow),
+    currentWindowBackendConnectionId(sourceWindow),
+  ])
+  const command = cwd ? newSessionCommand(cwd, { newWindow: true }) : null
+  await createWindow(withBackendConnection(command, backendConnectionId))
+}
+
+async function createWindowFromSource(command, sourceWindow) {
+  const backendConnectionId = await currentWindowBackendConnectionId(sourceWindow)
+  await createWindow(withBackendConnection(command, backendConnectionId))
 }
 
 async function currentWindowCwd(window) {
@@ -170,6 +179,30 @@ async function currentWindowCwd(window) {
     return typeof cwd === 'string' ? cwd.trim() : ''
   } catch {
     return ''
+  }
+}
+
+async function currentWindowBackendConnectionId(window) {
+  if (!window || window.isDestroyed()) return ''
+
+  try {
+    const id = await window.webContents.executeJavaScript(
+      'window.__leylineBackendConnectionId || ""',
+    )
+    return typeof id === 'string' ? id.trim() : ''
+  } catch {
+    return ''
+  }
+}
+
+function withBackendConnection(command, backendConnectionId) {
+  if (!backendConnectionId) return command
+  return {
+    ...(command || {}),
+    detail: {
+      ...(command?.detail || {}),
+      backendConnectionId,
+    },
   }
 }
 
@@ -308,12 +341,15 @@ async function startPackagedAppServer() {
 }
 
 function urlWithInitialCommand(url, command) {
-  if (command?.name !== 'leyline:new-session' || !command.detail?.cwd) {
-    return url
-  }
+  const cwd = command?.name === 'leyline:new-session' ? command.detail?.cwd : ''
+  const backendConnectionId = command?.detail?.backendConnectionId
+  if (!cwd && !backendConnectionId) return url
 
   const next = new URL(url)
-  next.searchParams.set('leylineNewSessionCwd', command.detail.cwd)
+  if (cwd) next.searchParams.set('leylineNewSessionCwd', cwd)
+  if (backendConnectionId) {
+    next.searchParams.set('leylineBackendConnectionId', backendConnectionId)
+  }
   return next.toString()
 }
 

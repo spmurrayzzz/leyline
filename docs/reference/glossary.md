@@ -1,6 +1,8 @@
 # Glossary
 
 - **Active run**: Work that a pi runtime is currently generating or executing.
+- **Backend connection**: A named Leyline server URL that a window can use for
+  sessions, runtime events, terminal traffic, and exports.
 - **Compaction**: A pi operation that replaces older context with a shorter
   summary to reduce context use.
 - **Composer**: The input area for prompts, images, shell commands, slash
@@ -13,6 +15,7 @@
   file. It is a timestamped `leyline-trash` directory next to the configured pi
   session directory.
 - **Memory**: Local Markdown context in global, project, or session scope.
+- **Native backend**: The backend that supplied the current Leyline app.
 - **Memory Inspector**: The **Memory** drawer for creating, editing, archiving,
   restoring, and deleting visible memory.
 - **Pi session**: A persisted, tree-structured JSONL conversation log managed by
@@ -22,8 +25,8 @@
   opening, renaming, and deleting sessions.
 - **Runtime**: The live pi session object that runs prompts, tools, shell
   commands, and model operations.
-- **Runtime events**: The **Events** drawer data from the local server event
-  stream.
+- **Runtime events**: The **Events** drawer data from the selected backend's
+  event stream.
 - **Session scope**: Data that applies to one session file.
 - **Steering**: A message sent to the current active run. Use Enter during an
   active run.

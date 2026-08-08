@@ -15,6 +15,25 @@ modules under `server/pi-api/` for local API routes.
 If you use a separate static server, it does not include the pi API unless you
 also start the Leyline backend.
 
+## A saved backend connection fails
+
+1. Open **Settings**.
+2. Find the connection in **Backend**.
+3. Select **Test**.
+4. Confirm that the URL contains the scheme, host, and applicable port.
+5. Remove `/api/pi` from the saved URL. Leyline adds this path.
+
+Open `<backend-url>/api/pi/info` to check the server directly. A compatible
+server returns `name: "Leyline"` and `apiVersion: 1`.
+
+When the UI and backend use different non-loopback origins, set
+`LEYLINE_SERVER_ALLOWED_ORIGINS` on the backend. Restart the backend after you
+change the variable. A page that uses HTTPS cannot connect to an HTTP backend
+when the browser blocks mixed content.
+
+Select **Retry** in the sidebar after the backend becomes available. Retry
+checks the backend again and reconnects the runtime event stream.
+
 ## No sessions appear
 
 Confirm that pi has created session JSONL files. By default, Leyline uses the

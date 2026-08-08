@@ -29,7 +29,9 @@ A normal `leyline` request uses the active window. A `leyline -n` request create
 a window. `Command+Shift+N` also creates a window and uses the active window's
 current project directory when one is available.
 
-All windows use one packaged local server in the Electron main process.
+The Electron main process provides one packaged native backend to all windows.
+Each window can select a different saved backend. A new window inherits the
+active backend from its source window.
 
 ## Saved window state
 

@@ -6,9 +6,10 @@ pi API as the browser workflow.
 Electron adds these functions:
 
 - Native windows and desktop shortcuts
-- A single packaged local server shared by all app windows
+- A packaged native backend available to all app windows
 - macOS login-shell environment loading
 - Saved window size, position, maximized state, and full-screen state
+- Independent backend selection in each window
 - The `leyline` command after local publication
 
 Dictation is not available in Electron. Use a compatible browser when you need

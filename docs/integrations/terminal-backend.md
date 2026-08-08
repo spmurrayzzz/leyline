@@ -1,6 +1,7 @@
 # Terminal backend
 
-Leyline uses xterm in the browser and `node-pty` on the server. The two sides communicate through `/api/pi/terminal`.
+Leyline uses xterm in the browser and `node-pty` on the server. The two sides
+communicate through `/api/pi/terminal` on the active backend.
 
 ## Browser lifecycle
 
@@ -31,7 +32,9 @@ See the [API reference](../reference/api#terminal-websocket) for message contrac
 
 The terminal uses the backend's active runtime CWD. It is not a session-scoped API operation.
 
-All browser tabs and Electron windows connected to one server share the active-session pointer. A selection in one window can change the CWD used by a new terminal connection in another window.
+All browser tabs and Electron windows connected to one backend share its
+active-session pointer. A selection in one window can change the CWD for a new
+terminal connection in another window on that backend.
 
 ## Packaged Electron
 

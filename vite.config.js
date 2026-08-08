@@ -25,4 +25,7 @@ function docsSite() {
 
 export default defineConfig({
   plugins: [vue(), docsSite(), piApi()],
+  server: {
+    cors: false,
+  },
 })

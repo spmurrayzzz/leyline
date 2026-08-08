@@ -4,7 +4,7 @@ layout: home
 hero:
   name: Leyline
   text: UI for your pi coding agent sessions
-  tagline: Browse, run, monitor, control, and export local pi sessions from a focused browser or Electron workspace.
+  tagline: Browse, run, monitor, control, and export pi sessions from a focused browser or Electron workspace.
   actions:
     - theme: brand
       text: Get started
@@ -23,14 +23,16 @@ features:
     details: Submit prompts, images, shell commands, steering messages, queued follow-ups, slash commands, and long-running goals.
   - title: Watch live work
     details: Follow assistant text, thinking, tool calls, runtime events, queues, context use, and goal progress.
+  - title: Connect backend hosts
+    details: Save named Leyline backends, set an app-wide default, and select an active backend for each window.
   - title: Manage durable memory
     details: Inspect global, project, and session memory. Create, edit, archive, restore, or delete local records.
   - title: Delegate to subagents
     details: Run specialized child agents and set model overrides by global, project, or session scope.
   - title: Review and revise history
     details: Edit prompts, retry turns, fork sessions, reset a thread, label rollouts, and inspect rich file or diff previews.
-  - title: Use a local terminal
-    details: Open the PTY-backed xterm drawer in the active project through the same local server.
+  - title: Use a terminal
+    details: Open the PTY-backed xterm drawer in the active project through the selected backend.
   - title: Export transcripts
     details: Save portable HTML with Markdown, tools, thinking output, images, token data, previews, and optional share metadata.
 ---

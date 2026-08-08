@@ -1,3 +1,5 @@
+import { backendHttpUrl } from './backend'
+
 export async function fetchSessions() {
   const data = await apiRequest('/api/pi/sessions', 'Failed to load sessions')
   return data.sessions || []
@@ -293,7 +295,7 @@ async function apiRequest(url, fallbackError, options = {}) {
     init.body = JSON.stringify(init.body)
   }
 
-  const response = await fetch(url, init)
+  const response = await fetch(backendHttpUrl(url), init)
   const data = await response.json()
   if (!response.ok) throw new Error(data.error || fallbackError)
   return data

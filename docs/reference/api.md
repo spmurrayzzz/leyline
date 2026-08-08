@@ -1,8 +1,11 @@
 # API reference
 
-Leyline serves the API under `/api/pi`. The API is a local application interface. It has no authentication or cross-user access control.
+Leyline serves the runtime API under `/api/pi`. The native backend also serves
+the connection registry under `/api/leyline`. These APIs have no authentication
+or cross-user access control.
 
-All implemented HTTP routes are listed below. Successful HTTP requests return `200`. The API does not currently return `201` or `202`.
+Successful runtime requests usually return `200`. A connection create request
+returns `201`. An accepted preflight request returns `204`.
 
 ## Conventions and status behavior
 
@@ -16,12 +19,19 @@ Most errors have this envelope:
 
 Status behavior is:
 
-- `400` is used only when `GET /sessions/by-path` has no `path` query.
-- `404` is used for an unknown route, a missing detail session, a missing activation session, or a missing scoped runtime session.
+- `400` is used for connection-registry validation and a missing `path` on `GET /sessions/by-path`.
+- `403` rejects a browser origin that the server does not allow.
+- `404` is used for an unknown runtime or connection-registry route, or a missing session.
 - `405` is used when a known route receives an unsupported method.
-- `500` is used for thrown errors. This includes malformed JSON, most validation errors, SDK errors, missing memories, and some missing sessions.
+- `500` is used for thrown runtime errors. This includes malformed JSON, SDK errors, missing memories, and some missing sessions.
 
-The current status codes do not distinguish all client errors from server errors. Clients must read the `error` value.
+The current status codes do not distinguish all client errors from server
+errors. Clients must read the `error` value.
+
+HTTP routes and terminal WebSocket upgrades use the same origin policy.
+Same-origin and loopback browser clients work by default. Use
+`LEYLINE_SERVER_ALLOWED_ORIGINS` for other frontend origins. Requests without
+an `Origin` header remain allowed.
 
 ## Common response objects
 
@@ -120,6 +130,101 @@ Goal = {
 ```
 
 The extension UI objects contain status strings, widget line arrays, and notification records from bundled extensions.
+
+## Backend information
+
+### `GET /api/pi/info`
+
+Leyline uses this route before it selects a saved backend.
+
+Response:
+
+```text
+{
+  name: "Leyline",
+  version: string,
+  apiVersion: 1,
+  capabilities: {
+    events: true,
+    exports: true,
+    terminal: true
+  }
+}
+```
+
+The frontend rejects a backend when `name` or `apiVersion` is incompatible.
+
+## Connection registry
+
+The connection registry is part of the native backend. A selected remote
+backend does not store the app's connection definitions.
+
+```text
+BackendConnection = {
+  id: string,
+  name: string,
+  url: string,
+  createdAt: number,
+  updatedAt: number
+}
+
+BackendRegistry = {
+  connections: BackendConnection[],
+  defaultConnectionId: string
+}
+```
+
+`connections` contains saved records. The native backend uses the reserved ID
+`builtin` and does not occur in this array.
+
+### `GET /api/leyline/connections`
+
+Response: `BackendRegistry`.
+
+### `POST /api/leyline/connections`
+
+Request:
+
+```text
+{ name: string, url: string }
+```
+
+Response: `BackendRegistry` with status `201`.
+
+The name is limited to 80 characters. The URL must use HTTP or HTTPS and must
+contain a hostname or IP address. It can contain a port and a base path. It
+cannot contain credentials, a query, or a fragment.
+
+### `PATCH /api/leyline/connections/:id`
+
+Request:
+
+```text
+{ name?: string, url?: string }
+```
+
+Response: `BackendRegistry`.
+
+### `DELETE /api/leyline/connections/:id`
+
+Response: `BackendRegistry`.
+
+The native backend and the current window's active connection cannot be removed
+through the UI. Another window can remove a saved connection that is active in
+this window. Deleting the default saved connection resets the default to
+`builtin`.
+
+### `PUT /api/leyline/connections/default`
+
+Request:
+
+```text
+{ id: string }
+```
+
+Response: `BackendRegistry`.
+
+The ID can identify a saved connection or the native `builtin` connection.
 
 ## Session routes
 

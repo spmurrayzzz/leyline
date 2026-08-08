@@ -1,4 +1,5 @@
 import { computed, ref } from 'vue'
+import { backendHttpUrl } from '../lib/backend'
 
 export function useRuntimeEvents({
   onActiveSession,
@@ -17,7 +18,7 @@ export function useRuntimeEvents({
 
   function openEventStream() {
     closeEventStream()
-    eventSource = new EventSource('/api/pi/events')
+    eventSource = new EventSource(backendHttpUrl('/api/pi/events'))
 
     eventSource.addEventListener('active_session', (event) => {
       const data = JSON.parse(event.data)

@@ -2,6 +2,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import { Terminal } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
 import { nextTick, ref } from 'vue'
+import { backendWebSocketUrl } from '../lib/backend'
 
 export function useTerminal() {
   const terminalOpen = ref(false)
@@ -75,10 +76,7 @@ export function useTerminal() {
     resizeTerminal()
     focusTerminal()
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const socket = new WebSocket(
-      `${protocol}//${window.location.host}/api/pi/terminal`,
-    )
+    const socket = new WebSocket(backendWebSocketUrl('/api/pi/terminal'))
     terminalSocket = socket
 
     terminalInputDisposable = term.onData((data) => {

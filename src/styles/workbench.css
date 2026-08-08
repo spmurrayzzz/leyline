@@ -57,6 +57,69 @@
   width: var(--start-composer-width);
 }
 
+.backend-unavailable-panel {
+  display: grid;
+  justify-items: center;
+  width: min(460px, 100%);
+  gap: 8px;
+  text-align: center;
+}
+
+.backend-unavailable-panel > span {
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.backend-unavailable-panel strong {
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 500;
+}
+
+.backend-unavailable-panel code {
+  color: #b8bac3;
+  font-size: 11px;
+}
+
+.backend-unavailable-panel p {
+  margin: 6px 0 8px;
+  color: #d99a9a;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.backend-unavailable-panel > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.session-error-panel {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.backend-unavailable-panel button,
+.session-error-panel button {
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  padding: 7px 10px;
+  color: #d9dbe4;
+  font-size: 11px;
+}
+
+.backend-unavailable-panel button:hover,
+.session-error-panel button:hover {
+  border-color: #4b4d58;
+  color: var(--text);
+}
+
 .startup-reveal-hold .start-panel {
   position: absolute;
   inset: 0;

@@ -17,8 +17,13 @@ The runtime also appends `.pi/LEYLINE_SYSTEM.md` to the system prompt. This prom
 
 ## Local metadata
 
-Memory records, rollout feedback, and subagent model overrides use SQLite under `~/.local/share/leyline/`. Pi session history remains in pi JSONL session files.
+Backend connections, the configured default, memory records, rollout feedback,
+and subagent model overrides use SQLite under `~/.local/share/leyline/`. Pi
+session history remains in pi JSONL session files.
 
 ## Browser and Electron servers
 
-Vite mounts the API as development middleware. A packaged Electron process starts one local HTTP server and shares it across all Leyline windows. Both paths use the same router, runtime registry, SSE stream, and terminal WebSocket implementation.
+Vite mounts the native backend as development middleware. A packaged Electron
+process starts one native HTTP server for all Leyline windows. Both paths use
+the same router, runtime registry, SSE stream, and terminal WebSocket
+implementation. Each window can select a saved backend instead.

@@ -1,8 +1,9 @@
 # <img src="assets/icon.png" width="96" height="96" alt="Leyline icon" align="center"> Leyline
 
-Leyline is a local web UI for pi coding-agent sessions. It uses Vue 3 and Vite
-for the frontend. A local backend uses the pi SDK for session state, prompts,
-model controls, runtime events, and an embedded terminal.
+Leyline is a web UI for pi coding-agent sessions. It uses Vue 3 and Vite for
+the frontend. Its native backend uses the pi SDK for sessions, prompts, model
+controls, runtime events, and the embedded terminal. You can also save named
+connections to other Leyline backends.
 
 ## Screenshots
 
@@ -17,9 +18,10 @@ model controls, runtime events, and an embedded terminal.
 
 ## Features
 
-Browse, search, create, and run pi sessions from a local web UI. Leyline shows
+Browse, search, create, and run pi sessions from a focused web UI. Leyline shows
 rendered transcripts, live runtime output, model controls, memory, subagents,
-runtime events, and an embedded terminal.
+runtime events, and an embedded terminal. Each window can use the native
+backend or a saved backend connection.
 
 For the reasoning behind the project, see [Motivations](docs/motivations.md).
 
@@ -55,6 +57,22 @@ http://localhost:5173/
 The Vite server also serves the documentation at
 `http://localhost:5173/docs/`. To run only the documentation server, use
 `npm run docs:dev`.
+
+## Backend connections
+
+The sidebar footer shows the backend for the current window. Open **Settings**
+to add, test, edit, remove, or select a named connection. The **Native backend**
+is the server that supplied the current Leyline app.
+
+Saved connections and the configured default are app-wide. Each browser or
+Electron window keeps its active connection separately. A fresh window uses the
+default. A new Electron window inherits the source window's active connection.
+
+Leyline sends runtime HTTP commands, runtime events, terminal WebSocket traffic,
+and exports to the active backend. Connection management stays on the native
+backend. See [Settings](docs/user-guide/settings.md) for
+connection setup and [Environment variables](docs/reference/environment.md) for
+packaged server and origin settings.
 
 ## Optional Electron app
 

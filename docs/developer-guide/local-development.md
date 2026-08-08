@@ -20,7 +20,8 @@ Start Vite:
 npm run dev
 ```
 
-Open `http://localhost:5173/`. Vite mounts the Vue app, VitePress site, pi API, SSE endpoint, and terminal WebSocket.
+Open `http://localhost:5173/`. Vite mounts the Vue app, VitePress site, native
+backend, connection registry, SSE endpoint, and terminal WebSocket.
 
 Keep this process running during browser work and screenshot capture.
 

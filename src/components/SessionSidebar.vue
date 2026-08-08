@@ -1,10 +1,31 @@
 <script setup>
-import { ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
+import { backendDisplayAddress } from '../lib/backend'
 import { sessionTime } from '../lib/format'
 
 const props = defineProps({
+  activeBackendConnection: {
+    type: Object,
+    default: null,
+  },
   agentRunning: Boolean,
+  backendConnectionBusyId: {
+    type: String,
+    default: '',
+  },
+  backendConnectionError: {
+    type: String,
+    default: '',
+  },
+  backendConnections: {
+    type: Array,
+    default: () => [],
+  },
   creatingSessionCwd: {
+    type: String,
+    default: '',
+  },
+  defaultBackendConnectionId: {
     type: String,
     default: '',
   },
@@ -83,6 +104,7 @@ const emit = defineEmits([
   'reload-session',
   'request-delete-session',
   'retry-sessions',
+  'select-backend',
   'select-session',
   'toggle-project',
   'update:query',
@@ -91,6 +113,25 @@ const emit = defineEmits([
 
 const defaultVisibleSessionCount = 5
 const expandedSessionProjects = ref(new Set())
+const backendMenu = ref(null)
+const backendMenuOpen = ref(false)
+
+onMounted(() => document.addEventListener('click', closeBackendMenuOnOutsideClick))
+onUnmounted(() => document.removeEventListener('click', closeBackendMenuOnOutsideClick))
+
+function closeBackendMenuOnOutsideClick(event) {
+  if (!backendMenu.value?.contains(event.target)) backendMenuOpen.value = false
+}
+
+function selectBackend(connection) {
+  backendMenuOpen.value = false
+  emit('select-backend', connection)
+}
+
+function openBackendSettings() {
+  backendMenuOpen.value = false
+  emit('open-settings')
+}
 
 const vFocusSelect = {
   mounted(el) {
@@ -393,21 +434,74 @@ const onAfterLeave = (el) => {
     </section>
 
     <div class="sidebar-actions">
-      <button
-        class="settings-button"
-        type="button"
-        title="Reload runtime"
-        aria-label="Reload runtime"
-        :disabled="!selectedSession || agentRunning || reloadingSession"
-        @click="emit('reload-session')"
-      >{{ reloadingSession ? '…' : '↻' }}</button>
-      <button
-        class="settings-button"
-        type="button"
-        title="Settings"
-        aria-label="Open settings"
-        @click="emit('open-settings')"
-      >⚙</button>
+      <div ref="backendMenu" class="backend-switcher">
+        <button
+          class="backend-switcher-trigger"
+          type="button"
+          :title="activeBackendConnection?.url"
+          :aria-expanded="backendMenuOpen"
+          @click="backendMenuOpen = !backendMenuOpen"
+        >
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <rect x="2.5" y="2.5" width="11" height="4" rx="1"></rect>
+            <rect x="2.5" y="9.5" width="11" height="4" rx="1"></rect>
+            <path d="M5 4.5h.01M5 11.5h.01"></path>
+          </svg>
+          <span>
+            <strong>{{ activeBackendConnection?.name || 'Native backend' }}</strong>
+            <small>{{ backendDisplayAddress(activeBackendConnection) }}</small>
+          </span>
+          <svg class="backend-switcher-caret" viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M5 6.5l3 3 3-3"></path>
+          </svg>
+        </button>
+
+        <div v-if="backendMenuOpen" class="backend-switcher-menu">
+          <span class="backend-switcher-heading">Backends</span>
+          <button
+            v-for="connection in backendConnections"
+            :key="connection.id"
+            type="button"
+            :class="{ active: connection.id === activeBackendConnection?.id }"
+            :disabled="!!backendConnectionBusyId"
+            @click="selectBackend(connection)"
+          >
+            <span>
+              <strong>{{ connection.name }}</strong>
+              <small>
+                {{ backendDisplayAddress(connection) }}
+                <template v-if="connection.id === defaultBackendConnectionId"> · default</template>
+              </small>
+            </span>
+            <span v-if="connection.id === activeBackendConnection?.id">✓</span>
+            <span v-else-if="backendConnectionBusyId === connection.id">…</span>
+          </button>
+          <span v-if="backendConnectionError" class="backend-switcher-error">
+            {{ backendConnectionError }}
+          </span>
+          <button type="button" class="backend-switcher-manage" @click="openBackendSettings">
+            Manage backends
+          </button>
+        </div>
+      </div>
+
+      <div class="sidebar-action-buttons">
+        <button
+          class="settings-button"
+          type="button"
+          title="Reload runtime"
+          aria-label="Reload runtime"
+          :disabled="!selectedSession || agentRunning || reloadingSession"
+          @click="emit('reload-session')"
+        >{{ reloadingSession ? '…' : '↻' }}</button>
+        <button
+          class="settings-button"
+          type="button"
+          title="Settings"
+          aria-label="Open settings"
+          @click="emit('open-settings')"
+        >⚙</button>
+      </div>
     </div>
   </aside>
 </template>

@@ -1,10 +1,14 @@
 # Developer guide
 
-This section is for contributors who work on Leyline's Vue app, modular local server, Electron shell, pi runtimes, and bundled extensions.
+This section is for contributors who work on Leyline's Vue app, modular backend, Electron shell, pi runtimes, and bundled extensions.
 
 Start with [local development](./local-development). Then read [architecture](./architecture), [frontend state](./frontend-state), and [backend API](./backend-api).
 
-The current implementation includes concurrent runtimes, SSE updates, transcript projection, scoped memory, rollout feedback, subagents, goals, HTML export, and a PTY WebSocket. Packaged Electron windows share one local server process.
+The current implementation includes concurrent runtimes, named backend
+connections, SSE updates, transcript projection, scoped memory, rollout
+feedback, subagents, goals, HTML export, and a PTY WebSocket. Packaged Electron
+windows share one native backend process and select their active backend
+independently.
 
 Use these references for implementation details:
 

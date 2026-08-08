@@ -23,7 +23,9 @@ Queue changes and goal-state messages also trigger a new `active_session` snapsh
 
 ## Frontend adapter
 
-`useRuntimeEvents.js` creates one `EventSource('/api/pi/events')`. It handles `active_session`, `runtime_event`, and `extension_ui`.
+`useRuntimeEvents.js` creates one `EventSource` for `/api/pi/events` on the
+active backend. It handles `active_session`, `runtime_event`, and
+`extension_ui`.
 
 Connection open and error callbacks update the visible stream status. EventSource performs its standard reconnect behavior after a disconnection.
 
@@ -70,11 +72,14 @@ Each runtime event includes `activeSessionId`. Keep this field when adding event
 
 Live transcript updates apply only to the selected session. Background events update sidebar status and unread state.
 
-All connected browser tabs and packaged Electron windows receive all broadcasts. SSE clients are process-wide, as are runtime handles.
+All windows connected to one backend receive its broadcasts. SSE clients and
+runtime handles are process-wide within that backend. Windows on another
+backend receive a different stream.
 
 ## Terminal events
 
-The terminal endpoint is `/api/pi/terminal`. It sends JSON WebSocket messages with `ready`, `data`, `error`, or `exit` types.
+The terminal endpoint is `/api/pi/terminal` on the active backend. It sends JSON
+WebSocket messages with `ready`, `data`, `error`, or `exit` types.
 
 The browser sends `input` and `resize` messages. Closing the socket kills its PTY process.
 

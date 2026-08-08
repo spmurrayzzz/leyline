@@ -3,6 +3,7 @@ import { stat } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { extname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { backendConnectionsHandler } from './backend-connections.js'
 import {
   configurePiWebSocketServer,
   piApiHandler,
@@ -13,11 +14,16 @@ const defaultDist = join(root, 'dist')
 
 export async function startLeylineServer(options = {}) {
   const distDir = resolve(options.distDir || defaultDist)
-  const host = options.host || '127.0.0.1'
-  const port = options.port || 0
+  const host = options.host || process.env.LEYLINE_SERVER_HOST || '127.0.0.1'
+  const port = serverPort(options.port, process.env.LEYLINE_SERVER_PORT)
 
   const server = createServer((req, res) => {
     const url = new URL(req.url, `http://${req.headers.host}`)
+
+    if (url.pathname.startsWith('/api/leyline/')) {
+      req.url = url.pathname.slice('/api/leyline'.length) + url.search
+      return backendConnectionsHandler(req, res)
+    }
 
     if (url.pathname.startsWith('/api/pi/')) {
       req.url = url.pathname.slice('/api/pi'.length) + url.search
@@ -39,7 +45,7 @@ export async function startLeylineServer(options = {}) {
 
   const address = server.address()
   const actualPort = typeof address === 'object' ? address.port : port
-  const url = `http://${host}:${actualPort}`
+  const url = `http://${urlHost(host)}:${actualPort}`
   process.env.LEYLINE_SERVER_URL = url
 
   return {
@@ -47,6 +53,22 @@ export async function startLeylineServer(options = {}) {
     url,
     close: () => new Promise((resolveClose) => server.close(resolveClose)),
   }
+}
+
+function urlHost(host) {
+  const value = String(host)
+  if (value.startsWith('[') && value.endsWith(']')) return value
+  return value.includes(':') ? `[${value}]` : value
+}
+
+function serverPort(optionPort, environmentPort) {
+  if (optionPort !== undefined) return optionPort
+  if (environmentPort === undefined || environmentPort === '') return 0
+  const port = Number(environmentPort)
+  if (!Number.isInteger(port) || port < 0 || port > 65535) {
+    throw new Error('LEYLINE_SERVER_PORT must be an integer from 0 through 65535')
+  }
+  return port
 }
 
 async function serveStatic(req, res, distDir) {

@@ -1,14 +1,20 @@
 # Backend API design
 
-Leyline exposes local HTTP routes under `/api/pi`. The same handler runs in Vite and in the packaged Electron server.
+Leyline exposes runtime routes under `/api/pi`. The same handler runs in Vite
+and in the packaged Electron server. The native backend also exposes the app
+connection registry under `/api/leyline`.
 
 ## Request flow
 
 During browser development, `server/pi-api/index.js` mounts `piApiHandler` as Vite middleware. Vite removes the `/api/pi` prefix before routing.
 
-In a packaged app, `server/leyline-server.js` removes the same prefix. It sends the remaining path to `piApiHandler`.
+In a packaged app, `server/leyline-server.js` removes the same prefix. It sends
+the remaining path to `piApiHandler`. Vite and the packaged server also route
+`/api/leyline/connections` to `server/backend-connections.js`.
 
-`server/pi-api/router.js` parses JSON request bodies and dispatches operations. Successful JSON responses use explicit envelopes such as `{ sessions }`, `{ active }`, or `{ ok: true }`.
+`server/pi-api/router.js` parses JSON request bodies and dispatches operations.
+Successful JSON responses use explicit envelopes such as `{ sessions }`,
+`{ active }`, or `{ ok: true }`.
 
 The router returns JSON for HTTP errors. It uses explicit 400, 404, and 405 responses in some branches, and its outer handler maps other errors to 500.
 
@@ -18,8 +24,10 @@ The terminal does not use the HTTP router. It uses a WebSocket upgrade at `/api/
 
 | Module | Ownership |
 | --- | --- |
+| `server/backend-connections.js` | Named connection and default storage on the native backend |
 | `server/pi-api/index.js` | Shared runtime instance, Vite integration, and WebSocket setup |
 | `server/pi-api/router.js` | HTTP method and path dispatch |
+| `server/pi-api/cors.js` | Shared HTTP and WebSocket origin policy |
 | `server/pi-api/runtime.js` | `AgentSessionRuntime` lifecycle, runtime handles, session operations, bundled resources, and subagent execution |
 | `server/pi-api/sessions.js` | Session discovery, configured session directories, list metadata, and subagent markers |
 | `server/pi-api/dtos.js` | Runtime, session state, session detail, model, command, and transcript DTOs |
@@ -57,7 +65,9 @@ Legacy routes such as `/prompt`, `/bash`, and `/compact` use `requireActiveHandl
 
 Fork and Reset to here currently use active-session routes. The terminal also uses the process-wide active runtime cwd.
 
-This distinction matters in concurrent browser tabs and Electron windows. Scoped operations select the requested handle, while active operations depend on the latest selection.
+This distinction matters when windows use the same backend. Scoped operations
+select the requested handle. Active operations depend on the latest selection
+in that backend process.
 
 ## Runtime construction
 
@@ -84,9 +94,13 @@ Rename appends a `session_info` record. Delete moves the JSONL file to Leyline t
 
 Reset to here is the explicit exception. It replaces the manager entries with the retained branch and rewrites the current file.
 
-## Memory, feedback, and subagent storage
+## Application metadata
 
-`memories.js`, `rollout-feedback.js`, and `subagents.js` share `~/.local/share/leyline/memory.sqlite`.
+`backend-connections.js`, `memories.js`, `rollout-feedback.js`, and
+`subagents.js` share `~/.local/share/leyline/memory.sqlite`.
+
+Backend connection definitions and the default are app-wide. A window stores
+its active connection ID in `sessionStorage`.
 
 Memory operations enforce global, project, and session visibility. The Memory Inspector can create, update, archive, restore, and permanently delete visible rows.
 
@@ -108,6 +122,10 @@ The browser does not reconstruct goal state from transcript text. It uses the pr
 
 ## Frontend client
 
-`src/lib/pi-api.js` owns frontend fetch calls and request field names. Keep path construction and response-envelope handling in this module.
+`src/lib/backend.js` supplies the active backend base URL for runtime HTTP,
+SSE, terminal WebSocket, and export requests. `src/lib/pi-api.js` owns runtime fetch
+calls and request field names.
 
-UI components and composables call this client instead of calling `fetch()` directly. The EventSource and terminal WebSocket are the two exceptions.
+`src/lib/leyline-api.js` manages the native connection registry and checks
+`GET /api/pi/info` before a switch. UI components and composables use these
+clients instead of constructing transport URLs directly.

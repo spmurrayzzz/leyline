@@ -6,9 +6,14 @@ Leyline has one Vue frontend and two server startup paths. Both paths use the sa
 
 `npm run dev` starts Vite at `http://localhost:5173/`. `vite.config.js` loads the Vue plugin, the VitePress middleware, and `piApi()`.
 
-The `piApi()` plugin mounts HTTP routes at `/api/pi`. It also attaches the terminal WebSocket server to the Vite HTTP server.
+The `piApi()` plugin mounts runtime routes at `/api/pi` and connection routes
+at `/api/leyline`. It also attaches the terminal WebSocket server to the Vite
+HTTP server.
 
-The browser loads the Vue app from Vite. The browser uses HTTP for commands, server-sent events (SSE) for runtime events, and WebSocket for the terminal.
+The browser loads the Vue app from Vite. The native backend uses the same
+origin. A window can select another saved backend for runtime HTTP commands,
+server-sent events (SSE), terminal WebSocket traffic, and exports. Connection
+management stays on the native backend.
 
 ## Electron development flow
 
@@ -22,19 +27,49 @@ The renderer has context isolation enabled and Node.js integration disabled. Ele
 
 A packaged app does not start Vite. `electron/main.js` starts `server/leyline-server.js` once in the Electron main process.
 
-The server listens on an ephemeral loopback port. It serves `dist/`, routes `/api/pi/*`, and attaches the terminal WebSocket server.
+By default, the server listens on an ephemeral loopback port. The server host
+and port environment variables can change this address. It serves `dist/`,
+routes `/api/pi/*` and `/api/leyline/*`, and attaches the terminal WebSocket
+server.
 
-All Electron windows load the same loopback server. They share one backend module instance, one runtime handle map, and one active-session pointer.
+All Electron windows load the same native server. A window can select another
+saved backend without changing the active backend in other windows.
 
 Electron uses a single-instance lock. A `leyline -n` request creates another window in the first Electron process.
 
 ## Backend boundaries
 
-`server/pi-api/index.js` creates one backend runtime and exports the Vite and standalone server adapters. `server/pi-api/router.js` handles HTTP routing.
+`server/pi-api/index.js` creates one backend runtime and exports the Vite and
+standalone server adapters. `server/pi-api/router.js` handles HTTP routing.
 
-`server/pi-api/runtime.js` owns pi sessions and runtime handles. Other backend modules own DTOs, events, storage, export, filesystem access, and the terminal.
+`server/pi-api/runtime.js` owns pi sessions and runtime handles. Other backend
+modules own DTOs, events, storage, export, filesystem access, and the terminal.
 
-`src/lib/pi-api.js` is the frontend HTTP client. `useRuntimeEvents.js` owns the SSE connection, and `useTerminal.js` owns the terminal WebSocket.
+`src/lib/pi-api.js` is the frontend HTTP client. `useRuntimeEvents.js` owns the
+SSE connection, and `useTerminal.js` owns the terminal WebSocket.
+
+## Backend connections and transport routing
+
+`server/backend-connections.js` stores named connections and the default. Its
+routes use `/api/leyline/connections` on the native backend.
+
+`src/composables/useBackendConnections.js` loads the registry and keeps the
+active connection ID in window `sessionStorage`. Saved definitions and the
+default are app-wide. The active connection is window-specific.
+
+`src/lib/backend.js` supplies the base URL for runtime HTTP, SSE, terminal
+WebSocket, and export requests. The native backend uses the current app origin. Saved
+connections can use hostnames, IPv4 or IPv6 addresses, ports, and base paths.
+
+Electron passes the source window's connection ID when it creates a window. A
+fresh window uses the configured default. `GET /api/pi/info` verifies the
+backend name and API version before Leyline switches to it. The response also
+reports transport capabilities.
+
+`server/pi-api/cors.js` applies one origin policy to pi HTTP routes, the
+connection registry, and terminal WebSocket upgrades. Same-origin and loopback
+clients work by default. Other frontend origins must be listed in
+`LEYLINE_SERVER_ALLOWED_ORIGINS`.
 
 ## Runtime handles and active selection
 
@@ -55,7 +90,10 @@ Handles remain available after the user selects another session. This permits ba
 
 Scoped session routes resolve a handle by session ID. Use scoped routes for prompt, shell, compaction, edit, interrupt, reload, model, and thinking operations.
 
-Active selection is not window-specific. A selection in one browser or Electron window changes the terminal target and all legacy active-session routes.
+Active session selection is process-wide within one backend. Two windows that
+use the same backend can change its terminal target and all legacy
+active-session routes. Windows that use different backends do not share this
+selection.
 
 ## Session storage and projection
 
@@ -89,17 +127,24 @@ Reset removes later entries and other branches from that file. It does not creat
 
 ## SQLite metadata
 
-The Memory Inspector, rollout feedback, and subagent model overrides use Node.js `DatabaseSync`. They open `~/.local/share/leyline/memory.sqlite`.
+Leyline uses Node.js `DatabaseSync` for app metadata. The default database is
+`~/.local/share/leyline/memory.sqlite`.
 
 The database currently contains these application tables:
 
+- `backend_connections`
+- `leyline_settings`
 - `memories`
 - `rollout_feedback`
 - `subagent_overrides`
 
-Memory and subagent scopes use canonical project roots and hashed scope IDs. Rollout feedback uses cwd, session path, session ID, and entry ID.
+`backend_connections` stores named backend URLs. `leyline_settings` stores the
+default connection ID. Memory and subagent scopes use canonical project roots
+and hashed scope IDs. Rollout feedback uses the cwd, session path, session ID,
+and entry ID.
 
-The bundled memory extension and all three backend modules honor `LEYLINE_MEMORY_DIR`. When set, they use `memory.sqlite` in that directory.
+These modules honor `LEYLINE_MEMORY_DIR`. When set, they use `memory.sqlite` in
+that directory.
 
 ## Bundled extensions and prompt
 

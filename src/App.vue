@@ -10,6 +10,7 @@ import SubagentConfigDrawer from './components/SubagentConfigDrawer.vue'
 import StartComposer from './components/StartComposer.vue'
 import SessionSidebar from './components/SessionSidebar.vue'
 import TranscriptEntry from './components/TranscriptEntry.vue'
+import { useBackendConnections } from './composables/useBackendConnections'
 import { useLiveTurnProjection } from './composables/useLiveTurnProjection'
 import { useMemoryInspector } from './composables/useMemoryInspector'
 import { useProjectBrowser } from './composables/useProjectBrowser'
@@ -18,6 +19,7 @@ import { useSessionWorkspace } from './composables/useSessionWorkspace'
 import { useTerminal } from './composables/useTerminal'
 import { useToolExpansion } from './composables/useToolExpansion'
 import { useWorkbenchScroll } from './composables/useWorkbenchScroll'
+import { backendDisplayAddress, backendHttpUrl } from './lib/backend'
 import { fuzzyScore } from './lib/fuzzy'
 import {
   eventTime,
@@ -54,6 +56,10 @@ const attachedImages = ref([])
 const workbench = ref(null)
 const eventLogOpen = ref(false)
 const settingsOpen = ref(false)
+const backendConnectionFormOpen = ref(false)
+const backendConnectionEditingId = ref('')
+const backendConnectionName = ref('')
+const backendConnectionUrl = ref('')
 const subagentConfigOpen = ref(false)
 const subagentConfigLoading = ref(false)
 const subagentConfigSaving = ref(false)
@@ -97,6 +103,25 @@ const vFocusSelect = {
   },
 }
 const {
+  activeConnection: activeBackendConnection,
+  activeConnectionAddress: activeBackendConnectionAddress,
+  activeConnectionId: activeBackendConnectionId,
+  activateConnection: activateBackendConnection,
+  busyId: backendConnectionBusyId,
+  clearResult: clearBackendConnectionResult,
+  connections: backendConnections,
+  createConnection: createSavedBackendConnection,
+  defaultConnectionId: defaultBackendConnectionId,
+  error: backendConnectionError,
+  initialize: initializeBackendConnections,
+  loading: backendConnectionsLoading,
+  removeConnection: removeSavedBackendConnection,
+  setDefault: setDefaultBackendConnection,
+  testConnection: testBackendConnection,
+  testResult: backendConnectionTestResult,
+  updateConnection: updateSavedBackendConnection,
+} = useBackendConnections()
+const {
   closeTerminalPanel,
   connectTerminal,
   terminalCwd,
@@ -118,7 +143,9 @@ const initPhaseFloorMs = 340
 
 const selectedSessionExportUrl = computed(() => {
   if (!selectedSession.value?.id) return ''
-  return `/api/pi/sessions/${encodeURIComponent(selectedSession.value.id)}/export`
+  return backendHttpUrl(
+    `/api/pi/sessions/${encodeURIComponent(selectedSession.value.id)}/export`,
+  )
 })
 const settingsSessionId = computed(() => {
   return selectedSession.value?.id || activeRuntimeSession.value?.id || ''
@@ -128,6 +155,7 @@ const settingsPath = computed(() => {
   return selectedSession.value?.path || activeRuntimeSession.value?.path || ''
 })
 let initPhaseTimer = null
+const pendingInitialNativeCwd = ref('')
 let composerScannerSettlingTimer = null
 let composerCommitTimer = null
 let startupDockTimer = null
@@ -520,6 +548,12 @@ const startFlowVisible = computed(() => {
   if (sessionLoading.value || sessionSwitching.value) return false
   return !selectedSession.value
 })
+const backendUnavailable = computed(() => {
+  return !initializing.value
+    && !selectedSession.value
+    && sessions.value.length === 0
+    && Boolean(sessionsError.value)
+})
 const newSessionTransitionActive = computed(() => {
   return Boolean(
     startupShellVisible.value || newSessionSettling.value,
@@ -646,22 +680,10 @@ onMounted(async () => {
   window.addEventListener('leyline:toggle-memory', handleNativeToggleMemory)
   window.addEventListener('leyline:toggle-sidebar', handleNativeToggleSidebar)
   window.addEventListener('leyline:escape', handleNativeEscape)
+  await initializeBackendConnections()
   updateNativeWindowCwd()
-  openEventStream()
-  initPhase.value = 'sessions'
-  const initialNativeCwd = consumeInitialNativeNewSessionCwd()
-  if (initialNativeCwd) newSessionCwd.value = initialNativeCwd
-  await waitInitPhaseFloor()
-  if (initialNativeCwd) {
-    try {
-      await handleNativeNewSession({ detail: { cwd: initialNativeCwd } })
-    } finally {
-      sessionsLoading.value = false
-      initPhase.value = 'sessions'
-    }
-    return
-  }
-  await loadSessions({ routeSessionId: sessionIdFromRoute() })
+  pendingInitialNativeCwd.value = consumeInitialNativeNewSessionCwd()
+  await loadBackendWorkspace()
 })
 
 onUnmounted(() => {
@@ -674,6 +696,7 @@ onUnmounted(() => {
   window.removeEventListener('leyline:toggle-memory', handleNativeToggleMemory)
   window.removeEventListener('leyline:toggle-sidebar', handleNativeToggleSidebar)
   window.removeEventListener('leyline:escape', handleNativeEscape)
+  delete window.__leylineBackendConnectionId
   delete window.__leylineCurrentCwd
   disposeTerminalResize()
   closeEventStream()
@@ -902,13 +925,195 @@ function liveItemClass(item) {
 }
 
 
-function toggleSettingsDrawer() {
+function openSettingsDrawer() {
   if (memoryDirty.value && !confirmDiscardMemoryChanges()) return
-  settingsOpen.value = !settingsOpen.value
+  settingsOpen.value = true
   subagentConfigOpen.value = false
   eventLogOpen.value = false
   memoryOpen.value = false
-  if (settingsOpen.value) projectDetailCwd.value = ''
+  projectDetailCwd.value = ''
+}
+
+function toggleSettingsDrawer() {
+  if (settingsOpen.value) {
+    settingsOpen.value = false
+    return
+  }
+  openSettingsDrawer()
+}
+
+async function verifyActiveBackendConnection() {
+  if (activeBackendConnection.value.builtIn) return true
+  try {
+    await testBackendConnection(activeBackendConnection.value)
+    return true
+  } catch (error) {
+    sessionsError.value = error.message
+    sessionsLoading.value = false
+    initPhase.value = 'sessions'
+    return false
+  }
+}
+
+async function loadBackendWorkspace() {
+  if (!await verifyActiveBackendConnection()) return
+  if (pendingInitialNativeCwd.value) {
+    newSessionCwd.value = pendingInitialNativeCwd.value
+  }
+  openEventStream()
+  initPhase.value = 'sessions'
+  await waitInitPhaseFloor()
+
+  if (pendingInitialNativeCwd.value) {
+    const cwd = pendingInitialNativeCwd.value
+    try {
+      await handleNativeNewSession({ detail: { cwd } })
+      if (selectedSession.value?.cwd === cwd) pendingInitialNativeCwd.value = ''
+    } finally {
+      sessionsLoading.value = false
+      initPhase.value = 'sessions'
+    }
+    return
+  }
+
+  await loadSessions({ routeSessionId: sessionIdFromRoute() })
+}
+
+async function retryBackendConnection() {
+  sessionsLoading.value = true
+  sessionError.value = ''
+  sessionsError.value = ''
+  await loadBackendWorkspace()
+}
+
+async function switchBackendConnection(connection) {
+  if (!connection || connection.id === activeBackendConnectionId.value) return
+  if (memoryDirty.value && !confirmDiscardMemoryChanges()) return
+  if (!confirmBackendDisconnect(connection.name)) return
+
+  try {
+    await activateBackendConnection(connection.id)
+  } catch {
+    openSettingsDrawer()
+  }
+}
+
+function confirmBackendDisconnect(targetName) {
+  const notices = []
+  if (agentRunning.value) {
+    notices.push(`The current run will continue on ${activeBackendConnection.value.name}.`)
+  }
+  if (draft.value.trim() || attachedImages.value.length) {
+    notices.push('The unsent composer draft will be cleared.')
+  }
+  if (!notices.length) return true
+  notices.push(`Switch this window to ${targetName}?`)
+  return window.confirm(notices.join('\n\n'))
+}
+
+function beginCreateBackendConnection() {
+  clearBackendConnectionResult()
+  backendConnectionEditingId.value = ''
+  backendConnectionName.value = ''
+  backendConnectionUrl.value = ''
+  backendConnectionFormOpen.value = true
+}
+
+function beginEditBackendConnection(connection) {
+  clearBackendConnectionResult()
+  backendConnectionEditingId.value = connection.id
+  backendConnectionName.value = connection.name
+  backendConnectionUrl.value = connection.url
+  backendConnectionFormOpen.value = true
+}
+
+function cancelBackendConnectionForm() {
+  backendConnectionFormOpen.value = false
+  backendConnectionEditingId.value = ''
+  backendConnectionName.value = ''
+  backendConnectionUrl.value = ''
+  clearBackendConnectionResult()
+}
+
+function backendConnectionDraft() {
+  const name = backendConnectionName.value.trim()
+  const url = backendConnectionUrl.value.trim()
+  if (!name) throw new Error('Connection name is required')
+  if (!url) throw new Error('Backend URL is required')
+  return {
+    id: backendConnectionEditingId.value || 'draft',
+    name,
+    url,
+    builtIn: false,
+  }
+}
+
+async function testBackendConnectionDraft() {
+  try {
+    await testBackendConnection(backendConnectionDraft())
+  } catch (error) {
+    backendConnectionError.value = error.message
+  }
+}
+
+async function saveBackendConnection() {
+  let draftConnection
+  try {
+    draftConnection = backendConnectionDraft()
+  } catch (error) {
+    backendConnectionError.value = error.message
+    return
+  }
+
+  const existing = backendConnections.value.find((connection) => {
+    return connection.id === backendConnectionEditingId.value
+  })
+  const reconnectsCurrent = existing?.id === activeBackendConnectionId.value
+    && existing.url !== draftConnection.url
+  if (reconnectsCurrent && !confirmBackendDisconnect(draftConnection.name)) return
+
+  try {
+    await testBackendConnection(draftConnection)
+    if (backendConnectionEditingId.value) {
+      const result = await updateSavedBackendConnection(
+        backendConnectionEditingId.value,
+        draftConnection.name,
+        draftConnection.url,
+      )
+      cancelBackendConnectionForm()
+      if (result.requiresReconnect) {
+        await activateBackendConnection(result.connection.id, { skipTest: true })
+      }
+      return
+    }
+
+    await createSavedBackendConnection(draftConnection.name, draftConnection.url)
+    cancelBackendConnectionForm()
+  } catch (error) {
+    backendConnectionError.value = error.message
+  }
+}
+
+async function testSavedBackendConnection(connection) {
+  try {
+    await testBackendConnection(connection)
+  } catch {
+  }
+}
+
+async function makeDefaultBackendConnection(connection) {
+  try {
+    await setDefaultBackendConnection(connection.id)
+  } catch {
+  }
+}
+
+async function deleteBackendConnection(connection) {
+  if (!window.confirm(`Remove the ${connection.name} backend connection?`)) return
+  try {
+    await removeSavedBackendConnection(connection.id)
+  } catch {
+  }
 }
 
 function toggleEventDrawer() {
@@ -1738,13 +1943,7 @@ function handleEscape(event) {
 
 function consumeInitialNativeNewSessionCwd() {
   const url = new URL(window.location.href)
-  const cwd = url.searchParams.get('leylineNewSessionCwd')?.trim() || ''
-  if (!cwd) return ''
-
-  url.searchParams.delete('leylineNewSessionCwd')
-  const next = `${url.pathname}${url.search}${url.hash}`
-  window.history.replaceState({}, '', next)
-  return cwd
+  return url.searchParams.get('leylineNewSessionCwd')?.trim() || ''
 }
 
 function updateNativeWindowCwd() {
@@ -1941,8 +2140,13 @@ function closePickerMenus() {
 
     <SessionSidebar
       v-model:query="sessionQuery"
+      :active-backend-connection="activeBackendConnection"
       :agent-running="agentRunning"
+      :backend-connection-busy-id="backendConnectionBusyId"
+      :backend-connection-error="backendConnectionError"
+      :backend-connections="backendConnections"
       :creating-session-cwd="creatingSessionCwd"
+      :default-backend-connection-id="defaultBackendConnectionId"
       :deleting-session-id="deletingSessionId"
       :expanded-project="isProjectExpanded"
       :highlighted-text="highlightedText"
@@ -1968,7 +2172,8 @@ function closePickerMenus() {
       @open-settings="toggleSettingsDrawer"
       @reload-session="reloadSession"
       @request-delete-session="requestDeleteSession"
-      @retry-sessions="loadSessions"
+      @retry-sessions="retryBackendConnection"
+      @select-backend="switchBackendConnection"
       @select-session="selectSession"
       @toggle-project="toggleProject"
     />
@@ -2077,8 +2282,33 @@ function closePickerMenus() {
             <div class="skeleton-line short"></div>
           </div>
         </div>
-        <div v-else-if="sessionError" class="empty-workbench error-note">
-          {{ sessionError }}
+        <div v-else-if="sessionError" class="empty-workbench error-note session-error-panel">
+          <span>{{ sessionError }}</span>
+          <button
+            v-if="pendingInitialNativeCwd"
+            type="button"
+            :disabled="!!backendConnectionBusyId"
+            @click="retryBackendConnection"
+          >{{ backendConnectionBusyId ? 'Retrying…' : 'Retry' }}</button>
+        </div>
+        <div v-else-if="backendUnavailable" class="backend-unavailable-panel">
+          <span>Backend unavailable</span>
+          <strong>Cannot connect to {{ activeBackendConnection.name }}</strong>
+          <code>{{ activeBackendConnectionAddress }}</code>
+          <p>{{ sessionsError }}</p>
+          <div>
+            <button
+              type="button"
+              :disabled="!!backendConnectionBusyId"
+              @click="retryBackendConnection"
+            >{{ backendConnectionBusyId ? 'Retrying…' : 'Retry' }}</button>
+            <button type="button" @click="openSettingsDrawer">Choose backend</button>
+            <button
+              v-if="!activeBackendConnection.builtIn"
+              type="button"
+              @click="switchBackendConnection(backendConnections[0])"
+            >Use native backend</button>
+          </div>
         </div>
         <div
           v-else-if="startFlowVisible || startupRevealHold"
@@ -2526,10 +2756,137 @@ function closePickerMenus() {
           <header class="settings-drawer-header">
             <div>
               <strong>Settings</strong>
-              <span>Runtime and session state</span>
+              <span>Connections, runtime, and session state</span>
             </div>
             <button type="button" @click="settingsOpen = false">×</button>
           </header>
+
+          <section class="settings-group backend-settings-group">
+            <div class="settings-group-heading">
+              <h2>Backend</h2>
+              <button
+                type="button"
+                :disabled="backendConnectionsLoading || !!backendConnectionBusyId"
+                @click="beginCreateBackendConnection"
+              >Add connection</button>
+            </div>
+
+            <div class="backend-current-card">
+              <span>Current window</span>
+              <strong>{{ activeBackendConnection.name }}</strong>
+              <code>{{ activeBackendConnectionAddress }}</code>
+            </div>
+
+            <p v-if="backendConnectionError" class="backend-connection-error">
+              {{ backendConnectionError }}
+            </p>
+
+            <form
+              v-if="backendConnectionFormOpen"
+              class="backend-connection-form"
+              @submit.prevent="saveBackendConnection"
+            >
+              <div class="backend-connection-form-heading">
+                <strong>
+                  {{ backendConnectionEditingId ? 'Edit connection' : 'New connection' }}
+                </strong>
+                <button type="button" @click="cancelBackendConnectionForm">×</button>
+              </div>
+              <label>
+                <span>Name</span>
+                <input
+                  v-model="backendConnectionName"
+                  type="text"
+                  maxlength="80"
+                  placeholder="Build host"
+                  @input="clearBackendConnectionResult"
+                />
+              </label>
+              <label>
+                <span>Backend URL</span>
+                <input
+                  v-model="backendConnectionUrl"
+                  type="url"
+                  placeholder="http://192.168.1.42:4317"
+                  spellcheck="false"
+                  @input="clearBackendConnectionResult"
+                />
+              </label>
+              <small>Leyline adds the <code>/api/pi</code> path.</small>
+              <span
+                v-if="backendConnectionTestResult?.id
+                  === (backendConnectionEditingId || 'draft')"
+                class="backend-connection-success"
+              >{{ backendConnectionTestResult.message }}</span>
+              <div class="backend-connection-form-actions">
+                <button
+                  type="button"
+                  :disabled="!!backendConnectionBusyId"
+                  @click="testBackendConnectionDraft"
+                >{{ backendConnectionBusyId
+                  === (backendConnectionEditingId || 'draft') ? 'Testing…' : 'Test' }}</button>
+                <button type="submit" :disabled="!!backendConnectionBusyId">
+                  {{ backendConnectionBusyId ? 'Saving…' : 'Save' }}
+                </button>
+              </div>
+            </form>
+
+            <div class="backend-connection-list">
+              <article
+                v-for="connection in backendConnections"
+                :key="connection.id"
+                class="backend-connection-card"
+              >
+                <div class="backend-connection-heading">
+                  <span>
+                    <strong>{{ connection.name }}</strong>
+                    <small>
+                      <template v-if="connection.id === activeBackendConnectionId">Current window</template>
+                      <template v-if="connection.id === activeBackendConnectionId
+                        && connection.id === defaultBackendConnectionId"> · </template>
+                      <template v-if="connection.id === defaultBackendConnectionId">Default</template>
+                    </small>
+                  </span>
+                  <code>{{ backendDisplayAddress(connection) }}</code>
+                </div>
+                <span
+                  v-if="backendConnectionTestResult?.id === connection.id"
+                  class="backend-connection-success"
+                >{{ backendConnectionTestResult.message }}</span>
+                <div class="backend-connection-actions">
+                  <button
+                    v-if="connection.id !== activeBackendConnectionId"
+                    type="button"
+                    :disabled="!!backendConnectionBusyId"
+                    @click="switchBackendConnection(connection)"
+                  >{{ backendConnectionBusyId === connection.id ? 'Connecting…' : 'Use' }}</button>
+                  <button
+                    type="button"
+                    :disabled="!!backendConnectionBusyId"
+                    @click="testSavedBackendConnection(connection)"
+                  >Test</button>
+                  <button
+                    v-if="connection.id !== defaultBackendConnectionId"
+                    type="button"
+                    :disabled="!!backendConnectionBusyId"
+                    @click="makeDefaultBackendConnection(connection)"
+                  >Make default</button>
+                  <button
+                    v-if="!connection.builtIn"
+                    type="button"
+                    :disabled="!!backendConnectionBusyId"
+                    @click="beginEditBackendConnection(connection)"
+                  >Edit</button>
+                  <button
+                    v-if="!connection.builtIn && connection.id !== activeBackendConnectionId"
+                    type="button"
+                    :disabled="!!backendConnectionBusyId"
+                    @click="deleteBackendConnection(connection)"
+                  >Remove</button>
+                </div>
+              </article>
+            </div>
+          </section>
 
           <section class="settings-group">
             <h2>Runtime</h2>

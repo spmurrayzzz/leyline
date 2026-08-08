@@ -32,6 +32,18 @@ const availableModels = [
     availableThinkingLevels: ['off', 'low', 'medium', 'high'],
   },
 ]
+const backendRegistry = {
+  connections: [
+    {
+      id: 'team-backend',
+      name: 'Team backend',
+      url: 'https://api.example.com',
+      createdAt: fixedNow - 86400000,
+      updatedAt: fixedNow - 3600000,
+    },
+  ],
+  defaultConnectionId: 'builtin',
+}
 
 const sessions = [
   session('demo-session', 'Review the release flow', '2026-08-06T15:42:00.000Z', 5),
@@ -224,6 +236,16 @@ try {
       await drawer.waitFor()
       await drawer.locator('input').fill('release')
       await drawer.locator('.project-session-card').first().waitFor()
+    },
+  })
+  await capture({
+    browser,
+    file: path.join(docsOutputDir, 'backend-connections.png'),
+    route: '/sessions/demo-session',
+    ready: '.assistant-message',
+    interact: async (page) => {
+      await page.getByRole('button', { name: 'Open settings' }).click()
+      await page.locator('aside[aria-label="Settings"] .backend-connection-card').last().waitFor()
     },
   })
   await capture({
@@ -581,6 +603,18 @@ async function capture({
       export function parsePatchFiles() { return [] }
     `,
   }))
+  await page.route('**/api/leyline/connections', async (request) => {
+    const method = request.request().method()
+    if (method === 'GET') {
+      return request.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(backendRegistry),
+      })
+    }
+    unexpected.push(`request: ${method} /api/leyline/connections`)
+    return request.abort()
+  })
   await page.route('**/api/pi/**', async (request) => {
     const req = request.request()
     const url = new URL(req.url())
@@ -612,6 +646,7 @@ async function capture({
     await page.goto(url, { waitUntil: 'domcontentloaded' })
     await page.locator(ready).first().waitFor({ state: 'visible', timeout: 15000 })
     if (interact) await interact(page)
+    await sanitizeNativeBackendAddress(page)
     await page.evaluate(async () => {
       await document.fonts.ready
     })
@@ -780,13 +815,32 @@ async function disableMotion(page) {
   }))
 }
 
+async function sanitizeNativeBackendAddress(page) {
+  const source = new URL(baseUrl).host
+  const replacement = 'localhost:5173'
+  if (!source || source === replacement) return
+
+  await page.locator('body').evaluate((element, values) => {
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
+    let node = walker.nextNode()
+    while (node) {
+      if (node.nodeValue.includes(values.source)) {
+        node.nodeValue = node.nodeValue.replaceAll(values.source, values.replacement)
+      }
+      node = walker.nextNode()
+    }
+  }, { source, replacement })
+}
+
 async function assertPrivateDataAbsent(page) {
   const text = await page.locator('body').innerText()
+  const captureHost = new URL(baseUrl).host
   const forbidden = [
     '/Users/',
     os.homedir(),
     os.userInfo().username,
     process.cwd(),
+    captureHost === 'localhost:5173' ? '' : captureHost,
   ].filter((value) => value && value.length > 2)
   const found = forbidden.find((value) => text.includes(value))
   if (found) throw new Error(`Private text found before capture: ${found}`)

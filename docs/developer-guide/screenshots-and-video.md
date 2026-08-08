@@ -32,7 +32,11 @@ Start Vite, then run:
 npm run docs:screenshots
 ```
 
-This command intercepts Leyline API calls and supplies sanitized fixtures. It does not create sessions or change local model configuration.
+This command intercepts Leyline API calls and supplies sanitized fixtures. It
+also replaces the backend registry with the native backend and a fictional
+saved connection. The visible native address is `localhost:5173`, even when the
+capture uses another server URL. The command does not create sessions or change
+local model configuration.
 
 The command writes product images to `docs/public/screenshots/`. It also refreshes the two README images in `assets/readme/`.
 

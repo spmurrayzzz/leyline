@@ -3,6 +3,7 @@ import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import pty from 'node-pty'
 import { WebSocket, WebSocketServer } from 'ws'
+import { requestOriginAllowed } from './cors.js'
 
 const require = createRequire(import.meta.url)
 
@@ -13,6 +14,11 @@ export function configurePiWebSocketServer(httpServer, getCwd) {
   httpServer.on('upgrade', (req, socket, head) => {
     const url = new URL(req.url, 'http://localhost')
     if (url.pathname !== '/api/pi/terminal') return
+    if (!requestOriginAllowed(req)) {
+      socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n')
+      socket.destroy()
+      return
+    }
 
     terminalServer.handleUpgrade(req, socket, head, (ws) => {
       terminalServer.emit('connection', ws, req)
