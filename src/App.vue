@@ -351,7 +351,6 @@ const transcriptPreferences = useTranscriptPreferences()
 const {
   error: transcriptPreferencesError,
   load: loadTranscriptPreferences,
-  saving: transcriptPreferencesSaving,
   setThinkingDefault,
   thinkingDefault,
 } = transcriptPreferences
@@ -2945,17 +2944,16 @@ function closePickerMenus() {
                 <strong>Thoughts</strong>
                 <small>How thought rows start in live and saved transcripts</small>
               </span>
-              <div class="settings-choice-options">
+              <div class="settings-choice-options" :data-active="thinkingDefault">
+                <span class="settings-choice-thumb" aria-hidden="true" />
                 <button
                   type="button"
                   :class="{ active: thinkingDefault === 'collapsed' }"
-                  :disabled="transcriptPreferencesSaving"
                   @click="setThinkingDefault('collapsed')"
                 >Collapsed</button>
                 <button
                   type="button"
                   :class="{ active: thinkingDefault === 'expanded' }"
-                  :disabled="transcriptPreferencesSaving"
                   @click="setThinkingDefault('expanded')"
                 >Expanded</button>
               </div>

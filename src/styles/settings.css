@@ -375,6 +375,7 @@
 }
 
 .settings-choice-options {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 3px;
@@ -384,23 +385,34 @@
   padding: 3px;
 }
 
+.settings-choice-thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc((100% - 9px) / 2);
+  border-radius: 6px;
+  background: var(--panel-soft);
+  transition: transform 220ms cubic-bezier(0.25, 0.9, 0.35, 1);
+}
+
+.settings-choice-options[data-active="expanded"] .settings-choice-thumb {
+  transform: translateX(calc(100% + 3px));
+}
+
 .settings-choice-options button {
+  position: relative;
   border: 0;
   border-radius: 6px;
   background: transparent;
   padding: 6px;
   color: var(--muted);
   font-size: 11px;
+  transition: color 180ms ease;
 }
 
 .settings-choice-options button.active {
-  background: var(--panel-soft);
   color: var(--text);
-}
-
-.settings-choice-options button:disabled {
-  opacity: 0.5;
-  cursor: default;
 }
 
 .settings-choice-error {

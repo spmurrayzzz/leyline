@@ -22,12 +22,15 @@ export function useTranscriptPreferences() {
   }
 
   async function setThinkingDefault(value) {
+    if (value === thinkingDefault.value) return
+    const previous = thinkingDefault.value
+    thinkingDefault.value = value
     saving.value = true
     error.value = ''
     try {
-      const data = await setLeylineSetting(THINKING_DEFAULT_SETTING_KEY, value)
-      thinkingDefault.value = data.value === 'expanded' ? 'expanded' : 'collapsed'
+      await setLeylineSetting(THINKING_DEFAULT_SETTING_KEY, value)
     } catch (saveError) {
+      thinkingDefault.value = previous
       error.value = saveError.message
     } finally {
       saving.value = false
