@@ -13,7 +13,7 @@ const hljs = loadHighlightJs()
 const markdown = new MarkdownIt({
   html: false,
   linkify: true,
-  breaks: false,
+  breaks: true,
   highlight: highlightCode,
 })
 

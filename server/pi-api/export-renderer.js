@@ -11,7 +11,7 @@ import {
 const exportMarkdown = new MarkdownIt({
   html: false,
   linkify: true,
-  breaks: false,
+  breaks: true,
 })
 
 exportMarkdown.renderer.rules.table_open = () =>
