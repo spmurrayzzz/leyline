@@ -5,6 +5,7 @@ export function useRuntimeEvents({
   onActiveSession,
   onRuntimeEvent,
   onExtensionUi,
+  onExtensionError,
 } = {}) {
   const runtimeEvents = ref([])
   const eventStreamError = ref('')
@@ -21,20 +22,29 @@ export function useRuntimeEvents({
     eventSource = new EventSource(backendHttpUrl('/api/pi/events'))
 
     eventSource.addEventListener('active_session', (event) => {
-      const data = JSON.parse(event.data)
-      onActiveSession?.(data)
+      const data = parseEvent(event, 'active session')
+      if (data) onActiveSession?.(data)
     })
 
     eventSource.addEventListener('runtime_event', (event) => {
-      const data = JSON.parse(event.data)
+      const data = parseEvent(event, 'runtime')
+      if (!data) return
       appendRuntimeEvent(data)
       onRuntimeEvent?.(data)
     })
 
     eventSource.addEventListener('extension_ui', (event) => {
-      const data = JSON.parse(event.data)
+      const data = parseEvent(event, 'extension UI')
+      if (!data) return
       appendRuntimeEvent({ ...data, type: 'extension_ui' })
       onExtensionUi?.(data)
+    })
+
+    eventSource.addEventListener('extension_error', (event) => {
+      const data = parseEvent(event, 'extension error')
+      if (!data) return
+      appendRuntimeEvent({ ...data, type: 'extension_error' })
+      onExtensionError?.(data)
     })
 
     eventSource.onopen = () => {
@@ -48,6 +58,17 @@ export function useRuntimeEvents({
       eventStreamError.value = 'Runtime event stream disconnected'
       appendRuntimeEvent({ type: 'disconnected' })
       console.warn('pi event stream disconnected')
+    }
+  }
+
+  function parseEvent(event, label) {
+    try {
+      return JSON.parse(event.data)
+    } catch (error) {
+      const message = `Invalid ${label} event: ${error.message}`
+      eventStreamError.value = message
+      appendRuntimeEvent({ type: 'error', message })
+      return null
     }
   }
 

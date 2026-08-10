@@ -387,8 +387,13 @@ export function useSessionWorkspace({
     const wasBusy = previous.isStreaming || previous.isCompacting
     const willBeBusy = next.isStreaming || next.isCompacting
     const finished = wasBusy && !willBeBusy
+    const runtimeError = event.type === 'error'
+      || (event.type === 'compaction_end' && event.errorMessage)
+      || (event.type === 'message_end'
+        && event.message?.role === 'assistant'
+        && event.message?.stopReason === 'error')
     const unread = id !== selectedSessionId.value && (
-      finished || event.type === 'error' || event.type === 'aborted'
+      finished || runtimeError || event.type === 'aborted'
     )
 
     patchRuntimeSessionState(id, patch, { unread })
@@ -437,7 +442,14 @@ export function useSessionWorkspace({
     if (['tool_call', 'tool_execution_start'].includes(event.type)) {
       return { isStreaming: true, error: '' }
     }
-    if (event.type === 'agent_end') return { isStreaming: false, error: '' }
+    if (event.type === 'agent_end') {
+      return { isStreaming: false, error: previous.error || '' }
+    }
+    if (event.type === 'message_end'
+      && event.message?.role === 'assistant'
+      && event.message?.stopReason === 'error') {
+      return { isStreaming: false, isCompacting: false, error: 'error' }
+    }
     if (event.type === 'error') {
       return { isStreaming: false, isCompacting: false, error: 'error' }
     }

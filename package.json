@@ -20,7 +20,8 @@
     "screenshot": "node scripts/screenshot.js",
     "docs:screenshots": "node scripts/docs-screenshots.js",
     "video": "node scripts/video.js",
-    "video:mp4": "node scripts/video-mp4.js"
+    "video:mp4": "node scripts/video-mp4.js",
+    "mock-backend": "node scripts/mock-backend.js"
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "0.81.0",

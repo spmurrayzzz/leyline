@@ -412,6 +412,10 @@ const {
     patchRuntimeExtensionUi(data.state, data.goal)
     surfaceExtensionNotification(data.state)
   },
+  onExtensionError(data) {
+    if (data.activeSessionId !== selectedSessionId.value) return
+    promptError.value = data.error?.message || data.error || 'Extension error'
+  },
 })
 const currentMobileModelLabel = computed(() => {
   return modelChip(composerRuntime.value?.state?.model)
@@ -908,6 +912,9 @@ function eventSummary(item) {
   if (type === 'message_update') return event.message?.role || 'message'
   if (type === 'message_end') return event.message?.role || 'message'
   if (type === 'error') return event.error?.message || event.message || 'error'
+  if (type === 'extension_error') {
+    return event.error?.message || event.error || 'extension error'
+  }
   return item.activeSessionId ? item.activeSessionId.slice(0, 8) : 'runtime'
 }
 

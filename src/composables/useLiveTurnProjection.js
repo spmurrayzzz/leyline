@@ -232,6 +232,18 @@ export function useLiveTurnProjection({ onIntent } = {}) {
       emit({ type: 'surface-error', message: event.errorMessage })
       return
     }
+
+    const modelError = event?.type === 'message_end'
+      && event.message?.role === 'assistant'
+      && event.message?.stopReason === 'error'
+    if (modelError) {
+      emit({
+        type: 'surface-error',
+        message: event.message.errorMessage || 'Model request failed',
+      })
+      return
+    }
+
     if (event?.type !== 'error') return
     emit({
       type: 'surface-error',
