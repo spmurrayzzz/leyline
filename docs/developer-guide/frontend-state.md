@@ -9,6 +9,7 @@
 | `App.vue` | Drawer visibility, composer draft, attachments, edit state, prompt submission, goal commands, subagent drawer requests, project detail selection, and startup motion phases |
 | `useSessionWorkspace.js` | Session list, routes, selected detail, activation, runtime snapshots, model and thinking controls, rename, delete, fork, reset, reload, and sidebar search |
 | `useBackendConnections.js` | App-wide connection records, window-specific selection, connection tests, and default selection |
+| `useTranscriptPreferences.js` | App-wide transcript display settings, loading state, and save errors |
 | `useLiveTurnProjection.js` | Optimistic user entries, live assistant blocks, live tools, compaction activity, and live-to-persisted reconciliation |
 | `useRuntimeEvents.js` | EventSource lifecycle, connection state, and the local event log |
 | `useMemoryInspector.js` | Visible Memory data, loading, optimistic mutations, dirty-state guards, and drawer state |
@@ -27,15 +28,17 @@
 
 `TranscriptEntry.vue` renders persisted entries and emits transcript actions. `LiveAssistantMessage.vue` renders live assistant output.
 
+`useTranscriptPreferences.js` loads app-wide display settings. `App.vue` gives the thought display default to both transcript components.
+
 ## Backend selection
 
 `useBackendConnections.js` reads connection records from the native backend.
 It stores the active ID in window `sessionStorage` and configures
 `src/lib/backend.js` before workspace requests begin.
 
-A backend switch verifies `GET /api/pi/info` and reloads the window. `App.vue`
-then opens SSE and loads sessions from the selected backend. Retry uses the same
-connection flow.
+A backend switch verifies `GET /api/pi/info` and reloads the window. `App.vue` then opens SSE and loads sessions from the selected backend.
+
+Retry uses the same connection flow. Transcript preferences always use the native backend, not the selected runtime backend.
 
 ## Session selection
 

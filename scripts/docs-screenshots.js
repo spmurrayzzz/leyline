@@ -2,6 +2,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { chromium } from 'playwright'
+import { THINKING_DEFAULT_SETTING_KEY } from '../lib/leyline-settings.js'
 import { renderSessionExportHtml } from '../server/pi-api/export-renderer.js'
 
 const baseUrl = process.env.DOCS_SCREENSHOT_URL || 'http://localhost:5173/'
@@ -615,6 +616,26 @@ async function capture({
     unexpected.push(`request: ${method} /api/leyline/connections`)
     return request.abort()
   })
+  await page.route(
+    `**/api/leyline/settings/${THINKING_DEFAULT_SETTING_KEY}`,
+    async (request) => {
+      const method = request.request().method()
+      if (method === 'GET') {
+        return request.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            key: THINKING_DEFAULT_SETTING_KEY,
+            value: 'collapsed',
+          }),
+        })
+      }
+      unexpected.push(
+        `request: ${method} /api/leyline/settings/${THINKING_DEFAULT_SETTING_KEY}`,
+      )
+      return request.abort()
+    },
+  )
   await page.route('**/api/pi/**', async (request) => {
     const req = request.request()
     const url = new URL(req.url())

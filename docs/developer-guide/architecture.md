@@ -6,14 +6,13 @@ Leyline has one Vue frontend and two server startup paths. Both paths use the sa
 
 `npm run dev` starts Vite at `http://localhost:5173/`. `vite.config.js` loads the Vue plugin, the VitePress middleware, and `piApi()`.
 
-The `piApi()` plugin mounts runtime routes at `/api/pi` and connection routes
-at `/api/leyline`. It also attaches the terminal WebSocket server to the Vite
-HTTP server.
+The `piApi()` plugin mounts runtime routes at `/api/pi`. It mounts native app routes at `/api/leyline`.
+
+The plugin also attaches the terminal WebSocket server to the Vite HTTP server.
 
 The browser loads the Vue app from Vite. The native backend uses the same
 origin. A window can select another saved backend for runtime HTTP commands,
-server-sent events (SSE), terminal WebSocket traffic, and exports. Connection
-management stays on the native backend.
+server-sent events (SSE), terminal WebSocket traffic, and exports. Connection management and app settings stay on the native backend.
 
 ## Electron development flow
 
@@ -48,14 +47,15 @@ modules own DTOs, events, storage, export, filesystem access, and the terminal.
 `src/lib/pi-api.js` is the frontend HTTP client. `useRuntimeEvents.js` owns the
 SSE connection, and `useTerminal.js` owns the terminal WebSocket.
 
-## Backend connections and transport routing
+## Backend connections, app settings, and transport routing
 
-`server/backend-connections.js` stores named connections and the default. Its
-routes use `/api/leyline/connections` on the native backend.
+`server/backend-connections.js` stores named connections, the default connection, and app settings. Its routes use `/api/leyline` on the native backend.
 
-`src/composables/useBackendConnections.js` loads the registry and keeps the
-active connection ID in window `sessionStorage`. Saved definitions and the
-default are app-wide. The active connection is window-specific.
+`src/composables/useBackendConnections.js` loads the registry and keeps the active connection ID in window `sessionStorage`.
+
+Saved definitions and the default are app-wide. The active connection is window-specific.
+
+`src/composables/useTranscriptPreferences.js` loads the thought display default from the native backend. All windows use this app-wide setting.
 
 `src/lib/backend.js` supplies the base URL for runtime HTTP, SSE, terminal
 WebSocket, and export requests. The native backend uses the current app origin. Saved
@@ -66,10 +66,9 @@ fresh window uses the configured default. `GET /api/pi/info` verifies the
 backend name and API version before Leyline switches to it. The response also
 reports transport capabilities.
 
-`server/pi-api/cors.js` applies one origin policy to pi HTTP routes, the
-connection registry, and terminal WebSocket upgrades. Same-origin and loopback
-clients work by default. Other frontend origins must be listed in
-`LEYLINE_SERVER_ALLOWED_ORIGINS`.
+`server/pi-api/cors.js` applies one origin policy to pi HTTP routes, native app routes, and terminal WebSocket upgrades.
+
+Same-origin and loopback clients work by default. Other frontend origins must be listed in `LEYLINE_SERVER_ALLOWED_ORIGINS`.
 
 ## Runtime handles and active selection
 
@@ -138,10 +137,9 @@ The database currently contains these application tables:
 - `rollout_feedback`
 - `subagent_overrides`
 
-`backend_connections` stores named backend URLs. `leyline_settings` stores the
-default connection ID. Memory and subagent scopes use canonical project roots
-and hashed scope IDs. Rollout feedback uses the cwd, session path, session ID,
-and entry ID.
+`backend_connections` stores named backend URLs. `leyline_settings` stores the default connection ID and UI settings.
+
+Memory and subagent scopes use canonical project roots and hashed scope IDs. Rollout feedback uses the cwd, session path, session ID, and entry ID.
 
 These modules honor `LEYLINE_MEMORY_DIR`. When set, they use `memory.sqlite` in
 that directory.

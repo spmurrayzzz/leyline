@@ -4,9 +4,19 @@ The transcript separates assistant text, reasoning, tools, skills, subagents, an
 
 ## Expand a thought
 
-Saved reasoning appears in a collapsed **Thought** row. Select the row to expand or collapse it.
+Saved reasoning appears in a **Thought** row. During a live response, the row uses **Thinking**.
 
-During a live response, the row uses **Thinking** and starts expanded. Saved assistant text appears as rendered Markdown. Raw HTML is disabled.
+The setting in **Settings** controls how each new row starts. If no setting is saved, Leyline uses **Collapsed**.
+
+To change the default state:
+
+1. Open **Settings**.
+2. Find **Display**.
+3. For **Thoughts**, select **Collapsed** or **Expanded**.
+
+The setting does not change a row that is already in the transcript. Select a row to expand or collapse it.
+
+Saved assistant text appears as rendered Markdown. Raw HTML is disabled.
 
 ## Expand a tool row
 

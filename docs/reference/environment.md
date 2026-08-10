@@ -14,7 +14,7 @@ variables come from the user's pi setup.
 | `LEYLINE_SERVER_ALLOWED_ORIGINS` | Comma-separated frontend origins that can use the backend. Same-origin and loopback clients work without this variable. Use `*` to allow all origins. |
 | `PI_CODING_AGENT_SESSION_DIR` | Session directory for discovery and new sessions. Leyline expands `~` and searches subdirectories for JSONL files. |
 | `PI_ENABLE_CREATE_GOAL` | Set to `1` to expose the goal extension's `create_goal` model tool. |
-| `LEYLINE_MEMORY_DIR` | Directory for the shared `memory.sqlite` database. Backend connections, the configured default, memory, rollout feedback, and subagent overrides use this path. |
+| `LEYLINE_MEMORY_DIR` | Directory for the shared `memory.sqlite` database. Backend connections, UI settings, memory, rollout feedback, and subagent overrides use this path. |
 | `SHELL` | Login shell used by Electron environment loading and the terminal backend. Electron defaults to `/bin/zsh`; the terminal has additional shell fallbacks. |
 
 Without `PI_CODING_AGENT_SESSION_DIR`, Leyline uses the session directory from
@@ -26,15 +26,17 @@ Use an absolute path for `LEYLINE_MEMORY_DIR`. Without this variable, Leyline us
 ~/.local/share/leyline/memory.sqlite
 ```
 
-The database can contain the `backend_connections`, `leyline_settings`,
-`memories`, `rollout_feedback`, and `subagent_overrides` tables.
+The database can contain the `backend_connections`, `leyline_settings`, `memories`, `rollout_feedback`, and `subagent_overrides` tables.
+
+The `leyline_settings` table contains the default backend ID and UI settings.
 
 Set `LEYLINE_SERVER_ALLOWED_ORIGINS` on a backend when a browser UI connects
 from a different non-loopback origin. Separate origins with commas. Each value
 must include its scheme and host. Add a port when the origin uses one.
 
-Changing `LEYLINE_MEMORY_DIR` selects a different connection registry and
-default connection. It also selects different memory and rollout metadata.
+Changing `LEYLINE_MEMORY_DIR` selects a different connection registry, default connection, and set of UI settings.
+
+It also selects different memory and rollout metadata.
 
 The backend API does not have authentication. Do not bind the packaged server
 to an untrusted network. The origin policy restricts browsers, but it does not

@@ -1,16 +1,16 @@
 # Backend API design
 
-Leyline exposes runtime routes under `/api/pi`. The same handler runs in Vite
-and in the packaged Electron server. The native backend also exposes the app
-connection registry under `/api/leyline`.
+Leyline exposes runtime routes under `/api/pi`. The same handler runs in Vite and in the packaged Electron server.
+
+The native backend also exposes the app connection registry and app settings under `/api/leyline`.
 
 ## Request flow
 
 During browser development, `server/pi-api/index.js` mounts `piApiHandler` as Vite middleware. Vite removes the `/api/pi` prefix before routing.
 
-In a packaged app, `server/leyline-server.js` removes the same prefix. It sends
-the remaining path to `piApiHandler`. Vite and the packaged server also route
-`/api/leyline/connections` to `server/backend-connections.js`.
+In a packaged app, `server/leyline-server.js` removes the same prefix. It sends the remaining path to `piApiHandler`.
+
+Vite and the packaged server route `/api/leyline/*` to `server/backend-connections.js`.
 
 `server/pi-api/router.js` parses JSON request bodies and dispatches operations.
 Successful JSON responses use explicit envelopes such as `{ sessions }`,
@@ -24,7 +24,8 @@ The terminal does not use the HTTP router. It uses a WebSocket upgrade at `/api/
 
 | Module | Ownership |
 | --- | --- |
-| `server/backend-connections.js` | Named connection and default storage on the native backend |
+| `server/backend-connections.js` | Named connections, the default connection, and app settings on the native backend |
+| `lib/leyline-settings.js` | Setting keys that the native backend and browser share |
 | `server/pi-api/index.js` | Shared runtime instance, Vite integration, and WebSocket setup |
 | `server/pi-api/router.js` | HTTP method and path dispatch |
 | `server/pi-api/cors.js` | Shared HTTP and WebSocket origin policy |
@@ -99,8 +100,7 @@ Reset to here is the explicit exception. It replaces the manager entries with th
 `backend-connections.js`, `memories.js`, `rollout-feedback.js`, and
 `subagents.js` share `~/.local/share/leyline/memory.sqlite`.
 
-Backend connection definitions and the default are app-wide. A window stores
-its active connection ID in `sessionStorage`.
+Backend connection definitions, the default connection, and UI settings are app-wide. A window stores its active connection ID in `sessionStorage`.
 
 Memory operations enforce global, project, and session visibility. The Memory Inspector can create, update, archive, restore, and permanently delete visible rows.
 
@@ -126,6 +126,6 @@ The browser does not reconstruct goal state from transcript text. It uses the pr
 SSE, terminal WebSocket, and export requests. `src/lib/pi-api.js` owns runtime fetch
 calls and request field names.
 
-`src/lib/leyline-api.js` manages the native connection registry and checks
-`GET /api/pi/info` before a switch. UI components and composables use these
-clients instead of constructing transport URLs directly.
+`src/lib/leyline-api.js` manages the native connection registry and app settings. It also checks `GET /api/pi/info` before a switch.
+
+`useTranscriptPreferences.js` reads and writes the thought display default. UI components and composables do not construct transport URLs directly.

@@ -7,6 +7,7 @@
 - `src/components/`: Contains focused Vue surfaces for sessions, composers, transcript entries, drawers, pickers, and previews.
 - `src/composables/useSessionWorkspace.js`: Owns session, route, activation, and runtime-control state.
 - `src/composables/useBackendConnections.js`: Owns connection records, the default, and window-specific backend selection.
+- `src/composables/useTranscriptPreferences.js`: Owns app-wide transcript display settings.
 - `src/composables/useLiveTurnProjection.js`: Owns optimistic and live transcript state.
 - `src/composables/useRuntimeEvents.js`: Adapts SSE to frontend callbacks and the event log.
 - `src/composables/useMemoryInspector.js`: Owns Memory Inspector requests and optimistic state.
@@ -17,7 +18,7 @@
 - `src/composables/useDictation.js`: Wraps browser speech recognition.
 - `src/composables/useSmoothStreamingText.js`: Controls incremental live text display.
 - `src/lib/backend.js`: Builds runtime HTTP and WebSocket URLs for the active backend.
-- `src/lib/leyline-api.js`: Manages the native connection registry and backend identity checks.
+- `src/lib/leyline-api.js`: Manages the native connection registry, app settings, and backend identity checks.
 - `src/lib/pi-api.js`: Contains frontend runtime API functions.
 - `src/lib/transcript.js`: Configures Markdown and syntax highlighting, then re-exports shared projection helpers.
 - `src/lib/format.js`: Contains UI labels and value formatting.
@@ -25,9 +26,10 @@
 
 ## Shared library
 
+- `lib/leyline-settings.js`: Defines app setting keys for the native backend and browser.
 - `lib/transcript-projection.js`: Projects pi branch entries into shared transcript DTOs.
 
-This file is outside `src/` because Node.js backend code and browser code both import it.
+These files are outside `src/` because Node.js backend code and browser code import them.
 
 ## Styles
 
@@ -48,7 +50,7 @@ This file is outside `src/` because Node.js backend code and browser code both i
 
 ## Backend
 
-- `server/backend-connections.js`: Stores named backend connections and the default.
+- `server/backend-connections.js`: Stores named backend connections, the default, and native app settings.
 - `server/pi-api/index.js`: Creates the shared runtime and exports server adapters.
 - `server/pi-api/router.js`: Routes runtime HTTP requests.
 - `server/pi-api/cors.js`: Applies the shared HTTP and WebSocket origin policy.

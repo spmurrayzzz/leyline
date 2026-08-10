@@ -1,9 +1,8 @@
 # Settings
 
-The **Settings** drawer manages backend connections. It also shows runtime,
-agent, and session information.
+The **Settings** drawer manages backend connections, transcript display, and subagent defaults. It also shows runtime and session information.
 
-![Settings drawer with the native backend and a saved backend connection](/screenshots/backend-connections.png)
+![Settings drawer with backend connections and thought display options](/screenshots/backend-connections.png)
 
 ## Open Settings
 
@@ -62,6 +61,15 @@ The **Runtime** section shows:
 - **Events**: **Connected**, **Connecting**, or **Error**.
 
 These values are read-only in **Settings**. Change the model and thinking level in the composer.
+
+## Set the thought display default
+
+1. Find **Display**.
+2. For **Thoughts**, select **Collapsed** or **Expanded**.
+
+The setting controls the initial state of each new **Thought** or **Thinking** row. If no setting is saved, Leyline uses **Collapsed**.
+
+The setting does not change a row that is already in the transcript. The **Thinking** value in **Runtime** shows the model thinking level.
 
 ## Manage subagent models
 

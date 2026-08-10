@@ -1,8 +1,8 @@
 # API reference
 
-Leyline serves the runtime API under `/api/pi`. The native backend also serves
-the connection registry under `/api/leyline`. These APIs have no authentication
-or cross-user access control.
+Leyline serves the runtime API under `/api/pi`. The native backend also serves the connection registry and app settings under `/api/leyline`.
+
+These APIs have no authentication or cross-user access control.
 
 Successful runtime requests usually return `200`. A connection create request
 returns `201`. An accepted preflight request returns `204`.
@@ -19,9 +19,9 @@ Most errors have this envelope:
 
 Status behavior is:
 
-- `400` is used for connection-registry validation and a missing `path` on `GET /sessions/by-path`.
+- `400` is used for connection or setting validation and a missing `path` on `GET /sessions/by-path`.
 - `403` rejects a browser origin that the server does not allow.
-- `404` is used for an unknown runtime or connection-registry route, or a missing session.
+- `404` is used for an unknown runtime, native app route, setting key, or session.
 - `405` is used when a known route receives an unsupported method.
 - `500` is used for thrown runtime errors. This includes malformed JSON, SDK errors, missing memories, and some missing sessions.
 
@@ -225,6 +225,38 @@ Request:
 Response: `BackendRegistry`.
 
 The ID can identify a saved connection or the native `builtin` connection.
+
+## App settings
+
+App settings are part of the native backend. A selected remote backend does not store these settings.
+
+The server currently accepts only the `ui.thinking_default` setting key.
+
+### `GET /api/leyline/settings/ui.thinking_default`
+
+Response:
+
+```text
+{ key: "ui.thinking_default", value: "" | "collapsed" | "expanded" }
+```
+
+An empty value means that no value is stored. The frontend uses `collapsed` for an empty value.
+
+### `PUT /api/leyline/settings/ui.thinking_default`
+
+Request:
+
+```text
+{ value: "collapsed" | "expanded" }
+```
+
+Response:
+
+```text
+{ key: "ui.thinking_default", value: "collapsed" | "expanded" }
+```
+
+The route rejects other values with `400`. An unknown setting key returns `404`.
 
 ## Session routes
 
