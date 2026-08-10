@@ -10,6 +10,7 @@ import {
   renderedMessage,
   renderedToolJson,
   skillSummaries,
+  toolCommandCode,
 } from '../lib/transcript'
 
 const props = defineProps({
@@ -269,7 +270,7 @@ function navigateChildSession(childSession) {
     <div class="tool-card-header">
       <span class="chevron">›</span>
       <span>{{ entry.label }}</span>
-      <code v-if="entry.code">{{ entry.code }}</code>
+      <code v-if="entry.code" :title="entry.code">{{ entry.code }}</code>
       <span
         v-if="entry.contextLabel"
         class="tool-context-pill"
@@ -318,6 +319,10 @@ function navigateChildSession(childSession) {
     <div class="tool-expand-wrapper" :class="{ 'is-expanded': toolExpanded }">
       <div class="tool-expand-inner">
         <div class="tool-expanded-body" @click.stop>
+          <div v-if="toolCommandCode(entry)" class="tool-command-block">
+            <strong>Command</strong>
+            <pre>{{ entry.code }}</pre>
+          </div>
           <div
             v-if="entry.isError && entry.preview && entry.text"
             class="tool-error-summary"

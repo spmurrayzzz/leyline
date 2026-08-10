@@ -536,6 +536,17 @@ function renderPierre(container, preview) {
 }
 
 function renderPlainTool(container, entry) {
+  if (entry.code && (entry.toolName === 'bash' || entry.toolName === 'search_memory')) {
+    const commandWrap = document.createElement('div')
+    commandWrap.className = 'tool-command-block'
+    const label = document.createElement('strong')
+    label.textContent = 'Command'
+    const pre = document.createElement('pre')
+    pre.textContent = entry.code
+    commandWrap.appendChild(label)
+    commandWrap.appendChild(pre)
+    container.appendChild(commandWrap)
+  }
   const text = toolPreviewText(entry)
   const pre = document.createElement('pre')
   pre.className = 'tool-output'
@@ -925,6 +936,7 @@ button, input, textarea { color: inherit; font: inherit; }
 .tool-card-header code {
   overflow: hidden;
   min-width: 0;
+  max-width: 100%;
   border: 1px solid var(--border-soft);
   border-radius: 7px;
   background: #17181e;
@@ -932,6 +944,31 @@ button, input, textarea { color: inherit; font: inherit; }
   color: #aaa;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.tool-command-block {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 9px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: rgb(255 255 255 / 2%);
+  padding: 9px 10px;
+}
+.tool-command-block strong {
+  color: #9b9ba4;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.tool-command-block pre {
+  overflow: auto;
+  max-height: 220px;
+  margin: 0;
+  color: #c6c7cc;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
 }
 .tool-context-pill {
   border: 1px solid rgb(130 214 154 / 24%);

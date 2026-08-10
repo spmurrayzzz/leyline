@@ -292,6 +292,34 @@
   white-space: pre-wrap;
 }
 
+.tool-command-block {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 9px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: rgb(255 255 255 / 2%);
+  padding: 9px 10px;
+}
+
+.tool-command-block strong {
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tool-command-block pre {
+  overflow: auto;
+  max-height: 220px;
+  margin: 0;
+  color: #c6c7cc;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
 .tool-preview-clip {
   position: relative;
   overflow: hidden;
@@ -514,6 +542,9 @@
 }
 
 .tool-card-header code {
+  overflow: hidden;
+  min-width: 0;
+  max-width: 100%;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--panel-soft);
@@ -521,6 +552,8 @@
   color: #bfc0c5;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .success-card {

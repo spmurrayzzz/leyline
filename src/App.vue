@@ -48,6 +48,7 @@ import {
   messageBlocksFor,
   renderedToolJson,
   textFromBlocks,
+  toolCommandCode,
 } from './lib/transcript'
 
 const sidebarOpen = ref(false)
@@ -2533,13 +2534,13 @@ function closePickerMenus() {
                   </svg>
                 </span>
                 <span class="subagent-label">Subagent</span>
-                <code v-if="liveSubagentTarget(item)">{{ liveSubagentTarget(item) }}</code>
+                <code v-if="liveSubagentTarget(item)" :title="liveSubagentTarget(item)">{{ liveSubagentTarget(item) }}</code>
                 <em>{{ liveToolStatus(item) }}</em>
               </div>
               <div v-else class="tool-card-header">
                 <span class="live-tool-spinner"></span>
                 <span>{{ item.label }}</span>
-                <code v-if="item.code">{{ item.code }}</code>
+                <code v-if="item.code" :title="item.code">{{ item.code }}</code>
                 <em>{{ liveToolStatus(item) }}</em>
               </div>
             </article>
@@ -3092,7 +3093,7 @@ function closePickerMenus() {
           <header class="tool-fullscreen-header">
             <div>
               <span>{{ fullscreenTool.label }}</span>
-              <code v-if="fullscreenTool.code">{{ fullscreenTool.code }}</code>
+              <code v-if="fullscreenTool.code" :title="fullscreenTool.code">{{ fullscreenTool.code }}</code>
             </div>
             <div>
               <button
@@ -3107,6 +3108,10 @@ function closePickerMenus() {
             </div>
           </header>
           <div class="tool-fullscreen-body">
+            <div v-if="toolCommandCode(fullscreenTool)" class="tool-command-block">
+              <strong>Command</strong>
+              <pre>{{ fullscreenTool.code }}</pre>
+            </div>
             <div
               v-if="
                 fullscreenTool.isError &&

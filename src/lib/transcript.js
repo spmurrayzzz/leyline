@@ -34,6 +34,12 @@ export function renderedBlock(block) {
   return markdown.render(block.text || '')
 }
 
+export function toolCommandCode(entry) {
+  if (!entry?.code) return ''
+  if (entry.toolName === 'bash' || entry.toolName === 'search_memory') return entry.code
+  return ''
+}
+
 export function renderedToolJson(entry) {
   const text = entry.text || ''
   const trimmed = text.trim()
