@@ -348,6 +348,69 @@
   text-align: left;
 }
 
+.settings-choice-group {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--panel);
+  padding: 10px;
+}
+
+.settings-choice-group > span {
+  display: grid;
+  gap: 3px;
+}
+
+.settings-choice-group strong {
+  color: #d9dbe4;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.settings-choice-group small {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.settings-choice-options {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 3px;
+  border: 1px solid var(--border-soft);
+  border-radius: 9px;
+  background: #0c0d11;
+  padding: 3px;
+}
+
+.settings-choice-options button {
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  padding: 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.settings-choice-options button.active {
+  background: var(--panel-soft);
+  color: var(--text);
+}
+
+.settings-choice-options button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.settings-choice-error {
+  margin: -2px 2px 0;
+  color: #d99a9a;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+
 .settings-action-row:hover:not(:disabled) {
   border-color: #4b4d58;
   color: var(--text);

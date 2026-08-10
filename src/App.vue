@@ -18,6 +18,7 @@ import { useRuntimeEvents } from './composables/useRuntimeEvents'
 import { useSessionWorkspace } from './composables/useSessionWorkspace'
 import { useTerminal } from './composables/useTerminal'
 import { useToolExpansion } from './composables/useToolExpansion'
+import { useTranscriptPreferences } from './composables/useTranscriptPreferences'
 import { useWorkbenchScroll } from './composables/useWorkbenchScroll'
 import { backendDisplayAddress, backendHttpUrl } from './lib/backend'
 import { fuzzyScore } from './lib/fuzzy'
@@ -345,6 +346,17 @@ const {
   copyTitle,
   copyGlyph,
 } = toolExpansion
+const transcriptPreferences = useTranscriptPreferences()
+const {
+  error: transcriptPreferencesError,
+  load: loadTranscriptPreferences,
+  saving: transcriptPreferencesSaving,
+  setThinkingDefault,
+  thinkingDefault,
+} = transcriptPreferences
+const thinkingInitiallyExpanded = computed(
+  () => thinkingDefault.value === 'expanded',
+)
 const {
   memoryOpen,
   memoryDirty,
@@ -681,6 +693,7 @@ onMounted(async () => {
   window.addEventListener('leyline:toggle-sidebar', handleNativeToggleSidebar)
   window.addEventListener('leyline:escape', handleNativeEscape)
   await initializeBackendConnections()
+  await loadTranscriptPreferences()
   updateNativeWindowCwd()
   pendingInitialNativeCwd.value = consumeInitialNativeNewSessionCwd()
   await loadBackendWorkspace()
@@ -2444,6 +2457,7 @@ function closePickerMenus() {
             :copied-entry-id="copiedEntryId"
             :entry="entry"
             :skill-expanded="isSkillExpanded(entry)"
+            :thinking-initially-expanded="thinkingInitiallyExpanded"
             :tool-expanded="isToolExpanded(entry)"
             @copy="copyEntry"
             @edit="startEditingEntry"
@@ -2476,6 +2490,7 @@ function closePickerMenus() {
               :copied-entry-id="copiedEntryId"
               :entry="item.persistedEntry || item"
               :skill-expanded="isSkillExpanded(item.persistedEntry || item)"
+              :thinking-initially-expanded="thinkingInitiallyExpanded"
               @copy="copyEntry"
               @edit="startEditingEntry"
               @fork="forkSession"
@@ -2536,6 +2551,7 @@ function closePickerMenus() {
               :message-id="item.id"
               :persisted-entry="item.persistedEntry"
               :streaming="item.streaming"
+              :thinking-initially-expanded="thinkingInitiallyExpanded"
               @copy="copyTranscriptItem(item.id, liveAssistantDisplayCopyText(item))"
               @fork="forkSession"
               @reset="resetSessionToEntry"
@@ -2919,6 +2935,33 @@ function closePickerMenus() {
                 <dd>{{ eventStreamLabel }}</dd>
               </div>
             </dl>
+          </section>
+
+          <section class="settings-group">
+            <h2>Display</h2>
+            <div class="settings-choice-group">
+              <span>
+                <strong>Thoughts</strong>
+                <small>How thought rows start in live and saved transcripts</small>
+              </span>
+              <div class="settings-choice-options">
+                <button
+                  type="button"
+                  :class="{ active: thinkingDefault === 'collapsed' }"
+                  :disabled="transcriptPreferencesSaving"
+                  @click="setThinkingDefault('collapsed')"
+                >Collapsed</button>
+                <button
+                  type="button"
+                  :class="{ active: thinkingDefault === 'expanded' }"
+                  :disabled="transcriptPreferencesSaving"
+                  @click="setThinkingDefault('expanded')"
+                >Expanded</button>
+              </div>
+              <p v-if="transcriptPreferencesError" class="settings-choice-error">
+                {{ transcriptPreferencesError }}
+              </p>
+            </div>
           </section>
 
           <section class="settings-group">

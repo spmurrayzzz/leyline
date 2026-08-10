@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
 import SmoothMarkdownBlock from './SmoothMarkdownBlock.vue'
 
 const props = defineProps({
@@ -23,18 +23,12 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  thinkingInitiallyExpanded: Boolean,
 })
 
 const emit = defineEmits(['copy', 'fork', 'reset'])
 
-const thinkingExpanded = ref(true)
-
-watch(
-  () => props.streaming,
-  (streaming) => {
-    thinkingExpanded.value = true
-  },
-)
+const thinkingExpanded = ref(props.thinkingInitiallyExpanded)
 
 function copyTitle(id) {
   return props.copiedEntryId === id ? 'Copied' : 'Copy'

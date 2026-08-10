@@ -3,10 +3,12 @@ import { mkdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
+import { THINKING_DEFAULT_SETTING_KEY } from '../lib/leyline-settings.js'
 import { setCorsHeaders } from './pi-api/cors.js'
 import { json, readJson } from './pi-api/http.js'
 
 const BUILTIN_CONNECTION_ID = 'builtin'
+const THINKING_DEFAULT_VALUES = new Set(['collapsed', 'expanded'])
 
 export async function backendConnectionsHandler(req, res) {
   if (!setCorsHeaders(req, res)) {
@@ -49,6 +51,32 @@ export async function backendConnectionsHandler(req, res) {
       }
       if (req.method === 'DELETE') return json(res, deleteConnection(id))
       return json(res, { error: 'Method not allowed' }, 405)
+    }
+
+    const settingsMatch = url.pathname.match(/^\/settings\/([^/]+)$/)
+    if (settingsMatch) {
+      const key = decodeURIComponent(settingsMatch[1])
+      if (key !== THINKING_DEFAULT_SETTING_KEY) {
+        return json(res, { error: 'Unknown setting' }, 404)
+      }
+      const db = openDb()
+      try {
+        if (req.method === 'GET') {
+          return json(res, { key, value: settingValue(db, key) })
+        }
+        if (req.method !== 'PUT') {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+        const body = await readJson(req)
+        const value = String(body?.value ?? '')
+        if (!THINKING_DEFAULT_VALUES.has(value)) {
+          return json(res, { error: 'Value must be "collapsed" or "expanded"' }, 400)
+        }
+        setSetting(db, key, value)
+        return json(res, { key, value })
+      } finally {
+        db.close()
+      }
     }
 
     return json(res, { error: 'Not found' }, 404)

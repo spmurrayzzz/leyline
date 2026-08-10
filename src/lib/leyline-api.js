@@ -41,6 +41,24 @@ export function setDefaultBackendConnection(id) {
   )
 }
 
+export function getLeylineSetting(key) {
+  return shellRequest(
+    `/api/leyline/settings/${encodeURIComponent(key)}`,
+    'Failed to load the setting',
+  )
+}
+
+export function setLeylineSetting(key, value) {
+  return shellRequest(
+    `/api/leyline/settings/${encodeURIComponent(key)}`,
+    'Failed to save the setting',
+    {
+      method: 'PUT',
+      body: { value },
+    },
+  )
+}
+
 export async function fetchBackendInfo(connection) {
   const controller = new AbortController()
   const timeout = window.setTimeout(() => controller.abort(), 6000)

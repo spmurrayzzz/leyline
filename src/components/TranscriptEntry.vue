@@ -22,6 +22,7 @@ const props = defineProps({
     required: true,
   },
   skillExpanded: Boolean,
+  thinkingInitiallyExpanded: Boolean,
   toolExpanded: Boolean,
 })
 
@@ -40,7 +41,7 @@ const emit = defineEmits([
 
 const feedbackDraft = ref('')
 const noteOpen = ref(false)
-const thinkingExpanded = ref(false)
+const thinkingExpanded = ref(props.thinkingInitiallyExpanded)
 const helpfulThumbPaths = [
   'M7 10v11',
   'M15 5.2 14 10h5.2a2 2 0 0 1 2 2.4l-1.4 6.8'
