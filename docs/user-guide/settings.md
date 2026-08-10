@@ -2,7 +2,7 @@
 
 The **Settings** drawer manages backend connections, transcript display, and subagent defaults. It also shows runtime and session information.
 
-![Settings drawer with backend connections and thought display options](/screenshots/backend-connections.png)
+![Settings drawer with backend connections and thought display options](../assets/screenshots/backend-connections.png)
 
 ## Open Settings
 

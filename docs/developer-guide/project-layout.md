@@ -91,7 +91,7 @@ These files are outside `src/` because Node.js backend code and browser code imp
 - `scripts/video-mp4.js`: Converts the walkthrough with ffmpeg.
 - `screenshots/`: Stores ignored local captures.
 - `docs/`: Contains the VitePress documentation site.
-- `docs/public/screenshots/`: Contains tracked VitePress product images.
+- `docs/assets/screenshots/`: Contains tracked product images for VitePress and GitHub.
 - `assets/`: Contains README and application image sources.
 - `public/`: Contains static files copied into the frontend build.
 

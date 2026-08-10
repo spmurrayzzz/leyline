@@ -2,7 +2,7 @@
 
 The terminal is a bottom drawer for the selected session CWD.
 
-![Leyline terminal drawer connected to the selected project directory](/screenshots/terminal.png)
+![Leyline terminal drawer connected to the selected project directory](../assets/screenshots/terminal.png)
 
 *The terminal shares the workbench without replacing the transcript or composer.*
 

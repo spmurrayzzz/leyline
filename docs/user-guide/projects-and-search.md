@@ -19,7 +19,7 @@ Select **Show all N sessions** to show all sessions. Select **Show fewer** to re
 
 ## Open Project details
 
-![Project Details drawer with filtered session cards and sidebar context](/screenshots/project-details.png)
+![Project Details drawer with filtered session cards and sidebar context](../assets/screenshots/project-details.png)
 
 *Project Details provides focused session management for one project.*
 

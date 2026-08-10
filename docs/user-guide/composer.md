@@ -19,7 +19,7 @@ Steering changes the active run at its next accepted input point. The queued-mes
 
 ## Queue a follow-up message
 
-![Active composer with one steering message and one follow-up message in the queue](/screenshots/composer-queue.png)
+![Active composer with one steering message and one follow-up message in the queue](../assets/screenshots/composer-queue.png)
 
 *The queue keeps steering and follow-up messages distinct during an active run.*
 
@@ -37,7 +37,7 @@ Pressing **Escape** also sends a stop request. It also closes open menus and dra
 
 ## Run shell commands
 
-![Composer in hidden shell mode with shell tool context labels in the transcript](/screenshots/composer-shell.png)
+![Composer in hidden shell mode with shell tool context labels in the transcript](../assets/screenshots/composer-shell.png)
 
 *Shell labels show whether command output enters the session context.*
 

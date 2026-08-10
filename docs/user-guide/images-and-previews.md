@@ -33,7 +33,7 @@ An inline file preview shows up to 400 lines. It reports the number of clipped l
 
 ## Open a fullscreen preview
 
-![Fullscreen diff preview for an edited source file](/screenshots/preview-fullscreen.png)
+![Fullscreen diff preview for an edited source file](../assets/screenshots/preview-fullscreen.png)
 
 *Fullscreen mode uses the complete projected preview data.*
 

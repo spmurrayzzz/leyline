@@ -2,7 +2,7 @@
 
 The start screen appears when no session is selected. One submission can create a session and send its first prompt.
 
-![Leyline start screen with a selected project, model, thinking level, and tool count](/screenshots/home.png)
+![Leyline start screen with a selected project, model, thinking level, and tool count](../assets/screenshots/home.png)
 
 *The start screen stages project and runtime choices before session creation.*
 

@@ -6,7 +6,7 @@ import { THINKING_DEFAULT_SETTING_KEY } from '../lib/leyline-settings.js'
 import { renderSessionExportHtml } from '../server/pi-api/export-renderer.js'
 
 const baseUrl = process.env.DOCS_SCREENSHOT_URL || 'http://localhost:5173/'
-const docsOutputDir = path.resolve('docs/public/screenshots')
+const docsOutputDir = path.resolve('docs/assets/screenshots')
 const readmeOutputDir = path.resolve('assets/readme')
 const fixedNow = Date.parse('2026-08-06T16:00:00.000Z')
 const model = {

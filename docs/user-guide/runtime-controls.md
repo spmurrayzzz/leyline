@@ -2,7 +2,7 @@
 
 The composer shows controls for the model, thinking level, tools, and context usage.
 
-![Composer controls for the model, thinking level, dictation, tools, context usage, and terminal](/screenshots/composer-controls.png)
+![Composer controls for the model, thinking level, dictation, tools, context usage, and terminal](../assets/screenshots/composer-controls.png)
 
 *Runtime controls stay with the composer for the selected session.*
 

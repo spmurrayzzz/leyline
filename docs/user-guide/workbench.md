@@ -2,7 +2,7 @@
 
 The workbench shows the selected session, live output, composer, drawers, and terminal.
 
-![Leyline workbench with user messages, assistant output, thoughts, tools, and composer controls](/screenshots/workbench.png)
+![Leyline workbench with user messages, assistant output, thoughts, tools, and composer controls](../assets/screenshots/workbench.png)
 
 *The selected session stays readable while live runtime controls remain available.*
 

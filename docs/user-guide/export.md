@@ -2,7 +2,7 @@
 
 Use **Export transcript** to download the selected session as an HTML file.
 
-![Exported Leyline transcript with session metadata and rendered messages](/screenshots/export.png)
+![Exported Leyline transcript with session metadata and rendered messages](../assets/screenshots/export.png)
 
 *The export places session metadata above a standalone transcript view.*
 

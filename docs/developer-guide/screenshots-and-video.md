@@ -38,7 +38,7 @@ The registry contains the native backend and a fictional saved connection. The t
 
 The visible native address is `localhost:5173`, even when the capture uses another server URL. The command does not change local data or model configuration.
 
-The command writes product images to `docs/public/screenshots/`. It also refreshes the two README images in `assets/readme/`.
+The command writes product images to `docs/assets/screenshots/`. It also refreshes the two README images in `assets/readme/`.
 
 Set a different app URL with:
 

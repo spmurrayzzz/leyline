@@ -2,7 +2,7 @@
 
 Transcript actions change the active branch or create a new session. Use **Fork from here** when you must keep both paths.
 
-![User message actions for editing, retrying, forking, resetting, and copying](/screenshots/transcript-actions.png)
+![User message actions for editing, retrying, forking, resetting, and copying](../assets/screenshots/transcript-actions.png)
 
 *A saved user-message header contains the history actions.*
 

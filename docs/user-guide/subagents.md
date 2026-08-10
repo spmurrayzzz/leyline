@@ -2,7 +2,7 @@
 
 Subagents run delegated tasks in child sessions with separate context.
 
-![Subagents drawer with transcript-scoped model overrides](/screenshots/subagents.png)
+![Subagents drawer with transcript-scoped model overrides](../assets/screenshots/subagents.png)
 
 *The drawer shows stored overrides and each agent's effective model.*
 

@@ -39,7 +39,7 @@ features:
 
 ## Leyline workspace
 
-![Leyline workbench showing a sanitized pi session](/screenshots/workbench.png)
+![Leyline workbench showing a sanitized pi session](./assets/screenshots/workbench.png)
 
 ## Browser first, Electron optional
 

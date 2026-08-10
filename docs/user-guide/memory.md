@@ -2,7 +2,7 @@
 
 The **Memory** drawer shows memories that are visible to the selected session.
 
-![Memory Inspector with project, session, and global memory scopes](/screenshots/memory-inspector.png)
+![Memory Inspector with project, session, and global memory scopes](../assets/screenshots/memory-inspector.png)
 
 *Visible Memory is grouped by the scope that controls where each record applies.*
 

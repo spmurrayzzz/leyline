@@ -2,7 +2,7 @@
 
 Leyline uses a mobile layout when the viewport is 760 pixels wide or less.
 
-![Leyline mobile session with the compact header, transcript, and composer](/screenshots/mobile-session.png)
+![Leyline mobile session with the compact header, transcript, and composer](../assets/screenshots/mobile-session.png)
 
 *The mobile workbench keeps the main session actions in one column.*
 
@@ -16,7 +16,7 @@ The **Memory**, **Events**, and **Export transcript** icons remain available. Th
 
 ## Open the mobile sidebar
 
-![Mobile session sidebar open above the workbench](/screenshots/mobile-sidebar.png)
+![Mobile session sidebar open above the workbench](../assets/screenshots/mobile-sidebar.png)
 
 *The session navigator opens above the mobile workbench.*
 

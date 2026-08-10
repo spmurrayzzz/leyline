@@ -2,7 +2,7 @@
 
 A goal lets the agent continue work across automatic turns. Runtime events show activity from the current Leyline page connection.
 
-![Active goal controls with the Runtime events drawer open](/screenshots/goal-events.png)
+![Active goal controls with the Runtime events drawer open](../assets/screenshots/goal-events.png)
 
 *Goal state and recent runtime events remain separate from transcript history.*
 
