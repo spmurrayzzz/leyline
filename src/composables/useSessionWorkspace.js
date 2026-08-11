@@ -6,6 +6,7 @@ import {
   createPiSession,
   deletePiSession,
   fetchPiRuntimeState,
+  fetchProjects,
   fetchSessionDetail,
   fetchSessions,
   forkPiSession,
@@ -24,8 +25,12 @@ export function useSessionWorkspace({
   markNewOutput,
 } = {}) {
   const sessions = ref([])
+  const projectSummaries = ref([])
   const sessionsError = ref('')
   const sessionsLoading = ref(true)
+  const sessionsHydrating = ref(false)
+  const sessionsHydrationError = ref('')
+  const sessionsHydrated = ref(false)
   const creatingSessionCwd = ref('')
   const newSessionCwd = ref('')
   const startRuntimeState = ref(null)
@@ -109,26 +114,71 @@ export function useSessionWorkspace({
     return { label: parts.join(' · ') }
   })
   let sessionSelectionToken = 0
+  let sessionListRequestToken = 0
   let sessionActivationQueue = Promise.resolve()
+  const startRuntimeRequests = new Map()
   let refreshTimer
   let sessionHandoffSettlingTimer
+
+  async function loadHomeProjects() {
+    sessionsLoading.value = true
+    sessionsError.value = ''
+    sessionError.value = ''
+    initPhase.value = 'events'
+
+    try {
+      projectSummaries.value = await fetchProjects()
+      const targetCwd = newSessionCwd.value || projectSummaries.value[0]?.cwd || ''
+      if (!newSessionCwd.value && targetCwd) newSessionCwd.value = targetCwd
+      if (targetCwd) await loadStartRuntimeState(targetCwd)
+      initPhase.value = 'workspace'
+      sessionsLoading.value = false
+      initPhase.value = 'sessions'
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  async function hydrateSessions() {
+    if (sessionsHydrating.value) return
+    sessionsHydrating.value = true
+    sessionsHydrationError.value = ''
+    try {
+      await loadSessions({ showLoading: false, background: true })
+    } finally {
+      sessionsHydrating.value = false
+    }
+  }
 
   async function loadSessions({
     routeSessionId = '',
     selectFirst = false,
     showLoading = true,
+    background = false,
   } = {}) {
+    const requestToken = ++sessionListRequestToken
+    const sessionsAtStart = background
+      ? new Map(sessions.value.map((session) => [session.id, session]))
+      : null
     if (showLoading) sessionsLoading.value = true
 
     initPhase.value = 'events'
-    sessionsError.value = ''
+    if (background) sessionsHydrationError.value = ''
+    else sessionsError.value = ''
+    let loaded = false
 
     try {
       const nextSessions = await fetchSessions()
-      sessions.value = nextSessions
+      if (requestToken !== sessionListRequestToken) return false
+      sessions.value = background
+        ? mergeHydratedSessions(nextSessions, sessionsAtStart)
+        : nextSessions
+      sessionsHydrated.value = true
+      reconcileProjectSummaries()
+      sessionsHydrationError.value = ''
       if (!newSessionCwd.value && sessions.value[0]?.cwd) {
         newSessionCwd.value = sessions.value[0].cwd
-        await loadStartRuntimeState(newSessionCwd.value)
       }
       const routedSession = routeSessionId
         ? sessions.value.find((session) => session.id === routeSessionId)
@@ -140,31 +190,80 @@ export function useSessionWorkspace({
       else if (selectFirst && sessions.value[0]) {
         await selectSession(sessions.value[0])
       }
+      loaded = true
     } catch (error) {
-      if (showLoading || sessions.value.length === 0) {
+      if (requestToken !== sessionListRequestToken) return false
+      if (background) sessionsHydrationError.value = error.message
+      else if (showLoading || sessions.value.length === 0) {
         sessionsError.value = error.message
       }
     } finally {
-      if (showLoading) {
+      if (showLoading && requestToken === sessionListRequestToken) {
         initPhase.value = 'workspace'
         sessionsLoading.value = false
         initPhase.value = 'sessions'
       }
     }
+    return loaded
+  }
+
+  function mergeHydratedSessions(nextSessions, sessionsAtStart) {
+    const currentById = new Map(
+      sessions.value.map((session) => [session.id, session]),
+    )
+    const nextIds = new Set(nextSessions.map((session) => session.id))
+    const addedSessions = sessions.value.filter((session) => {
+      return !sessionsAtStart.has(session.id) && !nextIds.has(session.id)
+    })
+    const mergedSessions = nextSessions.flatMap((session) => {
+      const previous = sessionsAtStart.get(session.id)
+      if (!previous) return [session]
+      const current = currentById.get(session.id)
+      if (!current) return []
+      return [current === previous ? session : current]
+    })
+    return [...addedSessions, ...mergedSessions]
+  }
+
+  function reconcileProjectSummaries() {
+    const currentProjects = new Set(sessions.value.flatMap((session) => {
+      if (session.isSubagentSession || !session.cwd) return []
+      return [session.cwd]
+    }))
+    projectSummaries.value = projectSummaries.value.filter((project) => {
+      return currentProjects.has(project.cwd)
+    })
   }
 
   async function loadStartRuntimeState(cwd) {
     const targetCwd = cwd?.trim()
     if (!targetCwd || selectedSession.value) return
+    const pending = startRuntimeRequests.get(targetCwd)
+    if (pending) return pending
 
+    const request = (async () => {
+      try {
+        const state = await fetchPiRuntimeState(targetCwd)
+        if (newSessionCwd.value !== targetCwd || selectedSession.value) return
+        startRuntimeState.value = state
+        startSelectedModel.value = null
+        startSelectedThinkingLevel.value = null
+        sessionError.value = ''
+      } catch (error) {
+        if (newSessionCwd.value === targetCwd
+          && !selectedSession.value
+          && !startRuntimeState.value) {
+          sessionError.value = error.message
+        }
+      }
+    })()
+    startRuntimeRequests.set(targetCwd, request)
     try {
-      const state = await fetchPiRuntimeState(targetCwd)
-      if (newSessionCwd.value !== targetCwd || selectedSession.value) return
-      startRuntimeState.value = state
-      startSelectedModel.value = null
-      startSelectedThinkingLevel.value = null
-    } catch (error) {
-      if (!startRuntimeState.value) sessionError.value = error.message
+      return await request
+    } finally {
+      if (startRuntimeRequests.get(targetCwd) === request) {
+        startRuntimeRequests.delete(targetCwd)
+      }
     }
   }
 
@@ -619,6 +718,7 @@ export function useSessionWorkspace({
       sessions.value = sessions.value.filter((item) => {
         return item.id !== session.id
       })
+      if (sessionsHydrated.value) reconcileProjectSummaries()
       deleteConfirmSession.value = null
       if (selectedSessionId.value === session.id) {
         const cwd = session.cwd || newSessionCwd.value
@@ -945,37 +1045,47 @@ export function useSessionWorkspace({
     const projects = new Map()
     const query = sessionQuery.value.trim().toLowerCase()
 
+    for (const summary of projectSummaries.value) {
+      const key = summary.cwd
+      if (!key || projects.has(key)) continue
+      const name = summary.name || projectName(key)
+      const score = query ? sidebarSearchScore(name, query) : 1
+      projects.set(key, {
+        cwd: key,
+        name,
+        projectScore: score,
+        score,
+        sessions: [],
+      })
+    }
+
     for (const session of sessions.value) {
       if (session.isSubagentSession) continue
 
       const key = session.cwd || 'unknown'
-      const name = projectName(key)
-      const projectScore = query ? sidebarSearchScore(name, query) : 1
-      const sessionScoreValue = query ? sessionScore(session, query) : 1
-
-      if (query && projectScore === 0 && sessionScoreValue === 0) continue
-
       if (!projects.has(key)) {
+        const name = projectName(key)
+        const score = query ? sidebarSearchScore(name, query) : 1
         projects.set(key, {
           cwd: key,
           name,
-          score: projectScore,
+          projectScore: score,
+          score,
           sessions: [],
         })
       }
 
-      if (!query || projectScore > 0 || sessionScoreValue > 0) {
-        projects.get(key).sessions.push(session)
+      const project = projects.get(key)
+      const sessionScoreValue = query ? sessionScore(session, query) : 1
+      if (!query || project.projectScore > 0 || sessionScoreValue > 0) {
+        project.sessions.push(session)
       }
-
-      projects.get(key).score = Math.max(
-        projects.get(key).score,
-        projectScore,
-        sessionScoreValue,
-      )
+      project.score = Math.max(project.score, sessionScoreValue)
     }
 
-    const projectList = Array.from(projects.values())
+    const projectList = Array.from(projects.values()).filter((project) => {
+      return !query || project.score > 0
+    })
     for (const project of projectList) {
       project.sessions.sort((a, b) => {
         return sessionTimestamp(b) - sessionTimestamp(a)
@@ -1096,6 +1206,8 @@ export function useSessionWorkspace({
   }
 
   function dispose() {
+    sessionListRequestToken += 1
+    startRuntimeRequests.clear()
     clearTimeout(refreshTimer)
     clearTimeout(sessionHandoffSettlingTimer)
   }
@@ -1131,8 +1243,10 @@ export function useSessionWorkspace({
     handleNativeNewSession,
     handleRouteChange,
     highlightedText,
+    hydrateSessions,
     initPhase,
     initializing,
+    loadHomeProjects,
     loadSessions,
     loadStartRuntimeState,
     modelKey,
@@ -1167,6 +1281,8 @@ export function useSessionWorkspace({
     sessionRuntimeStatus,
     sessions,
     sessionsError,
+    sessionsHydrating,
+    sessionsHydrationError,
     sessionsLoading,
     sessionSwitching,
     sessionTitle,

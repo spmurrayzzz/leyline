@@ -1,5 +1,10 @@
 import { backendHttpUrl } from './backend'
 
+export async function fetchProjects() {
+  const data = await apiRequest('/api/pi/projects', 'Failed to load projects')
+  return data.projects || []
+}
+
 export async function fetchSessions() {
   const data = await apiRequest('/api/pi/sessions', 'Failed to load sessions')
   return data.sessions || []

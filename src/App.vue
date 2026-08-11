@@ -157,6 +157,7 @@ const settingsPath = computed(() => {
   return selectedSession.value?.path || activeRuntimeSession.value?.path || ''
 })
 let initPhaseTimer = null
+let homeHydrationFrame = null
 const pendingInitialNativeCwd = ref('')
 let composerScannerSettlingTimer = null
 let composerCommitTimer = null
@@ -244,8 +245,10 @@ const {
   handleNativeNewSession,
   handleRouteChange,
   highlightedText,
+  hydrateSessions,
   initPhase,
   initializing,
+  loadHomeProjects,
   loadSessions,
   loadStartRuntimeState,
   navigateHome: workspaceNavigateHome,
@@ -278,6 +281,8 @@ const {
   sessionRuntimeStatus,
   sessions,
   sessionsError,
+  sessionsHydrating,
+  sessionsHydrationError,
   sessionsLoading,
   sessionSwitching,
   sessionTitle,
@@ -723,6 +728,7 @@ onUnmounted(() => {
   workbenchScroll.dispose()
   toolExpansion.dispose()
   clearTimeout(initPhaseTimer)
+  cancelAnimationFrame(homeHydrationFrame)
   clearTimeout(composerScannerSettlingTimer)
   clearTimeout(composerCommitTimer)
   clearTimeout(startupDockTimer)
@@ -984,9 +990,9 @@ async function loadBackendWorkspace() {
   }
   openEventStream()
   initPhase.value = 'sessions'
-  await waitInitPhaseFloor()
 
   if (pendingInitialNativeCwd.value) {
+    await waitInitPhaseFloor()
     const cwd = pendingInitialNativeCwd.value
     try {
       await handleNativeNewSession({ detail: { cwd } })
@@ -998,7 +1004,26 @@ async function loadBackendWorkspace() {
     return
   }
 
-  await loadSessions({ routeSessionId: sessionIdFromRoute() })
+  const routeSessionId = sessionIdFromRoute()
+  if (!routeSessionId) {
+    if (await loadHomeProjects()) {
+      scheduleHomeSessionHydration()
+      return
+    }
+    await loadSessions()
+    return
+  }
+
+  await waitInitPhaseFloor()
+  await loadSessions({ routeSessionId })
+}
+
+function scheduleHomeSessionHydration() {
+  cancelAnimationFrame(homeHydrationFrame)
+  homeHydrationFrame = window.requestAnimationFrame(() => {
+    homeHydrationFrame = null
+    if (!sessionIdFromRoute()) void hydrateSessions()
+  })
 }
 
 async function retryBackendConnection() {
@@ -1006,6 +1031,14 @@ async function retryBackendConnection() {
   sessionError.value = ''
   sessionsError.value = ''
   await loadBackendWorkspace()
+}
+
+async function retrySessions() {
+  if (sessionsHydrationError.value) {
+    await hydrateSessions()
+    return
+  }
+  await retryBackendConnection()
 }
 
 async function switchBackendConnection(connection) {
@@ -2182,6 +2215,8 @@ function closePickerMenus() {
       :session-status="sessionRuntimeStatus"
       :session-title="sessionTitle"
       :sessions-error="sessionsError"
+      :sessions-hydrating="sessionsHydrating"
+      :sessions-hydration-error="sessionsHydrationError"
       :sessions-loading="sessionsLoading"
       :summary="sidebarRuntimeSummary"
       :visible-projects="visibleProjects"
@@ -2194,7 +2229,7 @@ function closePickerMenus() {
       @open-settings="toggleSettingsDrawer"
       @reload-session="reloadSession"
       @request-delete-session="requestDeleteSession"
-      @retry-sessions="retryBackendConnection"
+      @retry-sessions="retrySessions"
       @select-backend="switchBackendConnection"
       @select-session="selectSession"
       @toggle-project="toggleProject"

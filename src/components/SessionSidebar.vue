@@ -82,6 +82,11 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  sessionsHydrating: Boolean,
+  sessionsHydrationError: {
+    type: String,
+    default: '',
+  },
   sessionsLoading: Boolean,
   summary: {
     type: Object,
@@ -309,6 +314,7 @@ const onAfterLeave = (el) => {
             type="button"
             title="Project details"
             aria-label="Project details"
+            :disabled="project.sessions.length === 0"
             @click="emit('open-project-detail', project)"
           >⋯</button>
           <button
@@ -331,6 +337,20 @@ const onAfterLeave = (el) => {
           @after-leave="onAfterLeave"
         >
           <div v-if="expandedProject(project)" class="project-session-list">
+            <div
+              v-if="sessionsHydrating"
+              class="project-session-skeleton"
+              aria-hidden="true"
+            >
+              <div class="session-skeleton-row">
+                <div class="skeleton-line"></div>
+                <div class="skeleton-line short"></div>
+              </div>
+              <div class="session-skeleton-row">
+                <div class="skeleton-line"></div>
+                <div class="skeleton-line short"></div>
+              </div>
+            </div>
             <div
               v-for="session in displayedSessions(project)"
               :key="session.path || session.id"
@@ -430,6 +450,14 @@ const onAfterLeave = (el) => {
             >{{ sessionListToggleLabel(project) }}</button>
           </div>
         </Transition>
+      </div>
+
+      <div
+        v-if="!sessionsLoading && sessionsHydrationError"
+        class="sidebar-note error-note session-hydration-error"
+      >
+        Session history unavailable
+        <button type="button" @click="emit('retry-sessions')">Retry</button>
       </div>
     </section>
 

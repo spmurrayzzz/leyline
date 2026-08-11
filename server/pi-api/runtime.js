@@ -39,6 +39,7 @@ import {
 import { setRolloutFeedback } from './rollout-feedback.js'
 import {
   configuredSessionDir,
+  listPersistedProjects,
   listPersistedSessions,
   SUBAGENT_SESSION_CUSTOM_TYPE,
 } from './sessions.js'
@@ -193,6 +194,19 @@ async function createRuntimeResult(
 
 const createRuntime = (options) => createRuntimeResult(options)
 
+
+async function listProjects() {
+  const projects = await listPersistedProjects()
+  const persistedCwds = new Set(projects.map((project) => project.cwd))
+  const missing = []
+  for (const handle of runtimeHandles.values()) {
+    const cwd = handle.runtime.cwd
+    if (!cwd || persistedCwds.has(cwd)) continue
+    persistedCwds.add(cwd)
+    missing.push({ cwd, name: basename(cwd) || cwd })
+  }
+  return [...missing, ...projects]
+}
 
 async function listSessions() {
   const sessions = await listPersistedSessions()
@@ -900,6 +914,7 @@ export function createPiRuntimeApi() {
   html,
   interruptSession,
   json,
+  listProjects,
   listSessions,
   listSubagentConfigs,
   listVisibleMemories,

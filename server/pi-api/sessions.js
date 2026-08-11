@@ -1,6 +1,7 @@
-import { readdir, readFile, stat } from 'node:fs/promises'
+import { open, readdir, readFile, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
+import { StringDecoder } from 'node:string_decoder'
 import {
   getAgentDir,
   SessionManager,
@@ -9,6 +10,8 @@ import {
 import { goalStateFromEntries } from './goal-state.js'
 
 const SESSION_DIR_ENV = 'PI_CODING_AGENT_SESSION_DIR'
+const PROJECT_HEADER_SCAN_LIMIT = 1024 * 1024
+const PROJECT_SCAN_CONCURRENCY = 24
 export const SUBAGENT_SESSION_CUSTOM_TYPE = 'leyline-subagent-session'
 
 export async function listPersistedSessions() {
@@ -16,6 +19,25 @@ export async function listPersistedSessions() {
   if (!sessionDir) return markSubagentSessions(await SessionManager.listAll())
 
   return listSessionsFromConfiguredDir(sessionDir)
+}
+
+export async function listPersistedProjects() {
+  const sessionDir = configuredSessionDir(process.cwd())
+  const files = sessionDir
+    ? await sessionFiles(sessionDir)
+    : await defaultSessionFiles()
+  const records = await readProjectRecords(files)
+  const projects = new Map()
+
+  for (const record of records) {
+    const current = projects.get(record.cwd)
+    if (current && current.modified >= record.modified) continue
+    projects.set(record.cwd, record)
+  }
+
+  return [...projects.values()]
+    .sort((a, b) => b.modified - a.modified || a.name.localeCompare(b.name))
+    .map(({ cwd, name }) => ({ cwd, name }))
 }
 
 export function configuredSessionDir(cwd) {
@@ -68,6 +90,106 @@ async function sessionFiles(sessionDir) {
     return [...files, ...nested.flat()]
   } catch {
     return []
+  }
+}
+
+async function defaultSessionFiles() {
+  const root = join(getAgentDir(), 'sessions')
+  try {
+    const entries = await readdir(root, { withFileTypes: true })
+    const directories = entries.filter((entry) => entry.isDirectory())
+    const files = await Promise.all(directories.map(async (entry) => {
+      const directory = join(root, entry.name)
+      try {
+        return (await readdir(directory, { withFileTypes: true }))
+          .filter((file) => file.isFile() && file.name.endsWith('.jsonl'))
+          .map((file) => join(directory, file.name))
+      } catch {
+        return []
+      }
+    }))
+    return files.flat()
+  } catch {
+    return []
+  }
+}
+
+async function readProjectRecords(files) {
+  const records = new Array(files.length)
+  let nextIndex = 0
+  const workerCount = Math.min(PROJECT_SCAN_CONCURRENCY, files.length)
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (nextIndex < files.length) {
+      const index = nextIndex++
+      records[index] = await readProjectRecord(files[index])
+    }
+  })
+  await Promise.all(workers)
+  return records.filter(Boolean)
+}
+
+async function readProjectRecord(filePath) {
+  try {
+    const [header, stats] = await Promise.all([
+      readSessionHeader(filePath),
+      stat(filePath),
+    ])
+    if (!header) return null
+    return {
+      cwd: header.cwd,
+      name: basename(header.cwd) || header.cwd,
+      modified: stats.mtimeMs,
+    }
+  } catch {
+    return null
+  }
+}
+
+async function readSessionHeader(filePath) {
+  let file
+  try {
+    file = await open(filePath, 'r')
+    const decoder = new StringDecoder('utf8')
+    const buffer = Buffer.allocUnsafe(4096)
+    let pending = ''
+    let scanned = 0
+
+    while (scanned < PROJECT_HEADER_SCAN_LIMIT) {
+      const length = Math.min(buffer.length, PROJECT_HEADER_SCAN_LIMIT - scanned)
+      const { bytesRead } = await file.read(buffer, 0, length, null)
+      if (!bytesRead) {
+        pending += decoder.end()
+        return sessionHeaderFromLine(pending) || null
+      }
+      scanned += bytesRead
+      pending += decoder.write(buffer.subarray(0, bytesRead))
+
+      let newline = pending.indexOf('\n')
+      while (newline !== -1) {
+        const header = sessionHeaderFromLine(pending.slice(0, newline))
+        pending = pending.slice(newline + 1)
+        if (header !== undefined) return header
+        newline = pending.indexOf('\n')
+      }
+    }
+
+    return null
+  } catch {
+    return null
+  } finally {
+    await file?.close().catch(() => {})
+  }
+}
+
+function sessionHeaderFromLine(line) {
+  if (!line.trim()) return undefined
+  try {
+    const entry = JSON.parse(line)
+    if (entry.type !== 'session' || typeof entry.id !== 'string') return null
+    if (typeof entry.cwd !== 'string' || !entry.cwd.trim()) return null
+    return entry
+  } catch {
+    return undefined
   }
 }
 

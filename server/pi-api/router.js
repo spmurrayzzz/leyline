@@ -17,6 +17,7 @@ export function createPiApiHandler(api) {
     html,
     interruptSession,
     json,
+    listProjects,
     listSessions,
     listSubagentConfigs,
     listVisibleMemories,
@@ -74,6 +75,13 @@ async function piApiHandler(req, res) {
             terminal: true,
           },
         })
+      }
+
+      if (url.pathname === '/projects') {
+        if (req.method !== 'GET') {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+        return json(res, { projects: await listProjects() })
       }
 
       if (url.pathname === '/sessions') {
