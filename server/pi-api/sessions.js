@@ -37,7 +37,21 @@ export async function listPersistedProjects() {
 
   return [...projects.values()]
     .sort((a, b) => b.modified - a.modified || a.name.localeCompare(b.name))
-    .map(({ cwd, name }) => ({ cwd, name }))
+    .map(({ cwd, name, modified }) => ({ cwd, name, modified }))
+}
+
+export async function findPersistedSessionRecord(id) {
+  const sessionDir = configuredSessionDir(process.cwd())
+  const files = sessionDir
+    ? await sessionFiles(sessionDir)
+    : await defaultSessionFiles()
+  const suffix = `_${id}.jsonl`
+  for (const path of files) {
+    if (!path.endsWith(suffix)) continue
+    const header = await readSessionHeader(path)
+    if (header?.id === id) return { id, path, cwd: header.cwd || '' }
+  }
+  return null
 }
 
 export function configuredSessionDir(cwd) {

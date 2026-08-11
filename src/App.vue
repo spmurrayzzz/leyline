@@ -157,7 +157,7 @@ const settingsPath = computed(() => {
   return selectedSession.value?.path || activeRuntimeSession.value?.path || ''
 })
 let initPhaseTimer = null
-let homeHydrationFrame = null
+let sessionHydrationFrame = null
 const pendingInitialNativeCwd = ref('')
 let composerScannerSettlingTimer = null
 let composerCommitTimer = null
@@ -249,7 +249,9 @@ const {
   initPhase,
   initializing,
   loadHomeProjects,
+  loadRoutedSession,
   loadSessions,
+  loadSidebarProjects,
   loadStartRuntimeState,
   navigateHome: workspaceNavigateHome,
   newSessionCwd,
@@ -281,6 +283,7 @@ const {
   sessionRuntimeStatus,
   sessions,
   sessionsError,
+  sessionsHydrated,
   sessionsHydrating,
   sessionsHydrationError,
   sessionsLoading,
@@ -728,7 +731,7 @@ onUnmounted(() => {
   workbenchScroll.dispose()
   toolExpansion.dispose()
   clearTimeout(initPhaseTimer)
-  cancelAnimationFrame(homeHydrationFrame)
+  cancelAnimationFrame(sessionHydrationFrame)
   clearTimeout(composerScannerSettlingTimer)
   clearTimeout(composerCommitTimer)
   clearTimeout(startupDockTimer)
@@ -1007,22 +1010,23 @@ async function loadBackendWorkspace() {
   const routeSessionId = sessionIdFromRoute()
   if (!routeSessionId) {
     if (await loadHomeProjects()) {
-      scheduleHomeSessionHydration()
+      scheduleSessionHydration()
       return
     }
     await loadSessions()
     return
   }
 
-  await waitInitPhaseFloor()
-  await loadSessions({ routeSessionId })
+  void loadSidebarProjects()
+  void loadRoutedSession(routeSessionId)
+  scheduleSessionHydration()
 }
 
-function scheduleHomeSessionHydration() {
-  cancelAnimationFrame(homeHydrationFrame)
-  homeHydrationFrame = window.requestAnimationFrame(() => {
-    homeHydrationFrame = null
-    if (!sessionIdFromRoute()) void hydrateSessions()
+function scheduleSessionHydration() {
+  cancelAnimationFrame(sessionHydrationFrame)
+  sessionHydrationFrame = window.requestAnimationFrame(() => {
+    sessionHydrationFrame = null
+    void hydrateSessions()
   })
 }
 
@@ -2215,6 +2219,7 @@ function closePickerMenus() {
       :session-status="sessionRuntimeStatus"
       :session-title="sessionTitle"
       :sessions-error="sessionsError"
+      :sessions-hydrated="sessionsHydrated"
       :sessions-hydrating="sessionsHydrating"
       :sessions-hydration-error="sessionsHydrationError"
       :sessions-loading="sessionsLoading"

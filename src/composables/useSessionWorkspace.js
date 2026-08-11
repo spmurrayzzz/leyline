@@ -17,6 +17,9 @@ import {
   switchPiThinkingLevel,
 } from '../lib/pi-api'
 
+const PROJECT_AGE_REFRESH_MS = 60 * 60 * 1000
+const RECENT_PROJECT_WINDOW_MS = 30 * 24 * 60 * 60 * 1000
+
 export function useSessionWorkspace({
   liveTurn,
   terminal,
@@ -45,6 +48,7 @@ export function useSessionWorkspace({
   const sessionError = ref('')
   const activeRuntimeSession = ref(null)
   const runtimeSessionsById = ref({})
+  const projectAgeNow = ref(Date.now())
   const startupRun = ref(null)
   const sessionHandoff = ref(null)
   const sessionHandoffSettling = ref(false)
@@ -119,6 +123,9 @@ export function useSessionWorkspace({
   const startRuntimeRequests = new Map()
   let refreshTimer
   let sessionHandoffSettlingTimer
+  const projectAgeTimer = setInterval(() => {
+    projectAgeNow.value = Date.now()
+  }, PROJECT_AGE_REFRESH_MS)
 
   async function loadHomeProjects() {
     sessionsLoading.value = true
@@ -138,6 +145,12 @@ export function useSessionWorkspace({
     } catch {
       return false
     }
+  }
+
+  async function loadSidebarProjects() {
+    try {
+      projectSummaries.value = await fetchProjects()
+    } catch {}
   }
 
   async function hydrateSessions() {
@@ -346,7 +359,7 @@ export function useSessionWorkspace({
       await scrollToLatest?.()
 
       sessionActivating.value = true
-      await activateSelectedSession(token, session)
+      await activateSelectedSession(token, data.session || session)
       if (!isCurrentSessionSelection(token, session.id)) return
       await reconnectTerminalIfOpen()
     } catch (error) {
@@ -358,6 +371,14 @@ export function useSessionWorkspace({
       sessionLoading.value = false
       sessionSwitching.value = false
       sessionActivating.value = false
+    }
+  }
+
+  async function loadRoutedSession(routeSessionId) {
+    try {
+      await selectSession({ id: routeSessionId })
+    } finally {
+      sessionsLoading.value = false
     }
   }
 
@@ -399,7 +420,7 @@ export function useSessionWorkspace({
 
     const session = sessions.value.find((item) => item.id === id)
     if (session) await selectSession(session, { replaceRoute: true })
-    else await loadSessions({ routeSessionId: id })
+    else await loadRoutedSession(id)
   }
 
   async function handleNativeNewSession(event) {
@@ -463,14 +484,19 @@ export function useSessionWorkspace({
   function updateRuntimeSessionSnapshot(runtimeSession) {
     if (!runtimeSession?.id) return
     const state = runtimeSession.state || {}
-    patchRuntimeSessionState(runtimeSession.id, {
+    const patch = {
+      cwd: runtimeSession.cwd || '',
       isStreaming: state.isStreaming === true,
       isCompacting: state.isCompacting === true,
       queuedCount: queuedCount(state.queuedMessages),
       pendingToolCount: Array.isArray(state.pendingToolCalls)
         ? state.pendingToolCalls.length
         : 0,
-    }, { preserveUnread: true })
+    }
+    patchRuntimeSessionState(runtimeSession.id, patch, {
+      preserveUnread: true,
+      touchActivity: runtimeProjectActive(patch),
+    })
   }
 
   function updateRuntimeEventState(data) {
@@ -480,7 +506,7 @@ export function useSessionWorkspace({
 
     const previous = runtimeSessionsById.value[id] || {}
     const patch = runtimePatchFromEvent(event, previous)
-    if (!patch) return
+    if (!patch || Object.keys(patch).length === 0) return
 
     const next = { ...previous, ...patch }
     const wasBusy = previous.isStreaming || previous.isCompacting
@@ -495,7 +521,7 @@ export function useSessionWorkspace({
       finished || runtimeError || event.type === 'aborted'
     )
 
-    patchRuntimeSessionState(id, patch, { unread })
+    patchRuntimeSessionState(id, patch, { unread, touchActivity: true })
   }
 
   function sessionRuntimeStatus(id) {
@@ -520,6 +546,9 @@ export function useSessionWorkspace({
         unread: options.preserveUnread
           ? previous.unread === true
           : options.unread === true || previous.unread === true,
+        activityAt: options.touchActivity
+          ? Date.now()
+          : previous.activityAt || 0,
         updatedAt: Date.now(),
       },
     }
@@ -718,6 +747,9 @@ export function useSessionWorkspace({
       sessions.value = sessions.value.filter((item) => {
         return item.id !== session.id
       })
+      const nextRuntimeSessions = { ...runtimeSessionsById.value }
+      delete nextRuntimeSessions[session.id]
+      runtimeSessionsById.value = nextRuntimeSessions
       if (sessionsHydrated.value) reconcileProjectSummaries()
       deleteConfirmSession.value = null
       if (selectedSessionId.value === session.id) {
@@ -1053,6 +1085,7 @@ export function useSessionWorkspace({
       projects.set(key, {
         cwd: key,
         name,
+        modified: sessionTimestamp(summary),
         projectScore: score,
         score,
         sessions: [],
@@ -1069,6 +1102,7 @@ export function useSessionWorkspace({
         projects.set(key, {
           cwd: key,
           name,
+          modified: 0,
           projectScore: score,
           score,
           sessions: [],
@@ -1080,19 +1114,56 @@ export function useSessionWorkspace({
       if (!query || project.projectScore > 0 || sessionScoreValue > 0) {
         project.sessions.push(session)
       }
+      project.modified = Math.max(project.modified, sessionTimestamp(session))
       project.score = Math.max(project.score, sessionScoreValue)
     }
 
+    const selectedCwd = selectedSession.value?.cwd || newSessionCwd.value || ''
+    const runtimeStates = Object.values(runtimeSessionsById.value)
+    const activeRuntimeCwds = new Set(
+      runtimeStates
+        .filter(runtimeProjectActive)
+        .map((state) => state.cwd)
+        .filter(Boolean),
+    )
+    const runtimeActivityByCwd = new Map()
+    for (const state of runtimeStates) {
+      if (!state.cwd || !state.activityAt) continue
+      const current = runtimeActivityByCwd.get(state.cwd) || 0
+      runtimeActivityByCwd.set(state.cwd, Math.max(current, state.activityAt))
+    }
+    const cutoff = projectAgeNow.value - RECENT_PROJECT_WINDOW_MS
     const projectList = Array.from(projects.values()).filter((project) => {
       return !query || project.score > 0
     })
     for (const project of projectList) {
+      project.modified = Math.max(
+        project.modified,
+        runtimeActivityByCwd.get(project.cwd) || 0,
+      )
+      project.isOlder = project.modified > 0
+        && project.modified < cutoff
+        && project.cwd !== selectedCwd
+        && !activeRuntimeCwds.has(project.cwd)
       project.sessions.sort((a, b) => {
         return sessionTimestamp(b) - sessionTimestamp(a)
       })
     }
 
-    return projectList.sort((a, b) => b.score - a.score)
+    return projectList.sort((a, b) => {
+      const score = b.score - a.score
+      if (query && score) return score
+      return b.modified - a.modified || a.name.localeCompare(b.name)
+    })
+  }
+
+  function runtimeProjectActive(state) {
+    return state.isStreaming
+      || state.isCompacting
+      || state.queuedCount > 0
+      || state.pendingToolCount > 0
+      || state.unread
+      || state.error
   }
 
   function sessionScore(session, query) {
@@ -1208,6 +1279,7 @@ export function useSessionWorkspace({
   function dispose() {
     sessionListRequestToken += 1
     startRuntimeRequests.clear()
+    clearInterval(projectAgeTimer)
     clearTimeout(refreshTimer)
     clearTimeout(sessionHandoffSettlingTimer)
   }
@@ -1247,7 +1319,9 @@ export function useSessionWorkspace({
     initPhase,
     initializing,
     loadHomeProjects,
+    loadRoutedSession,
     loadSessions,
+    loadSidebarProjects,
     loadStartRuntimeState,
     modelKey,
     navigateHome,
@@ -1281,6 +1355,7 @@ export function useSessionWorkspace({
     sessionRuntimeStatus,
     sessions,
     sessionsError,
+    sessionsHydrated,
     sessionsHydrating,
     sessionsHydrationError,
     sessionsLoading,

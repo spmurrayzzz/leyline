@@ -39,6 +39,7 @@ import {
 import { setRolloutFeedback } from './rollout-feedback.js'
 import {
   configuredSessionDir,
+  findPersistedSessionRecord,
   listPersistedProjects,
   listPersistedSessions,
   SUBAGENT_SESSION_CUSTOM_TYPE,
@@ -196,16 +197,26 @@ const createRuntime = (options) => createRuntimeResult(options)
 
 
 async function listProjects() {
-  const projects = await listPersistedProjects()
-  const persistedCwds = new Set(projects.map((project) => project.cwd))
-  const missing = []
+  const projects = new Map(
+    (await listPersistedProjects()).map((project) => [project.cwd, project]),
+  )
+  const now = Date.now()
   for (const handle of runtimeHandles.values()) {
     const cwd = handle.runtime.cwd
-    if (!cwd || persistedCwds.has(cwd)) continue
-    persistedCwds.add(cwd)
-    missing.push({ cwd, name: basename(cwd) || cwd })
+    if (!cwd) continue
+    const current = projects.get(cwd)
+    const session = handle.runtime.session
+    const active = session.isStreaming || session.isCompacting
+    if (current && !active) continue
+    projects.set(cwd, {
+      cwd,
+      name: basename(cwd) || cwd,
+      modified: active ? now : current?.modified || now,
+    })
   }
-  return [...missing, ...projects]
+  return [...projects.values()].sort((a, b) => {
+    return b.modified - a.modified || a.name.localeCompare(b.name)
+  })
 }
 
 async function listSessions() {
@@ -219,8 +230,7 @@ async function listSessions() {
 async function findSession(id) {
   const handle = runtimeHandles.get(id)
   if (handle) return sessionInfo(handle)
-  const sessions = await listSessions()
-  return sessions.find((session) => session.id === id)
+  return findPersistedSessionRecord(id)
 }
 
 async function resolveSession(id, path, cwd) {

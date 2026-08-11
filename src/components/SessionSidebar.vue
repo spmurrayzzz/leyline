@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { backendDisplayAddress } from '../lib/backend'
 import { sessionTime } from '../lib/format'
 
@@ -82,6 +82,7 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  sessionsHydrated: Boolean,
   sessionsHydrating: Boolean,
   sessionsHydrationError: {
     type: String,
@@ -118,14 +119,44 @@ const emit = defineEmits([
 
 const defaultVisibleSessionCount = 5
 const expandedSessionProjects = ref(new Set())
+const olderProjectsExpanded = ref(false)
+const olderProjectsToggle = ref(null)
 const backendMenu = ref(null)
 const backendMenuOpen = ref(false)
+const sidebarProjects = computed(() => {
+  if (props.query.trim()) return props.visibleProjects
+
+  const recent = props.visibleProjects.filter((project) => !project.isOlder)
+  const older = props.visibleProjects.filter((project) => project.isOlder)
+  if (!older.length) return recent
+
+  return [
+    ...recent,
+    {
+      type: 'older-projects-toggle',
+      cwd: '__leyline-older-projects__',
+      count: older.length,
+    },
+    ...(olderProjectsExpanded.value ? older : []),
+  ]
+})
 
 onMounted(() => document.addEventListener('click', closeBackendMenuOnOutsideClick))
 onUnmounted(() => document.removeEventListener('click', closeBackendMenuOnOutsideClick))
 
 function closeBackendMenuOnOutsideClick(event) {
   if (!backendMenu.value?.contains(event.target)) backendMenuOpen.value = false
+}
+
+function setOlderProjectsToggle(element) {
+  olderProjectsToggle.value = element
+}
+
+async function toggleOlderProjects() {
+  olderProjectsExpanded.value = !olderProjectsExpanded.value
+  if (!olderProjectsExpanded.value) return
+  await nextTick()
+  olderProjectsToggle.value?.scrollIntoView({ block: 'start' })
 }
 
 function selectBackend(connection) {
@@ -276,17 +307,52 @@ const onAfterLeave = (el) => {
         {{ sessionsError }}
         <button type="button" @click="emit('retry-sessions')">Retry</button>
       </div>
-      <div v-else-if="visibleProjects.length === 0" class="sidebar-note">
+      <div
+        v-else-if="visibleProjects.length === 0
+          && !sessionsHydrated
+          && !sessionsHydrationError"
+        class="sidebar-note"
+        role="status"
+      >
+        {{ query.trim() ? 'Searching session history…' : 'Loading sessions…' }}
+      </div>
+      <div
+        v-else-if="visibleProjects.length === 0 && !sessionsHydrationError"
+        class="sidebar-note"
+        role="status"
+      >
         No sessions found
       </div>
 
       <div
-        v-for="project in visibleProjects"
+        v-for="project in sidebarProjects"
         v-else
         :key="project.cwd"
-        class="project"
+        :class="project.type === 'older-projects-toggle'
+          ? 'older-projects'
+          : 'project'"
       >
-        <div class="project-title">
+        <button
+          v-if="project.type === 'older-projects-toggle'"
+          :ref="setOlderProjectsToggle"
+          class="older-projects-toggle"
+          type="button"
+          :aria-label="`Older projects, ${project.count}`"
+          :aria-expanded="olderProjectsExpanded"
+          @click="toggleOlderProjects"
+        >
+          <svg
+            class="project-caret"
+            :class="{ expanded: olderProjectsExpanded }"
+            viewBox="0 0 16 16"
+            aria-hidden="true"
+          >
+            <path d="M6 4l4 4-4 4"></path>
+          </svg>
+          <span class="older-projects-label">Older projects</span>
+          <span class="older-projects-count">{{ project.count }}</span>
+        </button>
+        <div v-else class="project-title">
           <button @click="emit('toggle-project', project)">
             <span class="project-label">
               <svg
@@ -329,6 +395,7 @@ const onAfterLeave = (el) => {
         </div>
 
         <Transition
+          v-if="project.type !== 'older-projects-toggle'"
           name="project-sessions"
           @enter="onEnter"
           @after-enter="onAfterEnter"
