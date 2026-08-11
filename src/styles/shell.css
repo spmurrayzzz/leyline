@@ -34,15 +34,18 @@
   border-right: 1px solid var(--border-soft);
   background: var(--sidebar);
   padding: 0 12px;
+  transform: translateX(0);
   transition:
     border-color var(--motion-base) var(--ease-standard),
-    opacity var(--motion-base) var(--ease-standard);
+    opacity var(--motion-base) var(--ease-standard),
+    transform var(--motion-base) var(--ease-standard);
 }
 
 .sidebar-hidden .app-header-brand {
   border-right-width: 0;
   padding: 0;
   opacity: 0;
+  transform: translateX(-100%);
   pointer-events: none;
 }
 

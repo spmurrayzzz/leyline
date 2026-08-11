@@ -9,6 +9,7 @@
   .sidebar,
   .sidebar-collapse-button,
   .sidebar-reveal-button,
+  .app-header-brand,
   .section-action,
   .search-field,
   .project-title button,
@@ -307,6 +308,7 @@
     background: transparent;
     padding: 0 2px 0 8px;
     opacity: 1;
+    transform: translateX(0);
     pointer-events: auto;
   }
 
