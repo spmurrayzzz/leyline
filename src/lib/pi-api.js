@@ -107,6 +107,33 @@ export function clearSubagentModelOverride(session, agentKey, scope) {
   )
 }
 
+export function fetchVisionConfig(session) {
+  const params = scopedSessionParams(session)
+  return apiRequest(`/api/pi/vision/config?${params}`, 'Failed to load vision config')
+}
+
+export function setVisionModelOverride(session, scope, model) {
+  return apiRequest(
+    '/api/pi/vision/model',
+    'Failed to update vision model',
+    {
+      method: 'PUT',
+      body: scopedBody(session, { scope, model }),
+    },
+  )
+}
+
+export function clearVisionModelOverride(session, scope) {
+  return apiRequest(
+    '/api/pi/vision/model',
+    'Failed to reset vision model',
+    {
+      method: 'DELETE',
+      body: scopedBody(session, { scope }),
+    },
+  )
+}
+
 export function fetchVisibleMemories(session) {
   const params = scopedSessionParams(session)
   return apiRequest(

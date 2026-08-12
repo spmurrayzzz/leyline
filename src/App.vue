@@ -7,6 +7,7 @@ import ProjectDetailDrawer from './components/ProjectDetailDrawer.vue'
 import MemoryInspector from './components/MemoryInspector.vue'
 import SessionComposer from './components/SessionComposer.vue'
 import SubagentConfigDrawer from './components/SubagentConfigDrawer.vue'
+import VisionConfigDrawer from './components/VisionConfigDrawer.vue'
 import StartComposer from './components/StartComposer.vue'
 import SessionSidebar from './components/SessionSidebar.vue'
 import TranscriptEntry from './components/TranscriptEntry.vue'
@@ -35,11 +36,14 @@ import {
   editPrompt,
   fetchSessionDetailByPath,
   clearSubagentModelOverride,
+  clearVisionModelOverride,
   fetchSubagentConfigs,
+  fetchVisionConfig,
   interruptPiSession,
   runShellCommand,
   setEntryFeedback,
   setSubagentModelOverride,
+  setVisionModelOverride,
   submitPrompt,
 } from './lib/pi-api'
 import {
@@ -68,6 +72,12 @@ const subagentConfigSaving = ref(false)
 const subagentConfigError = ref('')
 const subagentConfigData = ref({ context: {}, agents: [] })
 let subagentConfigRequestToken = 0
+const visionConfigOpen = ref(false)
+const visionConfigLoading = ref(false)
+const visionConfigSaving = ref(false)
+const visionConfigError = ref('')
+const visionConfigData = ref({ context: {}, overrides: {}, model: '', modelSource: 'none' })
+let visionConfigRequestToken = 0
 const projectDetailCwd = ref('')
 const promptSubmitting = ref(false)
 const interrupting = ref(false)
@@ -301,9 +311,13 @@ const {
   visibleProjects,
 } = sessionWorkspace
 workbenchScroll.bind({ selectedSessionId, liveItems })
-watch(selectedSessionId, () => {
-  if (subagentConfigOpen.value) void loadSubagentConfigs()
-})
+watch(
+  () => visionSessionKey(scopedConfigTarget()),
+  () => {
+    if (subagentConfigOpen.value) void loadSubagentConfigs()
+    void loadVisionConfig()
+  },
+)
 const {
   projectBrowserOpen,
   projectBrowserInitialPath,
@@ -521,7 +535,23 @@ const imageSupportWarning = computed(() => {
   }
   const model = composerRuntime.value?.state?.model
   if (!attachedImages.value.length || !model || model.supportsImages) return ''
-  return `${modelChip(model)} does not support images.`
+  const command = draft.value.trim().startsWith('/')
+    ? draft.value.trim().slice(1).split(/\s/, 1)[0]
+    : ''
+  if (command && slashCommands.value.some((item) => {
+    return item.source === 'extension' && item.name === command
+  })) return 'Extension commands cannot include image attachments.'
+  if (visionConfigSaving.value) return 'Wait for the vision model setting to finish saving.'
+  if (visionConfigData.value?.model) return ''
+  return `${modelChip(model)} does not support images and no vision model is configured. Open Settings → Vision to set a default vision model.`
+})
+const visionDelegationNotice = computed(() => {
+  if (shellModeDraft.value || !attachedImages.value.length) return ''
+  const model = composerRuntime.value?.state?.model
+  if (!model || model.supportsImages) return ''
+  const visionModel = visionConfigData.value?.model
+  if (!visionModel) return ''
+  return `${modelChip(model)} can't read images directly. The image${attachedImages.value.length > 1 ? 's' : ''} will be described by the vision subagent (${visionModel}) before sending.`
 })
 const canSubmitDraft = computed(() => {
   if (imageSupportWarning.value) return false
@@ -852,6 +882,7 @@ function openProjectDetail(project) {
   projectDetailCwd.value = project.cwd
   settingsOpen.value = false
   subagentConfigOpen.value = false
+  visionConfigOpen.value = false
   eventLogOpen.value = false
   if (memoryOpen.value) closeMemoryDrawer()
 }
@@ -960,6 +991,7 @@ function openSettingsDrawer() {
   if (memoryDirty.value && !confirmDiscardMemoryChanges()) return
   settingsOpen.value = true
   subagentConfigOpen.value = false
+  visionConfigOpen.value = false
   eventLogOpen.value = false
   memoryOpen.value = false
   projectDetailCwd.value = ''
@@ -1180,6 +1212,7 @@ function toggleEventDrawer() {
   eventLogOpen.value = !eventLogOpen.value
   settingsOpen.value = false
   subagentConfigOpen.value = false
+  visionConfigOpen.value = false
   memoryOpen.value = false
   if (eventLogOpen.value) projectDetailCwd.value = ''
 }
@@ -1190,38 +1223,56 @@ function toggleMemoryPanel() {
   if (!wasOpen && memoryOpen.value) {
     projectDetailCwd.value = ''
     subagentConfigOpen.value = false
+    visionConfigOpen.value = false
   }
 }
 
 async function openSubagentConfig() {
-  if (!selectedSession.value?.cwd) return
   settingsOpen.value = false
   eventLogOpen.value = false
   memoryOpen.value = false
   projectDetailCwd.value = ''
   subagentConfigOpen.value = true
+  visionConfigOpen.value = false
+  if (!scopedConfigTarget()?.cwd) {
+    subagentConfigLoading.value = false
+    subagentConfigSaving.value = false
+    subagentConfigError.value = 'No project selected yet. Open a session or choose a project to manage agents.'
+    subagentConfigData.value = { context: {}, agents: [] }
+    return
+  }
   await loadSubagentConfigs()
 }
 
-function subagentSessionKey(session) {
-  return `${session?.id || ''}:${session?.sessionFile || session?.path || ''}`
+function scopedConfigTarget() {
+  const session = selectedSession.value
+  if (session?.cwd) return session
+  const cwd = newSessionCwd.value.trim()
+  return cwd ? { cwd } : null
 }
+
+function subagentSessionKey(session) {
+  return `${session?.cwd || ''}:${session?.id || ''}:${session?.sessionFile || session?.path || ''}`
+}
+
+let subagentConfigActiveKey = ''
 
 function currentSubagentRequest(token, sessionKey) {
   return token === subagentConfigRequestToken
-    && sessionKey === subagentSessionKey(selectedSession.value)
+    && sessionKey === subagentConfigActiveKey
 }
 
 async function loadSubagentConfigs() {
-  const session = selectedSession.value
-  if (!session?.cwd) return
+  const target = scopedConfigTarget()
+  if (!target?.cwd) return
   const token = ++subagentConfigRequestToken
-  const sessionKey = subagentSessionKey(session)
+  const sessionKey = subagentSessionKey(target)
+  subagentConfigActiveKey = sessionKey
   subagentConfigLoading.value = true
   subagentConfigSaving.value = false
   subagentConfigError.value = ''
   try {
-    const data = await fetchSubagentConfigs(session)
+    const data = await fetchSubagentConfigs(target)
     if (currentSubagentRequest(token, sessionKey)) subagentConfigData.value = data
   } catch (error) {
     if (currentSubagentRequest(token, sessionKey)) {
@@ -1233,15 +1284,16 @@ async function loadSubagentConfigs() {
 }
 
 async function saveSubagentModel(payload) {
-  const session = selectedSession.value
-  if (!session) return
+  const target = scopedConfigTarget()
+  if (!target?.cwd) return
   const token = ++subagentConfigRequestToken
-  const sessionKey = subagentSessionKey(session)
+  const sessionKey = subagentSessionKey(target)
+  subagentConfigActiveKey = sessionKey
   subagentConfigSaving.value = true
   subagentConfigError.value = ''
   try {
     const data = await setSubagentModelOverride(
-      session,
+      target,
       payload.agentKey,
       payload.scope,
       payload.model,
@@ -1257,15 +1309,16 @@ async function saveSubagentModel(payload) {
 }
 
 async function resetSubagentModel(payload) {
-  const session = selectedSession.value
-  if (!session) return
+  const target = scopedConfigTarget()
+  if (!target?.cwd) return
   const token = ++subagentConfigRequestToken
-  const sessionKey = subagentSessionKey(session)
+  const sessionKey = subagentSessionKey(target)
+  subagentConfigActiveKey = sessionKey
   subagentConfigSaving.value = true
   subagentConfigError.value = ''
   try {
     const data = await clearSubagentModelOverride(
-      session,
+      target,
       payload.agentKey,
       payload.scope,
     )
@@ -1276,6 +1329,104 @@ async function resetSubagentModel(payload) {
     }
   } finally {
     if (currentSubagentRequest(token, sessionKey)) subagentConfigSaving.value = false
+  }
+}
+
+function visionSessionKey(session) {
+  return `${session?.cwd || ''}:${session?.id || ''}:${session?.sessionFile || session?.path || ''}`
+}
+
+let visionConfigActiveKey = ''
+
+function currentVisionRequest(token, sessionKey) {
+  return token === visionConfigRequestToken
+    && sessionKey === visionConfigActiveKey
+}
+
+async function loadVisionConfig() {
+  const target = scopedConfigTarget()
+  if (!target?.cwd) {
+    ++visionConfigRequestToken
+    visionConfigActiveKey = ''
+    visionConfigLoading.value = false
+    visionConfigSaving.value = false
+    visionConfigError.value = ''
+    visionConfigData.value = { context: {}, overrides: {}, model: '', modelSource: 'none' }
+    return
+  }
+  const token = ++visionConfigRequestToken
+  const sessionKey = visionSessionKey(target)
+  visionConfigActiveKey = sessionKey
+  if (visionConfigOpen.value) visionConfigLoading.value = true
+  visionConfigSaving.value = false
+  visionConfigError.value = ''
+  visionConfigData.value = { context: {}, overrides: {}, model: '', modelSource: 'none' }
+  try {
+    const data = await fetchVisionConfig(target)
+    if (currentVisionRequest(token, sessionKey)) visionConfigData.value = data
+  } catch (error) {
+    if (currentVisionRequest(token, sessionKey)) {
+      visionConfigError.value = error.message || 'Failed to load vision config'
+    }
+  } finally {
+    if (currentVisionRequest(token, sessionKey)) visionConfigLoading.value = false
+  }
+}
+
+async function openVisionConfig() {
+  settingsOpen.value = false
+  eventLogOpen.value = false
+  memoryOpen.value = false
+  projectDetailCwd.value = ''
+  subagentConfigOpen.value = false
+  visionConfigOpen.value = true
+  if (!scopedConfigTarget()?.cwd) {
+    visionConfigLoading.value = false
+    visionConfigSaving.value = false
+    visionConfigError.value = 'No project selected yet. Open a session or choose a project to manage the vision model.'
+    visionConfigData.value = { context: {}, overrides: {}, model: '', modelSource: 'none' }
+    return
+  }
+  await loadVisionConfig()
+}
+
+async function saveVisionModel(payload) {
+  const target = scopedConfigTarget()
+  if (!target?.cwd) return
+  const token = ++visionConfigRequestToken
+  const sessionKey = visionSessionKey(target)
+  visionConfigActiveKey = sessionKey
+  visionConfigSaving.value = true
+  visionConfigError.value = ''
+  try {
+    const data = await setVisionModelOverride(target, payload.scope, payload.model)
+    if (currentVisionRequest(token, sessionKey)) visionConfigData.value = data
+  } catch (error) {
+    if (currentVisionRequest(token, sessionKey)) {
+      visionConfigError.value = error.message || 'Failed to update vision model'
+    }
+  } finally {
+    if (currentVisionRequest(token, sessionKey)) visionConfigSaving.value = false
+  }
+}
+
+async function resetVisionModel(payload) {
+  const target = scopedConfigTarget()
+  if (!target?.cwd) return
+  const token = ++visionConfigRequestToken
+  const sessionKey = visionSessionKey(target)
+  visionConfigActiveKey = sessionKey
+  visionConfigSaving.value = true
+  visionConfigError.value = ''
+  try {
+    const data = await clearVisionModelOverride(target, payload.scope)
+    if (currentVisionRequest(token, sessionKey)) visionConfigData.value = data
+  } catch (error) {
+    if (currentVisionRequest(token, sessionKey)) {
+      visionConfigError.value = error.message || 'Failed to reset vision model'
+    }
+  } finally {
+    if (currentVisionRequest(token, sessionKey)) visionConfigSaving.value = false
   }
 }
 
@@ -1439,6 +1590,8 @@ async function submitDraft(streamingBehavior) {
   if (startsEmptySession) beginInProjectNewSessionRun()
   pulseComposerCommit()
   const localEntry = beginUserTurn(text, images)
+  const delegatesImages = needsVisionDelegation(images, text)
+  if (delegatesImages) setAgentRunning(true, 'Describing image…')
   const submittedDraft = draft.value
   promptSubmitting.value = true
   promptError.value = ''
@@ -1466,6 +1619,7 @@ async function submitDraft(streamingBehavior) {
         resetLiveState()
       }
       removeOptimisticEntry(localEntry)
+      if (delegatesImages) setAgentRunning(false)
       if (!draft.value && !attachedImages.value.length) {
         draft.value = submittedDraft
         attachedImages.value = submittedAttachments
@@ -1480,6 +1634,23 @@ async function submitDraft(streamingBehavior) {
     promptSubmitting.value = false
     refocusComposer()
   }
+}
+
+function needsVisionDelegation(images, text) {
+  const model = composerRuntime.value?.state?.model
+  const command = text.startsWith('/')
+    ? text.slice(1).split(/\s/, 1)[0]
+    : ''
+  const extensionCommand = command && slashCommands.value.some((item) => {
+    return item.source === 'extension' && item.name === command
+  })
+  return Boolean(
+    images.length
+      && model
+      && !model.supportsImages
+      && visionConfigData.value?.model
+      && !extensionCommand,
+  )
 }
 
 function shellCommandFromText(text) {
@@ -1655,6 +1826,8 @@ async function retryEntry(entry) {
   hasNewOutput.value = false
   pulseComposerCommit()
   const localEntry = beginUserTurn(text, images)
+  const delegatesImages = needsVisionDelegation(images, text)
+  if (delegatesImages) setAgentRunning(true, 'Describing image…')
   promptSubmitting.value = true
   promptError.value = ''
   closePickerMenus()
@@ -1671,6 +1844,7 @@ async function retryEntry(entry) {
       sessionDetail.value = previousDetail
       resetLiveState()
       removeOptimisticEntry(localEntry)
+      if (delegatesImages) setAgentRunning(false)
       promptError.value = error.message
     }
   } finally {
@@ -1991,6 +2165,7 @@ function handleEscape(event) {
   settingsOpen.value = false
   eventLogOpen.value = false
   subagentConfigOpen.value = false
+  visionConfigOpen.value = false
   projectDetailCwd.value = ''
   if (memoryOpen.value) closeMemoryDrawer()
   closeToolFullscreen()
@@ -2421,6 +2596,7 @@ function closePickerMenus() {
             :current-model-label="currentModelLabel"
             :current-thinking-label="currentThinkingLabel"
             :image-support-warning="imageSupportWarning"
+            :vision-delegation-notice="visionDelegationNotice"
             :model-key="modelKey"
             :model-picker-open="modelPickerOpen"
             :new-session-cwd="newSessionCwd"
@@ -2679,6 +2855,7 @@ function closePickerMenus() {
         :context-usage-title="contextUsageTitle"
         :editing-label="editingLabel"
         :error="promptError || eventStreamError || imageSupportWarning"
+        :vision-delegation-notice="visionDelegationNotice"
         :interrupting="interrupting"
         :class="{
           'empty-session-composer': emptySessionShellVisible,
@@ -3015,12 +3192,22 @@ function closePickerMenus() {
             <button
               type="button"
               class="settings-action-row"
-              :disabled="!selectedSession?.cwd"
               @click="openSubagentConfig"
             >
               <span>
                 <strong>Subagents</strong>
                 <small>Model defaults by transcript, project, and global scope</small>
+              </span>
+              <span>Manage</span>
+            </button>
+            <button
+              type="button"
+              class="settings-action-row"
+              @click="openVisionConfig"
+            >
+              <span>
+                <strong>Vision agent</strong>
+                <small>Vision model for models without image support</small>
               </span>
               <span>Manage</span>
             </button>
@@ -3098,6 +3285,22 @@ function closePickerMenus() {
           @refresh="loadSubagentConfigs"
           @reset-model="resetSubagentModel"
           @set-model="saveSubagentModel"
+        />
+      </div>
+    </Transition>
+
+    <Transition name="event-drawer">
+      <div v-if="visionConfigOpen" class="settings-drawer-slot">
+        <VisionConfigDrawer
+          :available-models="availableModels"
+          :config="visionConfigData"
+          :error="visionConfigError"
+          :loading="visionConfigLoading"
+          :saving="visionConfigSaving"
+          @close="visionConfigOpen = false"
+          @refresh="loadVisionConfig"
+          @reset-model="resetVisionModel"
+          @set-model="saveVisionModel"
         />
       </div>
     </Transition>

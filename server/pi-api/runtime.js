@@ -52,6 +52,15 @@ import {
   setSubagentModelOverride,
 } from './subagents.js'
 import {
+  copySessionVisionOverrides,
+  deleteVisionModelOverride,
+  installVisionDelegationContext,
+  listVisionConfig,
+  registerVisionDelegation,
+  resolveVisionConfig,
+  setVisionModelOverride,
+} from './vision.js'
+import {
   createAgentSessionFromServices,
   createAgentSessionRuntime,
   createAgentSessionServices,
@@ -85,6 +94,15 @@ const BUNDLED_SUBAGENT_EXTENSION = resolve(
   '.pi',
   'extensions',
   'subagent',
+  'index.ts',
+)
+const BUNDLED_VISION_EXTENSION = resolve(
+  __dirname,
+  '..',
+  '..',
+  '.pi',
+  'extensions',
+  'vision-agent',
   'index.ts',
 )
 const BUNDLED_LEYLINE_SYSTEM_PROMPT = resolve(
@@ -157,7 +175,7 @@ function preferBundledExtensions(result) {
 
 async function createRuntimeResult(
   { cwd, sessionManager, sessionStartEvent },
-  { model, thinkingLevel } = {},
+  { model, thinkingLevel, allowImages = false } = {},
 ) {
   const services = await createAgentSessionServices({
     cwd,
@@ -166,11 +184,15 @@ async function createRuntimeResult(
         BUNDLED_GOAL_EXTENSION,
         BUNDLED_MEMORY_EXTENSION,
         BUNDLED_SUBAGENT_EXTENSION,
+        BUNDLED_VISION_EXTENSION,
       ],
       extensionsOverride: preferBundledExtensions,
       appendSystemPromptOverride: appendLeylineSystemPrompt,
     },
   })
+  if (allowImages) {
+    services.settingsManager.applyOverrides({ images: { blockImages: false } })
+  }
   const selectedModel = resolveSubagentModel(services.modelRuntime, model)
   if (modelRequested(model) && !selectedModel) {
     throw new Error(`Unknown subagent model: ${formatSubagentModel(model)}`)
@@ -190,6 +212,7 @@ async function createRuntimeResult(
     diagnostics: services.diagnostics,
   }
   forceOneAtATime(runtime.session)
+  installVisionDelegationContext(runtime.session)
   return runtime
 }
 
@@ -308,28 +331,103 @@ function setActiveHandle(handle) {
   activeSessionId = handle?.sessionId
 }
 
-async function promptSession(handle, text, images = [], streamingBehavior) {
-  forceOneAtATime(handle.runtime.session)
-  const promptText = typeof text === 'string' ? text : ''
-  const promptImages = validateImages(images)
-  if (!promptText.trim() && promptImages.length === 0) {
-    throw new Error('text or image is required')
-  }
-  if (streamingBehavior
-    && !['steer', 'followUp'].includes(streamingBehavior)) {
-    throw new Error('invalid streaming behavior')
-  }
+async function promptSession(handle, text, images = [], streamingBehavior, signal) {
+  const session = handle.runtime.session
+  const controller = new AbortController()
+  const abortPrompt = () => controller.abort()
+  if (signal?.aborted) abortPrompt()
+  else signal?.addEventListener?.('abort', abortPrompt, { once: true })
+  handle.pendingPromptControllers ||= new Set()
+  handle.pendingPromptControllers.add(controller)
 
+  try {
+    if (controller.signal.aborted) throw new Error('Prompt cancelled')
+    forceOneAtATime(session)
+    const promptText = typeof text === 'string' ? text : ''
+    const promptImages = validateImages(images)
+    if (!promptText.trim() && promptImages.length === 0) {
+      throw new Error('text or image is required')
+    }
+    if (streamingBehavior
+      && !['steer', 'followUp'].includes(streamingBehavior)) {
+      throw new Error('invalid streaming behavior')
+    }
+
+    const model = session.state?.model || session.model
+    const modelSupportsImages = Boolean(model?.input?.includes('image'))
+    const shouldDelegate = promptImages.length
+      && !modelSupportsImages
+      && !isExtensionCommand(session, promptText)
+    const delegation = shouldDelegate
+      ? await prepareVisionDelegation(
+        handle,
+        promptText,
+        promptImages,
+        controller.signal,
+      )
+      : null
+    if (controller.signal.aborted) throw new Error('Prompt cancelled')
+
+    if (!delegation) {
+      try {
+        await runSessionPrompt(session, promptText, promptImages, streamingBehavior)
+      } catch (error) {
+        if (controller.signal.aborted) throw new Error('Prompt cancelled')
+        throw error
+      }
+      if (controller.signal.aborted) {
+        await session.abort()
+        throw new Error('Prompt cancelled')
+      }
+      return
+    }
+
+    const registration = registerVisionDelegation(
+      session,
+      promptImages,
+      delegation.text,
+      promptText,
+    )
+    try {
+      const accepted = await runSessionPrompt(
+        session,
+        promptText,
+        promptImages,
+        streamingBehavior,
+      )
+      if (controller.signal.aborted) {
+        registration.cancel()
+        await session.abort()
+        throw new Error('Prompt cancelled')
+      }
+      if (!accepted) registration.cancel()
+    } catch (error) {
+      registration.cancel()
+      if (controller.signal.aborted) throw new Error('Prompt cancelled')
+      throw error
+    }
+  } finally {
+    signal?.removeEventListener?.('abort', abortPrompt)
+    handle.pendingPromptControllers.delete(controller)
+  }
+}
+
+async function runSessionPrompt(session, text, promptImages, streamingBehavior) {
+  const wasStreaming = session.isStreaming
+  const queueBefore = queuedMessageCount(session, streamingBehavior)
   let preflightSucceeded = false
+  let queued = false
   await new Promise((resolve, reject) => {
-    handle.runtime.session
-      .prompt(promptText, {
-        images: promptImages,
+    session
+      .prompt(text, {
+        images: promptImages.length ? promptImages : undefined,
         streamingBehavior,
         source: 'api',
         preflightResult: (didSucceed) => {
           if (!didSucceed) return
           preflightSucceeded = true
+          queued = wasStreaming
+            && queuedMessageCount(session, streamingBehavior) > queueBefore
           resolve()
         },
       })
@@ -337,6 +435,104 @@ async function promptSession(handle, text, images = [], streamingBehavior) {
         if (!preflightSucceeded) reject(error)
       })
   })
+  if (!wasStreaming && !session.isStreaming) {
+    await new Promise((resolve) => setImmediate(resolve))
+  }
+  return queued || session.isStreaming
+}
+
+function queuedMessageCount(session, streamingBehavior) {
+  if (streamingBehavior === 'followUp') {
+    return session.getFollowUpMessages().length
+  }
+  return session.getSteeringMessages().length
+}
+
+function isExtensionCommand(session, text) {
+  if (!text.startsWith('/')) return false
+  const name = text.slice(1).split(/\s/, 1)[0]
+  return Boolean(session.extensionRunner.getCommand(name))
+}
+
+async function prepareVisionDelegation(handle, text, images, signal) {
+  if (signal?.aborted) throw new Error('Prompt cancelled')
+  const session = handle.runtime.session
+  const cwd = session.sessionManager.getCwd()
+  const sessionPath = session.sessionManager.getSessionFile() || null
+  const resolved = resolveVisionConfig({ cwd, sessionPath })
+  if (!resolved.model) {
+    throw new Error(
+      `${formatModelLabel(session.state?.model || session.model)} does not support images and no vision model is configured. Set a default vision model in Leyline Settings → Vision.`,
+    )
+  }
+
+  const modelRuntime = handle.runtime.services?.modelRuntime
+  const visionModel = modelRuntime
+    ? resolveSubagentModel(modelRuntime, resolved.model)
+    : null
+  if (modelRuntime && !visionModel) {
+    throw new Error(`Unknown vision model: ${resolved.model}`)
+  }
+  if (visionModel && !visionModel.input?.includes('image')) {
+    throw new Error(
+      `The vision model ${formatSubagentModel(resolved.model)} does not support images. Choose a vision model in Leyline Settings → Vision.`,
+    )
+  }
+
+  const delegations = await Promise.all(images.map((image) => {
+    return runVision({
+      question: text && text.trim()
+        ? `This image was attached by a user with this prompt:\n\n${text}\n\nDescribe the image in enough detail for an agent that cannot see it, and answer anything the prompt asks.`
+        : 'Describe this image in detail so an agent that cannot see it understands what it shows.',
+      cwd,
+      parentSessionPath: sessionPath,
+      model: resolved.model,
+      image,
+      signal,
+    }).then((result) => ({
+      ok: visionDelegationOk(result),
+      text: visionResultText(result),
+    })).catch((error) => {
+      if (signal?.aborted) throw error
+      return {
+        ok: false,
+        text: error.message || String(error),
+      }
+    })
+  }))
+
+  const blocks = [
+    `[Attached image, described for you by the vision subagent (${resolved.model}). You cannot view the image directly.]`,
+  ]
+  delegations.forEach((delegation, index) => {
+    const label = images.length > 1 ? `${index + 1}. ` : ''
+    if (delegation.ok) blocks.push(`${label}${delegation.text}`)
+    else blocks.push(`${label}Vision delegation failed: ${delegation.text}`)
+  })
+  blocks.push('')
+  return { text: blocks.join('\n') }
+}
+
+function visionDelegationOk(result) {
+  if (result?.error) return false
+  return !(result?.messages || []).some((message) => message.role === 'error')
+}
+
+function formatModelLabel(model) {
+  if (!model) return 'The current model'
+  if (typeof model === 'object') return `${model.provider}/${model.id}`
+  return String(model)
+}
+
+function visionResultText(result) {
+  const messages = result?.messages || []
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i]
+    if (message.role === 'assistant' || message.role === 'error') {
+      if (message.content) return message.content.trim()
+    }
+  }
+  return result?.error || '(no description)'
 }
 
 async function bashSession(handle, command, excludeFromContext = false) {
@@ -405,10 +601,13 @@ function validateImages(images) {
 }
 
 async function interruptSession(handle) {
+  for (const controller of handle.pendingPromptControllers || []) {
+    controller.abort()
+  }
   await handle.runtime.session.abort()
 }
 
-async function editSessionPrompt(handle, entryId, text, images = []) {
+async function editSessionPrompt(handle, entryId, text, images = [], signal) {
   const session = handle.runtime.session
   if (!entryId) throw new Error('entryId is required')
   if (session.isStreaming) {
@@ -431,7 +630,7 @@ async function editSessionPrompt(handle, entryId, text, images = []) {
   }
 
   try {
-    await promptSession(handle, text, images)
+    await promptSession(handle, text, images, undefined, signal)
   } catch (error) {
     moveSessionLeaf(session, oldLeafId)
     throw error
@@ -496,6 +695,11 @@ async function forkActiveSession(entryId) {
   runtimeHandles.set(activeHandle.sessionId, activeHandle)
   setActiveHandle(activeHandle)
   copySessionSubagentOverrides({
+    cwd: activeRuntime.session.sessionManager.getCwd(),
+    fromSessionPath: previousSessionPath,
+    toSessionPath: activeRuntime.session.sessionManager.getSessionFile(),
+  })
+  copySessionVisionOverrides({
     cwd: activeRuntime.session.sessionManager.getCwd(),
     fromSessionPath: previousSessionPath,
     toSessionPath: activeRuntime.session.sessionManager.getSessionFile(),
@@ -567,6 +771,9 @@ function discardActiveSession() {
 }
 
 function discardRuntimeHandle(handle) {
+  for (const controller of handle.pendingPromptControllers || []) {
+    controller.abort()
+  }
   handle.unsubscribe?.()
   handle.runtime.session.dispose()
   runtimeHandles.delete(handle.sessionId)
@@ -610,6 +817,9 @@ async function reloadSession(handle) {
 
   let applied = false
   try {
+    for (const controller of handle.pendingPromptControllers || []) {
+      controller.abort()
+    }
     await handle.runtime.teardownCurrent('reload', previousSessionFile)
     handle.unsubscribe?.()
     const previousId = handle.sessionId
@@ -746,11 +956,15 @@ async function exportSessionDetail(id) {
   return detail
 }
 
-async function runSubagent({ task, cwd, parentSessionPath, model, thinkingLevel, tools, systemPrompt, signal }) {
+async function runSubagent({ task, cwd, parentSessionPath, model, thinkingLevel, tools, systemPrompt, images, allowImages = false, signal }) {
   if (!cwd) throw new Error('cwd is required')
   if (!task) throw new Error('task is required')
+  if (tools !== undefined && !Array.isArray(tools)) {
+    throw new Error('tools must be an array')
+  }
   if (signal?.aborted) throw new Error('Subagent cancelled')
   const requestedThinkingLevel = normalizeSubagentThinkingLevel(thinkingLevel)
+  const promptImages = validateImages(images)
 
   const sessionManager = SessionManager.create(cwd, configuredSessionDir(cwd))
   const childPath = sessionManager.newSession({
@@ -772,6 +986,7 @@ async function runSubagent({ task, cwd, parentSessionPath, model, thinkingLevel,
     const createSubagentRuntime = (options) => createRuntimeResult(options, {
       model,
       thinkingLevel: requestedThinkingLevel,
+      allowImages,
     })
     const runtime = await createAgentSessionRuntime(createSubagentRuntime, {
       cwd,
@@ -780,10 +995,15 @@ async function runSubagent({ task, cwd, parentSessionPath, model, thinkingLevel,
     })
     session = runtime.session
     if (signal?.aborted) throw new Error('Subagent cancelled')
+    if (promptImages.length && !session.model?.input?.includes('image')) {
+      throw new Error(
+        `The configured model ${formatSubagentModel(model)} does not support images. Use a vision-capable model.`,
+      )
+    }
     abortSubagent = () => session?.abort?.()
     signal?.addEventListener?.('abort', abortSubagent, { once: true })
 
-    if (tools?.length) {
+    if (tools !== undefined) {
       if (typeof session.setActiveToolsByName !== 'function') {
         throw new Error('Subagent runtime does not support tool allowlists')
       }
@@ -803,7 +1023,10 @@ async function runSubagent({ task, cwd, parentSessionPath, model, thinkingLevel,
     let preflightSucceeded = false
     await new Promise((resolve, reject) => {
       session
-        .prompt(taskWithPrompt, { source: 'api' })
+        .prompt(taskWithPrompt, {
+          images: promptImages.length ? promptImages : undefined,
+          source: 'api',
+        })
         .then(() => {
           preflightSucceeded = true
           resolve()
@@ -863,6 +1086,29 @@ async function runSubagent({ task, cwd, parentSessionPath, model, thinkingLevel,
     if (signal?.aborted) throw new Error('Subagent cancelled')
     throw error
   }
+}
+
+const VISION_AGENT_PROMPT =
+  'You are the vision subagent for a parent coding agent that cannot receive ' +
+  'images directly. Study the attached image and report what it shows in prose. ' +
+  'Include any visible text (UI labels, error messages, terminal output, ' +
+  'diagrams), notable layout, colors, and relationships between parts. ' +
+  'If the user asked a specific question, answer it directly first, then give ' +
+  'the surrounding detail the parent needs.'
+
+async function runVision({ question, cwd, parentSessionPath, model, image, signal }) {
+  if (!image) throw new Error('image is required')
+  return runSubagent({
+    task: question || 'Describe this image in detail.',
+    cwd,
+    parentSessionPath,
+    model,
+    tools: [],
+    systemPrompt: VISION_AGENT_PROMPT,
+    images: [image],
+    allowImages: true,
+    signal,
+  })
 }
 
 function normalizeSubagentThinkingLevel(thinkingLevel) {
@@ -928,6 +1174,7 @@ export function createPiRuntimeApi() {
   listSessions,
   listSubagentConfigs,
   listVisibleMemories,
+  listVisionConfig,
   openEventStream,
   promptSession,
   readDirectory,
@@ -939,11 +1186,14 @@ export function createPiRuntimeApi() {
   resetSessionToEntry,
   resolveSession,
   resolveSubagentConfig,
+  resolveVisionConfig,
   runtimeHandleForId,
   runtimeState,
   setMemoryStatus,
   setSubagentModelOverride,
   deleteSubagentModelOverride,
+  setVisionModelOverride,
+  deleteVisionModelOverride,
   setSessionMode,
   setSessionModel,
   setRolloutFeedback,
@@ -955,5 +1205,6 @@ export function createPiRuntimeApi() {
   trashSession,
   updateMemory,
   runSubagent,
+  runVision,
   }
 }

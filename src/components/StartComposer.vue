@@ -41,6 +41,10 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  visionDelegationNotice: {
+    type: String,
+    default: '',
+  },
   modelKey: {
     type: Function,
     required: true,
@@ -222,6 +226,9 @@ defineExpose({ form })
         {{ imageSupportWarning }}
       </div>
     </Transition>
+    <Transition name="composer-reveal">
+      <div v-if="visionDelegationNotice" class="composer-notice">{{ visionDelegationNotice }}</div>
+    </Transition>
     <div class="start-composer-bar">
       <div class="composer-primary-row">
         <div class="composer-row-spacer"></div>
@@ -301,6 +308,7 @@ defineExpose({ form })
             :title="shellMode ? 'Run shell command' : 'Send message'"
             :disabled="!newSessionCwd.trim()
               || !!creatingSessionCwd
+              || !!imageSupportWarning
               || (shellMode && (!shellCommand || attachedImages.length))"
           >{{ shellMode ? 'Run' : '↑' }}</button>
         </div>

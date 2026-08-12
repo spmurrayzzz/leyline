@@ -68,6 +68,10 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  visionDelegationNotice: {
+    type: String,
+    default: '',
+  },
   interrupting: Boolean,
   modelKey: {
     type: Function,
@@ -282,6 +286,9 @@ function updateDraft(event) {
     </Transition>
     <Transition name="composer-reveal">
       <div v-if="error" class="composer-error">{{ error }}</div>
+    </Transition>
+    <Transition name="composer-reveal">
+      <div v-if="visionDelegationNotice" class="composer-notice">{{ visionDelegationNotice }}</div>
     </Transition>
     <div class="composer-bar">
       <div class="composer-primary-row">

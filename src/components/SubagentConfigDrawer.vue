@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 const props = defineProps({
   agents: { type: Array, default: () => [] },
@@ -22,6 +22,14 @@ const modelOptions = computed(() => props.availableModels.map((model) => ({
   label: model.name || `${model.provider}/${model.id}`,
   value: `${model.provider}/${model.id}`,
 })))
+
+watch(
+  () => props.context.sessionAvailable,
+  (available) => {
+    if (available === false && scope.value === 'session') scope.value = 'project'
+  },
+  { immediate: true },
+)
 
 function selectedModel(agent) {
   return agent.overrides?.[scope.value] || ''

@@ -21,6 +21,7 @@ export function createPiApiHandler(api) {
     listSessions,
     listSubagentConfigs,
     listVisibleMemories,
+    listVisionConfig,
     openEventStream,
     promptSession,
     readDirectory,
@@ -31,12 +32,16 @@ export function createPiApiHandler(api) {
     resetSessionToEntry,
     resolveSession,
     resolveSubagentConfig,
+    resolveVisionConfig,
     runSubagent,
+    runVision,
     runtimeHandleForId,
     runtimeState,
     setMemoryStatus,
     setRolloutFeedback,
     setSubagentModelOverride,
+    setVisionModelOverride,
+    deleteVisionModelOverride,
     setSessionMode,
     setSessionModel,
     setSessionThinkingLevel,
@@ -147,6 +152,7 @@ async function piApiHandler(req, res) {
           body.text,
           body.images,
           body.streamingBehavior,
+          responseAbortSignal(res),
         )
         return json(res, { ok: true, active: activeSessionDto(handle) })
       }
@@ -188,7 +194,13 @@ async function piApiHandler(req, res) {
   
         const body = await readJson(req)
         const handle = requireActiveHandle()
-        await editSessionPrompt(handle, body.entryId, body.text, body.images)
+        await editSessionPrompt(
+          handle,
+          body.entryId,
+          body.text,
+          body.images,
+          responseAbortSignal(res),
+        )
         return json(res, { ok: true, active: activeSessionDto(handle) })
       }
   
@@ -434,6 +446,75 @@ async function piApiHandler(req, res) {
         }
       }
 
+      if (url.pathname === '/vision/config') {
+        if (req.method !== 'GET') {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+        return json(res, listVisionConfig({
+          cwd: url.searchParams.get('cwd'),
+          sessionPath: url.searchParams.get('sessionPath'),
+        }))
+      }
+
+      if (url.pathname === '/vision/model') {
+        if (!['PUT', 'DELETE'].includes(req.method)) {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+        const body = await readJson(req)
+        if (req.method === 'PUT') {
+          return json(res, setVisionModelOverride({
+            cwd: body.cwd,
+            model: body.model,
+            scope: body.scope,
+            sessionPath: body.sessionPath,
+          }))
+        }
+        return json(res, deleteVisionModelOverride({
+          cwd: body.cwd,
+          scope: body.scope,
+          sessionPath: body.sessionPath,
+        }))
+      }
+
+      if (url.pathname === '/vision/resolve') {
+        if (req.method !== 'POST') {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+        const body = await readJson(req)
+        return json(res, resolveVisionConfig({
+          cwd: body.cwd,
+          sessionPath: body.sessionPath,
+          staticModel: body.staticModel,
+        }))
+      }
+
+      if (url.pathname === '/vision') {
+        if (req.method !== 'POST') {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+
+        const body = await readJson(req)
+        const controller = new AbortController()
+        let responseFinished = false
+        res.on('finish', () => { responseFinished = true })
+        res.on('close', () => {
+          if (!responseFinished) controller.abort()
+        })
+        try {
+          const result = await runVision({
+            question: body.question,
+            cwd: body.cwd,
+            parentSessionPath: body.parentSessionPath,
+            model: body.model,
+            image: body.image,
+            signal: controller.signal,
+          })
+          return json(res, result)
+        } catch (error) {
+          return json(res, { error: error.message }, 500)
+        }
+      }
+
       const scopedActions = [
         'prompt',
         'bash',
@@ -465,6 +546,7 @@ async function piApiHandler(req, res) {
             body.text,
             body.images,
             body.streamingBehavior,
+            responseAbortSignal(res),
           )
           return json(res, { ok: true, active: activeSessionDto(handle) })
         }
@@ -485,7 +567,13 @@ async function piApiHandler(req, res) {
           })
         }
         if (action === 'edit-prompt') {
-          await editSessionPrompt(handle, body.entryId, body.text, body.images)
+          await editSessionPrompt(
+            handle,
+            body.entryId,
+            body.text,
+            body.images,
+            responseAbortSignal(res),
+          )
           return json(res, { ok: true, active: activeSessionDto(handle) })
         }
         if (action === 'interrupt') {
@@ -584,4 +672,14 @@ async function piApiHandler(req, res) {
   }
 
   return piApiHandler
+}
+
+function responseAbortSignal(res) {
+  const controller = new AbortController()
+  let finished = false
+  res.once('finish', () => { finished = true })
+  res.once('close', () => {
+    if (!finished) controller.abort()
+  })
+  return controller.signal
 }

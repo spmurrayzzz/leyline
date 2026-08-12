@@ -479,6 +479,17 @@
   line-height: 1.4;
 }
 
+.vision-config-note {
+  margin: -4px 2px 2px;
+  color: #b5b7c0;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.vision-config-note code {
+  color: #d9dbe4;
+}
+
 .subagent-config-list {
   display: grid;
   gap: 8px;

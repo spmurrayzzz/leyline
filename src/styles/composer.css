@@ -297,6 +297,13 @@ textarea::placeholder {
   font-weight: 700;
 }
 
+.composer-notice {
+  margin: 0 20px 9px;
+  color: #c8a15f;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .composer-bar {
   display: grid;
   padding: 0;
