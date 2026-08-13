@@ -42,6 +42,7 @@ import {
   findPersistedSessionRecord,
   listPersistedProjects,
   listPersistedSessions,
+  listSessionsForProject,
   SUBAGENT_SESSION_CUSTOM_TYPE,
 } from './sessions.js'
 import {
@@ -785,8 +786,12 @@ async function trashSession(id) {
 async function trashProject(cwd) {
   if (!cwd) throw new Error('Project cwd is required')
 
-  const sessions = (await listSessions())
-    .filter((session) => session.cwd === cwd)
+  const persisted = await listSessionsForProject(cwd)
+  const runtimeOnly = [...runtimeHandles.values()]
+    .map(sessionInfo)
+    .filter((session) => session.cwd === cwd
+      && !persisted.some((item) => item.id === session.id))
+  const sessions = [...runtimeOnly, ...persisted]
   if (!sessions.length) return { count: 0, path: '' }
 
   for (const session of sessions) {

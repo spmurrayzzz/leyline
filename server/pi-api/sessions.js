@@ -54,6 +54,15 @@ export async function findPersistedSessionRecord(id) {
   return null
 }
 
+export async function listSessionsForProject(cwd) {
+  const sessionDir = configuredSessionDir(process.cwd())
+  const files = sessionDir
+    ? await sessionFiles(sessionDir)
+    : await defaultSessionFiles()
+  const records = await readSessionFileRecords(files)
+  return records.filter((record) => record.cwd === cwd)
+}
+
 export function configuredSessionDir(cwd) {
   const envSessionDir = process.env[SESSION_DIR_ENV]
   if (envSessionDir) return expandTildePath(envSessionDir)
@@ -157,6 +166,26 @@ async function readProjectRecord(filePath) {
   } catch {
     return null
   }
+}
+
+async function readSessionFileRecords(files) {
+  const records = new Array(files.length)
+  let nextIndex = 0
+  const workerCount = Math.min(PROJECT_SCAN_CONCURRENCY, files.length)
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (nextIndex < files.length) {
+      const index = nextIndex++
+      records[index] = await readSessionFileRecord(files[index])
+    }
+  })
+  await Promise.all(workers)
+  return records.filter(Boolean)
+}
+
+async function readSessionFileRecord(filePath) {
+  const header = await readSessionHeader(filePath)
+  if (!header) return null
+  return { id: header.id, path: filePath, cwd: header.cwd }
 }
 
 async function readSessionHeader(filePath) {
