@@ -104,6 +104,7 @@ const props = defineProps({
 
 const emit = defineEmits([
   'keydown',
+  'open-image',
   'open-project-browser',
   'paste',
   'remove-image',
@@ -216,8 +217,20 @@ defineExpose({ form })
         :key="`${image.mimeType}-${index}`"
         class="attachment-chip"
       >
-        <img :src="image.preview" alt="Pasted image" />
-        <button type="button" @click="emit('remove-image', index)">×</button>
+        <button
+          class="attachment-preview-button"
+          type="button"
+          :aria-label="`Open attached image ${index + 1}`"
+          @click="emit('open-image', image.preview, `Attached image ${index + 1}`)"
+        >
+          <img :src="image.preview" alt="Pasted image" />
+        </button>
+        <button
+          class="attachment-remove-button"
+          type="button"
+          :aria-label="`Remove attached image ${index + 1}`"
+          @click="emit('remove-image', index)"
+        >×</button>
       </div>
     </div>
     </Transition>

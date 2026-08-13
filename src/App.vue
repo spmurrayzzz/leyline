@@ -67,6 +67,7 @@ const sidebarOpen = ref(false)
 const desktopSidebarHidden = ref(false)
 const draft = ref('')
 const attachedImages = ref([])
+const fullscreenImage = ref(null)
 const workbench = ref(null)
 const eventLogOpen = ref(false)
 const settingsOpen = ref(false)
@@ -2140,6 +2141,15 @@ function removeAttachedImage(index) {
   })
 }
 
+function openImageFullscreen(src, title = 'Image preview') {
+  if (!src) return
+  fullscreenImage.value = { src, title }
+}
+
+function closeImageFullscreen() {
+  fullscreenImage.value = null
+}
+
 function fileToImageContent(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -2252,6 +2262,7 @@ function handleEscape(event) {
   visionConfigOpen.value = false
   projectDetailCwd.value = ''
   if (memoryOpen.value) closeMemoryDrawer()
+  closeImageFullscreen()
   closeToolFullscreen()
   closeProjectBrowser()
   cancelConfirmDelete()
@@ -2702,6 +2713,7 @@ function closePickerMenus() {
             :tools-chip-label="toolsChipLabel"
             :tools-picker-open="toolsPickerOpen"
             @keydown="handleStartComposerKeydown"
+            @open-image="openImageFullscreen"
             @open-project-browser="openProjectBrowser"
             @paste="handleComposerPaste"
             @remove-image="removeAttachedImage"
@@ -2773,6 +2785,7 @@ function closePickerMenus() {
             @fork="forkSession"
             @mark-feedback="markEntryFeedback"
             @navigate-child-session="navigateChildSession"
+            @open-image="openImageFullscreen"
             @reset="resetSessionToEntry"
             @retry="retryEntry"
             @open-tool-fullscreen="openToolFullscreen"
@@ -2804,6 +2817,7 @@ function closePickerMenus() {
               @edit="startEditingEntry"
               @fork="forkSession"
               @mark-feedback="markEntryFeedback"
+              @open-image="openImageFullscreen"
               @reset="resetSessionToEntry"
               @retry="retryEntry"
               @toggle-skill="toggleSkill"
@@ -2818,6 +2832,7 @@ function closePickerMenus() {
               @fork="forkSession"
               @mark-feedback="markEntryFeedback"
               @navigate-child-session="navigateChildSession"
+              @open-image="openImageFullscreen"
               @reset="resetSessionToEntry"
               @open-tool-fullscreen="openToolFullscreen"
               @toggle-tool="toggleTool"
@@ -2863,6 +2878,7 @@ function closePickerMenus() {
               :thinking-initially-expanded="thinkingInitiallyExpanded"
               @copy="copyTranscriptItem(item.id, liveAssistantDisplayCopyText(item))"
               @fork="forkSession"
+              @open-image="openImageFullscreen"
               @reset="resetSessionToEntry"
             />
 
@@ -2975,6 +2991,7 @@ function closePickerMenus() {
         @cancel-edit="cancelEditingEntry"
         @interrupt="interruptAgent"
         @keydown="handleComposerKeydown"
+        @open-image="openImageFullscreen"
         @paste="handleComposerPaste"
         @remove-image="removeAttachedImage"
         @select-model="selectModel"
@@ -3423,6 +3440,41 @@ function closePickerMenus() {
             <span>{{ eventSummary(item) }}</span>
           </div>
         </aside>
+      </div>
+    </Transition>
+
+    <Transition name="tool-fullscreen">
+      <div
+        v-if="fullscreenImage"
+        class="tool-fullscreen-backdrop"
+        @click="closeImageFullscreen"
+      >
+        <section
+          class="tool-fullscreen"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="fullscreen-image-title"
+          @click.stop
+        >
+          <header class="tool-fullscreen-header">
+            <div>
+              <span id="fullscreen-image-title">{{ fullscreenImage.title }}</span>
+            </div>
+            <div>
+              <button
+                type="button"
+                title="Close image preview"
+                aria-label="Close image preview"
+                @click="closeImageFullscreen"
+              >×</button>
+            </div>
+          </header>
+          <div class="tool-fullscreen-body">
+            <div class="tool-fullscreen-image">
+              <img :src="fullscreenImage.src" :alt="fullscreenImage.title" />
+            </div>
+          </div>
+        </section>
       </div>
     </Transition>
 

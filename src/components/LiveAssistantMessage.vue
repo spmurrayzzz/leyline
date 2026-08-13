@@ -26,7 +26,7 @@ const props = defineProps({
   thinkingInitiallyExpanded: Boolean,
 })
 
-const emit = defineEmits(['copy', 'fork', 'reset'])
+const emit = defineEmits(['copy', 'fork', 'open-image', 'reset'])
 
 const thinkingExpanded = ref(props.thinkingInitiallyExpanded)
 
@@ -36,6 +36,10 @@ function copyTitle(id) {
 
 function copyGlyph(id) {
   return props.copiedEntryId === id ? '✓' : '⧉'
+}
+
+function openImage(src, title) {
+  emit('open-image', src, title)
 }
 </script>
 
@@ -117,6 +121,7 @@ function copyGlyph(id) {
         :block="block"
         :stream-key="`${messageId}-${index}`"
         :streaming="streaming"
+        @open-image="openImage"
       />
     </template>
   </article>

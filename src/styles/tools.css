@@ -355,6 +355,21 @@
   object-fit: contain;
 }
 
+.tool-image-preview-button {
+  width: 100%;
+  color: inherit;
+  cursor: zoom-in;
+}
+
+.tool-image-preview-button:hover {
+  border-color: #5b5f75;
+}
+
+.tool-image-preview-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .tool-preview-fade {
   position: absolute;
   right: 0;

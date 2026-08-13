@@ -33,6 +33,7 @@ const emit = defineEmits([
   'fork',
   'mark-feedback',
   'navigate-child-session',
+  'open-image',
   'reset',
   'retry',
   'open-tool-fullscreen',
@@ -149,6 +150,17 @@ function subagentTarget(entry) {
 function navigateChildSession(childSession) {
   if (!childSession) return
   emit('navigate-child-session', childSession)
+}
+
+function openMarkdownImage(event) {
+  const image = event.target
+  if (image?.tagName !== 'IMG') return
+  event.preventDefault()
+  emit(
+    'open-image',
+    image.currentSrc || image.src,
+    image.alt || 'Transcript image',
+  )
 }
 </script>
 
@@ -331,9 +343,18 @@ function navigateChildSession(childSession) {
             <pre>{{ entry.text }}</pre>
           </div>
           <template v-if="entry.preview?.kind === 'image'">
-            <div class="tool-preview-clip tool-image-preview">
+            <button
+              class="tool-preview-clip tool-image-preview tool-image-preview-button"
+              type="button"
+              aria-label="Open read image preview"
+              @click="emit(
+                'open-image',
+                imageSrc(entry.preview),
+                'Read image preview',
+              )"
+            >
               <img :src="imageSrc(entry.preview)" alt="Read image preview" />
-            </div>
+            </button>
           </template>
           <template v-else-if="entry.preview">
             <div class="tool-preview-clip">
@@ -515,6 +536,7 @@ function navigateChildSession(childSession) {
           v-else
           class="entry-text markdown-body assistant-text-block"
           v-html="renderedBlock(block)"
+          @click="openMarkdownImage"
         ></div>
       </template>
     </template>
@@ -536,19 +558,32 @@ function navigateChildSession(childSession) {
           <div
             class="skill-expanded entry-text markdown-body"
             v-html="renderedMessage(entry)"
+            @click="openMarkdownImage"
           ></div>
         </div>
       </div>
     </div>
-    <div v-else class="entry-text markdown-body" v-html="renderedMessage(entry)">
-    </div>
+    <div
+      v-else
+      class="entry-text markdown-body"
+      v-html="renderedMessage(entry)"
+      @click="openMarkdownImage"
+    ></div>
     <div v-if="imageBlocksFor(entry).length" class="message-images">
-      <img
+      <button
         v-for="(image, index) in imageBlocksFor(entry)"
         :key="`${entry.id}-image-${index}`"
-        :src="imageSrc(image)"
-        alt="Attached image"
-      />
+        class="message-image-button"
+        type="button"
+        :aria-label="`Open attached image ${index + 1}`"
+        @click="emit(
+          'open-image',
+          imageSrc(image),
+          `Attached image ${index + 1}`,
+        )"
+      >
+        <img :src="imageSrc(image)" alt="Attached image" />
+      </button>
     </div>
   </article>
 </template>
