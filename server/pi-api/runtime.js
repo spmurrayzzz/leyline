@@ -173,10 +173,17 @@ function preferBundledExtensions(result) {
   }
 }
 
+function isolateRuntimeExtensions(result) {
+  return { ...result, extensions: [] }
+}
+
 async function createRuntimeResult(
   { cwd, sessionManager, sessionStartEvent },
-  { model, thinkingLevel, allowImages = false } = {},
+  { model, thinkingLevel, allowImages = false, isolatedSystemPrompt } = {},
 ) {
+  const systemPrompt = typeof isolatedSystemPrompt === 'string'
+    ? isolatedSystemPrompt.trim()
+    : ''
   const services = await createAgentSessionServices({
     cwd,
     resourceLoaderOptions: {
@@ -186,8 +193,17 @@ async function createRuntimeResult(
         BUNDLED_SUBAGENT_EXTENSION,
         BUNDLED_VISION_EXTENSION,
       ],
-      extensionsOverride: preferBundledExtensions,
-      appendSystemPromptOverride: appendLeylineSystemPrompt,
+      extensionsOverride: systemPrompt
+        ? isolateRuntimeExtensions
+        : preferBundledExtensions,
+      ...(systemPrompt
+        ? {
+            noContextFiles: true,
+            noSkills: true,
+            systemPromptOverride: () => systemPrompt,
+            appendSystemPromptOverride: () => [],
+          }
+        : { appendSystemPromptOverride: appendLeylineSystemPrompt }),
     },
   })
   if (allowImages) {
@@ -956,7 +972,7 @@ async function exportSessionDetail(id) {
   return detail
 }
 
-async function runSubagent({ task, cwd, parentSessionPath, model, thinkingLevel, tools, systemPrompt, images, allowImages = false, signal }) {
+async function runSubagent({ task, cwd, parentSessionPath, model, thinkingLevel, tools, systemPrompt, isolatedSystemPrompt, images, allowImages = false, signal }) {
   if (!cwd) throw new Error('cwd is required')
   if (!task) throw new Error('task is required')
   if (tools !== undefined && !Array.isArray(tools)) {
@@ -987,6 +1003,7 @@ async function runSubagent({ task, cwd, parentSessionPath, model, thinkingLevel,
       model,
       thinkingLevel: requestedThinkingLevel,
       allowImages,
+      isolatedSystemPrompt,
     })
     const runtime = await createAgentSessionRuntime(createSubagentRuntime, {
       cwd,
@@ -1104,7 +1121,7 @@ async function runVision({ question, cwd, parentSessionPath, model, image, signa
     parentSessionPath,
     model,
     tools: [],
-    systemPrompt: VISION_AGENT_PROMPT,
+    isolatedSystemPrompt: VISION_AGENT_PROMPT,
     images: [image],
     allowImages: true,
     signal,
