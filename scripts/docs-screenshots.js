@@ -213,12 +213,16 @@ const visionConfigPayload = (sessionAvailable) => ({
     sessionId: sessionAvailable ? memoryPayload.context.sessionId : null,
   },
   overrides: {
-    global: 'anthropic/claude-sonnet-4-6',
-    project: 'local/minimax-m2.7',
-    ...(sessionAvailable ? { session: 'local/minimax-m2.7' } : {}),
+    global: { model: 'anthropic/claude-sonnet-4-6', thinking: '' },
+    project: { model: 'local/minimax-m2.7', thinking: 'medium' },
+    ...(sessionAvailable
+      ? { session: { model: 'local/minimax-m2.7', thinking: 'high' } }
+      : {}),
   },
   model: 'local/minimax-m2.7',
   modelSource: sessionAvailable ? 'session' : 'project',
+  thinking: sessionAvailable ? 'high' : 'medium',
+  thinkingSource: sessionAvailable ? 'session' : 'project',
 })
 
 const goal = {
@@ -367,7 +371,7 @@ try {
       await page.getByRole('button', { name: 'Open settings' }).click()
       await page.locator('.settings-action-row').filter({ hasText: 'Vision agent' }).click()
       const drawer = page.locator('aside[aria-label="Vision agent"]')
-      await drawer.locator('.subagent-config-card').waitFor()
+      await drawer.locator('.subagent-config-card').first().waitFor()
       const options = await drawer.locator('select option').allTextContents()
       if (options.some((option) => option.includes('text-only-coder'))) {
         throw new Error('Vision model selector includes a model without image support')

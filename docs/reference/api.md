@@ -620,7 +620,7 @@ Response:
 { ok: true, active: Active, detail: SessionDetail }
 ```
 
-The route forks at the specified entry, changes the runtime session ID, and selects the fork. It also copies session-level subagent and vision-model overrides. Streaming or compaction returns `500`.
+The route forks at the specified entry, changes the runtime session ID, and selects the fork. It also copies session-level subagent model overrides and vision overrides. Streaming or compaction returns `500`.
 
 ### `POST /api/pi/reset-to-entry`
 
@@ -1043,7 +1043,7 @@ Response:
 }
 ```
 
-The effective model and thinking use session, project, then global precedence. `model` is an empty string when no override applies; `thinking` is an empty string when no override applies.
+The server resolves `model` and `thinking` independently. Each field uses session, project, then global precedence. A field is an empty string when no override applies.
 
 ### `PUT /api/pi/vision/override`
 
@@ -1057,13 +1057,15 @@ Request:
   sessionPath?: string,
   scope: "global" | "project" | "session",
   model?: string,
-  thinking?: string
+  thinking?: "inherit" | "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | ""
 }
 ```
 
 Response: The same object as `GET /api/pi/vision/config`.
 
-At least one of `model` or `thinking` must be nonempty. `thinking` must be `inherit`, `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`; an empty string clears that field on the row. Both empty deletes the override at the scope, so a scope can hold a thinking-only override. The route stores the model without verifying availability or image support. The browser lists only available models with image support.
+The `model` and `thinking` fields are independent. An omitted or empty field clears that field at this scope. If both fields are empty, the route deletes the scope row. Thus, a scope can contain only a model or only a thinking setting.
+
+The `inherit` value uses the parent session's current thinking level when the child starts. The route does not verify model availability, image support, or thinking-level support. The browser lists only available models with image support.
 
 ### `DELETE /api/pi/vision/override`
 
@@ -1081,7 +1083,7 @@ Request:
 
 Response: The same object as `GET /api/pi/vision/config`.
 
-The route removes the override at the requested scope. A session scope requires a nonempty `sessionPath`. The server uses its canonical path when available and its resolved path otherwise.
+The route removes the model and thinking override at the requested scope. A session scope requires a nonempty `sessionPath`. The server uses its canonical path when available and its resolved path otherwise.
 
 ### `POST /api/pi/vision/resolve`
 
@@ -1108,7 +1110,7 @@ Response:
 }
 ```
 
-Stored session, project, and global values take priority over `staticModel`.
+Stored model values use session, project, global, then `staticModel` precedence. Stored thinking values use session, project, then global precedence. The route returns `inherit` unchanged.
 
 ### `POST /api/pi/vision`
 
@@ -1122,12 +1124,12 @@ Request:
   cwd: string,
   parentSessionPath?: string,
   model?: string | { provider: string, id: string },
-  thinking?: string,
+  thinking?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max",
   image: { type: "image", data: string, mimeType: string }
 }
 ```
 
-Success response: The same child-session, message, usage, model, thinking, and stop-reason object as `POST /api/pi/subagent`.
+Success response: The same object as `POST /api/pi/subagent`.
 
 The route creates one hidden child with an empty tool allowlist. The selected model must exist, have provider authentication, and support image input. The image must be PNG, JPEG, GIF, or WebP.
 

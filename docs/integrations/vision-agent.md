@@ -35,13 +35,21 @@ The tool selects a model in this order:
 
 The value `inherit` selects the parent model. It succeeds only when that model supports image input.
 
-The **Vision agent** drawer stores overrides in the `vision_overrides` table in `~/.local/share/leyline/memory.sqlite`. A session fork copies its session override. The drawer lists only models that report image input support.
+The **Vision agent** drawer stores overrides in the `vision_overrides` table in `~/.local/share/leyline/memory.sqlite`. The drawer lists only models that report image input support.
+
+## Thinking selection
+
+The drawer stores model and thinking values independently at each scope. Each value uses session, project, then global precedence. A scope can contain a thinking value without a model value.
+
+The **Thinking mode** card appears when the effective vision model supports reasoning. It provides the model's supported levels, **Match parent session**, and **Default (no override)**. **Match parent session** resolves to the parent session's current thinking level when the vision child starts.
+
+A session fork copies both values from its session override.
 
 ## Composer delegation
 
 Before Leyline submits an image to a parent model without image support, it completes these actions:
 
-1. Resolve the session, project, or global vision model.
+1. Resolve the session, project, or global vision model and thinking value.
 2. Run one hidden vision child for each attached image.
 3. Build a text block from the returned descriptions.
 4. Submit the original prompt and images to pi for transcript persistence.
@@ -65,6 +73,7 @@ The server creates each vision child through the normal subagent runtime path. T
 
 - Its model must support image input.
 - Its active tool allowlist is empty.
+- Its thinking level uses the effective vision override when one is set.
 - Its session contains the `leyline-subagent-session` marker and stays hidden from the sidebar.
 - Its JSONL history keeps the vision prompt and image.
 - A session-local settings override permits image input without changing the user's persisted pi image setting.
@@ -84,7 +93,7 @@ The direct vision execution route also aborts its child when the HTTP connection
 The integration uses these routes:
 
 1. `GET /api/pi/vision/config` reads visible overrides for the browser.
-2. `PUT|DELETE /api/pi/vision/override` changes one override. The PUT body carries the scope plus optional `model` and `thinking` values.
+2. `PUT|DELETE /api/pi/vision/override` changes one scope. PUT accepts optional `model` and `thinking` values. DELETE removes both values.
 3. `POST /api/pi/vision/resolve` resolves stored configuration for the extension.
 4. `POST /api/pi/vision` runs one vision child.
 

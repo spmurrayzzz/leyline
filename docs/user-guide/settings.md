@@ -73,18 +73,19 @@ The setting does not change a row that is already in the transcript. The **Think
 
 ## Manage the vision agent
 
-![Vision agent drawer with transcript, project, and global model scopes](../assets/screenshots/vision-agent.png)
+![Vision agent drawer with scoped model and thinking overrides](../assets/screenshots/vision-agent.png)
 
-*The drawer lists only models that support image input.*
+*The drawer lists only models that support image input. Thinking mode appears when the effective model supports reasoning.*
 
 1. Find **Agents**.
 2. Select **Manage** beside **Vision agent**.
 3. Select **Transcript**, **Project**, or **Global**.
 4. Select a vision model.
+5. If **Thinking mode** appears, select its thinking level.
 
-A **Transcript** override applies only to the current session and copies to forks. A **Project** override applies to all sessions in the project. The **Global** model supplies the default for other projects.
+A **Transcript** override applies only to the current session and copies to forks. A **Project** override applies to all sessions in the project. **Global** supplies the default for other projects.
 
-Leyline uses transcript, project, then global precedence. Select **Inherit from lower scope** to remove a transcript or project override. Select **None configured** to remove the global default.
+The model and thinking values use transcript, project, then global precedence independently. Select **Inherit from lower scope** to remove a transcript or project model override. Select **None configured** to remove the global model. **Default (no override)** removes the current thinking value. **Match parent session** uses the parent's current thinking level.
 
 The **Transcript** scope is unavailable before a session exists. On the start screen, the drawer selects **Project**.
 
