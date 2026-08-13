@@ -1,6 +1,3 @@
-import { FitAddon } from '@xterm/addon-fit'
-import { Terminal } from '@xterm/xterm'
-import '@xterm/xterm/css/xterm.css'
 import { nextTick, ref } from 'vue'
 import { backendWebSocketUrl } from '../lib/backend'
 
@@ -47,6 +44,10 @@ export function useTerminal() {
     terminalStatus.value = 'connecting'
     await nextTick()
     if (!terminalEl.value) return
+
+    const { FitAddon } = await import('@xterm/addon-fit')
+    const { Terminal } = await import('@xterm/xterm')
+    await import('@xterm/xterm/css/xterm.css')
 
     const runId = terminalRunId + 1
     terminalRunId = runId

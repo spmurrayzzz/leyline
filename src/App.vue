@@ -1,16 +1,24 @@
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import PierrePreview from './components/PierrePreview.vue'
-import LiveAssistantMessage from './components/LiveAssistantMessage.vue'
-import ProjectBrowser from './components/ProjectBrowser.vue'
-import ProjectDetailDrawer from './components/ProjectDetailDrawer.vue'
-import MemoryInspector from './components/MemoryInspector.vue'
-import SessionComposer from './components/SessionComposer.vue'
-import SubagentConfigDrawer from './components/SubagentConfigDrawer.vue'
-import VisionConfigDrawer from './components/VisionConfigDrawer.vue'
+import {
+  computed,
+  defineAsyncComponent,
+  nextTick,
+  onMounted,
+  onUnmounted,
+  ref,
+  watch,
+} from 'vue'
+const TranscriptEntry = defineAsyncComponent(() => import('./components/TranscriptEntry.vue'))
+const LiveAssistantMessage = defineAsyncComponent(() => import('./components/LiveAssistantMessage.vue'))
+const PierrePreview = defineAsyncComponent(() => import('./components/PierrePreview.vue'))
+const ProjectBrowser = defineAsyncComponent(() => import('./components/ProjectBrowser.vue'))
+const ProjectDetailDrawer = defineAsyncComponent(() => import('./components/ProjectDetailDrawer.vue'))
+const MemoryInspector = defineAsyncComponent(() => import('./components/MemoryInspector.vue'))
+const SessionComposer = defineAsyncComponent(() => import('./components/SessionComposer.vue'))
+const SubagentConfigDrawer = defineAsyncComponent(() => import('./components/SubagentConfigDrawer.vue'))
+const VisionConfigDrawer = defineAsyncComponent(() => import('./components/VisionConfigDrawer.vue'))
 import StartComposer from './components/StartComposer.vue'
 import SessionSidebar from './components/SessionSidebar.vue'
-import TranscriptEntry from './components/TranscriptEntry.vue'
 import { useBackendConnections } from './composables/useBackendConnections'
 import { useLiveTurnProjection } from './composables/useLiveTurnProjection'
 import { useMemoryInspector } from './composables/useMemoryInspector'
@@ -1454,9 +1462,17 @@ function trimNumber(value) {
   return value.toFixed(1).replace(/\.0$/, '')
 }
 
+function retryComposerFocus(attempt = 0) {
+  if (composerRef.value) {
+    composerRef.value.focus()
+    return
+  }
+  if (attempt < 40) setTimeout(() => retryComposerFocus(attempt + 1), 50)
+}
+
 async function refocusComposer() {
   await nextTick()
-  composerRef.value?.focus()
+  retryComposerFocus()
 }
 
 function beginInProjectNewSessionRun() {
@@ -1794,7 +1810,7 @@ function startEditingEntry(entry) {
   }))
   promptError.value = ''
   closePickerMenus()
-  nextTick(() => composerRef.value?.focus())
+  nextTick(() => retryComposerFocus())
 }
 
 async function retryEntry(entry) {
