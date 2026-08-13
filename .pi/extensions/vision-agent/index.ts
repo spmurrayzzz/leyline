@@ -91,8 +91,29 @@ function resultFailed(result: any): boolean {
 }
 
 export default function visionAgentExtension(pi: ExtensionAPI) {
+  const toolName = "vision_agent";
+  let suppressedForVision = false;
+
+  function syncToolAvailability(model: ExtensionContext["model"]) {
+    const activeTools = pi.getActiveTools();
+    const isActive = activeTools.includes(toolName);
+
+    if (model?.input?.includes("image")) {
+      if (isActive) {
+        suppressedForVision = true;
+        pi.setActiveTools(activeTools.filter((name) => name !== toolName));
+      }
+      return;
+    }
+
+    if (suppressedForVision && !isActive) {
+      pi.setActiveTools([...activeTools, toolName]);
+    }
+    suppressedForVision = false;
+  }
+
   pi.registerTool({
-    name: "vision_agent",
+    name: toolName,
     label: "Vision agent",
     description:
       "Inspect an image file using a separate vision-capable model and return a detailed text description.\n" +
@@ -121,6 +142,10 @@ export default function visionAgentExtension(pi: ExtensionAPI) {
       _onUpdate: ((partial: string) => void) | undefined,
       ctx: ExtensionContext,
     ) {
+      if (ctx.model?.input?.includes("image")) {
+        throw new Error("The current model supports image input. Use read to inspect the image file directly.");
+      }
+
       const cwd = params.cwd || ctx.cwd;
       const rawPath = params.path || "";
       if (!rawPath) throw new Error("path is required");
@@ -192,6 +217,14 @@ export default function visionAgentExtension(pi: ExtensionAPI) {
         };
       }
     },
+  });
+
+  pi.on("session_start", (_event, ctx) => {
+    syncToolAvailability(ctx.model);
+  });
+
+  pi.on("model_select", (event) => {
+    syncToolAvailability(event.model);
   });
 }
 
