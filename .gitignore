@@ -7,3 +7,4 @@ dist/
 /screenshots/
 /MEMORY.md
 release/
+.lighthouse/
