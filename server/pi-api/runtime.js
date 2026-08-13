@@ -782,6 +782,50 @@ async function trashSession(id) {
   return { path: trashPath }
 }
 
+async function trashProject(cwd) {
+  if (!cwd) throw new Error('Project cwd is required')
+
+  const sessions = (await listSessions())
+    .filter((session) => session.cwd === cwd)
+  if (!sessions.length) return { count: 0, path: '' }
+
+  for (const session of sessions) {
+    const handle = runtimeHandles.get(session.id)
+    if (!handle) continue
+    if (handle.runtime.session.isStreaming) {
+      throw new Error('Wait for the current response to finish before deleting.')
+    }
+    if (handle.runtime.session.isCompacting) {
+      throw new Error('Wait for compaction to finish before deleting.')
+    }
+  }
+
+  const stamp = trashStamp()
+  const moved = []
+  for (const session of sessions) {
+    const handle = runtimeHandles.get(session.id)
+    if (handle && !existsSync(session.path)) {
+      discardRuntimeHandle(handle)
+      continue
+    }
+    if (!handle && !existsSync(session.path)) continue
+
+    const trashPath = trashSessionPath(session, stamp)
+    await mkdir(dirname(trashPath), { recursive: true })
+    try {
+      await rename(session.path, trashPath)
+      moved.push(trashPath)
+    } catch (error) {
+      if (!isActiveSession(session.id) || error?.code !== 'ENOENT') throw error
+      discardActiveSession()
+    }
+
+    if (handle) discardRuntimeHandle(handle)
+  }
+
+  return { count: moved.length, path: moved[0] || '' }
+}
+
 function discardActiveSession() {
   if (!activeHandle) return
   discardRuntimeHandle(activeHandle)
@@ -797,14 +841,17 @@ function discardRuntimeHandle(handle) {
   if (activeHandle === handle) setActiveHandle(undefined)
 }
 
-function trashSessionPath(session) {
+function trashSessionPath(session, stamp = trashStamp()) {
   const sessionDir = configuredSessionDir(session.cwd) || dirname(session.path)
   const rel = relative(sessionDir, session.path)
   const safeRel = rel && !rel.startsWith('..') && rel !== session.path
     ? rel
     : basename(session.path)
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-')
   return join(dirname(sessionDir), 'leyline-trash', stamp, safeRel)
+}
+
+function trashStamp() {
+  return new Date().toISOString().replace(/[:.]/g, '-')
 }
 
 async function reloadSession(handle) {
@@ -1230,6 +1277,7 @@ export function createPiRuntimeApi() {
   switchActiveSession,
   toActiveSessionDetailDto,
   toSessionDto,
+  trashProject,
   trashSession,
   updateMemory,
   runSubagent,

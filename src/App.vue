@@ -242,10 +242,12 @@ const {
   availableThinkingLevels,
   beginRenameSession,
   beginStartupRun,
+  cancelDeleteProject,
   cancelDeleteSession,
   cancelRenameSession,
   commitRenameSession,
   composerRuntime,
+  confirmDeleteProject,
   confirmDeleteSession,
   contextUsage,
   createSession: workspaceCreateSession,
@@ -253,10 +255,13 @@ const {
   creatingSessionCwd,
   currentModelLabel,
   currentThinkingLabel,
+  deleteConfirmProject,
   deleteConfirmSession,
-  deleteSessionButtonLabel,
+  deleteProjectError,
+  deleteProjectPhase,
   deleteSessionError,
   deleteSessionPhase,
+  deletingProjectCwd,
   deletingSessionId,
   finishStartupRun,
   forkSession,
@@ -280,6 +285,7 @@ const {
   renamingSessionId,
   renamingSessionSavingId,
   renamingSessionSource,
+  requestDeleteProject,
   requestDeleteSession,
   resetSessionToEntry,
   runStartupPhase,
@@ -897,6 +903,42 @@ function openProjectDetail(project) {
 
 function closeProjectDetail() {
   projectDetailCwd.value = ''
+}
+
+const deleteConfirmActive = computed(() => {
+  return !!deleteConfirmSession.value || !!deleteConfirmProject.value
+})
+const confirmDeleteBusy = computed(() => {
+  return !!(deletingSessionId.value || deletingProjectCwd.value)
+})
+const confirmDeleteLabel = computed(() => {
+  return deleteSessionPhase.value === 'deleting'
+    || deleteProjectPhase.value === 'deleting'
+    ? 'Deleting…'
+    : 'Delete'
+})
+const confirmDeleteError = computed(() => {
+  return deleteSessionError.value || deleteProjectError.value
+})
+const confirmDeleteTitleId = computed(() => {
+  return deleteConfirmProject.value
+    ? 'delete-project-title'
+    : 'delete-session-title'
+})
+const projectDeleteSessionCount = computed(() => {
+  const project = deleteConfirmProject.value
+  if (!project) return 0
+  return sessions.value.filter((session) => {
+    return session.cwd === project.cwd
+  }).length
+})
+function cancelConfirmDelete() {
+  cancelDeleteSession()
+  cancelDeleteProject()
+}
+function confirmPendingDelete() {
+  if (deleteConfirmProject.value) confirmDeleteProject()
+  else confirmDeleteSession()
 }
 
 async function handleNativeToggleTerminal() {
@@ -2212,7 +2254,7 @@ function handleEscape(event) {
   if (memoryOpen.value) closeMemoryDrawer()
   closeToolFullscreen()
   closeProjectBrowser()
-  cancelDeleteSession()
+  cancelConfirmDelete()
   cancelEditingEntry()
   closePickerMenus()
 }
@@ -2423,6 +2465,7 @@ function closePickerMenus() {
       :backend-connections="backendConnections"
       :creating-session-cwd="creatingSessionCwd"
       :default-backend-connection-id="defaultBackendConnectionId"
+      :deleting-project-cwd="deletingProjectCwd"
       :deleting-session-id="deletingSessionId"
       :expanded-project="isProjectExpanded"
       :highlighted-text="highlightedText"
@@ -2450,6 +2493,7 @@ function closePickerMenus() {
       @open-project-detail="openProjectDetail"
       @open-settings="toggleSettingsDrawer"
       @reload-session="reloadSession"
+      @request-delete-project="requestDeleteProject"
       @request-delete-session="requestDeleteSession"
       @retry-sessions="retrySessions"
       @select-backend="switchBackendConnection"
@@ -2944,16 +2988,16 @@ function closePickerMenus() {
     </section>
 
     <div
-      v-if="deleteConfirmSession"
+      v-if="deleteConfirmActive"
       class="confirm-backdrop"
       role="presentation"
-      @click.self="cancelDeleteSession"
+      @click.self="cancelConfirmDelete"
     >
       <section
         class="confirm-modal"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="delete-session-title"
+        :aria-labelledby="confirmDeleteTitleId"
       >
         <div class="confirm-icon">
           <svg viewBox="0 0 16 16" aria-hidden="true">
@@ -2965,27 +3009,36 @@ function closePickerMenus() {
           </svg>
         </div>
         <div class="confirm-copy">
-          <h2 id="delete-session-title">Delete session?</h2>
-          <p>
+          <h2 :id="confirmDeleteTitleId">
+            {{ deleteConfirmProject ? 'Delete project?' : 'Delete session?' }}
+          </h2>
+          <p v-if="deleteConfirmProject">
+            Move “{{ deleteConfirmProject.name }}”
+            <template v-if="projectDeleteSessionCount > 0">
+              and its {{ projectDeleteSessionCount }} sessions
+            </template>
+            to Leyline trash.
+          </p>
+          <p v-else>
             Move “{{ sessionTitle(deleteConfirmSession) }}” to Leyline trash.
           </p>
-          <p v-if="deleteSessionError" class="confirm-error">
-            {{ deleteSessionError }}
+          <p v-if="confirmDeleteError" class="confirm-error">
+            {{ confirmDeleteError }}
           </p>
         </div>
         <div class="confirm-actions">
           <button
             type="button"
             class="confirm-cancel"
-            :disabled="!!deletingSessionId"
-            @click="cancelDeleteSession"
+            :disabled="confirmDeleteBusy"
+            @click="cancelConfirmDelete"
           >Cancel</button>
           <button
             type="button"
             class="confirm-delete"
-            :disabled="!!deletingSessionId"
-            @click="confirmDeleteSession"
-          >{{ deleteSessionButtonLabel() }}</button>
+            :disabled="confirmDeleteBusy"
+            @click="confirmPendingDelete"
+          >{{ confirmDeleteLabel }}</button>
         </div>
       </section>
     </div>

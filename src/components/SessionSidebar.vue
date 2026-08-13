@@ -33,6 +33,10 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  deletingProjectCwd: {
+    type: String,
+    default: '',
+  },
   expandedProject: {
     type: Function,
     required: true,
@@ -108,6 +112,7 @@ const emit = defineEmits([
   'open-project-detail',
   'open-settings',
   'reload-session',
+  'request-delete-project',
   'request-delete-session',
   'retry-sessions',
   'select-backend',
@@ -391,6 +396,23 @@ const onAfterLeave = (el) => {
             @click="emit('create-session', project)"
           >
             +
+          </button>
+          <button
+            class="project-delete-button"
+            type="button"
+            :disabled="deletingProjectCwd === project.cwd"
+            title="Trash project"
+            aria-label="Trash project"
+            @click="emit('request-delete-project', project)"
+          >
+            <span v-if="deletingProjectCwd === project.cwd">…</span>
+            <svg v-else viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M3.5 4.5h9"></path>
+              <path d="M6.5 4.5v-2h3v2"></path>
+              <path d="M5 6.5l.5 6h5l.5-6"></path>
+              <path d="M7 7.5v4"></path>
+              <path d="M9 7.5v4"></path>
+            </svg>
           </button>
         </div>
 

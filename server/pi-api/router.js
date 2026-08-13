@@ -49,6 +49,7 @@ export function createPiApiHandler(api) {
     switchActiveSession,
     toActiveSessionDetailDto,
     toSessionDto,
+    trashProject,
     trashSession,
     updateMemory,
     renderSessionExportHtml,
@@ -87,6 +88,15 @@ async function piApiHandler(req, res) {
           return json(res, { error: 'Method not allowed' }, 405)
         }
         return json(res, { projects: await listProjects() })
+      }
+
+      const projectMatch = url.pathname.match(/^\/projects\/([^/]+)$/)
+      if (projectMatch) {
+        if (req.method !== 'DELETE') {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+        const trashed = await trashProject(decodeURIComponent(projectMatch[1]))
+        return json(res, { ok: true, trashed })
       }
 
       if (url.pathname === '/sessions') {

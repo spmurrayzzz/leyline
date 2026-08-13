@@ -50,6 +50,14 @@ export function deletePiSession(id) {
   )
 }
 
+export function deletePiProject(cwd) {
+  return apiRequest(
+    `/api/pi/projects/${encodeURIComponent(cwd)}`,
+    'Failed to delete project',
+    { method: 'DELETE' },
+  )
+}
+
 export function renamePiSession(session, name) {
   const id = typeof session === 'string' ? session : session.id
   return apiRequest(

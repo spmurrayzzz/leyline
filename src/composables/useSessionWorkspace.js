@@ -4,6 +4,7 @@ import { formatMode, modelChip, projectName } from '../lib/format'
 import {
   activatePiSession,
   createPiSession,
+  deletePiProject,
   deletePiSession,
   fetchPiRuntimeState,
   fetchProjects,
@@ -63,6 +64,10 @@ export function useSessionWorkspace({
   const deleteConfirmSession = ref(null)
   const deleteSessionError = ref('')
   const deleteSessionPhase = ref('')
+  const deletingProjectCwd = ref('')
+  const deleteConfirmProject = ref(null)
+  const deleteProjectError = ref('')
+  const deleteProjectPhase = ref('')
   const forkingEntryId = ref('')
   const resettingEntryId = ref('')
   const initPhase = ref('sessions')
@@ -769,6 +774,74 @@ export function useSessionWorkspace({
     }
   }
 
+  function requestDeleteProject(project) {
+    if (!project?.cwd || deletingProjectCwd.value) return
+    deleteConfirmProject.value = project
+    deleteProjectError.value = ''
+    deleteProjectPhase.value = ''
+  }
+
+  function cancelDeleteProject() {
+    if (deletingProjectCwd.value) return
+    deleteConfirmProject.value = null
+    deleteProjectError.value = ''
+    deleteProjectPhase.value = ''
+  }
+
+  function deleteProjectButtonLabel() {
+    if (deleteProjectPhase.value === 'deleting') return 'Deleting…'
+    return 'Delete'
+  }
+
+  async function confirmDeleteProject() {
+    const project = deleteConfirmProject.value
+    if (!project?.cwd || deletingProjectCwd.value) return
+
+    deletingProjectCwd.value = project.cwd
+    deleteProjectPhase.value = 'deleting'
+    sessionError.value = ''
+    deleteProjectError.value = ''
+
+    try {
+      await deletePiProject(project.cwd)
+      const selectedWasInProject = sessions.value.some((session) => {
+        return session.cwd === project.cwd
+          && session.id === selectedSessionId.value
+      })
+      sessions.value = sessions.value.filter((session) => {
+        return session.cwd !== project.cwd
+      })
+      projectSummaries.value = projectSummaries.value.filter((item) => {
+        return item.cwd !== project.cwd
+      })
+      const nextRuntimeSessions = {}
+      for (const [id, state] of Object.entries(runtimeSessionsById.value)) {
+        if (state.cwd === project.cwd) continue
+        nextRuntimeSessions[id] = state
+      }
+      runtimeSessionsById.value = nextRuntimeSessions
+      deleteConfirmProject.value = null
+      if (selectedWasInProject) {
+        const cwd = projectSummaries.value.length
+          ? projectSummaries.value[0].cwd
+          : (sessions.value[0]?.cwd || '')
+        clearSelectedSession()
+        newSessionCwd.value = cwd
+        if (cwd) loadStartRuntimeState(cwd)
+        updateSessionRoute('')
+      } else if (newSessionCwd.value === project.cwd) {
+        newSessionCwd.value = projectSummaries.value[0]?.cwd
+          || sessions.value[0]?.cwd
+          || ''
+      }
+    } catch (error) {
+      deleteProjectError.value = error.message
+    } finally {
+      deletingProjectCwd.value = ''
+      deleteProjectPhase.value = ''
+    }
+  }
+
   async function forkSession(entry) {
     if (!entry?.id || !canBranchFromEntry()) return
 
@@ -1292,11 +1365,13 @@ export function useSessionWorkspace({
     beginRenameSession,
     beginStartupRun,
     cancelDeleteSession,
+    cancelDeleteProject,
     cancelRenameSession,
     clearSelectedSession,
     commitRenameSession,
     composerRuntime,
     confirmDeleteSession,
+    confirmDeleteProject,
     contextUsage,
     createSession,
     createSessionForCwd,
@@ -1304,10 +1379,15 @@ export function useSessionWorkspace({
     currentModelLabel,
     currentThinkingLabel,
     deleteConfirmSession,
+    deleteConfirmProject,
     deleteSessionButtonLabel,
+    deleteProjectButtonLabel,
     deleteSessionError,
+    deleteProjectError,
     deleteSessionPhase,
+    deleteProjectPhase,
     deletingSessionId,
+    deletingProjectCwd,
     dispose,
     finishStartupRun,
     forkingEntryId,
@@ -1334,6 +1414,7 @@ export function useSessionWorkspace({
     renamingSessionSavingId,
     renamingSessionSource,
     requestDeleteSession,
+    requestDeleteProject,
     resettingEntryId,
     resetSessionToEntry,
     runStartupPhase,

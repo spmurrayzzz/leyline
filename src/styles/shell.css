@@ -434,7 +434,7 @@ kbd {
 
 .project-title {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: 1fr auto auto auto;
   align-items: center;
   gap: 3px;
   margin-bottom: 2px;
@@ -517,10 +517,14 @@ kbd {
   transition-timing-function: var(--ease-accelerate);
 }
 
-.project-detail-button,
-.new-session-button {
+.project-title .project-detail-button,
+.project-title .new-session-button,
+.project-title .project-delete-button {
+  display: grid;
+  place-items: center;
   width: 20px;
   height: 20px;
+  padding: 0;
   color: var(--muted);
   font-size: 14px;
   line-height: 1;
@@ -532,16 +536,30 @@ kbd {
     opacity var(--motion-base) var(--ease-decelerate);
 }
 
+.project-title .project-delete-button {
+  color: #fca5a5;
+}
+
 .project-title:hover .project-detail-button,
 .project-title:focus-within .project-detail-button,
 .project-title:hover .new-session-button,
-.project-title:focus-within .new-session-button {
+.project-title:focus-within .new-session-button,
+.project-title:hover .project-delete-button,
+.project-title:focus-within .project-delete-button {
   opacity: 1;
 }
 
 .project-detail-button:hover,
-.new-session-button:hover {
+.new-session-button:hover,
+.project-delete-button:hover {
   color: var(--text);
+  transition-duration: var(--motion-quick);
+  transition-timing-function: var(--ease-accelerate);
+}
+
+.project-title .project-delete-button:hover {
+  color: #fca5a5;
+  background: rgb(248 113 113 / 10%);
   transition-duration: var(--motion-quick);
   transition-timing-function: var(--ease-accelerate);
 }
@@ -550,7 +568,8 @@ kbd {
   opacity: 0.45;
 }
 
-.project-title .project-detail-button:disabled {
+.project-detail-button:disabled,
+.project-delete-button:disabled {
   opacity: 0;
   pointer-events: none;
 }
@@ -725,7 +744,8 @@ kbd {
 
 .session-rename-button svg,
 .session-delete-button svg,
-.delete-session-button svg {
+.delete-session-button svg,
+.project-delete-button svg {
   width: 13px;
   height: 13px;
   fill: none;
