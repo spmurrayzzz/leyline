@@ -40,8 +40,8 @@ export function createPiApiHandler(api) {
     setMemoryStatus,
     setRolloutFeedback,
     setSubagentModelOverride,
-    setVisionModelOverride,
-    deleteVisionModelOverride,
+    setVisionOverride,
+    clearVisionOverride,
     setSessionMode,
     setSessionModel,
     setSessionThinkingLevel,
@@ -456,20 +456,21 @@ async function piApiHandler(req, res) {
         }))
       }
 
-      if (url.pathname === '/vision/model') {
+      if (url.pathname === '/vision/override') {
         if (!['PUT', 'DELETE'].includes(req.method)) {
           return json(res, { error: 'Method not allowed' }, 405)
         }
         const body = await readJson(req)
         if (req.method === 'PUT') {
-          return json(res, setVisionModelOverride({
+          return json(res, setVisionOverride({
             cwd: body.cwd,
             model: body.model,
+            thinking: body.thinking,
             scope: body.scope,
             sessionPath: body.sessionPath,
           }))
         }
-        return json(res, deleteVisionModelOverride({
+        return json(res, clearVisionOverride({
           cwd: body.cwd,
           scope: body.scope,
           sessionPath: body.sessionPath,
@@ -506,6 +507,7 @@ async function piApiHandler(req, res) {
             cwd: body.cwd,
             parentSessionPath: body.parentSessionPath,
             model: body.model,
+            thinking: body.thinking,
             image: body.image,
             signal: controller.signal,
           })

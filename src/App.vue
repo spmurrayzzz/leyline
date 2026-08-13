@@ -44,14 +44,14 @@ import {
   editPrompt,
   fetchSessionDetailByPath,
   clearSubagentModelOverride,
-  clearVisionModelOverride,
+  clearVisionOverride,
   fetchSubagentConfigs,
   fetchVisionConfig,
   interruptPiSession,
   runShellCommand,
   setEntryFeedback,
   setSubagentModelOverride,
-  setVisionModelOverride,
+  setVisionOverride,
   submitPrompt,
 } from './lib/pi-api'
 import {
@@ -1359,7 +1359,14 @@ async function loadVisionConfig() {
     visionConfigLoading.value = false
     visionConfigSaving.value = false
     visionConfigError.value = ''
-    visionConfigData.value = { context: {}, overrides: {}, model: '', modelSource: 'none' }
+    visionConfigData.value = {
+      context: {},
+      overrides: {},
+      model: '',
+      modelSource: 'none',
+      thinking: '',
+      thinkingSource: 'none',
+    }
     return
   }
   const token = ++visionConfigRequestToken
@@ -1368,7 +1375,14 @@ async function loadVisionConfig() {
   if (visionConfigOpen.value) visionConfigLoading.value = true
   visionConfigSaving.value = false
   visionConfigError.value = ''
-  visionConfigData.value = { context: {}, overrides: {}, model: '', modelSource: 'none' }
+  visionConfigData.value = {
+    context: {},
+    overrides: {},
+    model: '',
+    modelSource: 'none',
+    thinking: '',
+    thinkingSource: 'none',
+  }
   try {
     const data = await fetchVisionConfig(target)
     if (currentVisionRequest(token, sessionKey)) visionConfigData.value = data
@@ -1392,7 +1406,14 @@ async function openVisionConfig() {
     visionConfigLoading.value = false
     visionConfigSaving.value = false
     visionConfigError.value = 'No project selected yet. Open a session or choose a project to manage the vision model.'
-    visionConfigData.value = { context: {}, overrides: {}, model: '', modelSource: 'none' }
+    visionConfigData.value = {
+      context: {},
+      overrides: {},
+      model: '',
+      modelSource: 'none',
+      thinking: '',
+      thinkingSource: 'none',
+    }
     return
   }
   await loadVisionConfig()
@@ -1407,11 +1428,16 @@ async function saveVisionModel(payload) {
   visionConfigSaving.value = true
   visionConfigError.value = ''
   try {
-    const data = await setVisionModelOverride(target, payload.scope, payload.model)
+    const data = await setVisionOverride(
+      target,
+      payload.scope,
+      payload.model,
+      payload.thinking,
+    )
     if (currentVisionRequest(token, sessionKey)) visionConfigData.value = data
   } catch (error) {
     if (currentVisionRequest(token, sessionKey)) {
-      visionConfigError.value = error.message || 'Failed to update vision model'
+      visionConfigError.value = error.message || 'Failed to update vision agent'
     }
   } finally {
     if (currentVisionRequest(token, sessionKey)) visionConfigSaving.value = false
@@ -1427,11 +1453,11 @@ async function resetVisionModel(payload) {
   visionConfigSaving.value = true
   visionConfigError.value = ''
   try {
-    const data = await clearVisionModelOverride(target, payload.scope)
+    const data = await clearVisionOverride(target, payload.scope)
     if (currentVisionRequest(token, sessionKey)) visionConfigData.value = data
   } catch (error) {
     if (currentVisionRequest(token, sessionKey)) {
-      visionConfigError.value = error.message || 'Failed to reset vision model'
+      visionConfigError.value = error.message || 'Failed to reset vision agent'
     }
   } finally {
     if (currentVisionRequest(token, sessionKey)) visionConfigSaving.value = false
@@ -3315,8 +3341,8 @@ function closePickerMenus() {
           :saving="visionConfigSaving"
           @close="visionConfigOpen = false"
           @refresh="loadVisionConfig"
-          @reset-model="resetVisionModel"
-          @set-model="saveVisionModel"
+          @reset="resetVisionModel"
+          @save="saveVisionModel"
         />
       </div>
     </Transition>

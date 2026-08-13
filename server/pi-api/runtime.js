@@ -52,13 +52,13 @@ import {
   setSubagentModelOverride,
 } from './subagents.js'
 import {
+  clearVisionOverride,
   copySessionVisionOverrides,
-  deleteVisionModelOverride,
   installVisionDelegationContext,
   listVisionConfig,
   registerVisionDelegation,
   resolveVisionConfig,
-  setVisionModelOverride,
+  setVisionOverride,
 } from './vision.js'
 import {
   createAgentSessionFromServices,
@@ -503,6 +503,7 @@ async function prepareVisionDelegation(handle, text, images, signal) {
       cwd,
       parentSessionPath: sessionPath,
       model: resolved.model,
+      thinking: effectiveVisionThinking(resolved.thinking, session.thinkingLevel),
       image,
       signal,
     }).then((result) => ({
@@ -1113,19 +1114,29 @@ const VISION_AGENT_PROMPT =
   'If the user asked a specific question, answer it directly first, then give ' +
   'the surrounding detail the parent needs.'
 
-async function runVision({ question, cwd, parentSessionPath, model, image, signal }) {
+async function runVision({ question, cwd, parentSessionPath, model, thinking, image, signal }) {
   if (!image) throw new Error('image is required')
   return runSubagent({
     task: question || 'Describe this image in detail.',
     cwd,
     parentSessionPath,
     model,
+    thinkingLevel: thinking,
     tools: [],
     isolatedSystemPrompt: VISION_AGENT_PROMPT,
     images: [image],
     allowImages: true,
     signal,
   })
+}
+
+function effectiveVisionThinking(thinking, parentThinkingLevel) {
+  if (!thinking) return undefined
+  if (thinking === 'inherit') {
+    return normalizeSubagentThinkingLevel(parentThinkingLevel)
+  }
+  if (!SUBAGENT_THINKING_LEVELS.has(thinking)) return undefined
+  return thinking
 }
 
 function normalizeSubagentThinkingLevel(thinkingLevel) {
@@ -1209,8 +1220,8 @@ export function createPiRuntimeApi() {
   setMemoryStatus,
   setSubagentModelOverride,
   deleteSubagentModelOverride,
-  setVisionModelOverride,
-  deleteVisionModelOverride,
+  setVisionOverride,
+  clearVisionOverride,
   setSessionMode,
   setSessionModel,
   setRolloutFeedback,

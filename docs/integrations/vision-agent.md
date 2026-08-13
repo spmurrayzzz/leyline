@@ -84,7 +84,7 @@ The direct vision execution route also aborts its child when the HTTP connection
 The integration uses these routes:
 
 1. `GET /api/pi/vision/config` reads visible overrides for the browser.
-2. `PUT|DELETE /api/pi/vision/model` changes one override.
+2. `PUT|DELETE /api/pi/vision/override` changes one override. The PUT body carries the scope plus optional `model` and `thinking` values.
 3. `POST /api/pi/vision/resolve` resolves stored configuration for the extension.
 4. `POST /api/pi/vision` runs one vision child.
 

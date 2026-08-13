@@ -59,6 +59,23 @@ function getParentSessionPath(ctx: ExtensionContext): string | null {
   }
 }
 
+const VISION_THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
+
+type ThinkingLevel = (typeof VISION_THINKING_LEVELS)[number];
+
+function visionThinkingOverride(
+  configured: string | undefined,
+  parentThinkingLevel: ThinkingLevel | undefined,
+): ThinkingLevel | undefined {
+  const setting = configured?.trim();
+  if (!setting) return undefined;
+  if (setting === "inherit") return parentThinkingLevel;
+  if ((VISION_THINKING_LEVELS as readonly string[]).includes(setting)) {
+    return setting as ThinkingLevel;
+  }
+  return undefined;
+}
+
 function visionModelForOverride(
   override: string | undefined,
   scopedModel: string | undefined,
@@ -177,7 +194,7 @@ export default function visionAgentExtension(pi: ExtensionAPI) {
         const resolved = await callLeylineApi("/vision/resolve", {
           cwd,
           sessionPath: parentSessionPath,
-        }, signal) as { model?: string; modelSource?: string };
+        }, signal) as { model?: string; modelSource?: string; thinking?: string; thinkingSource?: string };
 
         const selectedModel = visionModelForOverride(params.model, resolved.model, ctx);
         if (!selectedModel) {
@@ -189,11 +206,14 @@ export default function visionAgentExtension(pi: ExtensionAPI) {
           };
         }
 
+        const selectedThinking = visionThinkingOverride(resolved.thinking, pi.getThinkingLevel());
+
         const result = await callLeylineApi("/vision", {
           question: params.question || "Describe this image in detail so an agent that cannot see it understands what it shows.",
           cwd,
           parentSessionPath,
           model: selectedModel,
+          thinking: selectedThinking,
           image: { type: "image", data: imageData, mimeType },
         }, signal) as VisionRun;
 

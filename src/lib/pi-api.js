@@ -112,21 +112,21 @@ export function fetchVisionConfig(session) {
   return apiRequest(`/api/pi/vision/config?${params}`, 'Failed to load vision config')
 }
 
-export function setVisionModelOverride(session, scope, model) {
+export function setVisionOverride(session, scope, model, thinking) {
   return apiRequest(
-    '/api/pi/vision/model',
-    'Failed to update vision model',
+    '/api/pi/vision/override',
+    'Failed to update vision agent',
     {
       method: 'PUT',
-      body: scopedBody(session, { scope, model }),
+      body: scopedBody(session, { scope, model, thinking }),
     },
   )
 }
 
-export function clearVisionModelOverride(session, scope) {
+export function clearVisionOverride(session, scope) {
   return apiRequest(
-    '/api/pi/vision/model',
-    'Failed to reset vision model',
+    '/api/pi/vision/override',
+    'Failed to reset vision agent',
     {
       method: 'DELETE',
       body: scopedBody(session, { scope }),

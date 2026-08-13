@@ -5,6 +5,16 @@ import { basename, dirname, join, resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 
 const SCOPES = new Set(['global', 'project', 'session'])
+const VISION_THINKING_LEVELS = new Set([
+  'inherit',
+  'off',
+  'minimal',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+  'max',
+])
 const VISION_DELEGATION_CUSTOM_TYPE = 'leyline-vision-delegation'
 const sessionDelegations = new WeakMap()
 
@@ -74,59 +84,77 @@ export function registerVisionDelegation(session, images, text, prompt) {
   }
 }
 
+const SCOPE_PRIORITY = ['session', 'project', 'global']
+
 export function listVisionConfig({ cwd, sessionPath }) {
   const context = visionContext(cwd, sessionPath)
   const db = openDb()
   try {
     const overrides = visibleOverrides(db, context)
-    const match = ['session', 'project', 'global']
-      .map((scope) => overrides.find((item) => item.scope === scope))
-      .find(Boolean)
+    const model = effectiveOverride(overrides, 'model')
+    const thinking = effectiveOverride(overrides, 'thinking')
     return {
       context,
       overrides: Object.fromEntries(
-        overrides.map((item) => [item.scope, item.model]),
+        overrides.map((item) => [item.scope, {
+          model: item.model,
+          thinking: item.thinking,
+        }]),
       ),
-      model: match?.model || '',
-      modelSource: match?.scope || 'none',
+      model: model.value,
+      modelSource: model.source,
+      thinking: thinking.value,
+      thinkingSource: thinking.source,
     }
   } finally {
     db.close()
   }
 }
 
-export function setVisionModelOverride({ cwd, model, scope, sessionPath }) {
+export function setVisionOverride({ cwd, model, thinking, scope, sessionPath }) {
   if (!SCOPES.has(scope)) throw new Error('Invalid vision override scope')
-  const value = String(model || '').trim()
-  if (!value) throw new Error('Model is required')
+  const modelValue = String(model || '').trim()
+  const thinkingValue = String(thinking || '').trim()
+  if (thinkingValue && !VISION_THINKING_LEVELS.has(thinkingValue)) {
+    throw new Error(`Invalid vision thinking level: ${thinkingValue}`)
+  }
   const context = visionContext(cwd, sessionPath)
   const identity = scopeIdentity(context, scope)
   const db = openDb()
   try {
-    db.prepare(`
-      INSERT INTO vision_overrides (
-        scope, scope_id, project_id, session_id, session_file,
-        model, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(scope, scope_id) DO UPDATE SET
-        model = excluded.model,
-        updated_at = excluded.updated_at
-    `).run(
-      scope,
-      identity.scopeId,
-      context.projectId,
-      identity.sessionId,
-      identity.sessionFile,
-      value,
-      Date.now(),
-    )
+    if (!modelValue && !thinkingValue) {
+      db.prepare(`
+        DELETE FROM vision_overrides
+        WHERE scope = ? AND scope_id = ?
+      `).run(scope, identity.scopeId)
+    } else {
+      db.prepare(`
+        INSERT INTO vision_overrides (
+          scope, scope_id, project_id, session_id, session_file,
+          model, thinking, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(scope, scope_id) DO UPDATE SET
+          model = excluded.model,
+          thinking = excluded.thinking,
+          updated_at = excluded.updated_at
+      `).run(
+        scope,
+        identity.scopeId,
+        context.projectId,
+        identity.sessionId,
+        identity.sessionFile,
+        modelValue,
+        thinkingValue || null,
+        Date.now(),
+      )
+    }
     return listVisionConfig({ cwd, sessionPath })
   } finally {
     db.close()
   }
 }
 
-export function deleteVisionModelOverride({ cwd, scope, sessionPath }) {
+export function clearVisionOverride({ cwd, scope, sessionPath }) {
   if (!SCOPES.has(scope)) throw new Error('Invalid vision override scope')
   const context = visionContext(cwd, sessionPath)
   const identity = scopeIdentity(context, scope)
@@ -147,12 +175,15 @@ export function resolveVisionConfig({ cwd, sessionPath, staticModel }) {
   const db = openDb()
   try {
     const overrides = visibleOverrides(db, context)
-    const match = ['session', 'project', 'global']
-      .map((scope) => overrides.find((item) => item.scope === scope))
-      .find(Boolean)
+    const model = effectiveOverride(overrides, 'model')
+    const thinking = effectiveOverride(overrides, 'thinking')
     return {
-      model: match?.model || String(staticModel || '').trim() || undefined,
-      modelSource: match?.scope || 'static',
+      model: model.value
+        || String(staticModel || '').trim()
+        || undefined,
+      modelSource: model.source === 'none' ? 'static' : model.source,
+      thinking: thinking.value || undefined,
+      thinkingSource: thinking.source,
     }
   } finally {
     db.close()
@@ -167,16 +198,17 @@ export function copySessionVisionOverrides({ cwd, fromSessionPath, toSessionPath
   const db = openDb()
   try {
     const rows = db.prepare(`
-      SELECT model FROM vision_overrides
+      SELECT model, thinking FROM vision_overrides
       WHERE scope = 'session' AND scope_id = ?
     `).all(source.sessionId)
     const insert = db.prepare(`
       INSERT INTO vision_overrides (
         scope, scope_id, project_id, session_id, session_file,
-        model, updated_at
-      ) VALUES ('session', ?, ?, ?, ?, ?, ?)
+        model, thinking, updated_at
+      ) VALUES ('session', ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(scope, scope_id) DO UPDATE SET
         model = excluded.model,
+        thinking = excluded.thinking,
         updated_at = excluded.updated_at
     `)
     const time = Date.now()
@@ -187,6 +219,7 @@ export function copySessionVisionOverrides({ cwd, fromSessionPath, toSessionPath
         target.sessionId,
         target.sessionFile,
         row.model,
+        row.thinking,
         time,
       )
     }
@@ -252,14 +285,23 @@ function imageSignature(content) {
 
 function visibleOverrides(db, context) {
   return db.prepare(`
-    SELECT scope, model FROM vision_overrides
+    SELECT scope, model, thinking FROM vision_overrides
     WHERE (scope = 'global' AND scope_id = 'global')
       OR (scope = 'project' AND scope_id = ?)
       OR (scope = 'session' AND scope_id = ?)
   `).all(context.projectId, context.sessionId).map((row) => ({
     scope: row.scope,
     model: row.model,
+    thinking: row.thinking || '',
   }))
+}
+
+function effectiveOverride(overrides, field) {
+  for (const scope of SCOPE_PRIORITY) {
+    const hit = overrides.find((item) => item.scope === scope && item[field])
+    if (hit) return { value: hit[field], source: scope }
+  }
+  return { value: '', source: 'none' }
 }
 
 function scopeIdentity(context, scope) {
@@ -320,6 +362,7 @@ function openDb() {
       session_id TEXT,
       session_file TEXT,
       model TEXT NOT NULL,
+      thinking TEXT,
       updated_at INTEGER NOT NULL,
       PRIMARY KEY (scope, scope_id)
     );
@@ -328,6 +371,10 @@ function openDb() {
     CREATE INDEX IF NOT EXISTS idx_vision_overrides_session
       ON vision_overrides(session_id, updated_at DESC);
   `)
+  const columns = db.prepare('PRAGMA table_info(vision_overrides)').all()
+  if (!columns.some((column) => column.name === 'thinking')) {
+    db.exec('ALTER TABLE vision_overrides ADD COLUMN thinking TEXT')
+  }
   return db
 }
 

@@ -1031,15 +1031,21 @@ Response:
     sessionFile: string | null,
     sessionId: string | null
   },
-  overrides: { global?: string, project?: string, session?: string },
+  overrides: {
+    global?: { model: string, thinking: string },
+    project?: { model: string, thinking: string },
+    session?: { model: string, thinking: string }
+  },
   model: string,
-  modelSource: "session" | "project" | "global" | "none"
+  modelSource: "session" | "project" | "global" | "none",
+  thinking: string,
+  thinkingSource: "session" | "project" | "global" | "none"
 }
 ```
 
-The effective model uses session, project, then global precedence. `model` is an empty string when no override applies.
+The effective model and thinking use session, project, then global precedence. `model` is an empty string when no override applies; `thinking` is an empty string when no override applies.
 
-### `PUT /api/pi/vision/model`
+### `PUT /api/pi/vision/override`
 
 **Designation:** Browser configuration route.
 
@@ -1050,15 +1056,16 @@ Request:
   cwd: string,
   sessionPath?: string,
   scope: "global" | "project" | "session",
-  model: string
+  model?: string,
+  thinking?: string
 }
 ```
 
 Response: The same object as `GET /api/pi/vision/config`.
 
-The model must be nonempty. The route stores the value but does not verify model availability or image support. The browser lists only available models with image support.
+At least one of `model` or `thinking` must be nonempty. `thinking` must be `inherit`, `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`; an empty string clears that field on the row. Both empty deletes the override at the scope, so a scope can hold a thinking-only override. The route stores the model without verifying availability or image support. The browser lists only available models with image support.
 
-### `DELETE /api/pi/vision/model`
+### `DELETE /api/pi/vision/override`
 
 **Designation:** Browser configuration route.
 
@@ -1095,7 +1102,9 @@ Response:
 ```text
 {
   model?: string,
-  modelSource: "session" | "project" | "global" | "static"
+  modelSource: "session" | "project" | "global" | "static",
+  thinking?: string,
+  thinkingSource: "session" | "project" | "global" | "none"
 }
 ```
 
@@ -1113,6 +1122,7 @@ Request:
   cwd: string,
   parentSessionPath?: string,
   model?: string | { provider: string, id: string },
+  thinking?: string,
   image: { type: "image", data: string, mimeType: string }
 }
 ```
