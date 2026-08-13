@@ -6,13 +6,13 @@ Start with [local development](./local-development). Then read [architecture](./
 
 The current implementation includes concurrent runtimes, named backend
 connections, SSE updates, transcript projection, scoped memory, rollout
-feedback, subagents, goals, HTML export, and a PTY WebSocket. Packaged Electron
+feedback, subagents, vision delegation, goals, HTML export, and a PTY WebSocket. Packaged Electron
 windows share one native backend process and select their active backend
 independently.
 
 Use these references for implementation details:
 
-- [Integrations](../integrations/) describes the pi SDK, goals, memory, subagents, and terminal.
+- [Integrations](../integrations/) describes the pi SDK, goals, memory, subagents, vision delegation, and terminal.
 - [Realtime events](./realtime-events) describes live runtime delivery.
 - [API reference](../reference/api) gives each HTTP and WebSocket contract.
 - [Project layout](./project-layout) maps the repository modules.

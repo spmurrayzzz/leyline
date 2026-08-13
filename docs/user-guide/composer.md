@@ -74,9 +74,15 @@ Press **Escape** to close the picker.
 
 Paste PNG, JPEG, GIF, or WebP images into the composer. Select **×** on an attachment to remove it.
 
-Leyline warns when the selected model does not support images. Remove the images or select a compatible model before submission.
+Leyline sends images directly to a model that supports image input. For other models, a configured vision agent describes each image before the parent prompt starts. The composer shows this delegation before submission.
+
+If no vision model is configured, the warning blocks submission. Open **Settings**, find **Agents**, and select **Manage** beside **Vision agent**.
+
+Shell commands and `/compact` cannot include images. Vision delegation does not run for extension slash commands, so do not attach images to those commands.
 
 The current composer has no fixed image count or byte limit. Provider and request limits can still reject large attachments.
+
+See [Images and previews](./images-and-previews) for model scope and context behavior.
 
 ## Use browser dictation
 

@@ -1,6 +1,6 @@
 # Images and previews
 
-Leyline supports pasted prompt images and transcript previews for tool output.
+Leyline supports pasted prompt images, vision delegation, and transcript previews for tool output.
 
 ## Attach an image to a prompt
 
@@ -9,11 +9,43 @@ Leyline supports pasted prompt images and transcript previews for tool output.
 3. Select **×** to remove an unwanted image.
 4. Send the prompt.
 
-Leyline accepts PNG, JPEG, GIF, and WebP image data. The composer has no fixed image count or byte limit.
+Leyline accepts PNG, JPEG, GIF, and WebP image data. The composer has no fixed image count or byte limit. Provider and request limits still apply.
 
-Leyline shows a warning when the selected model does not support images. Remove the images or select a compatible model before submission.
+Leyline sends the images directly when the selected model supports image input. When it does not, Leyline can use a configured vision model to describe each image first. The composer shows the vision model before submission.
 
-Shell commands and `/compact` cannot include images.
+If no vision model is configured, the composer blocks submission and shows a warning. Configure a vision model or select a model that supports image input.
+
+Shell commands and `/compact` cannot include images. Vision delegation does not run for extension slash commands. Do not attach images to those commands.
+
+## Configure vision delegation
+
+1. Open **Settings**.
+2. Find **Agents**.
+3. Select **Manage** beside **Vision agent**.
+4. Select **Transcript**, **Project**, or **Global**.
+5. Select a model that supports image input.
+
+Leyline chooses the first configured model in this order:
+
+1. The **Transcript** override.
+2. The **Project** override.
+3. The **Global** default.
+
+The start screen has no transcript yet, so the drawer selects **Project**. A session fork copies its **Transcript** override.
+
+Select **Inherit from lower scope** to remove a transcript or project override. Select **None configured** to remove the global default.
+
+## Understand delegated image context
+
+For each image, Leyline starts a hidden child session with the configured vision model. The child describes the image and answers image-related parts of the prompt.
+
+The parent model receives the description instead of the image. The saved user message keeps the original prompt and images, including after a reload or branch change.
+
+The configured model provider receives the image and prompt. The hidden child session also keeps its prompt and image in local pi session history. Hidden child sessions do not appear in the sidebar, but Leyline does not delete their JSONL files.
+
+Use a provider and local storage policy that are appropriate for the image data.
+
+Agents can also use the `vision_agent` tool to inspect an image file from the project. See [Vision agent integration](../integrations/vision-agent).
 
 ## Read prompt images
 

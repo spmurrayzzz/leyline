@@ -18,9 +18,12 @@ sidebar, renders transcript detail in the workbench, shows live runtime output,
 and exposes model, thinking, command, prompt-helper, and runtime controls.
 
 The composer submits prompts, image attachments, shell commands, queued
-follow-ups, and steering messages. Shell commands use Leyline's composer flows
-and pi runtime primitives; do not bypass them in Leyline implementation work
-unless the user explicitly asks.
+follow-ups, and steering messages. When the parent model cannot receive images,
+Leyline can use a configured vision model to describe them while preserving the
+original transcript attachments. The bundled `vision_agent` tool can inspect
+local image files through the same hidden child-session path. Shell commands use
+Leyline's composer flows and pi runtime primitives; do not bypass them in
+Leyline implementation work unless the user explicitly asks.
 
 Transcript rendering includes markdown, thinking/model rows, collapsed tool
 rows, skill prompt rows, live-to-persisted reconciliation, user-message editing,

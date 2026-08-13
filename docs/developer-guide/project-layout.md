@@ -5,6 +5,7 @@
 - `src/main.js`: Creates the Vue app and loads the CSS entry file.
 - `src/App.vue`: Composes the workspace and coordinates cross-feature state.
 - `src/components/`: Contains focused Vue surfaces for sessions, composers, transcript entries, drawers, pickers, and previews.
+- `src/components/VisionConfigDrawer.vue`: Manages transcript, project, and global vision-model overrides.
 - `src/composables/useSessionWorkspace.js`: Owns session, route, activation, and runtime-control state.
 - `src/composables/useBackendConnections.js`: Owns connection records, the default, and window-specific backend selection.
 - `src/composables/useTranscriptPreferences.js`: Owns app-wide transcript display settings.
@@ -43,7 +44,7 @@ These files are outside `src/` because Node.js backend code and browser code imp
 - `src/styles/tools.css`: Defines tool rows, skills, subagents, and previews.
 - `src/styles/composer.css`: Defines composer layout, menus, attachments, and submission states.
 - `src/styles/memory.css`: Defines the Memory Inspector.
-- `src/styles/settings.css`: Defines Settings, Runtime Events, and subagent configuration.
+- `src/styles/settings.css`: Defines Settings, Runtime Events, subagent configuration, and vision configuration.
 - `src/styles/modals.css`: Defines the project browser and confirmation dialogs.
 - `src/styles/terminal.css`: Defines the terminal drawer.
 - `src/styles/responsive.css`: Defines reduced-motion and responsive overrides.
@@ -64,6 +65,7 @@ These files are outside `src/` because Node.js backend code and browser code imp
 - `server/pi-api/memories.js`: Implements Memory Inspector storage.
 - `server/pi-api/rollout-feedback.js`: Implements rollout feedback storage.
 - `server/pi-api/subagents.js`: Implements subagent discovery and overrides.
+- `server/pi-api/vision.js`: Implements vision overrides and persisted parent-context replacement.
 - `server/pi-api/export-renderer.js`: Renders HTML transcript exports.
 - `server/pi-api/terminal.js`: Runs PTYs over WebSocket.
 - `server/pi-api/http.js`: Contains HTTP response helpers.
@@ -82,6 +84,7 @@ These files are outside `src/` because Node.js backend code and browser code imp
 - `.pi/extensions/goal/`: Implements goal commands, state, and controls.
 - `.pi/extensions/memory/`: Implements memory injection, commands, and tools.
 - `.pi/extensions/subagent/`: Implements single, parallel, and chain subagent tools.
+- `.pi/extensions/vision-agent/`: Implements image-file inspection through a vision child.
 
 ## Capture and documentation
 

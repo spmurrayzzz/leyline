@@ -104,15 +104,17 @@ Normal session changes use pi session and runtime methods. Transcript detail ope
 
 Leyline projects the branch through `lib/transcript-projection.js`. The same projected DTO supplies the browser transcript and HTML export.
 
-## Session lineage and subagents
+## Session lineage and child agents
 
 A parent session path records lineage for forks and subagent sessions. The parent path alone does not identify a subagent session.
 
-New subagent sessions contain a `leyline-subagent-session` custom entry. The entry records the child session ID and parent session path.
+New subagent and vision-child sessions contain a `leyline-subagent-session` custom entry. The entry records the child session ID and parent session path.
 
 Session discovery uses this explicit marker. It also has a compatibility fallback that finds child paths in parent `subagent` tool results.
 
-Forks use `AgentSessionRuntime.fork(entryId, { position: 'at' })`. A fork gets a new JSONL file and keeps normal session visibility.
+Vision delegation adds `leyline-vision-delegation` records to the parent branch. A session context transform uses these records to replace images with descriptions for a parent model that cannot receive images. The persisted user message keeps the images.
+
+Forks use `AgentSessionRuntime.fork(entryId, { position: 'at' })`. A fork gets a new JSONL file and keeps normal session visibility. It copies session-level subagent and vision-model overrides.
 
 ## Rename, delete, and reset
 
@@ -136,17 +138,20 @@ The database currently contains these application tables:
 - `memories`
 - `rollout_feedback`
 - `subagent_overrides`
+- `vision_overrides`
 
 `backend_connections` stores named backend URLs. `leyline_settings` stores the default connection ID and UI settings.
 
-Memory and subagent scopes use canonical project roots and hashed scope IDs. Rollout feedback uses the cwd, session path, session ID, and entry ID.
+Memory, subagent, and vision scopes use canonical project roots and hashed scope IDs. Rollout feedback uses the cwd, session path, session ID, and entry ID.
 
 These modules honor `LEYLINE_MEMORY_DIR`. When set, they use `memory.sqlite` in
 that directory.
 
 ## Bundled extensions and prompt
 
-Each runtime loads the bundled goal, memory, and subagent extensions from `.pi/extensions/`. It also appends `.pi/LEYLINE_SYSTEM.md` to the system prompt.
+Each runtime loads the bundled goal, memory, subagent, and vision-agent extensions from `.pi/extensions/`. It also appends `.pi/LEYLINE_SYSTEM.md` to the system prompt.
+
+Vision children use the normal subagent runtime path with no active tools. A session-local settings override permits image input without changing the user's persisted pi image setting.
 
 Reload creates replacement cwd-bound services. It then binds the new session, extensions, event subscription, and extension UI state to the existing handle.
 

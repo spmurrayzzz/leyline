@@ -21,6 +21,8 @@ features:
     details: Search sessions, group them by project, inspect project history, and move between parent and child sessions.
   - title: Run and direct agents
     details: Submit prompts, images, shell commands, steering messages, queued follow-ups, slash commands, and long-running goals.
+  - title: Use images with any model
+    details: Send images directly to compatible models or configure a vision agent to describe them for models without image support.
   - title: Watch live work
     details: Follow assistant text, thinking, tool calls, runtime events, queues, context use, and goal progress.
   - title: Connect backend hosts

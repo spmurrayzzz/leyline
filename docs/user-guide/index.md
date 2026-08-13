@@ -25,7 +25,7 @@ Use these pages for the main session tasks:
 - [Subagents](./subagents)
 - [Goals and events](./goals-and-events)
 - [Terminal](./terminal)
-- [Images and previews](./images-and-previews)
+- [Images, vision delegation, and previews](./images-and-previews)
 - [Export](./export)
 - [Settings](./settings)
 - [Mobile layout](./mobile)

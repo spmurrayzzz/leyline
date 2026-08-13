@@ -46,6 +46,6 @@ The workbench expands into the available space while the sidebar is hidden.
 
 ## Open workbench drawers
 
-Only one main right-side drawer is open at a time. Opening **Memory**, **Events**, **Settings**, **Subagents**, or **Project details** closes conflicting drawers.
+Only one main right-side drawer is open at a time. Opening **Memory**, **Events**, **Settings**, **Subagents**, **Vision agent**, or **Project details** closes conflicting drawers.
 
 The terminal is a bottom drawer. It can remain open while you use the transcript and composer.

@@ -123,6 +123,7 @@ export default defineConfig({
           { text: 'Goal extension', link: '/integrations/goal-extension' },
           { text: 'Memory', link: '/integrations/memory-integration' },
           { text: 'Subagents', link: '/integrations/subagents' },
+          { text: 'Vision agent', link: '/integrations/vision-agent' },
           {
             text: 'Terminal backend',
             link: '/integrations/terminal-backend',

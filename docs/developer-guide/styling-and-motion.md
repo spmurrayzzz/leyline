@@ -25,7 +25,7 @@ Avoid decorative glow, gradients, and extra panels. Existing gradients serve fad
 | `tools.css` | Tools, skills, subagents, files, diffs, and fullscreen previews |
 | `composer.css` | Composer, menus, attachments, context, and send states |
 | `memory.css` | Memory Inspector |
-| `settings.css` | Settings, Runtime Events, and subagent configuration |
+| `settings.css` | Settings, Runtime Events, subagent configuration, and vision configuration |
 | `modals.css` | Project browser and confirmation dialogs |
 | `terminal.css` | Terminal drawer |
 | `responsive.css` | Reduced-motion and viewport overrides |

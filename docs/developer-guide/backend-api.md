@@ -29,7 +29,7 @@ The terminal does not use the HTTP router. It uses a WebSocket upgrade at `/api/
 | `server/pi-api/index.js` | Shared runtime instance, Vite integration, and WebSocket setup |
 | `server/pi-api/router.js` | HTTP method and path dispatch |
 | `server/pi-api/cors.js` | Shared HTTP and WebSocket origin policy |
-| `server/pi-api/runtime.js` | `AgentSessionRuntime` lifecycle, runtime handles, session operations, bundled resources, and subagent execution |
+| `server/pi-api/runtime.js` | `AgentSessionRuntime` lifecycle, runtime handles, session operations, bundled resources, subagent execution, and vision execution |
 | `server/pi-api/sessions.js` | Session discovery, configured session directories, list metadata, and subagent markers |
 | `server/pi-api/dtos.js` | Runtime, session state, session detail, model, command, and transcript DTOs |
 | `server/pi-api/events.js` | SSE clients and event serialization |
@@ -39,6 +39,7 @@ The terminal does not use the HTTP router. It uses a WebSocket upgrade at `/api/
 | `server/pi-api/memories.js` | Memory Inspector queries and mutations |
 | `server/pi-api/rollout-feedback.js` | Assistant-entry feedback storage and DTO application |
 | `server/pi-api/subagents.js` | Agent discovery, scoped model overrides, and effective configuration |
+| `server/pi-api/vision.js` | Vision-model overrides, delegation records, and parent-context replacement |
 | `server/pi-api/export-renderer.js` | HTML export rendering, export CSS, and preview code |
 | `server/pi-api/terminal.js` | PTY and terminal WebSocket lifecycle |
 | `server/pi-api/http.js` | JSON body, JSON response, and HTML response helpers |
@@ -54,6 +55,7 @@ The router has these main route groups:
 - Memory Inspector operations
 - rollout feedback
 - subagent configuration and subagent execution
+- vision configuration, resolution, and child execution
 - SSE events
 
 See the [API reference](../reference/api) for route contracts. Compare that page with `server/pi-api/router.js` when route behavior changes.
@@ -76,7 +78,9 @@ in that backend process.
 
 `createAgentSessionRuntime()` wraps the session and services in `AgentSessionRuntime`. Runtime handles keep these objects alive for background work.
 
-Each runtime loads the bundled goal, memory, and subagent extensions. It also appends the Leyline system prompt.
+Each runtime loads the bundled goal, memory, subagent, and vision-agent extensions. It also appends the Leyline system prompt.
+
+Runtime creation installs a vision context transform on the session agent. The transform replaces matched images with persisted descriptions before the parent model receives context.
 
 Leyline forces steering and follow-up modes to `one-at-a-time`. Prompt requests can still select `steer` or `followUp` as their streaming behavior.
 
@@ -97,8 +101,8 @@ Reset to here is the explicit exception. It replaces the manager entries with th
 
 ## Application metadata
 
-`backend-connections.js`, `memories.js`, `rollout-feedback.js`, and
-`subagents.js` share `~/.local/share/leyline/memory.sqlite`.
+`backend-connections.js`, `memories.js`, `rollout-feedback.js`, `subagents.js`,
+and `vision.js` share `~/.local/share/leyline/memory.sqlite`.
 
 Backend connection definitions, the default connection, and UI settings are app-wide. A window stores its active connection ID in `sessionStorage`.
 
@@ -108,9 +112,9 @@ Rollout feedback stores `helpful` or `unhelpful` for an assistant entry. It can 
 
 Subagent configuration discovers definitions in `~/.pi/agent/agents` and the nearest project `.pi/agents` directory.
 
-Model override precedence is session, project, global, then the agent definition. Session overrides copy to a new fork.
+Subagent model precedence is session, project, global, then the agent definition. Vision-model precedence is session, project, then global. Session overrides for both features copy to a new fork.
 
-The subagent execution route creates a child pi session. It writes an explicit marker before it starts the child runtime.
+The subagent and vision execution routes create child pi sessions. They write an explicit marker before they start each child runtime. Vision children use an empty tool allowlist and a session-local image setting override.
 
 ## Goal state projection
 
@@ -127,5 +131,7 @@ SSE, terminal WebSocket, and export requests. `src/lib/pi-api.js` owns runtime f
 calls and request field names.
 
 `src/lib/leyline-api.js` manages the native connection registry and app settings. It also checks `GET /api/pi/info` before a switch.
+
+Vision configuration and prompt preflight use `src/lib/pi-api.js`. A prompt interrupt or disconnected request aborts pending vision children.
 
 `useTranscriptPreferences.js` reads and writes the thought display default. UI components and composables do not construct transport URLs directly.

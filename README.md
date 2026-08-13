@@ -23,6 +23,10 @@ rendered transcripts, live runtime output, model controls, memory, subagents,
 runtime events, and an embedded terminal. Each window can use the native
 backend or a saved backend connection.
 
+When the active model cannot receive images, Leyline can send each attachment
+to a configured vision model in a hidden child session. The parent model
+receives the descriptions while the transcript keeps the original images.
+
 For the reasoning behind the project, see [Motivations](docs/motivations.md).
 
 ## Requirements
@@ -134,6 +138,7 @@ directory. Use `leyline -n` to create the session in a new Leyline window.
 - [Getting started](docs/getting-started/index.md)
 - [Sessions](docs/user-guide/sessions.md)
 - [Composer](docs/user-guide/composer.md)
+- [Images and vision](docs/user-guide/images-and-previews.md)
 - [Memory](docs/user-guide/memory.md)
 - [Subagents](docs/user-guide/subagents.md)
 - [Goals and events](docs/user-guide/goals-and-events.md)

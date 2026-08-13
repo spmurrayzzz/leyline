@@ -453,6 +453,10 @@ Response:
 
 The response means prompt preflight succeeded. The model response can continue through SSE. Empty text is valid only when at least one valid image is present. Supported MIME types are PNG, JPEG, GIF, and WebP.
 
+A model with image support receives the images directly. For other models, the request waits while the configured vision model describes each image. Leyline persists the original user message and replaces its images with the descriptions in parent-model context. A missing or invalid vision model returns `500`.
+
+A disconnected prompt request or session interrupt cancels unfinished vision preflight.
+
 ### Shell command
 
 | Route | Designation |
@@ -518,7 +522,7 @@ Response:
 { ok: true, active: Active }
 ```
 
-The entry must be a user message. Leyline moves the active tree position and submits the replacement prompt. The response means prompt preflight succeeded.
+The entry must be a user message. Leyline moves the active tree position and submits the replacement prompt. The response means prompt preflight succeeded. Replacement images use the same direct-image or vision-delegation behavior as a new prompt.
 
 ### Interrupt
 
@@ -534,6 +538,8 @@ Response:
 ```text
 { ok: true, active: Active }
 ```
+
+Interrupt also aborts pending vision preflight and its unfinished child runs.
 
 ### Reload resources
 
@@ -614,7 +620,7 @@ Response:
 { ok: true, active: Active, detail: SessionDetail }
 ```
 
-The route forks at the specified entry, changes the runtime session ID, and selects the fork. It also copies session-level subagent model overrides. Streaming or compaction returns `500`.
+The route forks at the specified entry, changes the runtime session ID, and selects the fork. It also copies session-level subagent and vision-model overrides. Streaming or compaction returns `500`.
 
 ### `POST /api/pi/reset-to-entry`
 
@@ -998,6 +1004,124 @@ Success response:
 ```
 
 The route waits for completion. It returns `500` with `{ error }` for child setup or execution failure. If the HTTP connection closes first, the server aborts the child run.
+
+## Vision agent routes
+
+### `GET /api/pi/vision/config`
+
+**Designation:** Browser configuration route.
+
+Query:
+
+```text
+cwd: string
+sessionPath?: string
+```
+
+Response:
+
+```text
+{
+  context: {
+    cwd: string,
+    projectId: string,
+    projectName: string,
+    projectRoot: string,
+    sessionAvailable: boolean,
+    sessionFile: string | null,
+    sessionId: string | null
+  },
+  overrides: { global?: string, project?: string, session?: string },
+  model: string,
+  modelSource: "session" | "project" | "global" | "none"
+}
+```
+
+The effective model uses session, project, then global precedence. `model` is an empty string when no override applies.
+
+### `PUT /api/pi/vision/model`
+
+**Designation:** Browser configuration route.
+
+Request:
+
+```text
+{
+  cwd: string,
+  sessionPath?: string,
+  scope: "global" | "project" | "session",
+  model: string
+}
+```
+
+Response: The same object as `GET /api/pi/vision/config`.
+
+The model must be nonempty. The route stores the value but does not verify model availability or image support. The browser lists only available models with image support.
+
+### `DELETE /api/pi/vision/model`
+
+**Designation:** Browser configuration route.
+
+Request:
+
+```text
+{
+  cwd: string,
+  sessionPath?: string,
+  scope: "global" | "project" | "session"
+}
+```
+
+Response: The same object as `GET /api/pi/vision/config`.
+
+The route removes the override at the requested scope. A session scope requires a nonempty `sessionPath`. The server uses its canonical path when available and its resolved path otherwise.
+
+### `POST /api/pi/vision/resolve`
+
+**Designation:** Internal bundled-extension route.
+
+Request:
+
+```text
+{
+  cwd: string,
+  sessionPath?: string,
+  staticModel?: string
+}
+```
+
+Response:
+
+```text
+{
+  model?: string,
+  modelSource: "session" | "project" | "global" | "static"
+}
+```
+
+Stored session, project, and global values take priority over `staticModel`.
+
+### `POST /api/pi/vision`
+
+**Designation:** Internal bundled-extension execution route.
+
+Request:
+
+```text
+{
+  question?: string,
+  cwd: string,
+  parentSessionPath?: string,
+  model?: string | { provider: string, id: string },
+  image: { type: "image", data: string, mimeType: string }
+}
+```
+
+Success response: The same child-session, message, usage, model, thinking, and stop-reason object as `POST /api/pi/subagent`.
+
+The route creates one hidden child with an empty tool allowlist. The selected model must exist, have provider authentication, and support image input. The image must be PNG, JPEG, GIF, or WebP.
+
+The route waits for completion and returns `500` with `{ error }` for setup or execution failure. If the HTTP connection closes first, the server aborts the child run.
 
 ## Export route
 

@@ -6,8 +6,10 @@ Leyline uses `SessionManager.listAll()` for normal session discovery. If `PI_COD
 
 `AgentSession.prompt()` handles commands, skills, templates, queueing, authentication, compaction, and persistence. `session.executeBash()` runs shell commands. Leyline forces steering and follow-up delivery to `one-at-a-time` mode.
 
+For a parent model without image support, Leyline completes vision preflight before it calls `AgentSession.prompt()`. A session `agent.transformContext` wrapper keeps the original images in JSONL history and replaces them with stored descriptions in parent-model context.
+
 Forking uses `runtime.fork(entryId, { position: 'at' })`. Prompt edits use `session.navigateTree(entryId)` before Leyline submits replacement content. Rename appends pi session information. Delete moves the JSONL file to Leyline trash.
 
 Pi session logs are tree-structured JSONL records. Normal writes use runtime and session-manager primitives. Reset to here is an explicit exception. It rewrites the file so that the selected active branch ends at the target entry.
 
-Each runtime loads the bundled goal, memory, and subagent extensions. It also appends the bundled Leyline system prompt. See the [integration overview](./index) and [API reference](../reference/api).
+Each runtime loads the bundled goal, memory, subagent, and vision-agent extensions. It also appends the bundled Leyline system prompt. See the [integration overview](./index) and [API reference](../reference/api).

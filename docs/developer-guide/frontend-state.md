@@ -6,7 +6,7 @@
 
 | Owner | State and behavior |
 | --- | --- |
-| `App.vue` | Drawer visibility, composer draft, attachments, edit state, prompt submission, goal commands, subagent drawer requests, project detail selection, and startup motion phases |
+| `App.vue` | Drawer visibility, composer draft, attachments, edit state, prompt submission, goal commands, subagent and vision settings, project detail selection, and startup motion phases |
 | `useSessionWorkspace.js` | Session list, routes, selected detail, activation, runtime snapshots, model and thinking controls, rename, delete, fork, reset, reload, and sidebar search |
 | `useBackendConnections.js` | App-wide connection records, window-specific selection, connection tests, and default selection |
 | `useTranscriptPreferences.js` | App-wide transcript display settings, loading state, and save errors |
@@ -103,6 +103,14 @@ Dirty Memory state can block session changes and drawer changes. Memory Changes 
 
 `SubagentConfigDrawer.vue` owns the selected override scope. Backend data supplies discovered agents, visible overrides, and effective models.
 
+## Vision settings and preflight
+
+`App.vue` loads vision configuration for the selected session or staged start-screen project. A request token and target key prevent a response for an old target from replacing current data.
+
+`VisionConfigDrawer.vue` owns the selected scope. It disables **Transcript** before a session exists and lists only models with image support.
+
+When the parent model cannot receive attached images, `App.vue` shows the effective vision model and a preflight status. The backend completes image descriptions before normal prompt streaming begins.
+
 ## Tool expansion and previews
 
 `useToolExpansion.js` stores expanded tool IDs and skill IDs. It also owns clipboard fallback state and the selected fullscreen tool.
@@ -119,7 +127,7 @@ A selected-session change resets scroll state. The terminal height and composer 
 
 ## Drawer coordination
 
-`App.vue` coordinates Project Details, Settings, Runtime Events, Memory, and Subagents. Opening one contextual side drawer closes conflicting drawers.
+`App.vue` coordinates Project Details, Settings, Runtime Events, Memory, Subagents, and Vision agent. Opening one contextual side drawer closes conflicting drawers.
 
 The terminal is independent and can remain open below the workbench. Session changes reconnect it so the PTY uses the new active cwd.
 

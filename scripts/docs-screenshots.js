@@ -32,6 +32,13 @@ const availableModels = [
     supportsImages: true,
     availableThinkingLevels: ['off', 'low', 'medium', 'high'],
   },
+  {
+    provider: 'local',
+    id: 'text-only-coder',
+    name: 'Text Only Coder',
+    supportsImages: false,
+    availableThinkingLevels: ['off', 'low', 'medium', 'high'],
+  },
 ]
 const backendRegistry = {
   connections: [
@@ -56,6 +63,11 @@ const sessions = [
   session('export-layout', 'Check transcript export layout', '2026-08-02T09:15:00.000Z', 11),
   session('landing-copy', 'Tighten the landing page copy', '2026-08-01T13:20:00.000Z', 8, '/workspace/field-notes'),
   session('search-state', 'Preserve project search state', '2026-07-31T17:05:00.000Z', 6, '/workspace/field-notes'),
+]
+
+const projects = [
+  { cwd: '/workspace/harbor', name: 'harbor', modified: '2026-08-06T15:49:00.000Z' },
+  { cwd: '/workspace/field-notes', name: 'field-notes', modified: '2026-08-01T13:20:00.000Z' },
 ]
 
 const baseEntries = [
@@ -193,6 +205,22 @@ const subagentPayload = {
   ],
 }
 
+const visionConfigPayload = (sessionAvailable) => ({
+  context: {
+    ...memoryPayload.context,
+    sessionAvailable,
+    sessionFile: sessionAvailable ? memoryPayload.context.sessionFile : null,
+    sessionId: sessionAvailable ? memoryPayload.context.sessionId : null,
+  },
+  overrides: {
+    global: 'anthropic/claude-sonnet-4-6',
+    project: 'local/minimax-m2.7',
+    ...(sessionAvailable ? { session: 'local/minimax-m2.7' } : {}),
+  },
+  model: 'local/minimax-m2.7',
+  modelSource: sessionAvailable ? 'session' : 'project',
+})
+
 const goal = {
   objective: 'Prepare a safe release candidate',
   status: 'active',
@@ -326,8 +354,24 @@ try {
     ready: '.assistant-message',
     interact: async (page) => {
       await page.getByRole('button', { name: 'Open settings' }).click()
-      await page.locator('.settings-action-row').click()
+      await page.locator('.settings-action-row').filter({ hasText: 'Subagents' }).click()
       await page.locator('aside[aria-label="Subagents"] .subagent-config-card').first().waitFor()
+    },
+  })
+  await capture({
+    browser,
+    file: path.join(docsOutputDir, 'vision-agent.png'),
+    route: '/sessions/demo-session',
+    ready: '.assistant-message',
+    interact: async (page) => {
+      await page.getByRole('button', { name: 'Open settings' }).click()
+      await page.locator('.settings-action-row').filter({ hasText: 'Vision agent' }).click()
+      const drawer = page.locator('aside[aria-label="Vision agent"]')
+      await drawer.locator('.subagent-config-card').waitFor()
+      const options = await drawer.locator('select option').allTextContents()
+      if (options.some((option) => option.includes('text-only-coder'))) {
+        throw new Error('Vision model selector includes a model without image support')
+      }
     },
   })
   await capture({
@@ -647,12 +691,16 @@ async function capture({
       body: JSON.stringify(body),
     })
 
+    if (key === 'GET /api/pi/projects') return json({ projects })
     if (key === 'GET /api/pi/sessions') return json({ sessions })
     if (key === 'GET /api/pi/state') return json({ active: runtime })
     if (key === 'POST /api/pi/active-session') return json({ active: runtime })
     if (key === 'GET /api/pi/sessions/demo-session') return json(detailFor(scenario))
     if (key === 'GET /api/pi/memories') return json(memoryPayload)
     if (key === 'GET /api/pi/subagents') return json(subagentPayload)
+    if (key === 'GET /api/pi/vision/config') {
+      return json(visionConfigPayload(url.searchParams.has('sessionPath')))
+    }
     if (key === 'GET /api/pi/sessions/demo-session/export') {
       const html = await renderSessionExportHtml(detailFor(scenario))
       return request.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: html })
@@ -878,15 +926,23 @@ async function assertPrivateDataAbsent(page) {
 }
 
 async function assertModelLabel(page) {
-  const buttons = page.locator('.model-picker:not(.small-picker):not(.tool-picker) > .model-picker-button:visible')
+  const expected = 'local/minimax-m2.7'
+  const selector = '.model-picker:not(.small-picker):not(.tool-picker) > .model-picker-button'
+  await page.waitForFunction(({ expected, selector }) => {
+    const buttons = [...document.querySelectorAll(selector)]
+      .filter((button) => button.getClientRects().length)
+    return buttons.length > 0 && buttons.every((button) => {
+      const labels = [...button.querySelectorAll('.model-label')]
+        .filter((label) => label.getClientRects().length)
+      return labels.some((label) => label.textContent.trim() === expected)
+    })
+  }, { expected, selector }, { timeout: 15000 })
+  const buttons = page.locator(`${selector}:visible`)
   const count = await buttons.count()
-  if (!count) throw new Error('No visible model selector found')
   for (let index = 0; index < count; index += 1) {
     const label = buttons.nth(index).locator('.model-label:visible').first()
     const value = (await label.innerText()).trim()
-    if (value !== 'local/minimax-m2.7') {
-      throw new Error(`Unexpected model selector label: ${value}`)
-    }
+    if (value !== expected) throw new Error(`Unexpected model selector label: ${value}`)
   }
 }
 

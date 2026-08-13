@@ -57,7 +57,11 @@ Press **Shift+Enter** to add a line break.
 
 Paste one or more images into the composer. Leyline adds each image to the attachment tray.
 
-Select the **×** on an attachment to remove it. Leyline shows a warning when the staged model does not support images.
+Select **×** on an attachment to remove it. Leyline sends images directly when the staged model supports image input.
+
+For other models, Leyline uses the configured project or global vision model. The composer shows which vision model will describe the images. If none is configured, the warning blocks submission.
+
+Open **Settings**, find **Agents**, and select **Manage** beside **Vision agent** to configure it. Before Leyline creates a session, the drawer selects **Project** and disables **Transcript**.
 
 Leyline accepts PNG, JPEG, GIF, and WebP image data. The current composer has no fixed count or byte limit.
 

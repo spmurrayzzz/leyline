@@ -1,8 +1,8 @@
 # Settings
 
-The **Settings** drawer manages backend connections, transcript display, and subagent defaults. It also shows runtime and session information.
+The **Settings** drawer manages backend connections, transcript display, subagent defaults, and the vision model. It also shows runtime and session information.
 
-![Settings drawer with backend connections and thought display options](../assets/screenshots/backend-connections.png)
+![Settings drawer with backend connections, runtime details, and thought display options](../assets/screenshots/backend-connections.png)
 
 ## Open Settings
 
@@ -70,6 +70,25 @@ These values are read-only in **Settings**. Change the model and thinking level 
 The setting controls the initial state of each new **Thought** or **Thinking** row. If no setting is saved, Leyline uses **Collapsed**.
 
 The setting does not change a row that is already in the transcript. The **Thinking** value in **Runtime** shows the model thinking level.
+
+## Manage the vision agent
+
+![Vision agent drawer with transcript, project, and global model scopes](../assets/screenshots/vision-agent.png)
+
+*The drawer lists only models that support image input.*
+
+1. Find **Agents**.
+2. Select **Manage** beside **Vision agent**.
+3. Select **Transcript**, **Project**, or **Global**.
+4. Select a vision model.
+
+A **Transcript** override applies only to the current session and copies to forks. A **Project** override applies to all sessions in the project. The **Global** model supplies the default for other projects.
+
+Leyline uses transcript, project, then global precedence. Select **Inherit from lower scope** to remove a transcript or project override. Select **None configured** to remove the global default.
+
+The **Transcript** scope is unavailable before a session exists. On the start screen, the drawer selects **Project**.
+
+When the active model cannot receive images, Leyline uses the effective vision model to describe attachments. The original images stay in the transcript. See [Images and previews](./images-and-previews).
 
 ## Manage subagent models
 

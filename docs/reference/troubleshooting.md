@@ -103,7 +103,7 @@ Confirm that every Leyline process has the same `LEYLINE_MEMORY_DIR` value.
 Restart Vite or Electron after you change it.
 
 Without this variable, the memory extension, Memory Inspector, rollout feedback,
-and subagent overrides use `~/.local/share/leyline/memory.sqlite`.
+subagent overrides, and vision overrides use `~/.local/share/leyline/memory.sqlite`.
 
 ## Electron does not have shell environment variables
 
@@ -171,7 +171,23 @@ directory while Leyline is stopped, then start Leyline again.
 
 ## An image cannot be submitted
 
-Select a model that supports images when Leyline shows the image-support
-warning.
+If the selected model does not support image input, open **Settings**. Find
+**Agents**, then select **Manage** beside **Vision agent**. Configure a
+transcript, project, or global vision model.
 
-Shell commands cannot include image attachments.
+You can also select a parent model that supports image input. Shell commands
+and `/compact` cannot include image attachments. Vision delegation does not run
+for extension slash commands, so do not attach images to those commands.
+
+## Vision delegation fails
+
+Confirm these items:
+
+1. Open the **Vision agent** drawer and check the effective model.
+2. Confirm that the model still exists and supports image input.
+3. Confirm that its provider credentials are available to the Leyline server.
+4. Select **Reload runtime** after you change pi model configuration.
+5. Confirm that the image is PNG, JPEG, GIF, or WebP.
+
+The configured provider receives the image and prompt. Provider limits can
+reject a large image even when Leyline accepts its file type.

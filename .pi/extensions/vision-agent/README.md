@@ -38,9 +38,10 @@ chosen in this order:
 3. Project vision override
 4. Global default vision model
 
-If no model is selected anywhere, the tool returns a clear error. Leyline
-Settings shows a Vision group where the default model and project/transcript
-overrides are stored. Only models with image input support appear as options.
+If no model is selected anywhere, the tool returns a clear error. In Leyline,
+open **Settings**, find **Agents**, and select **Manage** beside **Vision agent**
+to set the global model or a project or transcript override. Only models with
+image input support appear as options.
 
 ## Prompt images without vision
 
