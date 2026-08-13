@@ -755,6 +755,10 @@ kbd {
   stroke-width: 1.5;
 }
 
+.project-delete-button svg {
+  transform: translateY(0.5px);
+}
+
 .session:hover .session-actions,
 .session:focus-within .session-actions {
   opacity: 1;
