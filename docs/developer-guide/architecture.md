@@ -112,7 +112,9 @@ New subagent and vision-child sessions contain a `leyline-subagent-session` cust
 
 Session discovery uses this explicit marker. It also has a compatibility fallback that finds child paths in parent `subagent` tool results.
 
-Vision delegation adds `leyline-vision-delegation` records to the parent branch. A session context transform uses these records to replace images with descriptions for a parent model that cannot receive images. The persisted user message keeps the images.
+Vision delegation adds `leyline-vision-delegation` records to the parent branch. A session context transform replaces image blocks with saved file paths and a `vision_agent` instruction. This applies when the parent model cannot receive images. After matching tool calls exist, the transform uses neutral context text. It does not request another inspection. The persisted user message keeps the images.
+
+Pasted delegated images are stored in `LEYLINE_MEMORY_DIR/attachments/<session-id>/`. Without `LEYLINE_MEMORY_DIR`, the path is `~/.local/share/leyline/attachments/<session-id>/`. The session and project trash operations remove the related attachment directory after they move the JSONL file.
 
 Forks use `AgentSessionRuntime.fork(entryId, { position: 'at' })`. A fork gets a new JSONL file and keeps normal session visibility. It copies session-level subagent and vision-model overrides.
 

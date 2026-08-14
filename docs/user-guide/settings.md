@@ -89,7 +89,7 @@ The model and thinking values use transcript, project, then global precedence in
 
 The **Transcript** scope is unavailable before a session exists. On the start screen, the drawer selects **Project**.
 
-When the active model cannot receive images, Leyline uses the effective vision model to describe attachments. The original images stay in the transcript. See [Images and previews](./images-and-previews).
+When the active model cannot receive images, Leyline tells it to call `vision_agent`. The tool uses the effective vision model and returns a description. The original images stay in the transcript. See [Images and previews](./images-and-previews).
 
 ## Manage subagent models
 

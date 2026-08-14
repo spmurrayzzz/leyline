@@ -14,7 +14,7 @@ variables come from the user's pi setup.
 | `LEYLINE_SERVER_ALLOWED_ORIGINS` | Comma-separated frontend origins that can use the backend. Same-origin and loopback clients work without this variable. Use `*` to allow all origins. |
 | `PI_CODING_AGENT_SESSION_DIR` | Session directory for discovery and new sessions. Leyline expands `~` and searches subdirectories for JSONL files. |
 | `PI_ENABLE_CREATE_GOAL` | Set to `1` to expose the goal extension's `create_goal` model tool. |
-| `LEYLINE_MEMORY_DIR` | Directory for the shared `memory.sqlite` database. Backend connections, UI settings, memory, rollout feedback, subagent overrides, and vision overrides use this path. |
+| `LEYLINE_MEMORY_DIR` | Directory for shared app metadata and pasted-image attachments. Backend connections, UI settings, memory, rollout feedback, subagent overrides, and vision overrides use `memory.sqlite` in this directory. Vision delegation uses its `attachments` subdirectory. |
 | `SHELL` | Login shell used by Electron environment loading and the terminal backend. Electron defaults to `/bin/zsh`; the terminal has additional shell fallbacks. |
 
 Without `PI_CODING_AGENT_SESSION_DIR`, Leyline uses the session directory from
@@ -24,6 +24,7 @@ Use an absolute path for `LEYLINE_MEMORY_DIR`. Without this variable, Leyline us
 
 ```text
 ~/.local/share/leyline/memory.sqlite
+~/.local/share/leyline/attachments/<session-id>/
 ```
 
 The database can contain the `backend_connections`, `leyline_settings`, `memories`, `rollout_feedback`, `subagent_overrides`, and `vision_overrides` tables.
@@ -36,7 +37,7 @@ must include its scheme and host. Add a port when the origin uses one.
 
 Changing `LEYLINE_MEMORY_DIR` selects a different connection registry, default connection, and set of UI settings.
 
-It also selects different memory, rollout, subagent, and vision metadata.
+It also selects different memory, rollout, subagent, and vision metadata, plus the attachment directory for delegated pasted images.
 
 The backend API does not have authentication. Do not bind the packaged server
 to an untrusted network. The origin policy restricts browsers, but it does not

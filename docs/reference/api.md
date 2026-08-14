@@ -453,9 +453,9 @@ Response:
 
 The response means prompt preflight succeeded. The model response can continue through SSE. Empty text is valid only when at least one valid image is present. Supported MIME types are PNG, JPEG, GIF, and WebP.
 
-A model with image support receives the images directly. For other models, the request waits while the configured vision model describes each image. Leyline persists the original user message and replaces its images with the descriptions in parent-model context. A missing or invalid vision model returns `500`.
+A model with image support receives the images directly. For other models, Leyline checks the configured vision model and saves each attachment in local app data. It persists the original user message. Parent-model context receives saved file paths and instructions to call `vision_agent`. The tool call and result appear in the transcript. A missing or invalid vision model returns `500`.
 
-A disconnected prompt request or session interrupt cancels unfinished vision preflight.
+The prompt response does not wait for `vision_agent` execution.
 
 ### Shell command
 
@@ -522,7 +522,7 @@ Response:
 { ok: true, active: Active }
 ```
 
-The entry must be a user message. Leyline moves the active tree position and submits the replacement prompt. The response means prompt preflight succeeded. Replacement images use the same direct-image or vision-delegation behavior as a new prompt.
+The entry must be a user message. Leyline moves the active tree position and submits the replacement prompt. The response means prompt preflight succeeded. Replacement images use the same direct-image or `vision_agent` tool-call behavior as a new prompt.
 
 ### Interrupt
 
@@ -539,7 +539,7 @@ Response:
 { ok: true, active: Active }
 ```
 
-Interrupt also aborts pending vision preflight and its unfinished child runs.
+Interrupt aborts pending prompt setup and the active parent run. It does not wait for a separate vision preflight.
 
 ### Reload resources
 

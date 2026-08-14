@@ -103,13 +103,13 @@ Dirty Memory state can block session changes and drawer changes. Memory Changes 
 
 `SubagentConfigDrawer.vue` owns the selected override scope. Backend data supplies discovered agents, visible overrides, and effective models.
 
-## Vision settings and preflight
+## Vision settings and image delegation
 
 `App.vue` loads vision configuration for the selected session or staged start-screen project. A request token and target key prevent a response for an old target from replacing current data.
 
 `VisionConfigDrawer.vue` owns the selected scope. It disables **Transcript** before a session exists and lists only models with image support.
 
-When the parent model cannot receive attached images, `App.vue` shows the effective vision model and a preflight status. The backend completes image descriptions before normal prompt streaming begins.
+When the parent model cannot receive attached images, `App.vue` shows the effective vision model. It tells the user that the model will call the vision subagent when the prompt runs. The backend saves the attachments and gives the parent a `vision_agent` instruction. The tool call and result appear in the transcript.
 
 ## Tool expansion and previews
 

@@ -59,7 +59,7 @@ Paste one or more images into the composer. Leyline adds each image to the attac
 
 Select **×** on an attachment to remove it. Leyline sends images directly when the staged model supports image input.
 
-For other models, Leyline uses the configured project or global vision model. The composer shows which vision model will describe the images. If none is configured, the warning blocks submission.
+For other models, Leyline uses the configured project or global vision model. When the prompt runs, the model calls `vision_agent` to inspect the images. The tool call and result appear in the transcript. If no vision model is configured, the warning blocks submission.
 
 Open **Settings**, find **Agents**, and select **Manage** beside **Vision agent** to configure it. Before Leyline creates a session, the drawer selects **Project** and disables **Transcript**.
 

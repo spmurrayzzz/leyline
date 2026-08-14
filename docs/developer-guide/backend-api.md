@@ -80,7 +80,7 @@ in that backend process.
 
 Each runtime loads the bundled goal, memory, subagent, and vision-agent extensions. It also appends the Leyline system prompt.
 
-Runtime creation installs a vision context transform on the session agent. The transform replaces matched images with persisted descriptions before the parent model receives context.
+Runtime creation installs a vision context transform on the session agent. The transform replaces matched images with saved file paths and `vision_agent` instructions. After matching tool calls exist, it uses neutral text instead of another instruction.
 
 Leyline forces steering and follow-up modes to `one-at-a-time`. Prompt requests can still select `steer` or `followUp` as their streaming behavior.
 
@@ -132,6 +132,6 @@ calls and request field names.
 
 `src/lib/leyline-api.js` manages the native connection registry and app settings. It also checks `GET /api/pi/info` before a switch.
 
-Vision configuration and prompt preflight use `src/lib/pi-api.js`. A prompt interrupt or disconnected request aborts pending vision children.
+Vision configuration and parent prompt requests use `src/lib/pi-api.js`. For a parent model without image input, the backend saves attachments and the parent calls `vision_agent` during its turn.
 
 `useTranscriptPreferences.js` reads and writes the thought display default. UI components and composables do not construct transport URLs directly.

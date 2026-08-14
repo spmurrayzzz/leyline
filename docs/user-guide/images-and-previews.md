@@ -11,7 +11,7 @@ Leyline supports pasted prompt images, vision delegation, and transcript preview
 
 Leyline accepts PNG, JPEG, GIF, and WebP image data. The composer has no fixed image count or byte limit. Provider and request limits still apply.
 
-Leyline sends the images directly when the selected model supports image input. When it does not, Leyline can use a configured vision model to describe each image first. The composer shows the vision model before submission.
+Leyline sends images directly when the selected model supports image input. When it does not, Leyline saves each image locally. It instructs the parent model to call `vision_agent`. The tool call and result appear in the transcript. The composer identifies the selected vision model before submission.
 
 If no vision model is configured, the composer blocks submission and shows a warning. Configure a vision model or select a model that supports image input.
 
@@ -37,9 +37,11 @@ Select **Inherit from lower scope** to remove a transcript or project override. 
 
 ## Understand delegated image context
 
-For each image, Leyline starts a hidden child session with the configured vision model. The child describes the image and answers image-related parts of the prompt.
+For each image that requires delegation, Leyline saves a local attachment. When the parent turn starts, the model calls `vision_agent`. The tool starts a hidden child session with the configured vision model. The child returns a detailed text description.
 
-The parent model receives the description instead of the image. The saved user message keeps the original prompt and images, including after a reload or branch change.
+The parent model receives the tool result instead of the image. The saved user message keeps the original prompt and images, including after a reload or branch change.
+
+Leyline removes the session attachment directory when it moves a session or project to trash.
 
 The configured model provider receives the image and prompt. The hidden child session also keeps its prompt and image in local pi session history. Hidden child sessions do not appear in the sidebar, but Leyline does not delete their JSONL files.
 

@@ -2,7 +2,7 @@
 
 Leyline bundles `.pi/extensions/vision-agent/index.ts`. The extension registers the `vision_agent` tool so a model can inspect image files through a separate image-capable model.
 
-The composer uses the same child-session path when the active parent model cannot receive attached images.
+When a parent model cannot receive an attached image, Leyline saves the image locally and instructs the model to call `vision_agent`. The tool call and its result appear in the transcript.
 
 ## Tool contract
 
@@ -47,15 +47,18 @@ A session fork copies both values from its session override.
 
 ## Composer delegation
 
-Before Leyline submits an image to a parent model without image support, it completes these actions:
+When a user attaches images to a parent model without image input, Leyline does these actions:
 
-1. Resolve the session, project, or global vision model and thinking value.
-2. Run one hidden vision child for each attached image.
-3. Build a text block from the returned descriptions.
-4. Submit the original prompt and images to pi for transcript persistence.
-5. Replace the images with the description block in parent-model context.
+1. Resolve the configured vision model and confirm that it supports image input.
+2. Save each image in the session attachment directory.
+3. Submit the original prompt and images to pi for transcript persistence.
+4. Replace image blocks in parent-model context with saved file paths and instructions to call `vision_agent`.
 
-The composer shows **Describing image…** during this preflight. It shows the selected vision model before submission.
+The attachment directory is `$LEYLINE_MEMORY_DIR/attachments/<session-id>/`. Without `LEYLINE_MEMORY_DIR`, it is `~/.local/share/leyline/attachments/<session-id>/`.
+
+The parent model calls `vision_agent` as part of its turn. The tool starts a hidden vision child. Its result appears in the transcript. The composer does not wait for a hidden vision-child preflight.
+
+Leyline removes the session attachment directory after it moves a session or project to trash.
 
 Leyline does not delegate images for extension slash commands because a handled extension command does not start a parent-model turn. When the active model lacks image support, the composer blocks those attachments. Do not attach images to an extension slash command.
 
@@ -63,13 +66,13 @@ Leyline does not delegate images for extension slash commands because a handled 
 
 `installVisionDelegationContext()` wraps the parent session's `agent.transformContext` function. A pending record covers the first model request before pi has finished writing the custom entry.
 
-After pi saves the user message, Leyline appends a `leyline-vision-delegation` custom entry. The entry stores the image signature, generated description, user-message timestamp, and user entry ID.
+After pi saves the user message, Leyline appends a `leyline-vision-delegation` custom entry. The entry stores the image signature, saved file paths, initial and settled context text, and user-message timestamp.
 
-At each later model boundary, the wrapper reloads these records from the active branch. It removes matched image blocks from parent-model context and adds the stored description. The persisted user message keeps its original text and images through reloads and branch changes.
+At each model boundary, the wrapper reloads these records from the active branch. It removes matched image blocks from parent-model context. Until `vision_agent` calls exist for all saved paths, it adds the stored tool instruction. It then adds neutral text so later turns and reloads do not request another inspection. The persisted user message keeps its original text and images through reloads and branch changes.
 
 ## Child runtime
 
-The server creates each vision child through the normal subagent runtime path. The child has these constraints:
+The server creates a vision child through the normal subagent runtime path when `vision_agent` runs. The child has these constraints:
 
 - Its model must support image input.
 - Its active tool allowlist is empty.
@@ -82,11 +85,9 @@ The configured model provider receives the image and prompt. Provider authentica
 
 ## Cancellation
 
-A prompt request owns an abort controller while vision preflight runs. A session interrupt or request disconnect cancels unfinished vision children.
+The `vision_agent` call uses the parent run's abort signal. The direct vision execution route aborts its child when the HTTP connection closes before completion.
 
-An individual child failure becomes a `Vision delegation failed` block. Other image children continue, and Leyline starts the parent prompt after all image runs finish.
-
-The direct vision execution route also aborts its child when the HTTP connection closes before completion.
+A child failure becomes an error tool result. The parent model receives that result in its context.
 
 ## Internal routes
 

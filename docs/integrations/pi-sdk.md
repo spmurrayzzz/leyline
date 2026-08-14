@@ -6,7 +6,7 @@ Leyline uses `SessionManager.listAll()` for normal session discovery. If `PI_COD
 
 `AgentSession.prompt()` handles commands, skills, templates, queueing, authentication, compaction, and persistence. `session.executeBash()` runs shell commands. Leyline forces steering and follow-up delivery to `one-at-a-time` mode.
 
-For a parent model without image support, Leyline completes vision preflight before it calls `AgentSession.prompt()`. A session `agent.transformContext` wrapper keeps the original images in JSONL history and replaces them with stored descriptions in parent-model context.
+For a parent model without image support, Leyline validates the vision model and saves pasted images before it calls `AgentSession.prompt()`. A session `agent.transformContext` wrapper keeps the original images in JSONL history. It replaces them in parent-model context with saved file paths and `vision_agent` instructions. The parent calls the tool during its turn.
 
 Forking uses `runtime.fork(entryId, { position: 'at' })`. Prompt edits use `session.navigateTree(entryId)` before Leyline submits replacement content. Rename appends pi session information. Delete moves the JSONL file to Leyline trash.
 

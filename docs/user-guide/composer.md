@@ -74,7 +74,7 @@ Press **Escape** to close the picker.
 
 Paste PNG, JPEG, GIF, or WebP images into the composer. Select **×** on an attachment to remove it.
 
-Leyline sends images directly to a model that supports image input. For other models, a configured vision agent describes each image before the parent prompt starts. The composer shows this delegation before submission.
+Leyline sends images directly to a model that supports image input. For other models, Leyline saves each image locally. It instructs the model to call `vision_agent` when its turn starts. The tool call and result appear in the transcript.
 
 If no vision model is configured, the warning blocks submission. Open **Settings**, find **Agents**, and select **Manage** beside **Vision agent**.
 
