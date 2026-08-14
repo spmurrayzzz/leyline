@@ -9,6 +9,11 @@ const baseUrl = process.env.DOCS_SCREENSHOT_URL || 'http://localhost:5173/'
 const docsOutputDir = path.resolve('docs/assets/screenshots')
 const readmeOutputDir = path.resolve('assets/readme')
 const fixedNow = Date.parse('2026-08-06T16:00:00.000Z')
+const visionAlertImage = {
+  type: 'image',
+  data: (await fs.readFile(path.resolve('scripts/fixtures/vision-alert.webp'))).toString('base64'),
+  mimeType: 'image/webp',
+}
 const model = {
   provider: 'local',
   id: 'minimax-m2.7',
@@ -120,6 +125,25 @@ const baseEntries = [
     text: 'Updated `scripts/release.js`. Verification now finishes before publication begins.',
     timestamp: '2026-08-06T15:47:00.000Z',
     rolloutFeedback: 'helpful',
+  }),
+]
+
+const visionEntries = [
+  messageEntry({
+    id: 'vision-user',
+    role: 'user',
+    label: 'You',
+    text: 'What does this warning mean, and what should I do before publication?',
+    images: [visionAlertImage],
+    timestamp: '2026-08-06T15:43:00.000Z',
+  }),
+  toolEntry({
+    id: 'tool-vision-agent',
+    label: 'Tool · vision_agent',
+    code: '',
+    toolName: 'vision_agent',
+    text: 'The image shows a release validation warning. Verification is required before publication. Run the checks, fix failures, then publish.',
+    timestamp: '2026-08-06T15:44:00.000Z',
   }),
 ]
 
@@ -364,6 +388,20 @@ try {
   })
   await capture({
     browser,
+    file: path.join(docsOutputDir, 'vision-tool-call.png'),
+    route: '/sessions/demo-session',
+    ready: '.transcript-tool',
+    scenario: 'vision',
+    interact: async (page) => {
+      const tool = page.locator('.transcript-tool').filter({ hasText: 'Tool · vision_agent' })
+      await tool.click()
+      await tool.locator('.tool-output').waitFor()
+    },
+    clipSelectors: ['.transcript-message.user-message', '.transcript-tool'],
+    padding: 18,
+  })
+  await capture({
+    browser,
     file: path.join(docsOutputDir, 'vision-agent.png'),
     route: '/sessions/demo-session',
     ready: '.assistant-message',
@@ -475,10 +513,20 @@ function session(
   }
 }
 
-function messageEntry({ id, role, label, text, thinking = '', timestamp, rolloutFeedback = '' }) {
+function messageEntry({
+  id,
+  role,
+  label,
+  text,
+  thinking = '',
+  images = [],
+  timestamp,
+  rolloutFeedback = '',
+}) {
   const blocks = []
   if (thinking) blocks.push({ type: 'thinking', text: thinking })
   blocks.push({ type: 'text', text })
+  blocks.push(...images)
   return {
     id,
     type: 'message',
@@ -589,17 +637,22 @@ function runtimeFor(scenario) {
 
 function detailFor(scenario) {
   const summary = sessions[0]
+  const entries = scenario === 'shell'
+    ? shellEntries
+    : scenario === 'vision'
+      ? visionEntries
+      : baseEntries
   return {
     session: {
       ...summary,
       sessionFile: summary.path,
-      messageCount: scenario === 'shell' ? shellEntries.length : baseEntries.length,
+      messageCount: entries.length,
       contextTokens: 12480,
       modified: '2026-08-06T15:49:00.000Z',
       created: '2026-08-06T15:42:00.000Z',
       contextUsage: { tokens: 12480, contextWindow: 200000, percent: 6.24 },
     },
-    entries: scenario === 'shell' ? shellEntries : baseEntries,
+    entries,
   }
 }
 

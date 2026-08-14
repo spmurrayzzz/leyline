@@ -39,6 +39,10 @@ Select **Inherit from lower scope** to remove a transcript or project override. 
 
 For each image that requires delegation, Leyline saves a local attachment. When the parent turn starts, the model calls `vision_agent`. The tool starts a hidden child session with the configured vision model. The child returns a detailed text description.
 
+![Attached release warning followed by an expanded vision_agent tool result](../assets/screenshots/vision-tool-call.png)
+
+*The parent model calls `vision_agent`, and its result appears as a normal transcript tool row.*
+
 The parent model receives the tool result instead of the image. The saved user message keeps the original prompt and images, including after a reload or branch change.
 
 Leyline removes the session attachment directory when it moves a session or project to trash.
