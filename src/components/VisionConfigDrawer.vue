@@ -133,9 +133,10 @@ function updateThinking(event) {
     </p>
 
     <p class="vision-config-description">
-      When the active model cannot receive images directly, Leyline runs the
-      <code>vision_agent</code> subagent to describe attached images and pastes
-      those descriptions into the prompt. The images stay in the transcript.
+      When the active model cannot receive images directly, the model calls the
+      <code>vision_agent</code> tool to inspect attached images. The tool runs
+      the configured vision model and returns a description. The images stay in
+      the transcript.
     </p>
 
     <div v-if="error" class="memory-error">{{ error }}</div>

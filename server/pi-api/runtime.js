@@ -1,5 +1,7 @@
+import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
-import { mkdir, rename } from 'node:fs/promises'
+import { mkdir, rename, rm, writeFile } from 'node:fs/promises'
+import { homedir } from 'node:os'
 import {
   basename,
   dirname,
@@ -378,7 +380,6 @@ async function promptSession(handle, text, images = [], streamingBehavior, signa
     const delegation = shouldDelegate
       ? await prepareVisionDelegation(
         handle,
-        promptText,
         promptImages,
         controller.signal,
       )
@@ -402,7 +403,7 @@ async function promptSession(handle, text, images = [], streamingBehavior, signa
     const registration = registerVisionDelegation(
       session,
       promptImages,
-      delegation.text,
+      delegation,
       promptText,
     )
     try {
@@ -471,7 +472,7 @@ function isExtensionCommand(session, text) {
   return Boolean(session.extensionRunner.getCommand(name))
 }
 
-async function prepareVisionDelegation(handle, text, images, signal) {
+async function prepareVisionDelegation(handle, images, signal) {
   if (signal?.aborted) throw new Error('Prompt cancelled')
   const session = handle.runtime.session
   const cwd = session.sessionManager.getCwd()
@@ -496,61 +497,69 @@ async function prepareVisionDelegation(handle, text, images, signal) {
     )
   }
 
-  const delegations = await Promise.all(images.map((image) => {
-    return runVision({
-      question: text && text.trim()
-        ? `This image was attached by a user with this prompt:\n\n${text}\n\nDescribe the image in enough detail for an agent that cannot see it, and answer anything the prompt asks.`
-        : 'Describe this image in detail so an agent that cannot see it understands what it shows.',
-      cwd,
-      parentSessionPath: sessionPath,
-      model: resolved.model,
-      thinking: effectiveVisionThinking(resolved.thinking, session.thinkingLevel),
-      image,
-      signal,
-    }).then((result) => ({
-      ok: visionDelegationOk(result),
-      text: visionResultText(result),
-    })).catch((error) => {
-      if (signal?.aborted) throw error
-      return {
-        ok: false,
-        text: error.message || String(error),
-      }
-    })
-  }))
-
   const blocks = [
-    `[Attached image, described for you by the vision subagent (${resolved.model}). You cannot view the image directly.]`,
+    `[Attached ${images.length === 1 ? 'image' : 'images'} you cannot receive directly; the active model does not support image content.]`,
+    'Inspect before answering:',
   ]
-  delegations.forEach((delegation, index) => {
+  const filePaths = await Promise.all(images.map((image) => {
+    return writeVisionImage(session, image)
+  }))
+  filePaths.forEach((filePath, index) => {
     const label = images.length > 1 ? `${index + 1}. ` : ''
-    if (delegation.ok) blocks.push(`${label}${delegation.text}`)
-    else blocks.push(`${label}Vision delegation failed: ${delegation.text}`)
+    blocks.push(
+      `${label}Saved to: ${filePath}\n` +
+      `Give the vision_agent tool path=${filePath} (cwd not needed; the path is absolute).`,
+    )
   })
   blocks.push('')
-  return { text: blocks.join('\n') }
+  const settledBlocks = [
+    `[Attached ${images.length === 1 ? 'image' : 'images'} that the active model cannot receive directly. You already inspected the attached image; no further vision agent call is needed.]`,
+  ]
+  filePaths.forEach((filePath, index) => {
+    const label = images.length > 1 ? `${index + 1}. ` : ''
+    settledBlocks.push(`${label}Saved to: ${filePath}`)
+  })
+  settledBlocks.push('')
+  return {
+    paths: filePaths,
+    settledText: settledBlocks.join('\n'),
+    text: blocks.join('\n'),
+  }
 }
 
-function visionDelegationOk(result) {
-  if (result?.error) return false
-  return !(result?.messages || []).some((message) => message.role === 'error')
+function imageFileExtension(mimeType) {
+  const map = {
+    'image/png': '.png',
+    'image/jpeg': '.jpg',
+    'image/gif': '.gif',
+    'image/webp': '.webp',
+  }
+  return map[mimeType] || '.png'
+}
+
+function visionImageBaseDir() {
+  const root = process.env.LEYLINE_MEMORY_DIR
+    || join(homedir(), '.local', 'share', 'leyline')
+  return join(root, 'attachments')
+}
+
+async function writeVisionImage(session, image) {
+  const sessionId = session.sessionManager.getSessionId()
+  const subdir = sessionId || 'pending'
+  const dir = join(visionImageBaseDir(), subdir)
+  await mkdir(dir, { recursive: true })
+  const hash = createHash('sha256').update(image.data || '').digest('hex').slice(0, 16)
+  const filePath = join(dir, `${hash}${imageFileExtension(image.mimeType)}`)
+  if (!existsSync(filePath)) {
+    await writeFile(filePath, Buffer.from(image.data, 'base64'), { flag: 'wx' })
+  }
+  return filePath
 }
 
 function formatModelLabel(model) {
   if (!model) return 'The current model'
   if (typeof model === 'object') return `${model.provider}/${model.id}`
   return String(model)
-}
-
-function visionResultText(result) {
-  const messages = result?.messages || []
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const message = messages[i]
-    if (message.role === 'assistant' || message.role === 'error') {
-      if (message.content) return message.content.trim()
-    }
-  }
-  return result?.error || '(no description)'
 }
 
 async function bashSession(handle, command, excludeFromContext = false) {
@@ -750,6 +759,15 @@ function normalizeSessionName(name) {
   return name.replace(/\s+/g, ' ').trim()
 }
 
+async function removeVisionAttachments(sessionId) {
+  if (!sessionId) return
+  try {
+    await rm(join(visionImageBaseDir(), sessionId), { recursive: true, force: true })
+  } catch {
+    // Best effort: an orphaned attachment folder must not block deletion.
+  }
+}
+
 async function trashSession(id) {
   const session = await findSession(id)
   if (!session) throw new Error('Session not found')
@@ -779,6 +797,7 @@ async function trashSession(id) {
   }
 
   if (handle) discardRuntimeHandle(handle)
+  await removeVisionAttachments(session.id)
 
   return { path: trashPath }
 }
@@ -826,6 +845,7 @@ async function trashProject(cwd) {
     }
 
     if (handle) discardRuntimeHandle(handle)
+    await removeVisionAttachments(session.id)
   }
 
   return { count: moved.length, path: moved[0] || '' }
@@ -1180,15 +1200,6 @@ async function runVision({ question, cwd, parentSessionPath, model, thinking, im
     allowImages: true,
     signal,
   })
-}
-
-function effectiveVisionThinking(thinking, parentThinkingLevel) {
-  if (!thinking) return undefined
-  if (thinking === 'inherit') {
-    return normalizeSubagentThinkingLevel(parentThinkingLevel)
-  }
-  if (!SUBAGENT_THINKING_LEVELS.has(thinking)) return undefined
-  return thinking
 }
 
 function normalizeSubagentThinkingLevel(thinkingLevel) {

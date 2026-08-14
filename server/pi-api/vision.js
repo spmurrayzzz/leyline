@@ -50,6 +50,8 @@ export function installVisionDelegationContext(session) {
     const record = {
       signature,
       text: pending.text,
+      settledText: pending.settledText || pending.text,
+      paths: pending.paths,
       userTimestamp: event.message.timestamp,
     }
     state.records.push(record)
@@ -65,15 +67,17 @@ export function installVisionDelegationContext(session) {
   sessionDelegations.set(session, state)
 }
 
-export function registerVisionDelegation(session, images, text, prompt) {
+export function registerVisionDelegation(session, images, delegation, prompt) {
   const state = sessionDelegations.get(session)
   if (!state) throw new Error('Vision delegation context is unavailable')
   const pending = {
     bound: false,
     createdAt: Date.now(),
+    paths: delegation?.paths,
     prompt,
+    settledText: delegation?.settledText,
     signature: imageSignature(images),
-    text,
+    text: delegation?.text,
   }
   state.pending.push(pending)
   return {
@@ -234,7 +238,8 @@ function visionDelegationRecords(entries) {
       return entry.type === 'custom'
         && entry.customType === VISION_DELEGATION_CUSTOM_TYPE
         && typeof entry.data?.signature === 'string'
-        && typeof entry.data?.text === 'string'
+        && (typeof entry.data?.text === 'string'
+          || typeof entry.data?.settledText === 'string')
         && Number.isFinite(entry.data?.userTimestamp)
     })
     .map((entry) => entry.data)
@@ -253,11 +258,23 @@ function applyVisionDelegations(messages, records) {
         && item.userTimestamp === message.timestamp
     })
     if (!record) return message
+    const alreadyInspected = Array.isArray(record.paths)
+      && record.paths.length > 0
+      && record.paths.every((path) => messages.some((item) => {
+        if (item.role !== 'assistant' || !Array.isArray(item.content)) return false
+        return item.content.some((block) => {
+          return block?.type === 'toolCall'
+            && block?.name === 'vision_agent'
+            && String(block.arguments?.path ?? '') === path
+        })
+      }))
     return {
       ...message,
       content: [
         ...message.content.filter((item) => item.type !== 'image'),
-        { type: 'text', text: record.text },
+        { type: 'text', text: alreadyInspected
+          ? record.settledText || record.text
+          : record.text },
       ],
     }
   })

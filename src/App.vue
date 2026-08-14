@@ -566,7 +566,7 @@ const visionDelegationNotice = computed(() => {
   if (!model || model.supportsImages) return ''
   const visionModel = visionConfigData.value?.model
   if (!visionModel) return ''
-  return `${modelChip(model)} can't read images directly. The image${attachedImages.value.length > 1 ? 's' : ''} will be described by the vision subagent (${visionModel}) before sending.`
+  return `${modelChip(model)} can't read images directly. The model will call the vision subagent (${visionModel}) to inspect the image${attachedImages.value.length > 1 ? 's' : ''} when the prompt runs.`
 })
 const canSubmitDraft = computed(() => {
   if (imageSupportWarning.value) return false
@@ -1675,8 +1675,6 @@ async function submitDraft(streamingBehavior) {
   if (startsEmptySession) beginInProjectNewSessionRun()
   pulseComposerCommit()
   const localEntry = beginUserTurn(text, images)
-  const delegatesImages = needsVisionDelegation(images, text)
-  if (delegatesImages) setAgentRunning(true, 'Describing image…')
   const submittedDraft = draft.value
   promptSubmitting.value = true
   promptError.value = ''
@@ -1704,7 +1702,6 @@ async function submitDraft(streamingBehavior) {
         resetLiveState()
       }
       removeOptimisticEntry(localEntry)
-      if (delegatesImages) setAgentRunning(false)
       if (!draft.value && !attachedImages.value.length) {
         draft.value = submittedDraft
         attachedImages.value = submittedAttachments
@@ -1719,23 +1716,6 @@ async function submitDraft(streamingBehavior) {
     promptSubmitting.value = false
     refocusComposer()
   }
-}
-
-function needsVisionDelegation(images, text) {
-  const model = composerRuntime.value?.state?.model
-  const command = text.startsWith('/')
-    ? text.slice(1).split(/\s/, 1)[0]
-    : ''
-  const extensionCommand = command && slashCommands.value.some((item) => {
-    return item.source === 'extension' && item.name === command
-  })
-  return Boolean(
-    images.length
-      && model
-      && !model.supportsImages
-      && visionConfigData.value?.model
-      && !extensionCommand,
-  )
 }
 
 function shellCommandFromText(text) {
@@ -1911,8 +1891,6 @@ async function retryEntry(entry) {
   hasNewOutput.value = false
   pulseComposerCommit()
   const localEntry = beginUserTurn(text, images)
-  const delegatesImages = needsVisionDelegation(images, text)
-  if (delegatesImages) setAgentRunning(true, 'Describing image…')
   promptSubmitting.value = true
   promptError.value = ''
   closePickerMenus()
@@ -1929,7 +1907,6 @@ async function retryEntry(entry) {
       sessionDetail.value = previousDetail
       resetLiveState()
       removeOptimisticEntry(localEntry)
-      if (delegatesImages) setAgentRunning(false)
       promptError.value = error.message
     }
   } finally {
