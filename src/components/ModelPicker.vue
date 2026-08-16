@@ -129,7 +129,6 @@ function selectModel(model) {
             v-model="query"
             placeholder="Filter models"
             @keydown.enter.prevent
-            @keydown.escape.prevent.stop="emit('toggle')"
           />
         </label>
         <button

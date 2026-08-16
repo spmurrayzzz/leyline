@@ -2228,8 +2228,30 @@ function closeMenusOnEscape(event) {
   handleEscape(event)
 }
 
+function anyEscapeTargetOpen() {
+  return Boolean(
+    fullscreenImage.value
+    || fullscreenTool.value
+    || projectBrowserOpen.value
+    || settingsOpen.value
+    || eventLogOpen.value
+    || subagentConfigOpen.value
+    || visionConfigOpen.value
+    || projectDetailCwd.value
+    || memoryOpen.value
+    || deleteConfirmActive.value
+    || editingEntry.value
+    || renamingSessionId.value
+    || modelPickerOpen.value
+    || thinkingPickerOpen.value
+    || toolsPickerOpen.value
+    || startProjectPickerOpen.value
+    || slashPickerOpen.value
+  )
+}
+
 function handleEscape(event) {
-  if (agentRunning.value) {
+  if (!anyEscapeTargetOpen() && agentRunning.value) {
     event?.preventDefault?.()
     void interruptAgent()
   }
