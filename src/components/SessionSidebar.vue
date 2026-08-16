@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { backendDisplayAddress } from '../lib/backend'
 import { sessionTime } from '../lib/format'
 
@@ -128,11 +128,41 @@ const olderProjectsExpanded = ref(false)
 const olderProjectsToggle = ref(null)
 const backendMenu = ref(null)
 const backendMenuOpen = ref(false)
+const projectOrder = ref([])
+
+watch(
+  () => props.visibleProjects,
+  (projects) => {
+    if (props.query.trim()) return
+
+    const visibleCwds = new Set(projects.map((project) => project.cwd))
+    const existing = projectOrder.value.filter((cwd) => visibleCwds.has(cwd))
+    const existingCwds = new Set(existing)
+    const added = projects
+      .map((project) => project.cwd)
+      .filter((cwd) => !existingCwds.has(cwd))
+    const next = [...added, ...existing]
+    if (next.length === projectOrder.value.length
+      && next.every((cwd, index) => cwd === projectOrder.value[index])) return
+    projectOrder.value = next
+  },
+  { immediate: true },
+)
+
+const orderedProjects = computed(() => {
+  const projects = new Map(
+    props.visibleProjects.map((project) => [project.cwd, project]),
+  )
+  return projectOrder.value
+    .map((cwd) => projects.get(cwd))
+    .filter(Boolean)
+})
+
 const sidebarProjects = computed(() => {
   if (props.query.trim()) return props.visibleProjects
 
-  const recent = props.visibleProjects.filter((project) => !project.isOlder)
-  const older = props.visibleProjects.filter((project) => project.isOlder)
+  const recent = orderedProjects.value.filter((project) => !project.isOlder)
+  const older = orderedProjects.value.filter((project) => project.isOlder)
   if (!older.length) return recent
 
   return [
