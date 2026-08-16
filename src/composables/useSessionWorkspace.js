@@ -1210,12 +1210,12 @@ export function useSessionWorkspace({
       return !query || project.score > 0
     })
     for (const project of projectList) {
-      project.modified = Math.max(
+      const recentModified = Math.max(
         project.modified,
         runtimeActivityByCwd.get(project.cwd) || 0,
       )
-      project.isOlder = project.modified > 0
-        && project.modified < cutoff
+      project.isOlder = recentModified > 0
+        && recentModified < cutoff
         && project.cwd !== selectedCwd
         && !activeRuntimeCwds.has(project.cwd)
       project.sessions.sort((a, b) => {
