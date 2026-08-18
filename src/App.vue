@@ -1078,6 +1078,8 @@ async function loadBackendWorkspace() {
   initPhase.value = 'sessions'
 
   if (pendingInitialNativeCwd.value) {
+    void loadSidebarProjects()
+    scheduleSessionHydration()
     await waitInitPhaseFloor()
     const cwd = pendingInitialNativeCwd.value
     try {
