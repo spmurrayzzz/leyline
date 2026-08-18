@@ -440,7 +440,6 @@ const {
     })
   },
   onRuntimeEvent(data) {
-    console.log('pi runtime event', data)
     updateRuntimeEventState(data)
     liveTurn.handle({ kind: 'runtime', ...data })
   },

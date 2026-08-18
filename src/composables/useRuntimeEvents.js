@@ -1,6 +1,11 @@
 import { computed, ref } from 'vue'
 import { backendHttpUrl } from '../lib/backend'
 
+const transientRuntimeEventTypes = new Set([
+  'message_update',
+  'tool_execution_update',
+])
+
 export function useRuntimeEvents({
   onActiveSession,
   onRuntimeEvent,
@@ -29,7 +34,9 @@ export function useRuntimeEvents({
     eventSource.addEventListener('runtime_event', (event) => {
       const data = parseEvent(event, 'runtime')
       if (!data) return
-      appendRuntimeEvent(data)
+      if (!transientRuntimeEventTypes.has(data.event?.type)) {
+        appendRuntimeEvent(data)
+      }
       onRuntimeEvent?.(data)
     })
 
