@@ -98,6 +98,11 @@ const reviewReady = ref(false)
 const reviewOpenRequested = ref(false)
 const reviewDesktopAvailable = ref(false)
 const reviewRefreshToken = ref(0)
+const reviewSummary = ref(defaultReviewSummary())
+const reviewLineCountFormatter = new Intl.NumberFormat('en', {
+  maximumFractionDigits: 1,
+  notation: 'compact',
+})
 const runtimeCwdBySessionId = new Map()
 let reviewCloseTimer = null
 let reviewDesktopQuery = null
@@ -163,6 +168,61 @@ const reviewEnabled = computed(() => {
 })
 const reviewAvailable = computed(() => {
   return reviewEnabled.value && reviewDesktopAvailable.value
+})
+const reviewHasLineStats = computed(() => {
+  const summary = reviewSummary.value
+  return summary.state === 'ready'
+    && summary.available
+    && summary.lineStatsAvailable
+    && (summary.additions > 0 || summary.deletions > 0)
+})
+const reviewAdditionText = computed(() => {
+  if (!reviewHasLineStats.value || reviewSummary.value.additions < 1) return ''
+  return `+${reviewLineCountFormatter.format(reviewSummary.value.additions)}`
+})
+const reviewDeletionText = computed(() => {
+  if (!reviewHasLineStats.value || reviewSummary.value.deletions < 1) return ''
+  return `−${reviewLineCountFormatter.format(reviewSummary.value.deletions)}`
+})
+const reviewFallbackBadgeText = computed(() => {
+  const { conflicts, filesTruncated, state, totalFiles } = reviewSummary.value
+  if (state === 'error') return '!'
+  if (state !== 'ready' || totalFiles < 1 || reviewHasLineStats.value) return ''
+  const count = filesTruncated || totalFiles > 99 ? '99+' : `${totalFiles}`
+  return conflicts ? `!${count}` : count
+})
+const reviewToggleDescription = computed(() => {
+  const summary = reviewSummary.value
+  if (summary.state === 'loading') return 'Review changes · Reading Git status'
+  if (summary.state === 'error') return 'Review changes · Git status unavailable'
+  if (!summary.available) return 'Review changes · No Git repository'
+
+  const parts = ['Review changes']
+  if (summary.branch) parts.push(summary.branch)
+  if (summary.totalFiles < 1) {
+    parts.push('Working tree clean')
+  } else {
+    const count = summary.filesTruncated
+      ? `${summary.totalFiles}+`
+      : summary.totalFiles
+    const fileLabel = summary.totalFiles === 1 && !summary.filesTruncated
+      ? 'file'
+      : 'files'
+    parts.push(`${count} changed ${fileLabel}`)
+    if (summary.conflicts) {
+      parts.push(`${summary.conflicts} ${summary.conflicts === 1 ? 'conflict' : 'conflicts'}`)
+    }
+    if (summary.lineStatsAvailable) {
+      if (summary.additions) parts.push(`${summary.additions.toLocaleString()} additions`)
+      if (summary.deletions) parts.push(`${summary.deletions.toLocaleString()} deletions`)
+    }
+    if (!summary.filesTruncated) {
+      if (summary.staged) parts.push(`${summary.staged} staged`)
+      if (summary.working) parts.push(`${summary.working} working`)
+    }
+  }
+  if (!reviewReady.value) parts.push('Preparing preview')
+  return parts.join(' · ')
 })
 const {
   closeTerminalPanel,
@@ -731,12 +791,14 @@ watch(reviewAvailable, (available) => {
   if (available) return
   reviewReady.value = false
   reviewOpenRequested.value = false
+  resetReviewSummary()
   closeReview(true)
 })
 
 watch(settingsCwd, (cwd, previousCwd) => {
   if (cwd === previousCwd) return
   reviewReady.value = false
+  resetReviewSummary()
   const reopen = reviewOpen.value || reviewOpenRequested.value
   closeReview(true)
   reviewOpenRequested.value = reopen && !!cwd
@@ -1031,6 +1093,30 @@ function sessionSortTime(session) {
     session?.modified || session?.timestamp || 0,
   ).getTime()
   return Number.isNaN(time) ? 0 : time
+}
+
+function defaultReviewSummary() {
+  return {
+    additions: 0,
+    available: true,
+    branch: '',
+    conflicts: 0,
+    deletions: 0,
+    filesTruncated: false,
+    lineStatsAvailable: false,
+    staged: 0,
+    state: 'loading',
+    totalFiles: 0,
+    working: 0,
+  }
+}
+
+function resetReviewSummary() {
+  reviewSummary.value = defaultReviewSummary()
+}
+
+function handleReviewSummary(summary) {
+  reviewSummary.value = { ...defaultReviewSummary(), ...summary }
 }
 
 function reviewMotionDuration() {
@@ -2590,10 +2676,18 @@ function closePickerMenus() {
           <button
             v-if="reviewAvailable"
             class="topbar-icon-button review-toggle-button"
-            :class="{ active: reviewOpen, preparing: !reviewReady }"
+            :class="{
+              active: reviewOpen,
+              'has-review-changes': reviewSummary.state === 'ready'
+                && reviewSummary.available && reviewSummary.totalFiles > 0,
+              preparing: !reviewReady,
+              'review-error': reviewSummary.state === 'error',
+              'review-unavailable': reviewSummary.state === 'ready'
+                && !reviewSummary.available,
+            }"
             type="button"
-            :title="reviewReady ? 'Review changes' : 'Preparing review'"
-            aria-label="Review changes"
+            :title="reviewToggleDescription"
+            :aria-label="reviewToggleDescription"
             :aria-busy="!reviewReady"
             :aria-pressed="reviewOpen"
             @click="toggleReview"
@@ -2604,6 +2698,30 @@ function closePickerMenus() {
                 stroke-width="2"
               ></path>
             </svg>
+            <span
+              v-if="reviewHasLineStats"
+              class="review-line-stats"
+              aria-hidden="true"
+            >
+              <span v-if="reviewSummary.conflicts" class="review-conflict-mark">!</span>
+              <span v-if="reviewAdditionText" class="review-line-additions">
+                {{ reviewAdditionText }}
+              </span>
+              <span v-if="reviewDeletionText" class="review-line-deletions">
+                {{ reviewDeletionText }}
+              </span>
+            </span>
+            <span
+              v-else-if="reviewFallbackBadgeText"
+              class="review-state-badge"
+              :class="{
+                conflict: reviewSummary.conflicts > 0,
+                error: reviewSummary.state === 'error',
+              }"
+              aria-hidden="true"
+            >
+              {{ reviewFallbackBadgeText }}
+            </span>
           </button>
           <button
             class="topbar-icon-button"
@@ -3203,6 +3321,7 @@ function closePickerMenus() {
       @prepared="handleReviewPrepared"
       @preparing="handleReviewPreparing"
       @resize="reviewPaneWidth = $event"
+      @summary="handleReviewSummary"
       @toggle-expand="toggleReviewExpanded"
     />
 

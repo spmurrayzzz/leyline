@@ -17,15 +17,20 @@ const emit = defineEmits([
   'prepared',
   'preparing',
   'resize',
+  'summary',
   'toggle-expand',
 ])
 
 const MIN_REVIEW_WIDTH = 340
 const review = ref({
+  additions: 0,
   available: true,
   branch: '',
+  conflicts: 0,
+  deletions: 0,
   files: [],
   filesTruncated: false,
+  lineStatsAvailable: false,
   root: '',
   totalFiles: 0,
 })
@@ -72,6 +77,9 @@ const stagedCount = computed(() => {
 const workingCount = computed(() => {
   return files.value.filter((file) => file.unstaged).length
 })
+const conflictCount = computed(() => {
+  return files.value.filter((file) => file.conflicted).length
+})
 const panelSubtitle = computed(() => {
   if (loading.value && !hasLoaded.value) return 'Loading project changes'
   if (!review.value.available) return 'No Git repository'
@@ -110,14 +118,17 @@ watch(() => props.sidebarHidden, constrainCurrentWidth)
 async function loadReview({ preserveSelection = false } = {}) {
   const generation = ++reviewGeneration
   emit('preparing')
+  if (error.value) hasLoaded.value = false
   loading.value = !hasLoaded.value
   refreshing.value = true
   error.value = ''
+  if (!hasLoaded.value) emit('summary', { state: 'loading' })
 
   try {
     const data = await fetchGitReview(props.cwd)
     if (generation !== reviewGeneration) return
     review.value = data
+    announceSummary()
     const preferredPath = preserveSelection ? selectedPath.value : ''
     const nextPath = files.value.some((file) => file.path === preferredPath)
       ? preferredPath
@@ -130,6 +141,7 @@ async function loadReview({ preserveSelection = false } = {}) {
     if (generation !== reviewGeneration) return
     error.value = err.message
     hasLoaded.value = true
+    emit('summary', { state: 'error' })
     clearDiff()
   } finally {
     if (generation === reviewGeneration) {
@@ -200,6 +212,28 @@ function announcePrepared() {
     || pendingPreviewKeys.size
   ) return
   emit('prepared')
+}
+
+function announceSummary() {
+  emit('summary', {
+    additions: Number.isInteger(review.value.additions)
+      ? review.value.additions
+      : 0,
+    available: review.value.available,
+    branch: review.value.branch,
+    conflicts: Number.isInteger(review.value.conflicts)
+      ? review.value.conflicts
+      : conflictCount.value,
+    deletions: Number.isInteger(review.value.deletions)
+      ? review.value.deletions
+      : 0,
+    filesTruncated: filesTruncated.value,
+    lineStatsAvailable: review.value.lineStatsAvailable === true,
+    staged: stagedCount.value,
+    state: 'ready',
+    totalFiles: totalFiles.value,
+    working: workingCount.value,
+  })
 }
 
 function markPreviewReady(key) {

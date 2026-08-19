@@ -94,8 +94,11 @@ index f21bb35..7ef14a9 100644
  }
 `
 const reviewPayload = {
+  additions: 27,
   available: true,
   branch: 'release-safety',
+  conflicts: 0,
+  deletions: 3,
   files: [
     {
       conflicted: false,
@@ -143,11 +146,14 @@ const reviewPayload = {
     },
   ],
   filesTruncated: false,
+  lineStatsAvailable: true,
   root: '/workspace/harbor',
   totalFiles: 4,
 }
 const cleanReviewPayload = {
   ...reviewPayload,
+  additions: 0,
+  deletions: 0,
   files: [],
   totalFiles: 0,
 }

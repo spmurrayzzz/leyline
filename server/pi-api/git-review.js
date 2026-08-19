@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { stat } from 'node:fs/promises'
+import { lstat, open, stat } from 'node:fs/promises'
 import { devNull } from 'node:os'
 import { resolve } from 'node:path'
 
@@ -12,20 +12,27 @@ const DIFF_FORMAT_ARGS = [
   '--src-prefix=a/',
   '--dst-prefix=b/',
 ]
+const GIT_BINARY_PROBE_BYTES = 8000
 const MAX_GIT_OUTPUT = 20 * 1024 * 1024
 const MAX_RENDERABLE_DIFF_BYTES = 1024 * 1024
 const MAX_RENDERABLE_DIFF_LINES = 5000
 const MAX_REVIEW_FILES = 500
+const MAX_UNTRACKED_DIFF_DRIVERS = 20
+const MAX_UNTRACKED_LINE_STATS_BYTES = 20 * 1024 * 1024
 
 export async function readGitReview(cwd) {
   const directory = await projectDirectory(cwd)
   const root = await repositoryRoot(directory)
   if (!root) {
     return {
+      additions: 0,
       available: false,
       branch: '',
+      conflicts: 0,
+      deletions: 0,
       files: [],
       filesTruncated: false,
+      lineStatsAvailable: true,
       root: directory,
       totalFiles: 0,
     }
@@ -37,9 +44,17 @@ export async function readGitReview(cwd) {
   ])
 
   const { files, truncated } = parseStatus(status.stdout, MAX_REVIEW_FILES)
+  const conflicts = truncated
+    ? await readConflictCount(root)
+    : files.filter((file) => file.conflicted).length
+  const lineStats = truncated
+    ? { additions: 0, deletions: 0, lineStatsAvailable: false }
+    : await readLineStats(root, files)
   return {
+    ...lineStats,
     available: true,
     branch,
+    conflicts,
     files,
     filesTruncated: truncated,
     root,
@@ -63,6 +78,165 @@ export async function readGitReviewDiff(cwd, path) {
   return {
     diffs: await fileDiffs(root, file),
     path: file.path,
+  }
+}
+
+async function readLineStats(root, files) {
+  try {
+    const [staged, working] = await Promise.all([
+      runGit(root, [
+        'diff',
+        '--cached',
+        '--numstat',
+        '-z',
+        '--no-ext-diff',
+        '--no-textconv',
+        '--find-renames',
+        '--',
+      ]),
+      runGit(root, [
+        'diff',
+        '--numstat',
+        '-z',
+        '--no-ext-diff',
+        '--no-textconv',
+        '--find-renames',
+        '--',
+      ]),
+    ])
+    const stagedStats = parseNumstat(staged.stdout)
+    const workingStats = parseNumstat(working.stdout)
+    let additions = stagedStats.additions + workingStats.additions
+    const deletions = stagedStats.deletions + workingStats.deletions
+    const untrackedFiles = files.filter((file) => file.untracked)
+    const diffAttributes = await untrackedDiffAttributes(root, untrackedFiles)
+    let untrackedBytesRemaining = MAX_UNTRACKED_LINE_STATS_BYTES
+    for (const file of untrackedFiles) {
+      const stats = await untrackedAdditions(
+        root,
+        file.path,
+        untrackedBytesRemaining,
+        diffAttributes.get(file.path),
+      )
+      additions += stats.additions
+      untrackedBytesRemaining -= stats.bytes
+    }
+    return { additions, deletions, lineStatsAvailable: true }
+  } catch {
+    return { additions: 0, deletions: 0, lineStatsAvailable: false }
+  }
+}
+
+async function readConflictCount(root) {
+  const result = await runGit(root, [
+    'diff',
+    '--name-only',
+    '-z',
+    '--diff-filter=U',
+    '--',
+  ])
+  let count = 0
+  for (const byte of Buffer.from(result.stdout)) {
+    if (byte === 0) count++
+  }
+  return count
+}
+
+function parseNumstat(output) {
+  let additions = 0
+  let deletions = 0
+  for (const record of output.split('\0')) {
+    const match = /^(\d+|-)\t(\d+|-)\t/.exec(record)
+    if (!match || match[1] === '-' || match[2] === '-') continue
+    additions += Number(match[1])
+    deletions += Number(match[2])
+  }
+  return { additions, deletions }
+}
+
+async function untrackedDiffAttributes(root, files) {
+  const attributes = new Map()
+  for (let offset = 0; offset < files.length; offset += 100) {
+    const paths = files.slice(offset, offset + 100).map((file) => file.path)
+    const result = await runGit(root, [
+      'check-attr',
+      '-z',
+      'diff',
+      '--',
+      ...paths,
+    ])
+    const records = result.stdout.split('\0')
+    for (let index = 0; index + 2 < records.length; index += 3) {
+      attributes.set(records[index], records[index + 2])
+    }
+  }
+
+  const drivers = [...new Set([...attributes.values()].filter((value) => {
+    return !['set', 'unset', 'unspecified'].includes(value)
+  }))]
+  if (drivers.length > MAX_UNTRACKED_DIFF_DRIVERS) {
+    throw new Error('Too many untracked diff drivers')
+  }
+  const driverModes = new Map(await Promise.all(drivers.map(async (driver) => {
+    const result = await runGit(
+      root,
+      ['config', '--type=bool', '--get', `diff.${driver}.binary`],
+      [0, 1],
+    )
+    if (result.code === 1) return [driver, 'unspecified']
+    return [driver, stripLineEnding(result.stdout) === 'true' ? 'unset' : 'set']
+  })))
+  for (const [path, value] of attributes) {
+    if (driverModes.has(value)) attributes.set(path, driverModes.get(value))
+  }
+  return attributes
+}
+
+async function untrackedAdditions(root, path, bytesRemaining, diffAttribute) {
+  const absolutePath = resolve(root, path)
+  const info = await lstat(absolutePath)
+  if (!info.isFile() && !info.isSymbolicLink()) {
+    return { additions: 0, bytes: 0 }
+  }
+  if (info.size > bytesRemaining) throw new Error('Untracked files are too large')
+  if (info.isSymbolicLink()) return { additions: 1, bytes: info.size }
+  if (diffAttribute === 'unset') return { additions: 0, bytes: info.size }
+  if (info.size === 0) return { additions: 0, bytes: 0 }
+
+  const file = await open(absolutePath, 'r')
+  const buffer = Buffer.allocUnsafe(64 * 1024)
+  let binaryProbeBytesRemaining = GIT_BINARY_PROBE_BYTES
+  let bytesRemainingInFile = info.size
+  let lastByte = -1
+  let lines = 0
+  try {
+    while (bytesRemainingInFile > 0) {
+      const length = Math.min(buffer.length, bytesRemainingInFile)
+      const { bytesRead } = await file.read(buffer, 0, length, null)
+      if (!bytesRead) break
+      bytesRemainingInFile -= bytesRead
+      const chunk = buffer.subarray(0, bytesRead)
+      if (diffAttribute !== 'set' && binaryProbeBytesRemaining > 0) {
+        const probeBytes = Math.min(chunk.length, binaryProbeBytesRemaining)
+        if (chunk.subarray(0, probeBytes).includes(0)) {
+          return { additions: 0, bytes: info.size }
+        }
+        binaryProbeBytesRemaining -= probeBytes
+      }
+      for (const byte of chunk) {
+        if (byte === 10) lines++
+      }
+      lastByte = chunk[chunk.length - 1]
+    }
+    if ((await file.stat()).size > info.size) {
+      throw new Error('Untracked file changed while reading')
+    }
+  } finally {
+    await file.close()
+  }
+  return {
+    additions: lines + (lastByte === 10 ? 0 : 1),
+    bytes: info.size,
   }
 }
 

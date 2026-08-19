@@ -195,6 +195,62 @@ h1 {
   opacity: 0.45;
 }
 
+.review-toggle-button.has-review-changes:not(.active) {
+  color: var(--muted-strong);
+}
+
+.review-toggle-button.review-error:not(.active) {
+  color: #e77b7b;
+}
+
+.review-toggle-button.review-unavailable:not(.active) svg {
+  opacity: 0.45;
+}
+
+.review-line-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 750;
+  line-height: 1;
+}
+
+.review-line-additions {
+  color: #68c989;
+}
+
+.review-conflict-mark,
+.review-line-deletions {
+  color: #e77b7b;
+}
+
+.review-state-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 15px;
+  height: 15px;
+  border: 1px solid var(--accent-border);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  padding: 0 4px;
+  color: #b8afff;
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.review-state-badge.conflict,
+.review-state-badge.error {
+  border-color: rgb(231 123 123 / 32%);
+  background: rgb(231 123 123 / 10%);
+  color: #e77b7b;
+}
+
 .topbar-icon-count {
   color: var(--muted);
   font-size: 11px;
