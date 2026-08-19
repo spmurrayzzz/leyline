@@ -352,7 +352,7 @@ function plural(count, word) {
           @click="emit('toggle-expand')"
         >
           <svg v-if="expanded" viewBox="0 0 16 16" aria-hidden="true">
-            <path d="M5.5 5.5h7v7h-7zM3.5 10.5h-1v-7h7v1"></path>
+            <path d="M2.5 6H6V2.5M13.5 6H10V2.5M2.5 10H6v3.5M13.5 10H10v3.5"></path>
           </svg>
           <svg v-else viewBox="0 0 16 16" aria-hidden="true">
             <path d="M6 2.5H2.5V6M10 2.5h3.5V6M6 13.5H2.5V10M10 13.5h3.5V10"></path>
