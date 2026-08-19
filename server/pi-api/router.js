@@ -25,6 +25,8 @@ export function createPiApiHandler(api) {
     openEventStream,
     promptSession,
     readDirectory,
+    readGitReview,
+    readGitReviewDiff,
     readJson,
     reloadSession,
     renameSession,
@@ -78,6 +80,7 @@ async function piApiHandler(req, res) {
           capabilities: {
             events: true,
             exports: true,
+            review: true,
             terminal: true,
           },
         })
@@ -150,6 +153,27 @@ async function piApiHandler(req, res) {
         ))
       }
   
+      if (url.pathname === '/review') {
+        if (req.method !== 'GET') {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+        const cwd = url.searchParams.get('cwd')
+        if (!cwd) return json(res, { error: 'Project path is required' }, 400)
+        return json(res, await readGitReview(cwd))
+      }
+
+      if (url.pathname === '/review/diff') {
+        if (req.method !== 'GET') {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+        const cwd = url.searchParams.get('cwd')
+        const path = url.searchParams.get('path')
+        if (!cwd || !path) {
+          return json(res, { error: 'Project path and file path are required' }, 400)
+        }
+        return json(res, await readGitReviewDiff(cwd, path))
+      }
+
       if (url.pathname === '/prompt') {
         if (req.method !== 'POST') {
           return json(res, { error: 'Method not allowed' }, 405)

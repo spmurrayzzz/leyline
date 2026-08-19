@@ -184,15 +184,23 @@
   grid-template-rows: 1fr;
 }
 
+.tool-expand-wrapper:not(.is-expanded) .tool-expand-inner {
+  content-visibility: hidden;
+}
+
 .tool-expand-inner {
   overflow: hidden;
   min-height: 0;
   opacity: 0;
-  transition: opacity var(--motion-base) var(--ease-decelerate);
+  transition:
+    opacity var(--motion-base) var(--ease-decelerate),
+    content-visibility 0s linear var(--motion-base) allow-discrete;
 }
 
 .tool-expand-wrapper.is-expanded .tool-expand-inner {
+  content-visibility: visible;
   opacity: 1;
+  transition-delay: 0s;
 }
 
 .skill-expand-wrapper {

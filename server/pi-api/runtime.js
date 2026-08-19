@@ -21,6 +21,7 @@ import {
   emptyExtensionUiState,
 } from './extension-ui.js'
 import { readDirectory } from './fs-browser.js'
+import { readGitReview, readGitReviewDiff } from './git-review.js'
 import {
   runtimeSessionDto,
   sessionInfo,
@@ -1269,6 +1270,8 @@ export function createPiRuntimeApi() {
   openEventStream,
   promptSession,
   readDirectory,
+  readGitReview,
+  readGitReviewDiff,
   readJson,
   reloadSession,
   renameSession,

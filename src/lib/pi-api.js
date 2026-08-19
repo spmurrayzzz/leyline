@@ -42,6 +42,22 @@ export function fetchFsDirectory(path, cwd = '') {
   return apiRequest(`/api/pi/fs${query}`, 'Failed to read folder')
 }
 
+export function fetchGitReview(cwd) {
+  const params = new URLSearchParams({ cwd })
+  return apiRequest(
+    `/api/pi/review?${params}`,
+    'Failed to load project changes',
+  )
+}
+
+export function fetchGitReviewDiff(cwd, path) {
+  const params = new URLSearchParams({ cwd, path })
+  return apiRequest(
+    `/api/pi/review/diff?${params}`,
+    'Failed to load file diff',
+  )
+}
+
 export function deletePiSession(id) {
   return apiRequest(
     `/api/pi/sessions/${encodeURIComponent(id)}`,

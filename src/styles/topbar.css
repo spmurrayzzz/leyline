@@ -191,13 +191,18 @@ h1 {
   stroke-width: 1.4;
 }
 
+.review-toggle-button.preparing:not(.active) svg {
+  opacity: 0.45;
+}
+
 .topbar-icon-count {
   color: var(--muted);
   font-size: 11px;
   line-height: 1;
 }
 
-.topbar-icon-button:hover:not(:disabled) {
+.topbar-icon-button:hover:not(:disabled),
+.topbar-icon-button.active {
   background: var(--panel-soft);
   color: var(--text);
   transition-duration: var(--motion-quick);

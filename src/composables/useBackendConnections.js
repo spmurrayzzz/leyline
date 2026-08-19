@@ -24,6 +24,7 @@ export function useBackendConnections() {
   const error = ref('')
   const busyId = ref('')
   const testResult = ref(null)
+  const activeConnectionInfo = ref(null)
   const activeConnection = computed(() => {
     return connectionForId(activeConnectionId.value) || connections.value[0]
   })
@@ -128,6 +129,12 @@ export function useBackendConnections() {
     }
   }
 
+  async function inspectActiveConnection() {
+    const info = await fetchBackendInfo(activeConnection.value)
+    activeConnectionInfo.value = info
+    return info
+  }
+
   function clearResult() {
     error.value = ''
     testResult.value = null
@@ -151,6 +158,7 @@ export function useBackendConnections() {
 
   function applyActiveConnection(id) {
     const connection = connectionForId(id) || connections.value[0]
+    activeConnectionInfo.value = null
     activeConnectionId.value = connection.id
     setActiveBackendConnection(connection)
     writeActiveConnectionId(connection.id)
@@ -175,6 +183,7 @@ export function useBackendConnections() {
     activeConnection,
     activeConnectionAddress,
     activeConnectionId,
+    activeConnectionInfo,
     activateConnection,
     busyId,
     clearResult,
@@ -183,6 +192,7 @@ export function useBackendConnections() {
     defaultConnectionId,
     error,
     initialize,
+    inspectActiveConnection,
     loading,
     removeConnection,
     setDefault,

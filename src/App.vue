@@ -13,6 +13,7 @@ const LiveAssistantMessage = defineAsyncComponent(() => import('./components/Liv
 const PierrePreview = defineAsyncComponent(() => import('./components/PierrePreview.vue'))
 const ProjectBrowser = defineAsyncComponent(() => import('./components/ProjectBrowser.vue'))
 const ProjectDetailDrawer = defineAsyncComponent(() => import('./components/ProjectDetailDrawer.vue'))
+const ReviewPane = defineAsyncComponent(() => import('./components/ReviewPane.vue'))
 const MemoryInspector = defineAsyncComponent(() => import('./components/MemoryInspector.vue'))
 const SessionComposer = defineAsyncComponent(() => import('./components/SessionComposer.vue'))
 const SubagentConfigDrawer = defineAsyncComponent(() => import('./components/SubagentConfigDrawer.vue'))
@@ -88,6 +89,19 @@ const visionConfigError = ref('')
 const visionConfigData = ref({ context: {}, overrides: {}, model: '', modelSource: 'none' })
 let visionConfigRequestToken = 0
 const projectDetailCwd = ref('')
+const reviewOpen = ref(false)
+const reviewClosing = ref(false)
+const reviewExpanded = ref(false)
+const reviewPaneExpanded = ref(false)
+const reviewPaneWidth = ref(420)
+const reviewReady = ref(false)
+const reviewOpenRequested = ref(false)
+const reviewDesktopAvailable = ref(false)
+const reviewRefreshToken = ref(0)
+const runtimeCwdBySessionId = new Map()
+let reviewCloseTimer = null
+let reviewDesktopQuery = null
+let reviewExpansionTimer = null
 const promptSubmitting = ref(false)
 const interrupting = ref(false)
 const goalCommandSubmitting = ref('')
@@ -127,6 +141,7 @@ const {
   activeConnection: activeBackendConnection,
   activeConnectionAddress: activeBackendConnectionAddress,
   activeConnectionId: activeBackendConnectionId,
+  activeConnectionInfo: activeBackendConnectionInfo,
   activateConnection: activateBackendConnection,
   busyId: backendConnectionBusyId,
   clearResult: clearBackendConnectionResult,
@@ -135,6 +150,7 @@ const {
   defaultConnectionId: defaultBackendConnectionId,
   error: backendConnectionError,
   initialize: initializeBackendConnections,
+  inspectActiveConnection: inspectActiveBackendConnection,
   loading: backendConnectionsLoading,
   removeConnection: removeSavedBackendConnection,
   setDefault: setDefaultBackendConnection,
@@ -142,6 +158,12 @@ const {
   testResult: backendConnectionTestResult,
   updateConnection: updateSavedBackendConnection,
 } = useBackendConnections()
+const reviewEnabled = computed(() => {
+  return activeBackendConnectionInfo.value?.capabilities?.review === true
+})
+const reviewAvailable = computed(() => {
+  return reviewEnabled.value && reviewDesktopAvailable.value
+})
 const {
   closeTerminalPanel,
   connectTerminal,
@@ -430,6 +452,9 @@ const {
   runtimeEvents,
 } = useRuntimeEvents({
   onActiveSession(activeSession) {
+    if (activeSession.id && activeSession.cwd) {
+      runtimeCwdBySessionId.set(activeSession.id, activeSession.cwd)
+    }
     updateRuntimeSessionSnapshot(activeSession)
     if (activeSession.id === selectedSessionId.value) {
       activeRuntimeSession.value = activeSession
@@ -441,6 +466,9 @@ const {
   },
   onRuntimeEvent(data) {
     updateRuntimeEventState(data)
+    if (runtimeEventSettled(data.event)) {
+      invalidateReview(runtimeCwd(data.activeSessionId))
+    }
     liveTurn.handle({ kind: 'runtime', ...data })
   },
   onExtensionUi(data) {
@@ -699,8 +727,28 @@ watch(activeRuntimeSession, (session) => {
   liveTurn.setRuntimeState(session.state)
 })
 
+watch(reviewAvailable, (available) => {
+  if (available) return
+  reviewReady.value = false
+  reviewOpenRequested.value = false
+  closeReview(true)
+})
+
+watch(settingsCwd, (cwd, previousCwd) => {
+  if (cwd === previousCwd) return
+  reviewReady.value = false
+  const reopen = reviewOpen.value || reviewOpenRequested.value
+  closeReview(true)
+  reviewOpenRequested.value = reopen && !!cwd
+})
+
 watch(selectedSessionId, () => {
   updateNativeWindowCwd()
+  if (!selectedSessionId.value) {
+    reviewReady.value = false
+    reviewOpenRequested.value = false
+    closeReview(true)
+  }
   expandedTools.value = new Set()
   expandedSkills.value = new Set()
   editingEntry.value = null
@@ -739,6 +787,9 @@ watch(composerScannerSourceActive, (active, wasActive) => {
 })
 
 onMounted(async () => {
+  reviewDesktopQuery = window.matchMedia('(min-width: 1121px)')
+  reviewDesktopAvailable.value = reviewDesktopQuery.matches
+  reviewDesktopQuery.addEventListener('change', handleReviewDesktopChange)
   window.addEventListener('keydown', closeMenusOnEscape, true)
   window.addEventListener('click', closeMenusOnOutsideClick)
   window.addEventListener('popstate', handleRouteChange)
@@ -756,6 +807,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  reviewDesktopQuery?.removeEventListener('change', handleReviewDesktopChange)
   window.removeEventListener('keydown', closeMenusOnEscape, true)
   window.removeEventListener('click', closeMenusOnOutsideClick)
   window.removeEventListener('popstate', handleRouteChange)
@@ -783,6 +835,8 @@ onUnmounted(() => {
   clearTimeout(newSessionSettlingTimer)
   clearTimeout(inProjectDockTimer)
   clearTimeout(inProjectSettlingTimer)
+  clearTimeout(reviewCloseTimer)
+  clearTimeout(reviewExpansionTimer)
 })
 
 async function markEntryFeedback(entry, label, feedbackText) {
@@ -979,8 +1033,113 @@ function sessionSortTime(session) {
   return Number.isNaN(time) ? 0 : time
 }
 
+function reviewMotionDuration() {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 1 : 240
+}
+
+function openReview() {
+  if (!reviewReady.value) {
+    reviewOpenRequested.value = true
+    return
+  }
+  clearTimeout(reviewCloseTimer)
+  reviewOpenRequested.value = false
+  reviewClosing.value = false
+  if (!reviewExpanded.value) reviewPaneExpanded.value = false
+  reviewOpen.value = true
+}
+
+function closeReview(immediate = false) {
+  clearTimeout(reviewCloseTimer)
+  clearTimeout(reviewExpansionTimer)
+  reviewOpenRequested.value = false
+  if (immediate) {
+    reviewOpen.value = false
+    reviewClosing.value = false
+    reviewExpanded.value = false
+    reviewPaneExpanded.value = false
+    return
+  }
+  if (!reviewOpen.value) return
+  reviewOpen.value = false
+  reviewClosing.value = true
+  reviewCloseTimer = window.setTimeout(
+    finishReviewClose,
+    reviewMotionDuration(),
+  )
+}
+
+function finishReviewClose() {
+  clearTimeout(reviewCloseTimer)
+  if (!reviewClosing.value) return
+  reviewClosing.value = false
+  reviewExpanded.value = false
+  reviewPaneExpanded.value = false
+}
+
+function handleReviewPreparing() {
+  reviewReady.value = false
+}
+
+function handleReviewPrepared() {
+  reviewReady.value = true
+  if (reviewOpenRequested.value) openReview()
+}
+
+function handleReviewDesktopChange(event) {
+  reviewDesktopAvailable.value = event.matches
+}
+
+function invalidateReview(cwd) {
+  if (!cwd || cwd !== settingsCwd.value || !reviewAvailable.value) return
+  reviewRefreshToken.value++
+}
+
+function runtimeCwd(sessionId) {
+  return runtimeCwdBySessionId.get(sessionId)
+    || sessions.value.find((session) => session.id === sessionId)?.cwd
+    || ''
+}
+
+function runtimeEventSettled(event) {
+  return ['agent_end', 'error', 'aborted'].includes(event?.type)
+}
+
+function collapseReviewExpanded() {
+  if (!reviewPaneExpanded.value) return
+  clearTimeout(reviewExpansionTimer)
+  reviewExpanded.value = false
+  reviewExpansionTimer = window.setTimeout(() => {
+    if (!reviewExpanded.value) reviewPaneExpanded.value = false
+  }, reviewMotionDuration())
+}
+
+function toggleReview() {
+  if (reviewOpen.value) {
+    closeReview()
+    return
+  }
+  if (reviewOpenRequested.value) {
+    reviewOpenRequested.value = false
+    return
+  }
+  openReview()
+}
+
+function toggleReviewExpanded() {
+  if (!reviewOpen.value) return
+  if (reviewExpanded.value) {
+    collapseReviewExpanded()
+    return
+  }
+  clearTimeout(reviewExpansionTimer)
+  reviewPaneExpanded.value = true
+  reviewExpanded.value = true
+}
+
 function navigateHome() {
   workspaceNavigateHome()
+  closeReview(true)
   sidebarOpen.value = false
 }
 
@@ -1056,9 +1215,8 @@ function toggleSettingsDrawer() {
 }
 
 async function verifyActiveBackendConnection() {
-  if (activeBackendConnection.value.builtIn) return true
   try {
-    await testBackendConnection(activeBackendConnection.value)
+    await inspectActiveBackendConnection()
     return true
   } catch (error) {
     sessionsError.value = error.message
@@ -1804,6 +1962,7 @@ async function submitShellCommand(shellCommand, images) {
   }, 'running')
 
   const sessionId = selectedSessionId.value
+  const shellCwd = settingsCwd.value
   try {
     const data = await runShellCommand(
       sessionId,
@@ -1825,6 +1984,7 @@ async function submitShellCommand(shellCommand, images) {
       promptError.value = error.message
     }
   } finally {
+    invalidateReview(shellCwd)
     promptSubmitting.value = false
     if (selectedSessionId.value === sessionId) setLiveActivity('')
     refocusComposer()
@@ -2248,6 +2408,7 @@ function anyEscapeTargetOpen() {
     || toolsPickerOpen.value
     || startProjectPickerOpen.value
     || slashPickerOpen.value
+    || (reviewPaneExpanded.value && window.innerWidth > 1120)
   )
 }
 
@@ -2261,6 +2422,7 @@ function handleEscape(event) {
   subagentConfigOpen.value = false
   visionConfigOpen.value = false
   projectDetailCwd.value = ''
+  collapseReviewExpanded()
   if (memoryOpen.value) closeMemoryDrawer()
   closeImageFullscreen()
   closeToolFullscreen()
@@ -2313,6 +2475,12 @@ function closePickerMenus() {
       'terminal-open': terminalOpen,
       'event-log-open': eventLogOpen,
       'memory-open': memoryOpen,
+      'review-open': reviewAvailable && reviewOpen && !!selectedSession,
+      'review-expanded': reviewAvailable && reviewOpen && reviewExpanded
+        && !!selectedSession,
+      'review-transcript-hidden': reviewAvailable
+        && (reviewOpen || reviewClosing) && reviewPaneExpanded
+        && !!selectedSession,
     }"
     :style="{
       '--composer-height': `${composerHeight}px`,
@@ -2321,6 +2489,7 @@ function closePickerMenus() {
       '--startup-composer-dock-x': startupComposerDockX,
       '--startup-composer-dock-y': startupComposerDockY,
       '--terminal-drawer-height': `${terminalDrawerHeight}px`,
+      '--review-pane-width': `${reviewPaneWidth}px`,
     }"
   >
     <button
@@ -2418,6 +2587,23 @@ function closePickerMenus() {
           </button>
         </div>
         <div v-if="selectedSession" class="topbar-meta">
+          <button
+            v-if="reviewAvailable"
+            class="topbar-icon-button review-toggle-button"
+            :class="{ active: reviewOpen, preparing: !reviewReady }"
+            type="button"
+            :title="reviewReady ? 'Review changes' : 'Preparing review'"
+            aria-label="Review changes"
+            :aria-busy="!reviewReady"
+            :aria-pressed="reviewOpen"
+            @click="toggleReview"
+          >
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M4 2.5h5l3 3v8H4z"></path>
+              <path d="M9 2.5v3h3"></path>
+              <path d="M6 8h4M6 10.5h4"></path>
+            </svg>
+          </button>
           <button
             class="topbar-icon-button"
             type="button"
@@ -3003,6 +3189,21 @@ function closePickerMenus() {
         @toggle-terminal="toggleTerminal"
       />
     </section>
+
+    <ReviewPane
+      v-if="reviewAvailable && selectedSession"
+      :cwd="selectedSession.cwd"
+      :expanded="reviewPaneExpanded"
+      :open="reviewOpen"
+      :refresh-token="reviewRefreshToken"
+      :sidebar-hidden="desktopSidebarHidden"
+      :width="reviewPaneWidth"
+      @close="closeReview"
+      @prepared="handleReviewPrepared"
+      @preparing="handleReviewPreparing"
+      @resize="reviewPaneWidth = $event"
+      @toggle-expand="toggleReviewExpanded"
+    />
 
     <div
       v-if="deleteConfirmActive"

@@ -111,8 +111,17 @@
   .composer-popover-enter-active,
   .composer-popover-leave-active,
   .composer-reveal-enter-active,
-  .composer-reveal-leave-active {
+  .composer-reveal-leave-active,
+  .review-pane,
+  .review-diff-ready-leave-active,
+  .review-pane-header button,
+  .review-pane-resize-handle::after {
     transition-duration: 1ms;
+  }
+
+  .tool-expand-inner,
+  .review-pane:not(.open) {
+    transition-delay: 0s;
   }
 
   .message-enter,
@@ -122,7 +131,9 @@
   .live-tool-card::before,
   .live-tool-card.is-completed,
   .composer.composer-committing .composer-input-shell,
-  .composer.composer-committing .send-button:not(.stop-button) {
+  .composer.composer-committing .send-button:not(.stop-button),
+  .review-loading-mark,
+  .review-pane-header button.refreshing svg {
     animation: none;
   }
 
@@ -239,6 +250,23 @@
   }
 }
 
+@media (min-width: 761px) and (max-width: 1120px) {
+  .leyline-app.review-open,
+  .leyline-app.review-open.event-log-open {
+    grid-template-columns: var(--sidebar-width) minmax(0, 1fr) 0;
+  }
+
+  .leyline-app.sidebar-hidden.review-open,
+  .leyline-app.sidebar-hidden.review-open.event-log-open {
+    grid-template-columns: 0 minmax(0, 1fr) 0;
+  }
+
+  .review-pane,
+  .review-toggle-button {
+    display: none;
+  }
+}
+
 @media (max-width: 760px) {
   :root {
     --content-max: 100%;
@@ -251,7 +279,11 @@
   .leyline-app,
   .leyline-app.sidebar-hidden,
   .leyline-app.event-log-open,
-  .leyline-app.sidebar-hidden.event-log-open {
+  .leyline-app.sidebar-hidden.event-log-open,
+  .leyline-app.review-open,
+  .leyline-app.review-open.event-log-open,
+  .leyline-app.sidebar-hidden.review-open,
+  .leyline-app.sidebar-hidden.review-open.event-log-open {
     grid-template-columns: 1fr;
     grid-template-rows: 50px minmax(0, 1fr);
     overflow: hidden;
@@ -405,7 +437,9 @@
     padding: 0;
   }
 
-  .topbar-icon-count {
+  .topbar-icon-count,
+  .review-pane,
+  .review-toggle-button {
     display: none;
   }
 

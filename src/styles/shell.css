@@ -137,6 +137,27 @@
   grid-template-columns: 0 minmax(0, 1fr) 0;
 }
 
+.leyline-app.review-open,
+.leyline-app.review-open.event-log-open {
+  grid-template-columns:
+    var(--sidebar-width) minmax(0, 1fr) var(--review-pane-width);
+}
+
+.leyline-app.sidebar-hidden.review-open,
+.leyline-app.sidebar-hidden.review-open.event-log-open {
+  grid-template-columns: 0 minmax(0, 1fr) var(--review-pane-width);
+}
+
+.leyline-app.review-expanded {
+  grid-template-columns:
+    var(--sidebar-width) minmax(0, 1fr)
+    calc(100vw - var(--sidebar-width));
+}
+
+.leyline-app.sidebar-hidden.review-expanded {
+  grid-template-columns: 0 minmax(0, 1fr) 100vw;
+}
+
 .leyline-app.sidebar-hidden .sidebar {
   border-right-color: transparent;
   pointer-events: none;

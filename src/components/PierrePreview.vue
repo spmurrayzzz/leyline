@@ -7,16 +7,19 @@ const props = defineProps({
   clipped: { type: Boolean, default: true },
 })
 
+const emit = defineEmits(['ready'])
 const container = ref(null)
 const error = ref('')
 let instance
 let diffContainer
+let renderTimer
 
 const options = {
   theme: 'pierre-dark',
   themeType: 'dark',
   overflow: 'wrap',
   tokenizeMaxLineLength: 20000,
+  onPostRender: handlePostRender,
   unsafeCSS: `
     [data-diffs] {
       --diffs-font-family: ui-monospace, SFMono-Regular, Menlo, Monaco,
@@ -48,11 +51,26 @@ onMounted(renderPreview)
 onBeforeUnmount(cleanup)
 watch(() => [visiblePreview.value, props.clipped], renderPreview, { deep: true })
 
+function handlePostRender(_node, renderedInstance) {
+  if (renderedInstance !== instance) return
+  clearTimeout(renderTimer)
+  renderTimer = undefined
+  emit('ready')
+}
+
 function cleanup() {
+  clearTimeout(renderTimer)
+  renderTimer = undefined
   instance?.cleanUp?.()
   instance = undefined
   diffContainer = undefined
   if (container.value) container.value.innerHTML = ''
+}
+
+function failPreview(message) {
+  cleanup()
+  error.value = message
+  emit('ready')
 }
 
 function renderPreview() {
@@ -64,13 +82,16 @@ function renderPreview() {
     diffContainer = document.createElement(DIFFS_TAG_NAME)
     diffContainer.className = 'pierre-diffs-container'
     container.value.appendChild(diffContainer)
+    renderTimer = window.setTimeout(() => {
+      failPreview('Preview rendering timed out')
+    }, 10000)
 
     const preview = visiblePreview.value
     if (preview.kind === 'file') renderFile(preview)
     else if (preview.kind === 'diff') renderDiff(preview)
     else if (preview.kind === 'patch') renderPatch(preview)
   } catch (err) {
-    error.value = err?.message || 'Could not render preview'
+    failPreview(err?.message || 'Could not render preview')
   }
 }
 
