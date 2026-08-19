@@ -19,9 +19,13 @@ connections to other Leyline backends.
 ## Features
 
 Browse, search, create, and run pi sessions from a focused web UI. Leyline shows
-rendered transcripts, live runtime output, model controls, memory, subagents,
-runtime events, and an embedded terminal. Each window can use the native
-backend or a saved backend connection.
+rendered transcripts, live runtime output, Git changes, model controls, memory,
+subagents, runtime events, and an embedded terminal. Each window can use the
+native backend or a saved backend connection.
+
+On desktop, the Git review pane prepares changed files and the selected diff
+before it opens. It separates staged and working-tree changes and can expand
+across the workspace.
 
 When the active model cannot receive images, Leyline can send each attachment
 to a configured vision model in a hidden child session. The parent model
@@ -138,6 +142,7 @@ directory. Use `leyline -n` to create the session in a new Leyline window.
 - [Getting started](docs/getting-started/index.md)
 - [Sessions](docs/user-guide/sessions.md)
 - [Composer](docs/user-guide/composer.md)
+- [Git review](docs/user-guide/git-review.md)
 - [Images and vision](docs/user-guide/images-and-previews.md)
 - [Memory](docs/user-guide/memory.md)
 - [Subagents](docs/user-guide/subagents.md)

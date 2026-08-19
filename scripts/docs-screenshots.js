@@ -57,6 +57,121 @@ const backendRegistry = {
   ],
   defaultConnectionId: 'builtin',
 }
+const backendInfo = {
+  name: 'Leyline',
+  version: '0.0.0',
+  apiVersion: 1,
+  capabilities: {
+    events: true,
+    exports: true,
+    review: true,
+    terminal: true,
+  },
+}
+const stagedReviewPatch = `diff --git a/scripts/release.js b/scripts/release.js
+index 03b7821..f21bb35 100644
+--- a/scripts/release.js
++++ b/scripts/release.js
+@@ -1,4 +1,4 @@
+ export async function release() {
+-  await publish()
+   await verify()
++  await publish()
+ }
+`
+const workingReviewPatch = `diff --git a/scripts/release.js b/scripts/release.js
+index f21bb35..7ef14a9 100644
+--- a/scripts/release.js
++++ b/scripts/release.js
+@@ -1,4 +1,7 @@
+ export async function release() {
+-  await verify()
++  const result = await verify()
++  if (!result.ok) {
++    throw new Error('Release verification failed')
++  }
+   await publish()
+ }
+`
+const reviewPayload = {
+  available: true,
+  branch: 'release-safety',
+  files: [
+    {
+      conflicted: false,
+      indexStatus: 'M',
+      kind: 'modified',
+      oldPath: '',
+      path: 'scripts/release.js',
+      staged: true,
+      unstaged: true,
+      untracked: false,
+      worktreeStatus: 'M',
+    },
+    {
+      conflicted: false,
+      indexStatus: '?',
+      kind: 'untracked',
+      oldPath: '',
+      path: 'src/release-summary.js',
+      staged: false,
+      unstaged: true,
+      untracked: true,
+      worktreeStatus: '?',
+    },
+    {
+      conflicted: false,
+      indexStatus: 'A',
+      kind: 'added',
+      oldPath: '',
+      path: 'tests/release.test.js',
+      staged: true,
+      unstaged: false,
+      untracked: false,
+      worktreeStatus: ' ',
+    },
+    {
+      conflicted: false,
+      indexStatus: ' ',
+      kind: 'modified',
+      oldPath: '',
+      path: 'vite.config.js',
+      staged: false,
+      unstaged: true,
+      untracked: false,
+      worktreeStatus: 'M',
+    },
+  ],
+  filesTruncated: false,
+  root: '/workspace/harbor',
+  totalFiles: 4,
+}
+const cleanReviewPayload = {
+  ...reviewPayload,
+  files: [],
+  totalFiles: 0,
+}
+const reviewDiffPayload = {
+  path: 'scripts/release.js',
+  diffs: [
+    {
+      binary: false,
+      bytes: Buffer.byteLength(stagedReviewPatch),
+      lines: stagedReviewPatch.split('\n').length - 1,
+      patch: stagedReviewPatch,
+      scope: 'staged',
+      tooLarge: false,
+    },
+    {
+      binary: false,
+      bytes: Buffer.byteLength(workingReviewPatch),
+      lines: workingReviewPatch.split('\n').length - 1,
+      patch: workingReviewPatch,
+      scope: 'working',
+      tooLarge: false,
+    },
+  ],
+}
 
 const sessions = [
   session('demo-session', 'Review the release flow', '2026-08-06T15:42:00.000Z', 5),
@@ -282,6 +397,34 @@ try {
   })
   await capture({
     browser,
+    file: path.join(docsOutputDir, 'git-review.png'),
+    route: '/sessions/demo-session',
+    ready: '.assistant-message',
+    scenario: 'review',
+    interact: async (page) => {
+      await page.getByRole('button', { name: 'Review changes' }).click()
+      const pane = page.locator('aside[aria-label="Review project changes"]')
+      await pane.waitFor({ state: 'visible' })
+      await pane.locator('.review-diff-section').nth(1).waitFor()
+    },
+  })
+  await capture({
+    browser,
+    file: path.join(docsOutputDir, 'git-review-expanded.png'),
+    route: '/sessions/demo-session',
+    ready: '.assistant-message',
+    scenario: 'review',
+    interact: async (page) => {
+      await page.getByRole('button', { name: 'Review changes' }).click()
+      const pane = page.locator('aside[aria-label="Review project changes"]')
+      await pane.waitFor({ state: 'visible' })
+      await pane.getByRole('button', { name: 'Expand review' }).click()
+      await page.locator('.leyline-app.review-expanded').waitFor()
+      await pane.locator('.review-diff-section').nth(1).waitFor()
+    },
+  })
+  await capture({
+    browser,
     file: path.join(docsOutputDir, 'project-details.png'),
     route: '/sessions/demo-session',
     ready: '.assistant-message',
@@ -442,6 +585,16 @@ try {
       await page.locator('.terminal-resize-handle').focus()
       await page.keyboard.press('ArrowUp')
       await page.keyboard.press('ArrowUp')
+      await page.locator('.workbench').evaluate((element) => {
+        element.scrollTop = element.scrollHeight
+      })
+      await page.waitForFunction(() => {
+        const workbench = document.querySelector('.workbench')
+        const atBottom = Math.abs(
+          workbench.scrollHeight - workbench.clientHeight - workbench.scrollTop,
+        ) < 2
+        return atBottom && !document.querySelector('.jump-latest-button')
+      })
     },
   })
   await capture({
@@ -449,6 +602,7 @@ try {
     file: path.join(docsOutputDir, 'export.png'),
     route: '/api/pi/sessions/demo-session/export?disposition=inline',
     ready: '.export-shell .transcript',
+    scenario: 'export',
     exportPage: true,
   })
   await capture({
@@ -648,7 +802,9 @@ function detailFor(scenario) {
       sessionFile: summary.path,
       messageCount: entries.length,
       contextTokens: 12480,
-      modified: '2026-08-06T15:49:00.000Z',
+      modified: scenario === 'export'
+        ? '2026-08-06T15:49:00.000Z'
+        : summary.modified,
       created: '2026-08-06T15:42:00.000Z',
       contextUsage: { tokens: 12480, contextWindow: 200000, percent: 6.24 },
     },
@@ -748,11 +904,16 @@ async function capture({
       body: JSON.stringify(body),
     })
 
+    if (key === 'GET /api/pi/info') return json(backendInfo)
     if (key === 'GET /api/pi/projects') return json({ projects })
     if (key === 'GET /api/pi/sessions') return json({ sessions })
     if (key === 'GET /api/pi/state') return json({ active: runtime })
     if (key === 'POST /api/pi/active-session') return json({ active: runtime })
     if (key === 'GET /api/pi/sessions/demo-session') return json(detailFor(scenario))
+    if (key === 'GET /api/pi/review') {
+      return json(scenario === 'review' ? reviewPayload : cleanReviewPayload)
+    }
+    if (key === 'GET /api/pi/review/diff') return json(reviewDiffPayload)
     if (key === 'GET /api/pi/memories') return json(memoryPayload)
     if (key === 'GET /api/pi/subagents') return json(subagentPayload)
     if (key === 'GET /api/pi/vision/config') {
@@ -771,16 +932,24 @@ async function capture({
     const url = new URL(route, baseUrl).toString()
     await page.goto(url, { waitUntil: 'domcontentloaded' })
     await page.locator(ready).first().waitFor({ state: 'visible', timeout: 15000 })
+    if (viewport.width > 1120 && route.startsWith('/sessions/')) {
+      await page.locator('.review-toggle-button:not(.preparing)').waitFor({
+        state: 'visible',
+        timeout: 15000,
+      })
+    }
     if (interact) await interact(page)
     await sanitizeNativeBackendAddress(page)
     await page.evaluate(async () => {
       await document.fonts.ready
+      await Promise.all([...document.images].map((image) => image.decode().catch(() => {})))
     })
     await disableMotion(page)
     if (!preserveHover) {
       await page.mouse.move(viewport.width - 2, viewport.height - 2)
       await page.evaluate(() => document.activeElement?.blur?.())
     }
+    await page.evaluate(() => window.scrollTo(0, 0))
     await assertPrivateDataAbsent(page)
     if (!exportPage) await assertModelLabel(page)
     if (unexpected.length) throw new Error(unexpected.join('\n'))

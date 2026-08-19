@@ -42,7 +42,8 @@ Electron uses a single-instance lock. A `leyline -n` request creates another win
 standalone server adapters. `server/pi-api/router.js` handles HTTP routing.
 
 `server/pi-api/runtime.js` owns pi sessions and runtime handles. Other backend
-modules own DTOs, events, storage, export, filesystem access, and the terminal.
+modules own DTOs, events, storage, export, filesystem access, Git review, and
+the terminal.
 
 `src/lib/pi-api.js` is the frontend HTTP client. `useRuntimeEvents.js` owns the
 SSE connection, and `useTerminal.js` owns the terminal WebSocket.
@@ -57,9 +58,10 @@ Saved definitions and the default are app-wide. The active connection is window-
 
 `src/composables/useTranscriptPreferences.js` loads the thought display default from the native backend. All windows use this app-wide setting.
 
-`src/lib/backend.js` supplies the base URL for runtime HTTP, SSE, terminal
-WebSocket, and export requests. The native backend uses the current app origin. Saved
-connections can use hostnames, IPv4 or IPv6 addresses, ports, and base paths.
+`src/lib/backend.js` supplies the base URL for runtime HTTP, Git review, SSE,
+terminal WebSocket, and export requests. The native backend uses the current
+app origin. Saved connections can use hostnames, IPv4 or IPv6 addresses, ports,
+and base paths.
 
 Electron passes the source window's connection ID when it creates a window. A
 fresh window uses the configured default. `GET /api/pi/info` verifies the
@@ -67,6 +69,9 @@ backend name and API version before Leyline switches to it. The response also
 reports transport capabilities.
 
 `server/pi-api/cors.js` applies one origin policy to pi HTTP routes, native app routes, and terminal WebSocket upgrades.
+
+`server/pi-api/git-review.js` reads status and per-file diffs from the selected
+backend's filesystem. The review API does not change Git state.
 
 Same-origin and loopback clients work by default. Other frontend origins must be listed in `LEYLINE_SERVER_ALLOWED_ORIGINS`.
 

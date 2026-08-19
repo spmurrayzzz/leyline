@@ -25,6 +25,7 @@ Avoid decorative glow, gradients, and extra panels. Existing gradients serve fad
 | `tools.css` | Tools, skills, subagents, files, diffs, and fullscreen previews |
 | `composer.css` | Composer, menus, attachments, context, and send states |
 | `memory.css` | Memory Inspector |
+| `review.css` | Git review rail, file list, diff states, resizing, and expanded layout |
 | `settings.css` | Settings, Runtime Events, subagent configuration, and vision configuration |
 | `modals.css` | Project browser and confirmation dialogs |
 | `terminal.css` | Terminal drawer |
@@ -50,7 +51,7 @@ Prefer opacity, transform, color, border color, and background color. Avoid anim
 
 The current motion families include:
 
-- session shell and composer docking
+- session shell, composer docking, and review-pane grid changes
 - optimistic user-message handoff
 - live assistant start
 - live tool progress and settle

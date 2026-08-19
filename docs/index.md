@@ -25,6 +25,8 @@ features:
     details: Send images directly to compatible models or configure a vision agent to describe them for models without image support.
   - title: Watch live work
     details: Follow assistant text, thinking, tool calls, runtime events, queues, context use, and goal progress.
+  - title: Review Git changes
+    details: Inspect staged, working-tree, untracked, and conflicted files in a prepared pane that can expand across the workspace.
   - title: Connect backend hosts
     details: Save named Leyline backends, set an app-wide default, and select an active backend for each window.
   - title: Manage durable memory

@@ -5,6 +5,7 @@
 - `src/main.js`: Creates the Vue app and loads the CSS entry file.
 - `src/App.vue`: Composes the workspace and coordinates cross-feature state.
 - `src/components/`: Contains focused Vue surfaces for sessions, composers, transcript entries, drawers, pickers, and previews.
+- `src/components/ReviewPane.vue`: Renders changed files and prepared Pierre diffs for the selected project.
 - `src/components/VisionConfigDrawer.vue`: Manages transcript, project, and global vision-model overrides.
 - `src/composables/useSessionWorkspace.js`: Owns session, route, activation, and runtime-control state.
 - `src/composables/useBackendConnections.js`: Owns connection records, the default, and window-specific backend selection.
@@ -44,6 +45,7 @@ These files are outside `src/` because Node.js backend code and browser code imp
 - `src/styles/tools.css`: Defines tool rows, skills, subagents, and previews.
 - `src/styles/composer.css`: Defines composer layout, menus, attachments, and submission states.
 - `src/styles/memory.css`: Defines the Memory Inspector.
+- `src/styles/review.css`: Defines the resizable and expanded Git review pane.
 - `src/styles/settings.css`: Defines Settings, Runtime Events, subagent configuration, and vision configuration.
 - `src/styles/modals.css`: Defines the project browser and confirmation dialogs.
 - `src/styles/terminal.css`: Defines the terminal drawer.
@@ -62,6 +64,7 @@ These files are outside `src/` because Node.js backend code and browser code imp
 - `server/pi-api/extension-ui.js`: Adapts extension UI state for the browser.
 - `server/pi-api/goal-state.js`: Projects goal extension state.
 - `server/pi-api/fs-browser.js`: Browses local directories.
+- `server/pi-api/git-review.js`: Reads Git status and bounded per-file diffs.
 - `server/pi-api/memories.js`: Implements Memory Inspector storage.
 - `server/pi-api/rollout-feedback.js`: Implements rollout feedback storage.
 - `server/pi-api/subagents.js`: Implements subagent discovery and overrides.

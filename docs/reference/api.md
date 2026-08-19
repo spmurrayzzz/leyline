@@ -19,7 +19,7 @@ Most errors have this envelope:
 
 Status behavior is:
 
-- `400` is used for connection or setting validation and a missing `path` on `GET /sessions/by-path`.
+- `400` is used for connection or setting validation and for missing required query values on session lookup or Git review routes.
 - `403` rejects a browser origin that the server does not allow.
 - `404` is used for an unknown runtime, native app route, setting key, or session.
 - `405` is used when a known route receives an unsupported method.
@@ -147,12 +147,13 @@ Response:
   capabilities: {
     events: true,
     exports: true,
+    review: true,
     terminal: true
   }
 }
 ```
 
-The frontend rejects a backend when `name` or `apiVersion` is incompatible.
+The frontend rejects a backend when `name` or `apiVersion` is incompatible. It shows the desktop review control only when `capabilities.review` is `true`.
 
 ## Connection registry
 
@@ -421,6 +422,88 @@ DirectoryEntry = {
 ```
 
 `entries` and `directories` contain the same directory list. The default `path` is `~/`. Paths that start with `./` or `../` require `cwd`. Other relative paths resolve from the server process directory. Invalid paths return `500`.
+
+## Git review routes
+
+These routes read the working tree on the selected backend. They do not change Git state or require an active runtime.
+
+```text
+GitReviewFile = {
+  conflicted: boolean,
+  indexStatus: string,
+  kind: "added" | "conflicted" | "copied" | "deleted" | "modified" | "renamed" | "replaced" | "untracked",
+  oldPath: string,
+  path: string,
+  staged: boolean,
+  unstaged: boolean,
+  untracked: boolean,
+  worktreeStatus: string
+}
+
+GitReviewDiff = {
+  binary: boolean,
+  bytes: number,
+  directory?: boolean,
+  lines: number,
+  patch: string,
+  scope: "staged" | "working" | "conflict",
+  tooLarge: boolean
+}
+```
+
+### `GET /api/pi/review`
+
+**Designation:** Browser route.
+
+Query:
+
+```text
+cwd: string
+```
+
+Response:
+
+```text
+{
+  available: boolean,
+  branch: string,
+  files: GitReviewFile[],
+  filesTruncated: boolean,
+  root: string,
+  totalFiles: number | null
+}
+```
+
+`available` is `false` when `cwd` is not inside a Git repository. In that state, `files` is empty and `root` is the resolved project directory.
+
+The response keeps at most 500 changed paths. When more paths exist, `filesTruncated` is `true` and `totalFiles` is `null`.
+
+A missing `cwd` returns `400`. An invalid directory or Git failure returns `500`.
+
+### `GET /api/pi/review/diff`
+
+**Designation:** Browser route.
+
+Query:
+
+```text
+cwd: string
+path: string
+```
+
+Response:
+
+```text
+{ path: string, diffs: GitReviewDiff[] }
+```
+
+The path must match a changed file from the bounded status list. A file can return separate `staged` and `working` sections.
+
+A conflict returns one `conflict` section. An untracked nested repository returns a `working` section with `directory: true`.
+
+A text diff larger than 1 MiB or 5,000 lines has `tooLarge: true` and an empty `patch`. Binary changes have `binary: true`.
+
+Missing query values return `400`. A missing repository, stale file path, invalid directory, or Git failure returns `500`.
 
 ## Runtime action routes
 

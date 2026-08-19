@@ -6,7 +6,7 @@
 
 | Owner | State and behavior |
 | --- | --- |
-| `App.vue` | Drawer visibility, composer draft, attachments, edit state, prompt submission, goal commands, subagent and vision settings, project detail selection, and startup motion phases |
+| `App.vue` | Drawer visibility, Git review state, composer draft, attachments, edit state, prompt submission, goal commands, subagent and vision settings, project detail selection, and startup motion phases |
 | `useSessionWorkspace.js` | Session list, routes, selected detail, activation, runtime snapshots, model and thinking controls, rename, delete, fork, reset, reload, and sidebar search |
 | `useBackendConnections.js` | App-wide connection records, window-specific selection, connection tests, and default selection |
 | `useTranscriptPreferences.js` | App-wide transcript display settings, loading state, and save errors |
@@ -27,6 +27,8 @@
 `SessionSidebar.vue` renders grouped projects and session controls. `SessionComposer.vue` and `StartComposer.vue` own local input mechanics and dictation adapters.
 
 `TranscriptEntry.vue` renders persisted entries and emits transcript actions. `LiveAssistantMessage.vue` renders live assistant output.
+
+`ReviewPane.vue` owns the changed-file list, selected diff, preparation state, and resize bounds. `App.vue` owns open and expanded state.
 
 `useTranscriptPreferences.js` loads app-wide display settings. `App.vue` gives the thought display default to both transcript components.
 
@@ -111,6 +113,16 @@ Dirty Memory state can block session changes and drawer changes. Memory Changes 
 
 When the parent model cannot receive attached images, `App.vue` shows the effective vision model. It tells the user that the model will call the vision subagent when the prompt runs. The backend saves the attachments and gives the parent a `vision_agent` instruction. The tool call and result appear in the transcript.
 
+## Git review
+
+`App.vue` enables review only when `/api/pi/info` reports the `review` capability and the viewport is wider than 1120 pixels.
+
+The selected desktop session mounts `ReviewPane.vue` while the pane is closed. The component prepares the Git status and first Pierre diff before it emits `prepared`.
+
+A settled runtime event for the selected project and a completed composer shell command increment the review refresh token. External filesystem changes require manual refresh.
+
+Expanded review hides the transcript and uses the full workspace after the sidebar. Collapse restores the saved review width.
+
 ## Tool expansion and previews
 
 `useToolExpansion.js` stores expanded tool IDs and skill IDs. It also owns clipboard fallback state and the selected fullscreen tool.
@@ -128,6 +140,8 @@ A selected-session change resets scroll state. The terminal height and composer 
 ## Drawer coordination
 
 `App.vue` coordinates Project Details, Settings, Runtime Events, Memory, Subagents, and Vision agent. Opening one contextual side drawer closes conflicting drawers.
+
+Git review uses a separate desktop grid track. It can remain open with the contextual drawer state.
 
 The terminal is independent and can remain open below the workbench. Session changes reconnect it so the PTY uses the new active cwd.
 

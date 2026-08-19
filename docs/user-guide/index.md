@@ -14,6 +14,7 @@ Use these pages for the main session tasks:
 
 - [Sessions](./sessions): select, rename, create, and delete sessions.
 - [Workbench](./workbench): use the header, transcript, drawers, and live output.
+- [Git review](./git-review): inspect staged, working-tree, and untracked project changes.
 - [Composer](./composer): send prompts, shell commands, images, steering messages, and follow-up messages.
 - [Runtime controls](./runtime-controls): select a model and thinking level, and inspect tools and context usage.
 - [Tools and thinking](./tools-and-thinking): inspect assistant thoughts, tools, skills, and rollout feedback.

@@ -44,6 +44,16 @@ These shortcuts apply in **Add project folder**.
 
 Leaving the rename field also saves the current value.
 
+## Resize Git review with keys
+
+Focus the **Resize review pane** handle first.
+
+| Shortcut | Action |
+| --- | --- |
+| **Arrow Left** | Increase review width by 24 pixels. |
+| **Arrow Right** | Decrease review width by 24 pixels. |
+| **Escape** | Collapse expanded review and restore the transcript. |
+
 ## Resize the terminal with keys
 
 Focus the **Resize terminal** handle first.

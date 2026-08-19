@@ -14,6 +14,7 @@ A subagent child session also shows **← parent session**. Select this control 
 
 The right side of the header contains these controls:
 
+- **Review changes** opens the desktop [Git review pane](./git-review). It appears when the selected backend supports review.
 - **Memory** opens the Memory Inspector. Its count shows active visible memories.
 - **Events** opens the Runtime events drawer. Its count shows retained runtime events.
 - **Export transcript** downloads the session as HTML.
@@ -47,5 +48,7 @@ The workbench expands into the available space while the sidebar is hidden.
 ## Open workbench drawers
 
 Only one main right-side drawer is open at a time. Opening **Memory**, **Events**, **Settings**, **Subagents**, **Vision agent**, or **Project details** closes conflicting drawers.
+
+Git review uses a separate desktop rail. You can resize it or expand it across the workspace.
 
 The terminal is a bottom drawer. It can remain open while you use the transcript and composer.

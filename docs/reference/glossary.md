@@ -11,6 +11,8 @@
 - **Follow-up**: A message that pi runs after the active turn finishes. Use
   Option+Enter during an active run.
 - **Fork**: A new pi session that starts from a selected transcript entry.
+- **Git review**: A read-only desktop pane for staged, working-tree, untracked,
+  and conflicted project changes.
 - **Leyline trash**: The directory where Leyline moves a deleted session JSONL
   file. It is a timestamped `leyline-trash` directory next to the configured pi
   session directory.

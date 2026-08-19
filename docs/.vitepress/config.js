@@ -41,6 +41,7 @@ export default defineConfig({
           { text: 'Start screen', link: '/user-guide/start-screen' },
           { text: 'Sessions', link: '/user-guide/sessions' },
           { text: 'Workbench', link: '/user-guide/workbench' },
+          { text: 'Git review', link: '/user-guide/git-review' },
           { text: 'Composer', link: '/user-guide/composer' },
           { text: 'Runtime controls', link: '/user-guide/runtime-controls' },
           {

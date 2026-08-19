@@ -32,7 +32,7 @@ Start Vite, then run:
 npm run docs:screenshots
 ```
 
-This command intercepts Leyline API calls and supplies sanitized fixtures. It replaces the backend registry and thought display setting.
+This command intercepts Leyline API calls and supplies sanitized fixtures. It replaces backend, session, Git review, and thought display data.
 
 The registry contains the native backend and a fictional saved connection. The thought display setting is **Collapsed**.
 
@@ -57,6 +57,7 @@ The documentation workflow uses these fixed settings:
 - Reduced motion: enabled
 - Model label: `local/minimax-m2.7`
 - Thought display default: **Collapsed**
+- Git review captures: `release-safety` with four sanitized changed files
 
 Each state uses a new browser context. The script freezes time, replaces SSE and terminal transports, waits for a state selector, and disables remaining motion.
 
