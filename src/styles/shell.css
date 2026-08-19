@@ -562,11 +562,11 @@ kbd {
 }
 
 .project-title:hover .project-detail-button,
-.project-title:focus-within .project-detail-button,
+.project-title:has(:focus-visible) .project-detail-button,
 .project-title:hover .new-session-button,
-.project-title:focus-within .new-session-button,
+.project-title:has(:focus-visible) .new-session-button,
 .project-title:hover .project-delete-button,
-.project-title:focus-within .project-delete-button {
+.project-title:has(:focus-visible) .project-delete-button {
   opacity: 1;
 }
 
@@ -781,14 +781,16 @@ kbd {
 }
 
 .session:hover .session-actions,
-.session:focus-within .session-actions {
+.session:focus-visible .session-actions,
+.session:has(:focus-visible) .session-actions {
   opacity: 1;
   pointer-events: auto;
   transform: translateY(0);
 }
 
 .session:hover .session-status,
-.session:focus-within .session-status {
+.session:focus-visible .session-status,
+.session:has(:focus-visible) .session-status {
   opacity: 0;
 }
 
