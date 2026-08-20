@@ -98,6 +98,7 @@ async function createWindow(initialCommand) {
     ) return
 
     if (isEscape) {
+      event.preventDefault()
       sendEscapeCommand(window)
       return
     }
