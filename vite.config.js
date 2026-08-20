@@ -9,6 +9,10 @@ function docsSite() {
     async configureServer(server) {
       const docs = await createVitePressServer('docs', {
         middlewareMode: true,
+        hmr: {
+          server: server.httpServer,
+          path: 'hmr',
+        },
       })
 
       server.middlewares.use((req, res, next) => {
