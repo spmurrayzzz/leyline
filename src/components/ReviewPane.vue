@@ -275,7 +275,7 @@ function constrainCurrentWidth() {
 }
 
 function constrainWidth(width) {
-  const sidebarWidth = props.sidebarHidden ? 0 : 304
+  const sidebarWidth = props.sidebarHidden ? 0 : 264
   const available = window.innerWidth - sidebarWidth - 400
   const maximum = Math.max(MIN_REVIEW_WIDTH, Math.min(720, available))
   maximumPaneWidth.value = maximum

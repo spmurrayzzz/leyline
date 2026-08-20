@@ -65,6 +65,7 @@ import {
 } from './lib/transcript'
 
 const sidebarOpen = ref(false)
+const sidebarNavigator = ref('')
 const desktopSidebarHidden = ref(false)
 const draft = ref('')
 const attachedImages = ref([])
@@ -350,7 +351,6 @@ const {
   forkSession,
   handleNativeNewSession,
   handleRouteChange,
-  highlightedText,
   hydrateSessions,
   initPhase,
   initializing,
@@ -386,7 +386,6 @@ const {
   sessionHandoffSettling,
   sessionIdFromRoute,
   sessionLoading,
-  sessionQuery,
   sessionRuntimeStatus,
   sessions,
   sessionsError,
@@ -396,7 +395,7 @@ const {
   sessionsLoading,
   sessionSwitching,
   sessionTitle,
-  sidebarRuntimeSummary,
+  sidebarActivitySessions,
   startSelectedModel,
   startSelectedThinkingLevel,
   startupRun,
@@ -420,12 +419,8 @@ const {
   projectBrowserInitialPath,
   startProjectPickerOpen,
   startProjectQuery,
-  expandedProjects,
   startProjectOptions,
   startProjectLabel,
-  isProjectExpanded,
-  expandProject,
-  toggleProject,
   selectStartProject,
   openProjectBrowser,
   closeProjectBrowser,
@@ -778,7 +773,6 @@ watch(slashCommandItems, () => {
 
 watch(sessionDetail, (detail) => {
   liveTurn.setPersistedDetail(detail)
-  if (detail?.session?.cwd) expandProject(detail.session.cwd)
   updateNativeWindowCwd()
 })
 
@@ -852,7 +846,7 @@ onMounted(async () => {
   reviewDesktopQuery = window.matchMedia('(min-width: 1121px)')
   reviewDesktopAvailable.value = reviewDesktopQuery.matches
   reviewDesktopQuery.addEventListener('change', handleReviewDesktopChange)
-  window.addEventListener('keydown', closeMenusOnEscape, true)
+  window.addEventListener('keydown', handleGlobalKeydown, true)
   window.addEventListener('click', closeMenusOnOutsideClick)
   window.addEventListener('popstate', handleRouteChange)
   window.addEventListener('leyline:new-session', handleNativeNewSession)
@@ -870,7 +864,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   reviewDesktopQuery?.removeEventListener('change', handleReviewDesktopChange)
-  window.removeEventListener('keydown', closeMenusOnEscape, true)
+  window.removeEventListener('keydown', handleGlobalKeydown, true)
   window.removeEventListener('click', closeMenusOnOutsideClick)
   window.removeEventListener('popstate', handleRouteChange)
   window.removeEventListener('leyline:new-session', handleNativeNewSession)
@@ -951,7 +945,29 @@ async function waitInitPhaseFloor() {
   })
 }
 
+function setSidebarNavigator(navigator) {
+  sidebarNavigator.value = navigator
+  if (!navigator) return
+  settingsOpen.value = false
+  subagentConfigOpen.value = false
+  visionConfigOpen.value = false
+  eventLogOpen.value = false
+  projectDetailCwd.value = ''
+  if (memoryOpen.value) closeMemoryDrawer()
+}
+
+function selectSidebarProject(project) {
+  if (!project?.cwd) return
+  if (memoryDirty.value && !confirmDiscardMemoryChanges()) return
+  workspaceNavigateHome()
+  selectStartProject(project.cwd)
+  closeReview(true)
+  projectDetailCwd.value = ''
+  sidebarNavigator.value = ''
+}
+
 async function createSession(project) {
+  sidebarNavigator.value = ''
   await workspaceCreateSession(project)
   projectBrowserOpen.value = false
   projectDetailCwd.value = ''
@@ -967,6 +983,7 @@ async function createSessionForCwd(cwd) {
 
 async function selectSession(session, options) {
   if (memoryDirty.value && !confirmDiscardMemoryChanges()) return
+  sidebarNavigator.value = ''
   await workspaceSelectSession(session, options)
   projectDetailCwd.value = ''
   sidebarOpen.value = false
@@ -1009,6 +1026,7 @@ async function navigateChildSession(childSession) {
 
 function openProjectDetail(project) {
   if (memoryDirty.value && !confirmDiscardMemoryChanges()) return
+  sidebarNavigator.value = ''
   projectDetailCwd.value = project.cwd
   settingsOpen.value = false
   subagentConfigOpen.value = false
@@ -1226,6 +1244,7 @@ function toggleReviewExpanded() {
 function navigateHome() {
   workspaceNavigateHome()
   closeReview(true)
+  sidebarNavigator.value = ''
   sidebarOpen.value = false
 }
 
@@ -2470,9 +2489,19 @@ async function submitStartDraft() {
   }
 }
 
-function closeMenusOnEscape(event) {
-  if (event.key !== 'Escape') return
-  handleEscape(event)
+function handleGlobalKeydown(event) {
+  if ((event.metaKey || event.ctrlKey)
+    && event.key.toLowerCase() === 'k') {
+    event.preventDefault()
+    if (deleteConfirmActive.value || editingEntry.value || renamingSessionId.value) {
+      return
+    }
+    closePickerMenus()
+    closeProjectBrowser()
+    setSidebarNavigator('quick')
+    return
+  }
+  if (event.key === 'Escape') handleEscape(event)
 }
 
 function anyEscapeTargetOpen() {
@@ -2480,6 +2509,7 @@ function anyEscapeTargetOpen() {
     fullscreenImage.value
     || fullscreenTool.value
     || projectBrowserOpen.value
+    || sidebarNavigator.value
     || settingsOpen.value
     || eventLogOpen.value
     || subagentConfigOpen.value
@@ -2505,6 +2535,7 @@ function handleEscape(event) {
   }
   settingsOpen.value = false
   eventLogOpen.value = false
+  sidebarNavigator.value = ''
   subagentConfigOpen.value = false
   visionConfigOpen.value = false
   projectDetailCwd.value = ''
@@ -2773,7 +2804,6 @@ function closePickerMenus() {
     </header>
 
     <SessionSidebar
-      v-model:query="sessionQuery"
       :active-backend-connection="activeBackendConnection"
       :agent-running="agentRunning"
       :backend-connection-busy-id="backendConnectionBusyId"
@@ -2783,9 +2813,10 @@ function closePickerMenus() {
       :default-backend-connection-id="defaultBackendConnectionId"
       :deleting-project-cwd="deletingProjectCwd"
       :deleting-session-id="deletingSessionId"
-      :expanded-project="isProjectExpanded"
-      :highlighted-text="highlightedText"
+      :navigator="sidebarNavigator"
+      :new-session-cwd="newSessionCwd"
       :reloading-session="reloadingSession"
+      :runtime-activity-sessions="sidebarActivitySessions"
       v-model:rename-draft="renameDraft"
       :renaming-session-id="renamingSessionId"
       :renaming-session-saving-id="renamingSessionSavingId"
@@ -2799,7 +2830,6 @@ function closePickerMenus() {
       :sessions-hydrating="sessionsHydrating"
       :sessions-hydration-error="sessionsHydrationError"
       :sessions-loading="sessionsLoading"
-      :summary="sidebarRuntimeSummary"
       :visible-projects="visibleProjects"
       @begin-rename-session="beginRenameSession"
       @cancel-rename-session="cancelRenameSession"
@@ -2813,8 +2843,9 @@ function closePickerMenus() {
       @request-delete-session="requestDeleteSession"
       @retry-sessions="retrySessions"
       @select-backend="switchBackendConnection"
+      @select-project="selectSidebarProject"
       @select-session="selectSession"
-      @toggle-project="toggleProject"
+      @update:navigator="setSidebarNavigator"
     />
 
     <section class="main-pane">

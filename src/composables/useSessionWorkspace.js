@@ -75,6 +75,26 @@ export function useSessionWorkspace({
     return sessionDetail.value?.session || sessions.value.find((s) => s.id === selectedSessionId.value)
   })
   const visibleProjects = computed(() => visibleProjectList())
+  const sessionsById = computed(() => {
+    return new Map(sessions.value.map((session) => [session.id, session]))
+  })
+  const sidebarActivitySessions = computed(() => {
+    return Object.entries(runtimeSessionsById.value).flatMap(([id, state]) => {
+      const status = runtimeStatus(state)
+      if (!status.label) return []
+      const session = sessionsById.value.get(id)
+        || (selectedSession.value?.id === id ? selectedSession.value : null)
+      if (!session?.cwd) return []
+      return [{
+        project: {
+          cwd: session.cwd,
+          name: projectName(session.cwd),
+        },
+        session,
+        status,
+      }]
+    })
+  })
   const initializing = computed(() => {
     return sessionsLoading.value && !selectedSession.value
   })
@@ -530,7 +550,10 @@ export function useSessionWorkspace({
   }
 
   function sessionRuntimeStatus(id) {
-    const state = runtimeSessionsById.value[id] || {}
+    return runtimeStatus(runtimeSessionsById.value[id] || {})
+  }
+
+  function runtimeStatus(state) {
     if (state.error) return { label: 'error', tone: 'error' }
     if (state.isCompacting) return { label: 'compacting', tone: 'compacting' }
     if (state.isStreaming) return { label: 'running', tone: 'running' }
@@ -1442,6 +1465,7 @@ export function useSessionWorkspace({
     sessionsLoading,
     sessionSwitching,
     sessionTitle,
+    sidebarActivitySessions,
     sidebarRuntimeSummary,
     setActiveRuntimeSession: (value) => { activeRuntimeSession.value = value },
     updateRuntimeEventState,

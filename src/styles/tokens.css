@@ -40,7 +40,7 @@
   --sk-duration: 1.3s;
   --sk-radius: 6px;
   --content-max: 1080px;
-  --sidebar-width: 304px;
+  --sidebar-width: 264px;
   --start-composer-width: min(
     760px,
     calc(100vw - var(--sidebar-width) - 88px)

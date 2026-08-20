@@ -1,10 +1,11 @@
-import { open, readdir, readFile, stat } from 'node:fs/promises'
+import { createReadStream } from 'node:fs'
+import { open, readdir, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
+import { createInterface } from 'node:readline'
 import { StringDecoder } from 'node:string_decoder'
 import {
   getAgentDir,
-  SessionManager,
   SettingsManager,
 } from '@earendil-works/pi-coding-agent'
 import { goalStateFromEntries } from './goal-state.js'
@@ -12,13 +13,25 @@ import { goalStateFromEntries } from './goal-state.js'
 const SESSION_DIR_ENV = 'PI_CODING_AGENT_SESSION_DIR'
 const PROJECT_HEADER_SCAN_LIMIT = 1024 * 1024
 const PROJECT_SCAN_CONCURRENCY = 24
+const sessionInfoCache = new Map()
+let pendingSessionList
 export const SUBAGENT_SESSION_CUSTOM_TYPE = 'leyline-subagent-session'
 
 export async function listPersistedSessions() {
-  const sessionDir = configuredSessionDir(process.cwd())
-  if (!sessionDir) return markSubagentSessions(await SessionManager.listAll())
-
-  return listSessionsFromConfiguredDir(sessionDir)
+  if (pendingSessionList) return pendingSessionList
+  const request = (async () => {
+    const sessionDir = configuredSessionDir(process.cwd())
+    const files = sessionDir
+      ? await sessionFiles(sessionDir)
+      : await defaultSessionFiles()
+    return listSessionsFromFiles(files, !!sessionDir)
+  })()
+  pendingSessionList = request
+  try {
+    return await request
+  } finally {
+    if (pendingSessionList === request) pendingSessionList = null
+  }
 }
 
 export async function listPersistedProjects() {
@@ -75,28 +88,20 @@ function expandTildePath(value) {
   return value
 }
 
-async function listSessionsFromConfiguredDir(sessionDir) {
-  const files = await sessionFiles(sessionDir)
-  const sessions = (await Promise.all(files.map(buildSessionInfo))).filter(Boolean)
+async function listSessionsFromFiles(files, goalFallback) {
+  const sessions = await buildSessionInfos(files, goalFallback)
   const marked = await markSubagentSessions(sessions)
   return marked.sort((a, b) => b.modified.getTime() - a.modified.getTime())
 }
 
-async function markSubagentSessions(sessions) {
-  const metadata = await Promise.all(sessions.map(async (session) => {
-    if (session.subagentChildPaths) {
-      return {
-        childPaths: session.subagentChildPaths,
-        marked: session.isSubagentSession === true,
-      }
-    }
-    return subagentMetadataFromFile(session.path)
-  }))
-  const subagentPaths = new Set(metadata.flatMap((item) => item.childPaths))
-
-  return sessions.map(({ subagentChildPaths, ...session }, index) => ({
+function markSubagentSessions(sessions) {
+  const subagentPaths = new Set(
+    sessions.flatMap((session) => session.subagentChildPaths || []),
+  )
+  return sessions.map(({ subagentChildPaths, ...session }) => ({
     ...session,
-    isSubagentSession: metadata[index].marked || subagentPaths.has(session.path),
+    isSubagentSession: session.isSubagentSession
+      || subagentPaths.has(session.path),
   }))
 }
 
@@ -236,81 +241,142 @@ function sessionHeaderFromLine(line) {
   }
 }
 
-async function buildSessionInfo(filePath) {
-  try {
-    const [content, stats] = await Promise.all([
-      readFile(filePath, 'utf8'),
-      stat(filePath),
-    ])
-    const entries = parseSessionEntries(content)
-    const header = entries[0]
-
-    if (header?.type !== 'session' || typeof header.id !== 'string') {
-      return null
+async function buildSessionInfos(files, goalFallback) {
+  const sessions = new Array(files.length)
+  let nextIndex = 0
+  const workerCount = Math.min(PROJECT_SCAN_CONCURRENCY, files.length)
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (nextIndex < files.length) {
+      const index = nextIndex++
+      sessions[index] = await buildSessionInfo(files[index], goalFallback)
     }
+  })
+  await Promise.all(workers)
+  const currentPaths = new Set(files)
+  for (const path of sessionInfoCache.keys()) {
+    if (!currentPaths.has(path)) sessionInfoCache.delete(path)
+  }
+  return sessions.filter(Boolean)
+}
 
+async function buildSessionInfo(filePath, goalFallback) {
+  try {
+    const stats = await stat(filePath)
+    const cached = sessionInfoCache.get(filePath)
+    if (cached?.mtimeMs === stats.mtimeMs && cached.size === stats.size) {
+      return cached.session
+    }
+    const lines = createInterface({
+      input: createReadStream(filePath, { encoding: 'utf8' }),
+      crlfDelay: Infinity,
+    })
+    let header
     let messageCount = 0
     let firstMessage = ''
     let name
-    const allMessages = []
-    const goal = goalStateFromEntries(entries)
+    let goalObjective = ''
+    let lastActivityTime = 0
+    let isSubagentSession = false
+    const subagentChildPaths = []
 
-    for (const entry of entries) {
-      if (entry.type === 'session_info') {
-        name = entry.name?.trim() || undefined
+    for await (const line of lines) {
+      const prefix = line.slice(0, 192)
+      if (!header) {
+        let entry
+        try {
+          entry = JSON.parse(line)
+        } catch {
+          continue
+        }
+        if (entry.type !== 'session' || typeof entry.id !== 'string') return null
+        header = entry
+        continue
       }
-      if (entry.type !== 'message') continue
+
+      if (prefix.includes('"type":"session_info"')) {
+        try {
+          const entry = JSON.parse(line)
+          name = entry.name?.trim() || undefined
+        } catch {}
+        continue
+      }
+
+      if (prefix.includes('"type":"custom"')) {
+        if (!line.includes(`"customType":"${SUBAGENT_SESSION_CUSTOM_TYPE}"`)
+          && !line.includes('"customType":"goal-state"')) continue
+        try {
+          const entry = JSON.parse(line)
+          if (entry.customType === SUBAGENT_SESSION_CUSTOM_TYPE
+            && entry.data?.sessionId === header.id) {
+            isSubagentSession = true
+          }
+          const goal = goalStateFromEntries([entry])
+          if (goal?.objective) goalObjective = goal.objective
+        } catch {}
+        continue
+      }
+
+      if (!prefix.includes('"type":"message"')) continue
       messageCount++
+      const role = prefix.match(/"role":"([^"]+)"/)?.[1]
+      if (role === 'toolResult' && line.includes('"toolName":"subagent"')) {
+        try {
+          const entry = JSON.parse(line)
+          for (const result of entry.message?.details?.results || []) {
+            const path = result.childSession?.path
+            if (typeof path === 'string' && path) subagentChildPaths.push(path)
+          }
+        } catch {}
+      }
+      if (role !== 'user' && role !== 'assistant') continue
 
-      const message = entry.message
-      if (!message || !('content' in message)) continue
-      if (message.role !== 'user' && message.role !== 'assistant') continue
+      const messageTimestamp = numericTimestampFromLine(line, role)
+      if (messageTimestamp) {
+        lastActivityTime = Math.max(lastActivityTime, messageTimestamp)
+      } else {
+        const timestamp = prefix.match(/"timestamp":"([^"]+)"/)?.[1]
+        if (timestamp) {
+          const time = new Date(timestamp).getTime()
+          if (!Number.isNaN(time)) lastActivityTime = Math.max(
+            lastActivityTime,
+            time,
+          )
+        }
+      }
 
-      const text = messageText(message.content)
-      if (!text) continue
-      allMessages.push(text)
-      if (!firstMessage && message.role === 'user') firstMessage = text
+      if (!firstMessage && role === 'user') {
+        firstMessage = firstMessageTextFromLine(line)
+      }
     }
 
-    return {
+    if (!header) return null
+    const headerTime = new Date(header.timestamp).getTime()
+    const modified = lastActivityTime > 0
+      ? new Date(lastActivityTime)
+      : Number.isNaN(headerTime) ? stats.mtime : new Date(headerTime)
+    const session = {
       path: filePath,
       id: header.id,
       cwd: typeof header.cwd === 'string' ? header.cwd : '',
       name,
       parentSessionPath: header.parentSession,
-      isSubagentSession: hasSubagentSessionMarker(entries, header.id),
-      subagentChildPaths: subagentChildPaths(entries),
+      isSubagentSession,
+      subagentChildPaths,
       created: new Date(header.timestamp),
-      modified: sessionModifiedDate(entries, header, stats.mtime),
+      modified,
       messageCount,
-      firstMessage: firstMessage || goal?.objective || '(no messages)',
-      allMessagesText: allMessages.join(' '),
+      firstMessage: firstMessage
+        || (goalFallback ? goalObjective : '')
+        || '(no messages)',
     }
+    sessionInfoCache.set(filePath, {
+      mtimeMs: stats.mtimeMs,
+      size: stats.size,
+      session,
+    })
+    return session
   } catch {
     return null
-  }
-}
-
-function parseSessionEntries(content) {
-  const entries = []
-  for (const line of content.trim().split('\n')) {
-    if (!line.trim()) continue
-    try {
-      entries.push(JSON.parse(line))
-    } catch {}
-  }
-  return entries
-}
-
-async function subagentMetadataFromFile(path) {
-  try {
-    const entries = parseSessionEntries(await readFile(path, 'utf8'))
-    return {
-      childPaths: subagentChildPaths(entries),
-      marked: hasSubagentSessionMarker(entries, entries[0]?.id),
-    }
-  } catch {
-    return { childPaths: [], marked: false }
   }
 }
 
@@ -322,19 +388,62 @@ export function hasSubagentSessionMarker(entries, sessionId) {
   })
 }
 
-function subagentChildPaths(entries) {
-  const paths = []
-  for (const entry of entries) {
-    const message = entry.message
-    if (entry.type !== 'message' || message?.role !== 'toolResult') continue
-    if (message.toolName !== 'subagent') continue
+function numericTimestampFromLine(line, role) {
+  const marker = ',"timestamp":'
+  let index
+  if (role === 'assistant') {
+    const stopReasonIndex = line.lastIndexOf(',"stopReason":')
+    index = stopReasonIndex === -1
+      ? -1
+      : line.indexOf(marker, stopReasonIndex)
+  } else {
+    index = line.lastIndexOf(marker)
+  }
+  if (index === -1) return 0
+  const start = index + marker.length
+  if (line[start] < '0' || line[start] > '9') return 0
+  let end = start + 1
+  while (line[end] >= '0' && line[end] <= '9') end++
+  return Number(line.slice(start, end)) || 0
+}
 
-    for (const result of message.details?.results || []) {
-      const path = result.childSession?.path
-      if (typeof path === 'string' && path) paths.push(path)
+function firstMessageTextFromLine(line) {
+  if (line.length < 256 * 1024) {
+    try {
+      return messageText(JSON.parse(line).message?.content)
+    } catch {
+      return ''
     }
   }
-  return paths
+
+  const textMarker = '"type":"text","text":'
+  const markerIndex = line.indexOf(textMarker)
+  if (markerIndex !== -1) {
+    return jsonStringAt(line, markerIndex + textMarker.length)
+  }
+
+  const contentMarker = '"content":'
+  const contentIndex = line.indexOf(contentMarker)
+  if (contentIndex === -1) return ''
+  return jsonStringAt(line, contentIndex + contentMarker.length)
+}
+
+function jsonStringAt(value, start) {
+  if (value[start] !== '"') return ''
+  let escaped = false
+  for (let index = start + 1; index < value.length; index++) {
+    const character = value[index]
+    if (character === '"' && !escaped) {
+      try {
+        return JSON.parse(value.slice(start, index + 1))
+      } catch {
+        return ''
+      }
+    }
+    if (character === '\\' && !escaped) escaped = true
+    else escaped = false
+  }
+  return ''
 }
 
 export function messageText(content) {

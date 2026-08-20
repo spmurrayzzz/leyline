@@ -157,7 +157,7 @@ const shellModeLabel = computed(() => {
   return hiddenShellMode.value ? 'shell · hidden' : 'shell · context'
 })
 const inputDisabled = computed(() => {
-  return props.reloadingSession || props.compacting
+  return !props.agentRunning && (props.reloadingSession || props.compacting)
 })
 const {
   dictationError,

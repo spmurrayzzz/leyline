@@ -12,6 +12,8 @@
   .app-header-brand,
   .section-action,
   .search-field,
+  .sidebar-project-shortcut,
+  .sidebar-navigator-result,
   .project-title button,
   .project-caret,
   .older-projects-toggle,
@@ -314,6 +316,26 @@
 
   .sidebar-open .sidebar {
     transform: translateX(0);
+  }
+
+  .project-sidebar {
+    padding: 12px 10px 10px;
+  }
+
+  .sidebar-navigator-backdrop {
+    padding: 0;
+  }
+
+  .sidebar-navigator-dialog {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .sidebar-navigator-results {
+    max-height: calc(100vh - 126px);
   }
 
   .sidebar-scrim {
