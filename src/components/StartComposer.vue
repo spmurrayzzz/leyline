@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useDictation } from '../composables/useDictation'
 import ModelPicker from './ModelPicker.vue'
 import { formatMode } from '../lib/format'
@@ -122,6 +122,7 @@ const emit = defineEmits([
 
 const form = ref(null)
 const textarea = ref(null)
+const startProjectMenuMaxHeight = ref(360)
 const shellMode = computed(() => props.draft.trimStart().startsWith('!'))
 const hiddenShellMode = computed(() => props.draft.trimStart().startsWith('!!'))
 const shellCommand = computed(() => {
@@ -158,6 +159,26 @@ const dictationTitle = computed(() => {
 watch(inputDisabled, (disabled) => {
   if (disabled) stopDictation()
 })
+
+watch(() => props.startProjectPickerOpen, (open) => {
+  if (open) updateStartProjectMenuMaxHeight()
+})
+
+onMounted(() => {
+  window.addEventListener('resize', updateStartProjectMenuMaxHeight)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', updateStartProjectMenuMaxHeight)
+})
+
+function updateStartProjectMenuMaxHeight() {
+  if (!props.startProjectPickerOpen || !form.value) return
+  const available = window.innerHeight
+    - form.value.getBoundingClientRect().bottom
+    - 20
+  startProjectMenuMaxHeight.value = Math.max(0, Math.min(360, available))
+}
 
 function updateDraft(event) {
   emit('update:draft', event.target.value)
@@ -379,7 +400,11 @@ defineExpose({ form })
       </div>
     </div>
     <Transition name="composer-popover">
-      <div v-if="startProjectPickerOpen" class="start-project-menu">
+      <div
+        v-if="startProjectPickerOpen"
+        class="start-project-menu"
+        :style="{ maxHeight: `${startProjectMenuMaxHeight}px` }"
+      >
         <label>
           <span>⌕</span>
           <input
