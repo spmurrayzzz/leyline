@@ -55,7 +55,7 @@ The documentation workflow uses these fixed settings:
 - Locale: `en-US`
 - Time zone: UTC
 - Reduced motion: enabled
-- Model label: `local/minimax-m2.7`
+- Model label: `local/deepseek-v4-flash`
 - Thought display default: **Collapsed**
 - Git review captures: `release-safety` with four sanitized changed files
 
@@ -71,7 +71,7 @@ Open every changed image. Check these items:
 2. No text or control is clipped.
 3. The image has no private path, project, prompt, account, or credential data.
 4. Hover, focus, loading, menu, and animation states appear only when they explain the documented action.
-5. Each visible model selector shows `local/minimax-m2.7`.
+5. Each visible model selector shows `local/deepseek-v4-flash`.
 6. Each Markdown image reference resolves in both documentation base paths.
 
 Run the PNG structure audit from the documentation screenshot skill when it is available. Also run `git diff --check` and both documentation builds.

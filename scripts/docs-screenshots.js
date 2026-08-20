@@ -16,19 +16,21 @@ const visionAlertImage = {
 }
 const model = {
   provider: 'local',
-  id: 'minimax-m2.7',
-  name: 'MiniMax M2.7',
-  supportsImages: true,
+  id: 'deepseek-v4-flash',
+  name: 'DeepSeek V4 Flash',
+  supportsImages: false,
+  contextWindow: 384000,
   availableThinkingLevels: ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'],
 }
 const availableModels = [
   model,
   {
-    provider: 'anthropic',
-    id: 'claude-sonnet-4-6',
-    name: 'Claude Sonnet 4.6',
+    provider: 'local',
+    id: 'qwen3.6-27b',
+    name: 'qwen3.6-27b',
     supportsImages: true,
-    availableThinkingLevels: ['off', 'low', 'medium', 'high'],
+    contextWindow: 262144,
+    availableThinkingLevels: ['off', 'minimal', 'low', 'medium', 'high'],
   },
   {
     provider: 'openai',
@@ -330,8 +332,8 @@ const subagentPayload = {
       model: 'inherit',
       thinking: 'high',
       tools: ['read', 'grep'],
-      overrides: { session: 'local/minimax-m2.7' },
-      effectiveModel: 'local/minimax-m2.7',
+      overrides: { session: 'local/deepseek-v4-flash' },
+      effectiveModel: 'local/deepseek-v4-flash',
       modelSource: 'session',
     },
     {
@@ -340,11 +342,11 @@ const subagentPayload = {
       description: 'Finds source evidence before implementation begins.',
       source: 'user',
       path: '/workspace/agents/researcher.md',
-      model: 'local/minimax-m2.7',
+      model: 'local/deepseek-v4-flash',
       thinking: 'medium',
       tools: ['read', 'grep', 'bash'],
-      overrides: { project: 'local/minimax-m2.7' },
-      effectiveModel: 'local/minimax-m2.7',
+      overrides: { project: 'local/deepseek-v4-flash' },
+      effectiveModel: 'local/deepseek-v4-flash',
       modelSource: 'project',
     },
   ],
@@ -358,13 +360,13 @@ const visionConfigPayload = (sessionAvailable) => ({
     sessionId: sessionAvailable ? memoryPayload.context.sessionId : null,
   },
   overrides: {
-    global: { model: 'anthropic/claude-sonnet-4-6', thinking: '' },
-    project: { model: 'local/minimax-m2.7', thinking: 'medium' },
+    global: { model: 'local/qwen3.6-27b', thinking: '' },
+    project: { model: 'local/qwen3.6-27b', thinking: 'medium' },
     ...(sessionAvailable
-      ? { session: { model: 'local/minimax-m2.7', thinking: 'high' } }
+      ? { session: { model: 'local/qwen3.6-27b', thinking: 'high' } }
       : {}),
   },
-  model: 'local/minimax-m2.7',
+  model: 'local/qwen3.6-27b',
   modelSource: sessionAvailable ? 'session' : 'project',
   thinking: sessionAvailable ? 'high' : 'medium',
   thinkingSource: sessionAvailable ? 'session' : 'project',
@@ -569,8 +571,14 @@ try {
       await page.locator('.settings-action-row').filter({ hasText: 'Vision agent' }).click()
       const drawer = page.locator('aside[aria-label="Vision agent"]')
       await drawer.locator('.subagent-config-card').first().waitFor()
-      const options = await drawer.locator('select option').allTextContents()
-      if (options.some((option) => option.includes('text-only-coder'))) {
+      const modelSelect = drawer.locator('select').first()
+      if (await modelSelect.inputValue() !== 'local/qwen3.6-27b') {
+        throw new Error('Vision model selector does not use local/qwen3.6-27b')
+      }
+      const options = await modelSelect.locator('option').allTextContents()
+      if (options.some((option) => {
+        return option.includes('deepseek-v4-flash') || option.includes('text-only-coder')
+      })) {
         throw new Error('Vision model selector includes a model without image support')
       }
     },
@@ -783,7 +791,7 @@ function runtimeFor(scenario) {
       followUpMode: 'one-at-a-time',
       activeToolCount: 4,
       activeToolNames: ['read', 'grep', 'bash', 'edit'],
-      contextUsage: { tokens: 12480, contextWindow: 200000, percent: 6.24 },
+      contextUsage: { tokens: 12480, contextWindow: model.contextWindow, percent: 3.25 },
       slashCommands: [
         { name: 'compact', description: 'Compact context', source: 'command' },
         { name: 'goal', description: 'Start or manage a goal', source: 'extension' },
@@ -822,7 +830,7 @@ function detailFor(scenario) {
         ? '2026-08-06T15:49:00.000Z'
         : summary.modified,
       created: '2026-08-06T15:42:00.000Z',
-      contextUsage: { tokens: 12480, contextWindow: 200000, percent: 6.24 },
+      contextUsage: { tokens: 12480, contextWindow: model.contextWindow, percent: 3.25 },
     },
     entries,
   }
@@ -1180,7 +1188,7 @@ async function assertPrivateDataAbsent(page) {
 }
 
 async function assertModelLabel(page) {
-  const expected = 'local/minimax-m2.7'
+  const expected = 'local/deepseek-v4-flash'
   const selector = '.model-picker:not(.small-picker):not(.tool-picker) > .model-picker-button'
   await page.waitForFunction(({ expected, selector }) => {
     const buttons = [...document.querySelectorAll(selector)]
