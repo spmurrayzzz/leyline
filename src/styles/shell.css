@@ -181,12 +181,12 @@
 }
 
 .project-sidebar {
-  padding: 12px 10px 10px;
+  padding: 12px 9px 10px 10px;
 }
 
 .sidebar-project-header {
   flex: none;
-  padding: 4px 4px 8px;
+  padding: 4px 0 8px;
 }
 
 .sidebar-project-control {
@@ -200,7 +200,7 @@
 .sidebar-project-identity {
   overflow: hidden;
   min-width: 0;
-  padding: 1px 2px;
+  padding: 1px 7px;
   color: var(--text);
 }
 
@@ -364,7 +364,6 @@
   min-height: 0;
   flex: 1;
   overflow-y: auto;
-  padding-right: 3px;
   scrollbar-color: #2d2d2d transparent;
   scrollbar-gutter: stable;
   scrollbar-width: thin;
@@ -372,7 +371,7 @@
 
 .session.project-session-row {
   min-height: 52px;
-  padding: 8px 9px;
+  padding: 8px 6px;
 }
 
 .session.project-session-row.active {
@@ -381,11 +380,17 @@
 }
 
 .project-session-skeleton .session-skeleton-row {
-  padding: 10px 9px 8px;
+  padding: 10px 7px 8px;
 }
 
-.project-session-empty {
-  padding: 14px 8px;
+.project-session-scroll > .sidebar-note {
+  padding-right: 7px;
+  padding-left: 7px;
+}
+
+.project-session-scroll > .project-session-empty {
+  padding-top: 14px;
+  padding-bottom: 14px;
   font-size: 12px;
 }
 
