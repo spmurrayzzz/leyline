@@ -9,7 +9,7 @@ Leyline provides composer, browser, rename, terminal, and Electron shortcuts.
 | **Enter** | Submit a prompt. During a run, queue **Steering**. |
 | **Option+Enter** | During a run, queue **Follow-up**. |
 | **Shift+Enter** | Add a line break. |
-| **Escape** | Stop an active run and close open menus, drawers, dialogs, previews, or edit mode. |
+| **Escape** | Close an open menu, drawer, dialog, preview, or edit mode. With no open surface, stop the active run. |
 
 ## Use slash command shortcuts
 
@@ -21,6 +21,15 @@ These shortcuts apply while the slash command picker is open.
 | **Arrow Up** | Select the previous result. |
 | **Tab** or **Enter** | Insert the selected command. |
 | **Escape** | Close the picker. |
+
+## Use navigation shortcuts
+
+| Shortcut | Action |
+| --- | --- |
+| **Command+K** or **Ctrl+K** | Open **Go to** for projects and sessions. |
+| **Escape** | Close the open navigator. |
+
+Leyline ignores the **Go to** shortcut during deletion confirmation, transcript editing, or session renaming.
 
 ## Use project folder shortcuts
 
@@ -39,6 +48,8 @@ These shortcuts apply in **Add project folder**.
 | Shortcut | Action |
 | --- | --- |
 | **Enter** or **Space** | Open a focused session row. |
+| **Arrow Down** | Focus the next session row. |
+| **Arrow Up** | Focus the previous session row. |
 | **Enter** while renaming | Save the session name. |
 | **Escape** while renaming | Cancel the rename. |
 
@@ -74,6 +85,6 @@ Focus the **Resize terminal** handle first.
 | **Command+Shift+E** | Open or close **Settings**. |
 | **Command+Shift+M** | Open or close **Memory**. |
 | **Command+E** | Hide or show the desktop sidebar. On mobile, open or close it. |
-| **Escape** | Stop the active run and close transient interface surfaces. |
+| **Escape** | Close an open transient surface. With no open surface, stop the active run. |
 
 The new-session shortcuts require a current session CWD. Leyline ignores the same-window new-session command during an active run or session creation.

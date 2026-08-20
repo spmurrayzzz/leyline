@@ -392,7 +392,7 @@ try {
     browser,
     file: path.join(docsOutputDir, 'home.png'),
     route: '/',
-    ready: '.start-panel .start-composer',
+    ready: '.project-sidebar .sidebar-project-shortcuts',
     scenario: 'home',
   })
   await capture({
@@ -431,13 +431,23 @@ try {
   })
   await capture({
     browser,
+    file: path.join(docsOutputDir, 'project-navigation.png'),
+    route: '/sessions/demo-session',
+    ready: '.assistant-message',
+    interact: async (page) => {
+      await page.getByRole('button', { name: 'Change project' }).click()
+      await page.getByRole('dialog', { name: 'Projects' }).waitFor()
+    },
+  })
+  await capture({
+    browser,
     file: path.join(docsOutputDir, 'project-details.png'),
     route: '/sessions/demo-session',
     ready: '.assistant-message',
     interact: async (page) => {
-      const project = page.locator('.project').filter({ hasText: 'harbor' }).first()
-      await project.hover()
-      await project.getByRole('button', { name: 'Project details' }).click()
+      const sidebar = page.locator('.project-sidebar')
+      await sidebar.getByRole('button', { name: 'Project actions' }).click()
+      await sidebar.getByRole('button', { name: 'Project details' }).click()
       const drawer = page.locator('aside[aria-label="Project details"]')
       await drawer.waitFor()
       await drawer.locator('input').fill('release')
@@ -633,7 +643,7 @@ try {
     browser,
     file: path.join(readmeOutputDir, 'home.png'),
     route: '/',
-    ready: '.start-panel .start-composer',
+    ready: '.project-sidebar .sidebar-project-shortcuts',
     viewport: { width: 1503, height: 818 },
     scenario: 'home',
     macWindow: true,
@@ -938,6 +948,18 @@ async function capture({
     const url = new URL(route, baseUrl).toString()
     await page.goto(url, { waitUntil: 'domcontentloaded' })
     await page.locator(ready).first().waitFor({ state: 'visible', timeout: 15000 })
+    if (!exportPage) {
+      await page.locator('.project-sidebar .sidebar-project-shortcuts').waitFor({
+        state: 'attached',
+        timeout: 15000,
+      })
+      await page.waitForFunction(() => {
+        const count = document.querySelector(
+          '.project-session-heading span:last-child',
+        )?.textContent?.trim()
+        return count && count !== '…'
+      }, undefined, { timeout: 15000 })
+    }
     if (viewport.width > 1120 && route.startsWith('/sessions/')) {
       await page.locator('.review-toggle-button:not(.preparing)').waitFor({
         state: 'visible',

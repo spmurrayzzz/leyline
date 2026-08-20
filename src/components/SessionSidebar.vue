@@ -942,7 +942,7 @@ const vFocusSelect = {
             <path d="M8 3v10M3 8h10"></path>
           </svg>
           <span>
-            <strong>{{ creatingSessionCwd === currentProject.cwd ? 'Creating…' : 'New session here' }}</strong>
+            <strong>{{ creatingSessionCwd === currentProject.cwd ? 'Creating…' : 'New session' }}</strong>
             <small>{{ currentProject.name }} · {{ activeBackendConnection?.name || 'Native backend' }}</small>
           </span>
           <span aria-hidden="true">›</span>

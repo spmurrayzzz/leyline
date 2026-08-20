@@ -1,36 +1,74 @@
 # Projects and search
 
-Leyline groups regular sessions by project CWD. The project name is the final folder name.
+Leyline uses each session CWD as a project. The project name is the final folder name.
 
-## Search the sidebar
+The sidebar keeps one current project in focus. It shows the project path, session search, session list, and project shortcuts.
+
+## Find a session in the current project
 
 1. Enter text in **Search sessions**.
-2. Select a matching project or session.
+2. Select a matching session.
 
-Search uses fuzzy matching against visible project and session labels. It does not search transcript content.
+Search matches session names and IDs in the current project. Each search term must match one of those values.
 
-All search terms must match one label. Leyline highlights matched characters in each result.
+Search does not inspect transcript content. Clear the field to restore the full session list.
 
-## Expand a project
+## Change the current project
 
-Select a project name to expand or collapse it. The expanded group shows the five-session preview unless search is active.
+![Project navigator with the current project and another available project](../assets/screenshots/project-navigation.png)
 
-Select **Show all N sessions** to show all sessions. Select **Show fewer** to restore the preview.
+*Change project keeps the session list focused on one working directory.*
+
+1. Select **Change project**.
+2. Enter text in **Search projects, paths, or sessions** if necessary.
+3. Select a project or session.
+
+Without a query, the navigator shows all projects. Search matches project names, CWDs, session names, and session IDs.
+
+When you select a project, Leyline opens the last session that you used in that project. Otherwise, it opens the most recent session.
+
+If the project has no sessions, Leyline opens the start screen for that CWD.
+
+Select **Open another folder** to add a project folder.
+
+## Use Go to
+
+Press **Command+K** or **Ctrl+K** to open **Go to**.
+
+Leyline ignores this shortcut during deletion confirmation, transcript editing, or session renaming.
+
+The default view shows projects and current or recent sessions. Enter a query to search all projects and regular sessions.
+
+Press **Escape** or select the shaded area to close the navigator.
+
+## Follow activity in other projects
+
+Select **Activity across other projects** at the bottom of the sidebar.
+
+The navigator excludes the current project and groups active sessions by state:
+
+- **Needs attention** contains unread sessions and errors.
+- **Running** contains running and compacting sessions.
+- **Queued** contains sessions with queued messages.
+
+Select an activity result to open that session.
 
 ## Open Project details
 
 ![Project Details drawer with filtered session cards and sidebar context](../assets/screenshots/project-details.png)
 
-*Project Details provides focused session management for one project.*
+*Project Details provides focused session management for the current project.*
 
-1. Point to a project row.
+1. Select **Project actions** beside the current project.
 2. Select **Project details**.
 
-The **Project details** drawer shows the CWD, session count, and current-session relationship.
+The drawer shows the CWD, session count, and current-session relationship.
+
+The **Project actions** menu also contains **Trash project**. This action moves all project sessions to Leyline trash after confirmation.
 
 ## Filter and sort project sessions
 
-Enter a name or session ID in **Filter sessions**. This filter uses text containment, not fuzzy matching.
+Enter a name or session ID in **Filter sessions**. This filter uses text containment.
 
 Select **Recent** to sort by time. Select **Title** to sort by session title.
 
@@ -50,7 +88,7 @@ Select **New session** to create an empty session in the project CWD.
 
 ## Add a project folder
 
-Select the **New session** plus control in the **Sessions** header. You can also select **Add new project** on the start screen.
+Select **Change project**, then select **Open another folder**. You can also select **Add new project** on the start screen.
 
 The **Add project folder** browser can open an existing folder or create the typed folder. See [Start screen](./start-screen#add-a-project-folder) for its keyboard controls.
 

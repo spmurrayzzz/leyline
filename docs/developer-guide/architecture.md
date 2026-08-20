@@ -105,6 +105,10 @@ Pi sessions are tree-structured JSONL files. The default directory is `~/.pi/age
 
 `PI_CODING_AGENT_SESSION_DIR` overrides session discovery and creation. Otherwise, Leyline uses pi's configured `sessionDir` or pi's default directory.
 
+Session discovery reads JSONL files with a bounded worker pool. It caches summaries by file modification time and size and combines concurrent list requests.
+
+Persisted summaries use the latest user or assistant message time for ordering. Session names come from the latest `session_info` entry.
+
 Normal session changes use pi session and runtime methods. Transcript detail opens the file with `SessionManager.open(path)` and reads `getBranch()`.
 
 Leyline projects the branch through `lib/transcript-projection.js`. The same projected DTO supplies the browser transcript and HTML export.

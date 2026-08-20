@@ -6,14 +6,14 @@
 
 | Owner | State and behavior |
 | --- | --- |
-| `App.vue` | Drawer visibility, Git review state, composer draft, attachments, edit state, prompt submission, goal commands, subagent and vision settings, project detail selection, and startup motion phases |
-| `useSessionWorkspace.js` | Session list, routes, selected detail, activation, runtime snapshots, model and thinking controls, rename, delete, fork, reset, reload, and sidebar search |
+| `App.vue` | Drawer and sidebar navigator visibility, Git review state, composer draft, attachments, edit state, prompt submission, goal commands, subagent and vision settings, project detail selection, and startup motion phases |
+| `useSessionWorkspace.js` | Session list, project grouping, routes, selected detail, activation, runtime snapshots, sidebar activity rows, model and thinking controls, rename, delete, fork, reset, and reload |
 | `useBackendConnections.js` | App-wide connection records, window-specific selection, connection tests, and default selection |
 | `useTranscriptPreferences.js` | App-wide transcript display settings, loading state, and save errors |
 | `useLiveTurnProjection.js` | Optimistic user entries, live assistant blocks, live tools, compaction activity, and live-to-persisted reconciliation |
 | `useRuntimeEvents.js` | EventSource lifecycle, connection state, and the local event log |
 | `useMemoryInspector.js` | Visible Memory data, loading, optimistic mutations, dirty-state guards, and drawer state |
-| `useProjectBrowser.js` | Project picker state, project expansion, and project-browser visibility |
+| `useProjectBrowser.js` | Project picker state, folder expansion, and project-browser visibility |
 | `useToolExpansion.js` | Tool and skill expansion, copy state, and fullscreen previews |
 | `useWorkbenchScroll.js` | Bottom following, composer space, new-output state, and Jump to latest |
 | `useTerminal.js` | xterm, WebSocket, PTY status, focus, fit, and drawer height |
@@ -24,7 +24,9 @@
 
 `App.vue` creates the composables and passes narrow props and events to components. Components do not own session runtime objects.
 
-`SessionSidebar.vue` renders grouped projects and session controls. `SessionComposer.vue` and `StartComposer.vue` own local input mechanics and dictation adapters.
+`SessionSidebar.vue` renders the current project and its virtualized session list. It owns session search, navigator search, stable project order, and cross-project activity groups.
+
+`SessionComposer.vue` and `StartComposer.vue` own local input mechanics and dictation adapters.
 
 `TranscriptEntry.vue` renders persisted entries and emits transcript actions. `LiveAssistantMessage.vue` renders live assistant output.
 
@@ -63,7 +65,7 @@ The selected session route is `/sessions/:id`. Browser history changes call the 
 
 SSE can send snapshots for all server handles. `App.vue` updates the selected runtime only when the IDs match.
 
-Background event summaries remain in `runtimeSessionsById`. This lets the sidebar show work that continues outside the selected session.
+Background event summaries remain in `runtimeSessionsById`. They supply row status in the current project and the **Activity across projects** navigator.
 
 ## Persisted and live transcript state
 
@@ -139,7 +141,7 @@ A selected-session change resets scroll state. The terminal height and composer 
 
 ## Drawer coordination
 
-`App.vue` coordinates Project Details, Settings, Runtime Events, Memory, Subagents, and Vision agent. Opening one contextual side drawer closes conflicting drawers.
+`App.vue` coordinates Project Details, Settings, Runtime Events, Memory, Subagents, Vision agent, and sidebar navigators. Opening a navigator closes conflicting drawers and configuration surfaces.
 
 Git review uses a separate desktop grid track. It can remain open with the contextual drawer state.
 

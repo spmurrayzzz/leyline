@@ -18,7 +18,7 @@ hero:
 
 features:
   - title: Browse sessions and projects
-    details: Search sessions, group them by project, inspect project history, and move between parent and child sessions.
+    details: Keep one project in focus, search its sessions, use Go to across projects, and move between parent and child sessions.
   - title: Run and direct agents
     details: Submit prompts, images, shell commands, steering messages, queued follow-ups, slash commands, and long-running goals.
   - title: Use images with any model

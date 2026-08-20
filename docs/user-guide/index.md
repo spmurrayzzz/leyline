@@ -6,7 +6,7 @@ Use Leyline to create, inspect, and control pi sessions.
 
 Use the [start screen](./start-screen) to select a project and send the first prompt.
 
-Use [projects and search](./projects-and-search) to find projects and manage their sessions.
+Use [projects and search](./projects-and-search) to change the current project, find sessions, and follow activity.
 
 ## Work in a session
 

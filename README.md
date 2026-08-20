@@ -18,10 +18,11 @@ connections to other Leyline backends.
 
 ## Features
 
-Browse, search, create, and run pi sessions from a focused web UI. Leyline shows
-rendered transcripts, live runtime output, Git changes, model controls, memory,
-subagents, runtime events, and an embedded terminal. Each window can use the
-native backend or a saved backend connection.
+Browse, search, create, and run pi sessions from a focused web UI. The sidebar
+keeps one project in focus, and **Go to** searches sessions across projects.
+Leyline shows rendered transcripts, live runtime output, Git changes, model
+controls, memory, subagents, runtime events, and an embedded terminal. Each
+window can use the native backend or a saved backend connection.
 
 On desktop, the Git review pane prepares changed files and the selected diff
 before it opens. It separates staged and working-tree changes and can expand

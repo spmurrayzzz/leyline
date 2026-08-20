@@ -21,11 +21,13 @@ The **Memory**, **Events**, and **Export transcript** icons remain available. Th
 *The session navigator opens above the mobile workbench.*
 
 1. Select **Open sessions** in the header.
-2. Select a project or session.
+2. Select a session in the current project.
+
+Select **Change project** before you select a session from another project.
 
 The sidebar opens over the workbench. Select the shaded area or a session to close it.
 
-The sidebar can use up to 86 percent of the viewport width, with a maximum width of 320 pixels.
+The sidebar can use up to 86 percent of the viewport width, with a maximum width of 320 pixels. Project, activity, and **Go to** navigators use the full viewport.
 
 ## Use transcript actions
 

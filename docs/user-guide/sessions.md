@@ -4,20 +4,22 @@ A session contains one pi conversation tree. Leyline shows the active branch as 
 
 ## Select a session
 
-1. Expand a project in the sidebar.
-2. Select a session name.
+1. Find the session in the current project list.
+2. Select the session name.
 
-You can also focus a session row and press **Enter** or **Space**.
+Select **Change project** first when the session belongs to a different project.
+
+You can also focus a session row and press **Enter** or **Space**. Press **Arrow Up** or **Arrow Down** to focus another row.
 
 A selected session uses the route `/sessions/<encoded-id>`. The start screen uses `/`.
 
-## Show more sessions
+## Browse the session list
 
-Each expanded project shows its five most recent sessions first. The selected session also remains visible when it is outside that preview.
+The sidebar shows all regular sessions in the current project. It orders them from most recent modification to oldest.
 
-Select **Show all N sessions** to show the full project list. Select **Show fewer** to restore the preview.
+The **Sessions** heading shows the session count. The list scrolls when it is longer than the available space.
 
-A session search shows all matching sessions and hides this preview control.
+Enter a session name or ID in **Search sessions** to filter the current project.
 
 ## Read runtime status
 
@@ -29,13 +31,13 @@ A session row can show these states:
 - **+N queued**: steering or follow-up messages are waiting.
 - **error**: the background runtime reported an error.
 
-The **Sessions** heading summarizes running, compacting, and unread sessions. Background sessions continue when you open another session.
+Select **Activity across other projects** to find active sessions outside the current project. Background sessions continue when you open another session.
 
 ## Create a session in a project
 
-Select the **New session** button beside a project. You can also select **New session** in **Project details**.
+Select **New session** at the bottom of the sidebar. You can also select **New session** in **Project details**.
 
-Leyline creates an empty session in that project's CWD. Use the centered composer to send its first prompt.
+Leyline creates an empty session in the current project CWD. Use the centered composer to send its first prompt.
 
 ## Rename a session from the sidebar
 

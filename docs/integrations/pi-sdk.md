@@ -1,6 +1,8 @@
 # pi SDK integration
 
-Leyline uses `SessionManager.listAll()` for normal session discovery. If `PI_CODING_AGENT_SESSION_DIR` is set, Leyline scans that directory instead. It uses `SessionManager.open(path)` and `getBranch()` for transcript detail.
+Leyline discovers sessions by scanning pi JSONL files with bounded concurrent readers. It caches unchanged summaries by file modification time and size.
+
+`PI_CODING_AGENT_SESSION_DIR` selects a different session root. Leyline uses `SessionManager.open(path)` and `getBranch()` for transcript detail.
 
 `AgentSessionRuntime` owns execution. Leyline keeps one runtime handle for each open session and tracks one selected active handle. Scoped API actions can run in background sessions without changing the selected session.
 

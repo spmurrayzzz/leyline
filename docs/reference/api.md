@@ -46,11 +46,15 @@ SessionSummary = {
   parentSessionPath?: string,
   isSubagentSession: boolean,
   firstMessage: string,
+  messageCount: number,
+  modified?: string,
   timestamp?: string
 }
 ```
 
-`timestamp` is the session creation time as an ISO string. `firstMessage` is limited to 140 characters.
+`timestamp` is the session creation time as an ISO string. `modified` is the latest user or assistant message time.
+
+For persisted sessions without message times, `modified` uses the session creation time or file modification time. `messageCount` counts all message records. `firstMessage` is limited to 140 characters.
 
 ### Session detail
 
@@ -272,6 +276,8 @@ Response:
 ```
 
 The list includes persisted sessions and open runtimes that are not yet in the persisted list.
+
+Persisted sessions use descending `modified` order. Runtime-only sessions appear before the persisted list.
 
 ### `POST /api/pi/sessions`
 
