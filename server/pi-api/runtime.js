@@ -22,6 +22,7 @@ import {
 } from './extension-ui.js'
 import { readDirectory } from './fs-browser.js'
 import { readGitReview, readGitReviewDiff } from './git-review.js'
+import { openGitReviewEventStream } from './git-review-watch.js'
 import {
   runtimeSessionDto,
   sessionInfo,
@@ -1268,6 +1269,7 @@ export function createPiRuntimeApi() {
   listVisibleMemories,
   listVisionConfig,
   openEventStream,
+  openGitReviewEventStream,
   promptSession,
   readDirectory,
   readGitReview,

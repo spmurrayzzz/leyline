@@ -64,7 +64,8 @@ These files are outside `src/` because Node.js backend code and browser code imp
 - `server/pi-api/extension-ui.js`: Adapts extension UI state for the browser.
 - `server/pi-api/goal-state.js`: Projects goal extension state.
 - `server/pi-api/fs-browser.js`: Browses local directories.
-- `server/pi-api/git-review.js`: Reads Git status and bounded per-file diffs.
+- `server/pi-api/git-review.js`: Reads Git status, bounded per-file diffs, and watcher Git state.
+- `server/pi-api/git-review-watch.js`: Shares recursive review watchers and sends review-change SSE events.
 - `server/pi-api/memories.js`: Implements Memory Inspector storage.
 - `server/pi-api/rollout-feedback.js`: Implements rollout feedback storage.
 - `server/pi-api/subagents.js`: Implements subagent discovery and overrides.

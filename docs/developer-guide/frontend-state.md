@@ -121,7 +121,9 @@ When the parent model cannot receive attached images, `App.vue` shows the effect
 
 The selected desktop session mounts `ReviewPane.vue` while the pane is closed. The component prepares the Git status and first Pierre diff before it emits `prepared`.
 
-A settled runtime event for the selected project and a completed composer shell command increment the review refresh token. External filesystem changes require manual refresh.
+When the backend reports `reviewWatch`, `ReviewPane.vue` opens `/api/pi/review/events?cwd=...`. Each connection and `review_change` event queues a refresh that preserves the selected file. The component closes the stream when its cwd changes or it unmounts.
+
+A settled runtime event for the selected project and a completed composer shell command still increment the review refresh token. These triggers and the manual refresh control remain available when filesystem watching is unavailable.
 
 Expanded review hides the transcript and uses the full workspace after the sidebar. Collapse restores the saved review width.
 

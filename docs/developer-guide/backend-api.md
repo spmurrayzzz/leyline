@@ -36,7 +36,8 @@ The terminal does not use the HTTP router. It uses a WebSocket upgrade at `/api/
 | `server/pi-api/extension-ui.js` | Browser-compatible extension UI context and runtime event binding |
 | `server/pi-api/goal-state.js` | Goal custom-entry projection |
 | `server/pi-api/fs-browser.js` | Local directory browsing and path normalization |
-| `server/pi-api/git-review.js` | Read-only Git status and bounded per-file diffs |
+| `server/pi-api/git-review.js` | Read-only Git status, bounded per-file diffs, and watcher Git queries |
+| `server/pi-api/git-review-watch.js` | Shared recursive review watchers and review-change SSE clients |
 | `server/pi-api/memories.js` | Memory Inspector queries and mutations |
 | `server/pi-api/rollout-feedback.js` | Assistant-entry feedback storage and DTO application |
 | `server/pi-api/subagents.js` | Agent discovery, scoped model overrides, and effective configuration |
@@ -53,7 +54,7 @@ The router has these main route groups:
 - runtime state and active-session selection
 - prompt, shell, compaction, edit, fork, Reset to here, reload, model, thinking, mode, and interrupt
 - filesystem browsing
-- read-only Git review
+- read-only Git review and review-change SSE
 - Memory Inspector operations
 - rollout feedback
 - subagent configuration and subagent execution
@@ -81,6 +82,10 @@ The review routes run Git against the requested project directory on the selecte
 The status response keeps at most 500 changed paths. A text diff larger than 1 MiB or 5,000 lines returns metadata without a patch body.
 
 Git commands disable external diff drivers and text conversion. The browser keeps staged and working-tree patches in separate sections.
+
+`git-review-watch.js` shares one reference-counted recursive watcher per resolved repository root. It batches filesystem events, filters ignored paths, and watches the index, HEAD, current ref, and relevant Git configuration paths separately. This metadata coverage also supports linked worktrees.
+
+`GET /api/pi/review/events` sends `review_change` events to subscribed clients. Watchers close after their last client disconnects. Runtime-settled events, completed composer shell commands, and manual refresh remain fallback triggers.
 
 ## Runtime construction
 
@@ -142,7 +147,7 @@ calls and request field names.
 
 `src/lib/leyline-api.js` manages the native connection registry and app settings. It also checks `GET /api/pi/info` before a switch.
 
-The backend information response gates the review control with the `review` capability. `ReviewPane.vue` loads data through `src/lib/pi-api.js`.
+The backend information response gates the review control with the `review` capability and automatic watching with `reviewWatch`. `ReviewPane.vue` loads review data through `src/lib/pi-api.js` and opens the review stream through `backendHttpUrl()`.
 
 Vision configuration and parent prompt requests use `src/lib/pi-api.js`. For a parent model without image input, the backend saves attachments and the parent calls `vision_agent` during its turn.
 

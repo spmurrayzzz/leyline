@@ -43,7 +43,9 @@ Press **Escape** or select **Collapse review** to restore the transcript and the
 
 ## Refresh changes
 
-Leyline refreshes review after a known agent run or composer shell command settles. Select **Refresh changes** after another application changes the working tree.
+Leyline automatically refreshes review when the selected backend detects a nonignored working-tree change or a relevant Git state change. Changes from another application normally appear without a manual refresh.
+
+Leyline also refreshes after a known agent run or composer shell command settles. Select **Refresh changes** when automatic watching is unavailable or the displayed state appears stale.
 
 ## Use the terminal for Git actions
 

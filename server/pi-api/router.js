@@ -23,6 +23,7 @@ export function createPiApiHandler(api) {
     listVisibleMemories,
     listVisionConfig,
     openEventStream,
+    openGitReviewEventStream,
     promptSession,
     readDirectory,
     readGitReview,
@@ -81,6 +82,7 @@ async function piApiHandler(req, res) {
             events: true,
             exports: true,
             review: true,
+            reviewWatch: true,
             terminal: true,
           },
         })
@@ -160,6 +162,15 @@ async function piApiHandler(req, res) {
         const cwd = url.searchParams.get('cwd')
         if (!cwd) return json(res, { error: 'Project path is required' }, 400)
         return json(res, await readGitReview(cwd))
+      }
+
+      if (url.pathname === '/review/events') {
+        if (req.method !== 'GET') {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+        const cwd = url.searchParams.get('cwd')
+        if (!cwd) return json(res, { error: 'Project path is required' }, 400)
+        return openGitReviewEventStream(cwd, req, res)
       }
 
       if (url.pathname === '/review/diff') {

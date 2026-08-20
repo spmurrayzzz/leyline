@@ -167,6 +167,9 @@ const {
 const reviewEnabled = computed(() => {
   return activeBackendConnectionInfo.value?.capabilities?.review === true
 })
+const reviewWatchEnabled = computed(() => {
+  return activeBackendConnectionInfo.value?.capabilities?.reviewWatch === true
+})
 const reviewAvailable = computed(() => {
   return reviewEnabled.value && reviewDesktopAvailable.value
 })
@@ -3347,6 +3350,7 @@ function closePickerMenus() {
       :open="reviewOpen"
       :refresh-token="reviewRefreshToken"
       :sidebar-hidden="desktopSidebarHidden"
+      :watch-enabled="reviewWatchEnabled"
       :width="reviewPaneWidth"
       @close="closeReview"
       @prepared="handleReviewPrepared"

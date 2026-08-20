@@ -152,12 +152,13 @@ Response:
     events: true,
     exports: true,
     review: true,
+    reviewWatch: true,
     terminal: true
   }
 }
 ```
 
-The frontend rejects a backend when `name` or `apiVersion` is incompatible. It shows the desktop review control only when `capabilities.review` is `true`.
+The frontend rejects a backend when `name` or `apiVersion` is incompatible. It shows the desktop review control only when `capabilities.review` is `true`. It opens the automatic review stream only when `capabilities.reviewWatch` is `true`.
 
 ## Connection registry
 
@@ -485,6 +486,42 @@ Response:
 The response keeps at most 500 changed paths. When more paths exist, `filesTruncated` is `true` and `totalFiles` is `null`.
 
 A missing `cwd` returns `400`. An invalid directory or Git failure returns `500`.
+
+### `GET /api/pi/review/events`
+
+**Designation:** Browser review stream.
+
+Query:
+
+```text
+cwd: string
+```
+
+Response headers include `Content-Type: text/event-stream`, `Cache-Control: no-cache, no-transform`, and `Connection: keep-alive`.
+
+The stream starts with:
+
+```text
+: connected
+```
+
+Event frames use these names and data:
+
+```text
+review_change: {
+  root: string
+}
+
+review_watch_error: {
+  message: string
+}
+```
+
+The backend shares one recursive watcher for clients that resolve to the same repository root. It closes the watcher after the last client disconnects. Ordinary `.git` activity and ignored working-tree paths do not emit `review_change`; relevant Git metadata does.
+
+A new connection starts after watcher setup, so the frontend can use it as a catch-up boundary. A watcher setup or runtime error sends `review_watch_error` and closes the response. `EventSource` clients can reconnect automatically.
+
+A missing `cwd` returns `400` before the stream starts.
 
 ### `GET /api/pi/review/diff`
 

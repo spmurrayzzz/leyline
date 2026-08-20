@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { lstat, open, stat } from 'node:fs/promises'
+import { lstat, open, realpath, stat } from 'node:fs/promises'
 import { devNull } from 'node:os'
 import { resolve } from 'node:path'
 
@@ -13,6 +13,7 @@ const DIFF_FORMAT_ARGS = [
   '--dst-prefix=b/',
 ]
 const GIT_BINARY_PROBE_BYTES = 8000
+const GIT_IGNORE_BATCH_SIZE = 512
 const MAX_GIT_OUTPUT = 20 * 1024 * 1024
 const MAX_RENDERABLE_DIFF_BYTES = 1024 * 1024
 const MAX_RENDERABLE_DIFF_LINES = 5000
@@ -79,6 +80,72 @@ export async function readGitReviewDiff(cwd, path) {
     diffs: await fileDiffs(root, file),
     path: file.path,
   }
+}
+
+export async function resolveGitReviewWatchTarget(cwd) {
+  const directory = await projectDirectory(cwd)
+  const root = await repositoryRoot(directory)
+  if (!root) {
+    return {
+      gitWatchPaths: [],
+      repositoryRoot: '',
+      watchRoot: await realpath(directory),
+    }
+  }
+
+  const [gitDirectory, headReference] = await Promise.all([
+    runGit(root, ['rev-parse', '--absolute-git-dir']),
+    runGit(root, ['symbolic-ref', '--quiet', 'HEAD'], [0, 1]),
+  ])
+  const directoryPath = resolve(root, stripLineEnding(gitDirectory.stdout))
+  const metadataNames = [
+    'config',
+    'config.worktree',
+    'info/attributes',
+    'info/exclude',
+    'logs/HEAD',
+    'packed-refs',
+  ]
+  if (headReference.code === 0) {
+    metadataNames.push(stripLineEnding(headReference.stdout))
+  }
+  const metadataPaths = await Promise.all(metadataNames.map(async (name) => {
+    const result = await runGit(root, ['rev-parse', '--git-path', name])
+    return resolve(root, stripLineEnding(result.stdout))
+  }))
+  return {
+    gitWatchPaths: [
+      resolve(directoryPath, 'index'),
+      resolve(directoryPath, 'HEAD'),
+      ...metadataPaths,
+    ],
+    repositoryRoot: root,
+    watchRoot: root,
+  }
+}
+
+export async function hasGitReviewCollapsedWatchChange(root, paths) {
+  if (await hasGitReviewWatchChange(root, paths)) return true
+  const result = await runGit(root, ['ls-files', '-z', '--', ...paths])
+  return Boolean(result.stdout)
+}
+
+export async function hasGitReviewWatchChange(root, paths) {
+  for (let offset = 0; offset < paths.length; offset += GIT_IGNORE_BATCH_SIZE) {
+    const batch = paths.slice(offset, offset + GIT_IGNORE_BATCH_SIZE)
+    const result = await runGit(
+      root,
+      ['check-ignore', '-z', '--stdin'],
+      [0, 1],
+      `${batch.join('\0')}\0`,
+      false,
+    )
+    if (
+      result.code === 1
+      || result.stdout.split('\0').filter(Boolean).length < batch.length
+    ) return true
+  }
+  return false
 }
 
 async function readLineStats(root, files) {
@@ -456,13 +523,13 @@ function statusKind(status) {
   return 'modified'
 }
 
-function runGit(cwd, args, acceptedCodes = [0]) {
+function runGit(cwd, args, acceptedCodes = [0], input, literalPathspecs = true) {
   return new Promise((resolveCommand, rejectCommand) => {
-    execFile('git', ['-C', cwd, ...args], {
+    const child = execFile('git', ['-C', cwd, ...args], {
       encoding: 'utf8',
       env: {
         ...process.env,
-        GIT_LITERAL_PATHSPECS: '1',
+        GIT_LITERAL_PATHSPECS: literalPathspecs ? '1' : '0',
         GIT_OPTIONAL_LOCKS: '0',
         GIT_TERMINAL_PROMPT: '0',
         LC_ALL: 'C',
@@ -494,5 +561,9 @@ function runGit(cwd, args, acceptedCodes = [0]) {
       }
       rejectCommand(new Error(stderr.trim() || error.message))
     })
+    if (input !== undefined) {
+      child.stdin?.on('error', () => {})
+      child.stdin?.end(input)
+    }
   })
 }

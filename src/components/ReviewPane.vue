@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import PierrePreview from './PierrePreview.vue'
+import { backendHttpUrl } from '../lib/backend'
 import { fetchGitReview, fetchGitReviewDiff } from '../lib/pi-api'
 
 const props = defineProps({
@@ -9,6 +10,7 @@ const props = defineProps({
   open: Boolean,
   refreshToken: { type: Number, default: 0 },
   sidebarHidden: Boolean,
+  watchEnabled: Boolean,
   width: { type: Number, default: 420 },
 })
 
@@ -49,6 +51,9 @@ let diffGeneration = 0
 let diffRenderGeneration = 0
 let pendingPreviewKeys = new Set()
 let resizeCleanup
+let reviewEventSource
+let watchedRefreshQueued = false
+let watchedRefreshTimer
 
 const files = computed(() => review.value.files || [])
 const filesTruncated = computed(() => review.value.filesTruncated === true)
@@ -92,12 +97,14 @@ const panelSubtitle = computed(() => {
 onMounted(() => {
   emit('resize', constrainWidth(props.width))
   window.addEventListener('resize', constrainCurrentWidth)
+  openReviewEventStream()
   void loadReview()
 })
 
 onBeforeUnmount(() => {
   reviewGeneration++
   diffGeneration++
+  closeReviewEventStream()
   window.removeEventListener('resize', constrainCurrentWidth)
   resizeCleanup?.()
 })
@@ -106,7 +113,14 @@ watch(() => props.cwd, () => {
   selectedPath.value = ''
   diff.value = { diffs: [], path: '' }
   hasLoaded.value = false
+  closeReviewEventStream()
+  openReviewEventStream()
   void loadReview()
+})
+
+watch(() => props.watchEnabled, (enabled) => {
+  if (enabled) openReviewEventStream()
+  else closeReviewEventStream()
 })
 
 watch(() => props.refreshToken, () => {
@@ -114,6 +128,45 @@ watch(() => props.refreshToken, () => {
 })
 
 watch(() => props.sidebarHidden, constrainCurrentWidth)
+
+function openReviewEventStream() {
+  if (!props.watchEnabled || !props.cwd) return
+  closeReviewEventStream()
+  const params = new URLSearchParams({ cwd: props.cwd })
+  const source = new EventSource(
+    backendHttpUrl(`/api/pi/review/events?${params}`),
+  )
+  reviewEventSource = source
+  source.addEventListener('open', () => {
+    if (reviewEventSource === source) requestWatchedRefresh()
+  })
+  source.addEventListener('review_change', () => {
+    if (reviewEventSource === source) requestWatchedRefresh()
+  })
+}
+
+function closeReviewEventStream() {
+  reviewEventSource?.close()
+  reviewEventSource = undefined
+  clearTimeout(watchedRefreshTimer)
+  watchedRefreshTimer = undefined
+  watchedRefreshQueued = false
+}
+
+function requestWatchedRefresh() {
+  watchedRefreshQueued = true
+  scheduleWatchedRefresh()
+}
+
+function scheduleWatchedRefresh() {
+  if (!watchedRefreshQueued || watchedRefreshTimer || refreshing.value) return
+  watchedRefreshTimer = window.setTimeout(() => {
+    watchedRefreshTimer = undefined
+    if (refreshing.value) return
+    watchedRefreshQueued = false
+    void loadReview({ preserveSelection: true })
+  }, 80)
+}
 
 async function loadReview({ preserveSelection = false } = {}) {
   const generation = ++reviewGeneration
@@ -148,6 +201,7 @@ async function loadReview({ preserveSelection = false } = {}) {
       loading.value = false
       refreshing.value = false
       announcePrepared()
+      scheduleWatchedRefresh()
     }
   }
 }
