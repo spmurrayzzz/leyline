@@ -369,18 +369,62 @@
   scrollbar-width: thin;
 }
 
+.session-time-heading {
+  position: relative;
+  height: 26px;
+  padding: 9px 7px 4px;
+  color: #686868;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 13px;
+}
+
+.session-time-heading.has-separator::before {
+  position: absolute;
+  top: 3px;
+  right: 7px;
+  left: 7px;
+  height: 1px;
+  background: #242424;
+  content: '';
+}
+
 .session.project-session-row {
-  min-height: 52px;
-  padding: 8px 6px;
+  height: 36px;
+  min-height: 36px;
+  border: 0;
+  border-radius: 3px;
+  margin: 0;
+  padding: 0;
+  color: #aeaeae;
+  cursor: default;
 }
 
 .session.project-session-row.active {
-  border-color: var(--accent-border);
-  background: var(--accent-soft);
+  background: #303030;
+  color: #f0f0f0;
+}
+
+.session.project-session-row:has(.session-link:focus-visible) {
+  box-shadow: inset 0 0 0 2px #b8b8b8;
+  color: var(--text);
+}
+
+.session.project-session-row:not(.active):hover {
+  background: transparent;
+  color: var(--text);
 }
 
 .project-session-skeleton .session-skeleton-row {
-  padding: 10px 7px 8px;
+  display: flex;
+  align-items: center;
+  height: 36px;
+  min-height: 36px;
+  padding: 0 7px;
+}
+
+.project-session-skeleton .skeleton-line.short {
+  display: none;
 }
 
 .project-session-scroll > .sidebar-note {
@@ -1186,80 +1230,94 @@ kbd {
     opacity var(--motion-base) var(--ease-decelerate);
 }
 
+.session-link {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: inherit;
+  outline: 0;
+  background: transparent;
+  padding: 0 7px;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
 .session-title {
   display: block;
   overflow: hidden;
   min-width: 0;
-  line-height: 1.35;
+  color: inherit;
+  font-size: 12.5px;
+  font-weight: 450;
+  line-height: 1.2;
+  letter-spacing: -0.005em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.session-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  min-width: 0;
-  margin-top: 4px;
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.2;
-}
-
-.session-meta-details {
-  display: flex;
-  overflow: hidden;
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
-  max-width: calc(100% - 48px);
-  white-space: nowrap;
-}
-
-.session-meta-separator {
-  color: #555;
+.session.active .session-title {
+  font-weight: 620;
 }
 
 .session.is-renaming {
   display: flex;
   align-items: center;
-  padding: 7px 9px;
+  height: 36px;
+  min-height: 36px;
+  padding: 4px;
   cursor: default;
 }
 
 .session-title-input {
   min-width: 0;
   width: 100%;
+  height: 28px;
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: 5px;
   outline: none;
   background: #15161d;
   padding: 4px 6px;
   color: var(--text);
   font: inherit;
+  font-size: 12.5px;
 }
 
 .session-title-input:focus {
-  border-color: #4a415f;
+  border-color: #777;
 }
 
 .session-status {
   display: inline-flex;
   overflow: hidden;
   align-items: center;
+  gap: 5px;
   min-width: 0;
   margin-left: auto;
   color: var(--muted);
-  font-size: 11px;
-  font-weight: 700;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
-  transition: opacity var(--motion-fast) var(--ease-decelerate);
+}
+
+.session-status::before {
+  width: 5px;
+  height: 5px;
+  flex: none;
+  border-radius: 50%;
+  background: currentColor;
+  content: '';
 }
 
 .status-running {
-  color: #8ea7ff;
+  color: #a89cff;
 }
 
 .status-compacting {
@@ -1271,16 +1329,25 @@ kbd {
 }
 
 .status-error {
-  color: #fb7185;
+  color: #f39a9a;
 }
 
 .status-queued {
   color: #9aa0ad;
 }
 
-.session time {
+.session .session-time {
+  min-width: 34px;
   flex: none;
-  color: inherit;
+  color: #707070;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  text-align: right;
+}
+
+.session.active .session-time {
+  color: #a0a0a0;
 }
 
 .session-list-toggle {
@@ -1309,30 +1376,30 @@ kbd {
 .session-actions {
   display: flex;
   position: absolute;
-  right: 7px;
-  bottom: 5px;
-  gap: 2px;
+  top: 6px;
+  right: 4px;
+  align-items: center;
+  gap: 1px;
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
-  transform: translateY(1px);
-  transition:
-    opacity var(--motion-base) var(--ease-decelerate),
-    transform var(--motion-base) var(--ease-decelerate);
+  transition: opacity var(--motion-fast) var(--ease-decelerate);
 }
 
 .session-rename-button,
 .session-delete-button {
   display: grid;
   place-items: center;
-  width: 18px;
-  height: 18px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border: 0;
-  border-radius: 6px;
+  border-radius: 5px;
+  outline: 0;
   background: transparent;
-  color: var(--muted);
+  color: #919191;
   line-height: 1;
-  transition: color var(--motion-base) var(--ease-decelerate);
+  transition: color var(--motion-fast) var(--ease-decelerate);
 }
 
 .session-rename-button svg,
@@ -1353,32 +1420,44 @@ kbd {
 }
 
 .session:hover .session-actions,
-.session:focus-visible .session-actions,
 .session:has(:focus-visible) .session-actions {
   opacity: 1;
+  visibility: visible;
   pointer-events: auto;
-  transform: translateY(0);
+}
+
+.session:hover .session-link,
+.session:has(:focus-visible) .session-link {
+  padding-right: 57px;
 }
 
 .session:hover .session-status,
-.session:focus-visible .session-status,
-.session:has(:focus-visible) .session-status {
-  opacity: 0;
+.session:hover .session-time,
+.session:has(:focus-visible) .session-status,
+.session:has(:focus-visible) .session-time {
+  display: none;
 }
 
-.session-rename-button:hover {
+.session-rename-button:hover,
+.session-rename-button:focus-visible {
   background: transparent;
   color: var(--text);
 }
 
-.session-delete-button:hover {
+.session-delete-button:hover,
+.session-delete-button:focus-visible {
   background: transparent;
   color: #fca5a5;
 }
 
+.session-rename-button:focus-visible,
+.session-delete-button:focus-visible {
+  box-shadow: inset 0 0 0 2px #b8b8b8;
+}
+
 .session-rename-button:disabled,
 .session-delete-button:disabled {
-  opacity: 0.7;
+  opacity: 0.45;
 }
 
 .sidebar-note {
@@ -1488,13 +1567,12 @@ kbd {
 }
 
 .session.active {
-  background: rgb(255 255 255 / 7%);
-  color: var(--text);
-  font-weight: 500;
+  background: #303030;
+  color: #f0f0f0;
 }
 
 .session:not(.active):hover {
-  background: rgb(255 255 255 / 5%);
+  background: transparent;
   color: var(--text);
   transition-duration: var(--motion-quick);
   transition-timing-function: var(--ease-accelerate);

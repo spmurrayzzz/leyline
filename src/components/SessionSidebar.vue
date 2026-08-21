@@ -130,8 +130,33 @@ const sessionScroll = ref(null)
 const sessionScrollTop = ref(0)
 const sessionViewportHeight = ref(520)
 const lastSessionByProject = new Map()
-const SESSION_ROW_HEIGHT = 52
-const SESSION_OVERSCAN = 4
+const SESSION_ROW_HEIGHT = 36
+const SESSION_GROUP_HEIGHT = 26
+const SESSION_OVERSCAN_PX = SESSION_ROW_HEIGHT * 4
+const DAY_MS = 24 * 60 * 60 * 1000
+const sessionClockFormat = new Intl.DateTimeFormat(undefined, {
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+})
+const sessionWeekdayFormat = new Intl.DateTimeFormat(undefined, {
+  weekday: 'short',
+})
+const sessionDayFormat = new Intl.DateTimeFormat(undefined, {
+  day: 'numeric',
+  month: 'short',
+})
+const sessionMonthFormat = new Intl.DateTimeFormat(undefined, {
+  month: 'long',
+})
+const sessionMonthYearFormat = new Intl.DateTimeFormat(undefined, {
+  month: 'long',
+  year: 'numeric',
+})
+const sessionFullFormat = new Intl.DateTimeFormat(undefined, {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+})
 let navigatorOpener = null
 let sessionResizeObserver
 
@@ -240,21 +265,66 @@ const matchingProjectSessions = computed(() => {
     .map((item) => item.session)
 })
 
+const sessionListItems = computed(() => {
+  const items = []
+  const grouped = !sessionQuery.value.trim()
+  const now = new Date()
+  let previousGroup = ''
+
+  matchingProjectSessions.value.forEach((session, sessionIndex) => {
+    if (grouped) {
+      const group = sessionTimeGroup(session, now)
+      if (group.key !== previousGroup) {
+        items.push({
+          key: `group:${group.key}:${sessionIndex}`,
+          type: 'group',
+          label: group.label,
+          separator: sessionIndex > 0,
+          height: SESSION_GROUP_HEIGHT,
+        })
+        previousGroup = group.key
+      }
+    }
+    items.push({
+      key: `session:${session.path || session.id}`,
+      type: 'session',
+      session,
+      sessionIndex,
+      height: SESSION_ROW_HEIGHT,
+    })
+  })
+
+  let top = 0
+  return items.map((item) => {
+    const positioned = { ...item, top }
+    top += item.height
+    return positioned
+  })
+})
+
 const virtualSessionWindow = computed(() => {
-  const total = matchingProjectSessions.value.length
-  const visible = Math.ceil(
-    sessionViewportHeight.value / SESSION_ROW_HEIGHT,
-  ) + SESSION_OVERSCAN * 2
-  const start = Math.max(
+  const items = sessionListItems.value
+  const totalHeight = items.length
+    ? items.at(-1).top + items.at(-1).height
+    : 0
+  const overscanTop = Math.max(
     0,
-    Math.floor(sessionScrollTop.value / SESSION_ROW_HEIGHT) - SESSION_OVERSCAN,
+    sessionScrollTop.value - SESSION_OVERSCAN_PX,
   )
-  const end = Math.min(total, start + visible)
+  const overscanBottom = sessionScrollTop.value
+    + sessionViewportHeight.value
+    + SESSION_OVERSCAN_PX
+  const start = sessionItemIndexAt(items, overscanTop)
+  let end = start
+  while (end < items.length && items[end].top < overscanBottom) end += 1
+  const top = items[start]?.top ?? totalHeight
+  const renderedBottom = end > start
+    ? items[end - 1].top + items[end - 1].height
+    : top
   return {
-    sessions: matchingProjectSessions.value.slice(start, end),
-    start,
-    top: start * SESSION_ROW_HEIGHT,
-    bottom: (total - end) * SESSION_ROW_HEIGHT,
+    items: items.slice(start, end),
+    top,
+    bottom: Math.max(0, totalHeight - renderedBottom),
   }
 })
 
@@ -464,8 +534,12 @@ function scrollSelectedSessionIntoView() {
 function scrollSessionIntoView(index) {
   const element = sessionScroll.value
   if (!element || index < 0) return
-  const top = index * SESSION_ROW_HEIGHT
-  const bottom = top + SESSION_ROW_HEIGHT
+  const item = sessionListItems.value.find((candidate) => {
+    return candidate.type === 'session' && candidate.sessionIndex === index
+  })
+  if (!item) return
+  const top = item.top
+  const bottom = top + item.height
   if (top < element.scrollTop) element.scrollTop = top
   else if (bottom > element.scrollTop + element.clientHeight) {
     element.scrollTop = bottom - element.clientHeight
@@ -564,10 +638,67 @@ function beginRename(session) {
   emit('begin-rename-session', session, 'sidebar')
 }
 
-function sessionMessageLabel(session) {
-  const count = Number(session?.messageCount)
-  if (!Number.isFinite(count)) return ''
-  return `${count} ${count === 1 ? 'message' : 'messages'}`
+function sessionDate(session) {
+  const value = session?.modified || session?.timestamp
+  if (!value) return null
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function calendarDay(date) {
+  return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / DAY_MS
+}
+
+function daysBefore(date, now = new Date()) {
+  return Math.floor(calendarDay(now) - calendarDay(date))
+}
+
+function sessionTimeGroup(session, now) {
+  const date = sessionDate(session)
+  if (!date) return { key: 'earlier', label: 'Earlier' }
+  const days = daysBefore(date, now)
+  if (days <= 0) return { key: 'today', label: 'Today' }
+  if (days === 1) return { key: 'yesterday', label: 'Yesterday' }
+  if (days < 7) return { key: 'week', label: 'Past 7 days' }
+  const year = date.getFullYear()
+  const month = date.getMonth()
+  const currentYear = year === now.getFullYear()
+  return {
+    key: `month:${year}-${month}`,
+    label: currentYear
+      ? sessionMonthFormat.format(date)
+      : sessionMonthYearFormat.format(date),
+  }
+}
+
+function sessionListTime(session) {
+  const date = sessionDate(session)
+  if (!date) return 'new'
+  const days = daysBefore(date)
+  if (days <= 1) return sessionClockFormat.format(date)
+  if (days < 7) return sessionWeekdayFormat.format(date)
+  return sessionDayFormat.format(date)
+}
+
+function sessionDateTime(session) {
+  return sessionDate(session)?.toISOString() || ''
+}
+
+function sessionFullTime(session) {
+  const date = sessionDate(session)
+  return date ? sessionFullFormat.format(date) : 'New session'
+}
+
+function sessionItemIndexAt(items, offset) {
+  let low = 0
+  let high = items.length
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2)
+    const item = items[middle]
+    if (item.top + item.height <= offset) low = middle + 1
+    else high = middle
+  }
+  return low
 }
 
 function projectResultMeta(project) {
@@ -783,105 +914,121 @@ const vFocusSelect = {
               :style="{ height: `${virtualSessionWindow.top}px` }"
               aria-hidden="true"
             ></div>
-            <div
-              v-for="(session, index) in virtualSessionWindow.sessions"
-              :key="session.path || session.id"
-              class="session project-session-row"
-              :class="{
-                active: session.id === selectedSessionId,
-                'is-renaming': isRenaming(session),
-              }"
-              role="button"
-              :aria-posinset="virtualSessionWindow.start + index + 1"
-              :aria-setsize="matchingProjectSessions.length"
-              :tabindex="isRenaming(session) ? -1 : 0"
-              @click="!isRenaming(session) && emit('select-session', session)"
-              @keydown.enter="!isRenaming(session)
-                && emit('select-session', session)"
-              @keydown.space.prevent="!isRenaming(session)
-                && emit('select-session', session)"
-              @keydown.down.prevent="focusSession(
-                virtualSessionWindow.start + index + 1,
-              )"
-              @keydown.up.prevent="focusSession(
-                virtualSessionWindow.start + index - 1,
-              )"
+            <template
+              v-for="item in virtualSessionWindow.items"
+              :key="item.key"
             >
-              <input
-              v-if="isRenaming(session)"
-              v-focus-select
-              class="session-title-input"
-              :value="renameDraft"
-              aria-label="Session name"
-              @click.stop
-              @input="emit('update:renameDraft', $event.target.value)"
-              @keydown.space.stop
-              @keydown.enter.stop.prevent="emit(
-                'commit-rename-session',
-                session,
-              )"
-              @keydown.esc.stop.prevent="emit('cancel-rename-session')"
-              @blur="isRenaming(session)
-                && emit('commit-rename-session', session)"
-            />
-            <template v-else>
-              <span
-                class="session-title"
-                @dblclick.stop="beginRename(session)"
-              >{{ sessionTitle(session) }}</span>
-              <div class="session-meta">
-                <span class="session-meta-details">
-                  <template v-if="sessionMessageLabel(session)">
-                    <span>{{ sessionMessageLabel(session) }}</span>
-                    <span class="session-meta-separator" aria-hidden="true">
-                      ·
-                    </span>
-                  </template>
-                  <time>{{ sessionTime(session) || 'new' }}</time>
-                </span>
-                <span
-                  v-if="statusFor(session).label"
-                  class="session-status"
-                  :class="`status-${statusFor(session).tone}`"
-                >
-                  {{ statusFor(session).label }}
-                </span>
+              <div
+                v-if="item.type === 'group'"
+                class="session-time-heading"
+                :class="{ 'has-separator': item.separator }"
+                role="heading"
+                aria-level="3"
+              >
+                {{ item.label }}
               </div>
-              <div class="session-actions">
-                <button
-                  class="session-rename-button"
-                  type="button"
-                  title="Rename session"
-                  aria-label="Rename session"
-                  :disabled="renamingSessionSavingId === session.id"
-                  @click.stop="beginRename(session)"
-                >
-                  <span v-if="renamingSessionSavingId === session.id">…</span>
-                  <svg v-else viewBox="0 0 16 16" aria-hidden="true">
-                    <path d="M10.8 2.8l2.4 2.4"></path>
-                    <path d="M4 12l2.1-.4 6.2-6.2-1.7-1.7-6.2 6.2z"></path>
-                  </svg>
-                </button>
-                <button
-                  class="session-delete-button"
-                  type="button"
-                  title="Delete session"
-                  aria-label="Delete session"
-                  :disabled="deletingSessionId === session.id"
-                  @click.stop="emit('request-delete-session', session)"
-                >
-                  <span v-if="deletingSessionId === session.id">…</span>
-                  <svg v-else viewBox="0 0 16 16" aria-hidden="true">
-                    <path d="M3.5 4.5h9"></path>
-                    <path d="M6.5 4.5v-2h3v2"></path>
-                    <path d="M5 6.5l.5 6h5l.5-6"></path>
-                    <path d="M7 7.5v4"></path>
-                    <path d="M9 7.5v4"></path>
-                  </svg>
-                </button>
+              <div
+                v-else
+                class="session project-session-row"
+                :class="{
+                  active: item.session.id === selectedSessionId,
+                  'is-renaming': isRenaming(item.session),
+                }"
+              >
+                <input
+                  v-if="isRenaming(item.session)"
+                  v-focus-select
+                  class="session-title-input"
+                  :value="renameDraft"
+                  aria-label="Session name"
+                  @click.stop
+                  @input="emit('update:renameDraft', $event.target.value)"
+                  @keydown.space.stop
+                  @keydown.enter.stop.prevent="emit(
+                    'commit-rename-session',
+                    item.session,
+                  )"
+                  @keydown.esc.stop.prevent="emit('cancel-rename-session')"
+                  @blur="isRenaming(item.session)
+                    && emit('commit-rename-session', item.session)"
+                />
+                <template v-else>
+                  <button
+                    class="session-link"
+                    type="button"
+                    :aria-current="item.session.id === selectedSessionId
+                      ? 'page'
+                      : undefined"
+                    :aria-posinset="item.sessionIndex + 1"
+                    :aria-setsize="matchingProjectSessions.length"
+                    @click="emit('select-session', item.session)"
+                    @keydown.down.prevent="focusSession(
+                      item.sessionIndex + 1,
+                    )"
+                    @keydown.up.prevent="focusSession(
+                      item.sessionIndex - 1,
+                    )"
+                  >
+                    <span
+                      class="session-title"
+                      :title="sessionTitle(item.session)"
+                      @dblclick.stop="beginRename(item.session)"
+                    >{{ sessionTitle(item.session) }}</span>
+                    <span
+                      v-if="statusFor(item.session).label"
+                      class="session-status"
+                      :class="`status-${statusFor(item.session).tone}`"
+                    >
+                      {{ statusFor(item.session).label }}
+                    </span>
+                    <time
+                      v-else
+                      class="session-time"
+                      :datetime="sessionDateTime(item.session)"
+                      :title="sessionFullTime(item.session)"
+                    >{{ sessionListTime(item.session) }}</time>
+                  </button>
+                  <div class="session-actions">
+                    <button
+                      class="session-rename-button"
+                      type="button"
+                      title="Rename session"
+                      aria-label="Rename session"
+                      :disabled="renamingSessionSavingId === item.session.id"
+                      @click.stop="beginRename(item.session)"
+                    >
+                      <span
+                        v-if="renamingSessionSavingId === item.session.id"
+                      >…</span>
+                      <svg v-else viewBox="0 0 16 16" aria-hidden="true">
+                        <path d="M10.8 2.8l2.4 2.4"></path>
+                        <path d="M4 12l2.1-.4 6.2-6.2-1.7-1.7-6.2 6.2z"></path>
+                      </svg>
+                    </button>
+                    <button
+                      class="session-delete-button"
+                      type="button"
+                      title="Delete session"
+                      aria-label="Delete session"
+                      :disabled="deletingSessionId === item.session.id"
+                      @click.stop="emit(
+                        'request-delete-session',
+                        item.session,
+                      )"
+                    >
+                      <span v-if="deletingSessionId === item.session.id">…</span>
+                      <svg v-else viewBox="0 0 16 16" aria-hidden="true">
+                        <path d="M3.5 4.5h9"></path>
+                        <path d="M6.5 4.5v-2h3v2"></path>
+                        <path d="M5 6.5l.5 6h5l.5-6"></path>
+                        <path d="M7 7.5v4"></path>
+                        <path d="M9 7.5v4"></path>
+                      </svg>
+                    </button>
+                  </div>
+                </template>
               </div>
             </template>
-            </div>
             <div
               v-if="virtualSessionWindow.bottom"
               class="project-session-virtual-spacer"
