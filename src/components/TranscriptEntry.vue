@@ -1,6 +1,11 @@
+<script>
+import { defineAsyncComponent } from 'vue'
+
+const PierrePreview = defineAsyncComponent(() => import('./PierrePreview.vue'))
+</script>
+
 <script setup>
-import { ref } from 'vue'
-import PierrePreview from './PierrePreview.vue'
+import { ref, watch } from 'vue'
 import {
   entryClass,
   imageBlocksFor,
@@ -44,6 +49,11 @@ const emit = defineEmits([
 const feedbackDraft = ref('')
 const noteOpen = ref(false)
 const thinkingExpanded = ref(props.thinkingInitiallyExpanded)
+const toolContentMounted = ref(props.toolExpanded)
+
+watch(() => props.toolExpanded, (expanded) => {
+  if (expanded) toolContentMounted.value = true
+})
 const helpfulThumbPaths = [
   'M7 10v11',
   'M15 5.2 14 10h5.2a2 2 0 0 1 2 2.4l-1.4 6.8'
@@ -234,7 +244,11 @@ function openMarkdownImage(event) {
 
     <div class="tool-expand-wrapper" :class="{ 'is-expanded': toolExpanded }">
       <div class="tool-expand-inner">
-        <div class="tool-expanded-body subagent-expanded" @click.stop>
+        <div
+          v-if="toolContentMounted"
+          class="tool-expanded-body subagent-expanded"
+          @click.stop
+        >
           <div
             v-if="entry.isError && entry.text"
             class="tool-error-summary"
@@ -330,7 +344,11 @@ function openMarkdownImage(event) {
     </div>
     <div class="tool-expand-wrapper" :class="{ 'is-expanded': toolExpanded }">
       <div class="tool-expand-inner">
-        <div class="tool-expanded-body" @click.stop>
+        <div
+          v-if="toolContentMounted"
+          class="tool-expanded-body"
+          @click.stop
+        >
           <div v-if="toolCommandCode(entry)" class="tool-command-block">
             <strong>Command</strong>
             <pre>{{ entry.code }}</pre>

@@ -3112,7 +3112,7 @@ function closePickerMenus() {
         >
           <TranscriptEntry
             v-for="entry in entries"
-            :key="entry.id"
+            :key="`${selectedSession.id}:${entry.id}`"
             :class="{ 'message-enter': isEnteringEntry(entry) }"
             :copied-entry-id="copiedEntryId"
             :entry="entry"
