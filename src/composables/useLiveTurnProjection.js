@@ -114,7 +114,6 @@ export function useLiveTurnProjection({ onIntent } = {}) {
 
   function beginUserTurn(text, images = []) {
     activeLiveAssistantId = ''
-    clearLiveToolSettleTimers()
     const entry = pendingUserEntry(text, images)
     optimisticEntries.value = [...optimisticEntries.value, entry]
     liveUserMessages.value = [
@@ -266,7 +265,9 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     }
 
     if (type === 'tool_execution_end') {
-      upsertLiveTool(event, event.error || event.isError ? 'error' : 'reading')
+      const failed = Boolean(event.error || event.isError)
+      const tool = upsertLiveTool(event, failed ? 'error' : 'reading')
+      if (!failed) scheduleLiveToolSettle(tool.id)
       return
     }
 
@@ -296,10 +297,11 @@ export function useLiveTurnProjection({ onIntent } = {}) {
       liveTools.value = liveTools.value.map((tool) => {
         return tool.id === existing.id ? { ...tool, ...next } : tool
       })
-      return
+      return next
     }
 
     liveTools.value = [...liveTools.value, next]
+    return next
   }
 
   function findLiveTool(event, key) {
@@ -341,7 +343,10 @@ export function useLiveTurnProjection({ onIntent } = {}) {
 
   function finishLiveTools(status) {
     liveTools.value = liveTools.value.map((tool) => {
-      if (tool.persistedEntry) return tool
+      if (tool.persistedEntry
+        || ['reading', 'completed', 'error', 'aborted'].includes(tool.status)) {
+        return tool
+      }
       return { ...tool, status }
     })
   }
@@ -382,9 +387,12 @@ export function useLiveTurnProjection({ onIntent } = {}) {
 
   function settleLiveTool(id) {
     liveTools.value = liveTools.value.map((tool) => {
-      if (tool.id !== id || !tool.persistedEntry) return tool
-      return settledLiveTool(tool, tool.persistedEntry)
+      if (tool.id !== id) return tool
+      if (tool.persistedEntry) return settledLiveTool(tool, tool.persistedEntry)
+      if (tool.status === 'reading') return { ...tool, status: 'completed' }
+      return tool
     })
+    releaseLiveAnchorIfSettled()
   }
 
   function settledLiveTool(tool, entry) {
