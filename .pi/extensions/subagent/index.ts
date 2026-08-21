@@ -4,12 +4,14 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
+import { Agent, fetch } from "undici";
 import { readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
 
 const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
 const THINKING_SETTINGS = ["inherit", ...THINKING_LEVELS] as const;
+const LEYLINE_API_DISPATCHER = new Agent({ headersTimeout: 0, bodyTimeout: 0 });
 type ThinkingLevel = typeof THINKING_LEVELS[number];
 
 interface AgentDef {
@@ -144,6 +146,7 @@ async function callLeylineApi(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
     signal,
+    dispatcher: LEYLINE_API_DISPATCHER,
   });
 
   const data = await response.json();
@@ -194,6 +197,13 @@ async function runSubagentViaApi(params: {
     tools: params.tools.length > 0 ? params.tools : undefined,
     systemPrompt: params.systemPrompt || undefined,
   }, params.signal) as Promise<any>;
+}
+
+function errorText(error: any): string {
+  const cause = error?.cause;
+  const message = cause?.message || error?.message || String(error);
+  const code = cause?.code || error?.code;
+  return code && !message.includes(code) ? `${message} (${code})` : message;
 }
 
 function getParentSessionPath(ctx: ExtensionContext): string | null {
@@ -567,7 +577,7 @@ async function executeSingle(
       exitCode: 1,
       messages: [],
       usage: emptyUsage,
-      error: error.message || String(error),
+      error: errorText(error),
     };
   }
 }

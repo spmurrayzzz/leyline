@@ -3,8 +3,11 @@ import type {
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import { Agent, fetch } from "undici";
 import { readFileSync, statSync } from "node:fs";
 import { extname, isAbsolute, resolve } from "node:path";
+
+const LEYLINE_API_DISPATCHER = new Agent({ headersTimeout: 0, bodyTimeout: 0 });
 
 const IMAGE_MIME_TYPES: Record<string, string> = {
   ".png": "image/png",
@@ -42,6 +45,7 @@ async function callLeylineApi(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
     signal,
+    dispatcher: LEYLINE_API_DISPATCHER,
   });
 
   const data = await response.json();
@@ -49,6 +53,13 @@ async function callLeylineApi(
     throw new Error(data.error || `API error: ${response.status}`);
   }
   return data;
+}
+
+function errorText(error: any): string {
+  const cause = error?.cause;
+  const message = cause?.message || error?.message || String(error);
+  const code = cause?.code || error?.code;
+  return code && !message.includes(code) ? `${message} (${code})` : message;
 }
 
 function getParentSessionPath(ctx: ExtensionContext): string | null {
@@ -230,9 +241,10 @@ export default function visionAgentExtension(pi: ExtensionAPI) {
         };
       } catch (error: any) {
         if (signal?.aborted) throw error;
+        const message = errorText(error);
         return {
-          content: [{ type: "text", text: `vision_agent failed: ${error.message || String(error)}` }],
-          details: { childSession: null, messages: [], usage: emptyUsage(), error: error.message || String(error) },
+          content: [{ type: "text", text: `vision_agent failed: ${message}` }],
+          details: { childSession: null, messages: [], usage: emptyUsage(), error: message },
           isError: true,
         };
       }
