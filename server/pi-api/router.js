@@ -1,4 +1,5 @@
 import { setCorsHeaders } from './cors.js'
+import { compactSessionDetailDto } from './dtos.js'
 
 export function createPiApiHandler(api) {
   const {
@@ -686,7 +687,7 @@ async function piApiHandler(req, res) {
 
         const detail = await sessionDetail('', path)
         if (!detail) return json(res, { error: 'Session not found' }, 404)
-        return json(res, detail)
+        return json(res, sessionDetailResponse(detail, url))
       }
 
       const match = url.pathname.match(/^\/sessions\/([^/]+)$/)
@@ -709,7 +710,7 @@ async function piApiHandler(req, res) {
   
         const detail = await sessionDetail(id, url.searchParams.get('path'))
         if (!detail) return json(res, { error: 'Session not found' }, 404)
-        return json(res, detail)
+        return json(res, sessionDetailResponse(detail, url))
       }
   
       return json(res, { error: 'Not found' }, 404)
@@ -719,6 +720,12 @@ async function piApiHandler(req, res) {
   }
 
   return piApiHandler
+}
+
+function sessionDetailResponse(detail, url) {
+  return url.searchParams.get('compact') === '1'
+    ? compactSessionDetailDto(detail)
+    : detail
 }
 
 function responseAbortSignal(res) {

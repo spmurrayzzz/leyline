@@ -212,6 +212,21 @@ function toSessionDetailFromManager(manager, session, contextUsage) {
   }
 }
 
+export function compactSessionDetailDto(detail) {
+  return {
+    ...detail,
+    entries: detail.entries.map((entry) => {
+      if (entry.type !== 'tool') return entry
+      const compact = { ...entry }
+      delete compact.copyText
+      if (compact.preview?.fallbackText && !compact.isError) {
+        delete compact.text
+      }
+      return compact
+    }),
+  }
+}
+
 export function sessionInfo(handle) {
   const manager = handle.runtime.session.sessionManager
   const header = manager.getHeader()

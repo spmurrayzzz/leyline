@@ -20,16 +20,18 @@ export function createPiSession(cwd) {
 export function fetchSessionDetail(session) {
   const id = typeof session === 'string' ? session : session.id
   const path = typeof session === 'string' ? '' : session.path
-  const query = path ? `?path=${encodeURIComponent(path)}` : ''
+  const params = new URLSearchParams({ compact: '1' })
+  if (path) params.set('path', path)
   return apiRequest(
-    `/api/pi/sessions/${encodeURIComponent(id)}${query}`,
+    `/api/pi/sessions/${encodeURIComponent(id)}?${params}`,
     'Failed to load session',
   )
 }
 
 export function fetchSessionDetailByPath(path) {
+  const params = new URLSearchParams({ compact: '1', path })
   return apiRequest(
-    `/api/pi/sessions/by-path?path=${encodeURIComponent(path)}`,
+    `/api/pi/sessions/by-path?${params}`,
     'Failed to load session',
   )
 }
