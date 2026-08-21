@@ -8,14 +8,19 @@ export function useToolExpansion({ liveAssistantBlocks }) {
   const fullscreenTool = ref(null)
   let copiedTimer
 
+  function toolExpansionId(entry) {
+    return entry.toolCallId || entry.id
+  }
+
   function isToolExpanded(entry) {
-    return expandedTools.value.has(entry.id)
+    return expandedTools.value.has(toolExpansionId(entry))
   }
 
   function toggleTool(entry) {
+    const id = toolExpansionId(entry)
     const next = new Set(expandedTools.value)
-    if (next.has(entry.id)) next.delete(entry.id)
-    else next.add(entry.id)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
     expandedTools.value = next
   }
 

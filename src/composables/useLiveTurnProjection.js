@@ -2,6 +2,7 @@ import { computed, ref } from 'vue'
 import {
   imageBlocksFor,
   messageBlocks,
+  projectEntry,
   skillSummaries,
   textFromBlocks,
   toolAnnotation,
@@ -271,6 +272,11 @@ export function useLiveTurnProjection({ onIntent } = {}) {
       return
     }
 
+    if (type === 'message_end' && event.message?.role === 'toolResult') {
+      finalizeLiveToolResult(event.message)
+      return
+    }
+
     if (type === 'agent_end') finishLiveTools('completed')
     if (type === 'error') finishLiveTools('error')
     if (type === 'aborted') finishLiveTools('aborted')
@@ -289,8 +295,12 @@ export function useLiveTurnProjection({ onIntent } = {}) {
       toolName: event.toolName || 'tool',
       label: liveToolLabel(event, existing),
       code: liveToolCode(event) || existing?.code || '',
+      args: event.args || event.input || existing?.args || {},
       status,
       startedAt: existing?.startedAt || now,
+    }
+    if (event.result !== undefined || event.error) {
+      next.resultEntry = liveToolResultEntry(next, event, now)
     }
 
     if (existing) {
@@ -341,6 +351,70 @@ export function useLiveTurnProjection({ onIntent } = {}) {
       || (Array.isArray(args.ids) ? args.ids.join(', ') : '')
   }
 
+  function liveToolResultEntry(tool, event, timestamp) {
+    const result = event.result
+    const errorText = typeof event.error === 'string'
+      ? event.error
+      : event.error?.message || ''
+    const content = result?.content
+      ?? (typeof result === 'string' || Array.isArray(result)
+        ? result
+        : errorText)
+    return projectLiveToolEntry(tool, {
+      role: 'toolResult',
+      toolCallId: tool.toolCallId,
+      toolName: tool.toolName,
+      content,
+      details: result?.details,
+      isError: tool.status === 'error',
+    }, timestamp)
+  }
+
+  function finalizeLiveToolResult(message) {
+    const tool = liveTools.value.find((item) => {
+      return item.toolCallId === message.toolCallId
+    })
+    if (!tool) return
+
+    let status = tool.status
+    if (message.isError === true) status = 'error'
+    if (message.isError === false && status === 'error') {
+      status = liveToolFloorElapsed(tool) ? 'completed' : 'reading'
+    }
+
+    const next = {
+      ...tool,
+      status,
+      resultEntry: projectLiveToolEntry(
+        tool,
+        message,
+        message.timestamp || Date.now(),
+      ) || tool.resultEntry,
+    }
+    delete next.args
+    liveTools.value = liveTools.value.map((item) => {
+      return item.id === tool.id ? next : item
+    })
+    if (status === 'reading') scheduleLiveToolSettle(tool.id)
+  }
+
+  function projectLiveToolEntry(tool, message, timestamp) {
+    const toolCallId = message.toolCallId || tool.toolCallId || tool.id
+    const entry = projectEntry({
+      type: 'message',
+      id: tool.id,
+      timestamp: typeof timestamp === 'string'
+        ? timestamp
+        : new Date(timestamp).toISOString(),
+      message: {
+        ...message,
+        toolCallId,
+        toolName: message.toolName || tool.toolName,
+      },
+    }, new Map([[toolCallId, { arguments: tool.args }]]))
+    return entry ? { ...entry, persisted: false } : null
+  }
+
   function finishLiveTools(status) {
     liveTools.value = liveTools.value.map((tool) => {
       if (tool.persistedEntry
@@ -361,7 +435,7 @@ export function useLiveTurnProjection({ onIntent } = {}) {
       if (!entry) return tool
       if (!liveToolFloorElapsed(tool)) {
         scheduleLiveToolSettle(tool.id)
-        return { ...tool, persistedEntry: entry }
+        return attachPersistedLiveTool(tool, entry)
       }
       return settledLiveTool(tool, entry)
     })
@@ -395,13 +469,19 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     releaseLiveAnchorIfSettled()
   }
 
+  function attachPersistedLiveTool(tool, entry) {
+    const next = { ...tool, persistedEntry: entry }
+    delete next.args
+    delete next.resultEntry
+    return next
+  }
+
   function settledLiveTool(tool, entry) {
     return {
-      ...tool,
+      ...attachPersistedLiveTool(tool, entry),
       label: entry.label || tool.label,
       code: entry.code || tool.code,
       status: entry.isError ? 'error' : 'completed',
-      persistedEntry: entry,
     }
   }
 

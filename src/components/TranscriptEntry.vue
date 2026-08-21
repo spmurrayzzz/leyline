@@ -314,6 +314,7 @@ function openMarkdownImage(event) {
         ⛶
       </button>
       <button
+        v-if="!isLocalEntry(entry)"
         class="copy-button"
         type="button"
         title="Fork from here"
@@ -322,6 +323,7 @@ function openMarkdownImage(event) {
         ⎇
       </button>
       <button
+        v-if="!isLocalEntry(entry)"
         class="copy-button reset-button"
         type="button"
         title="Reset to here"

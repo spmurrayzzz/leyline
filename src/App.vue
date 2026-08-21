@@ -3163,10 +3163,12 @@ function closePickerMenus() {
             />
 
             <TranscriptEntry
-              v-else-if="item.type === 'tool' && item.persistedEntry"
+              v-else-if="item.type === 'tool'
+                && (item.persistedEntry
+                  || (item.resultEntry && item.status !== 'reading'))"
               :copied-entry-id="copiedEntryId"
-              :entry="item.persistedEntry"
-              :tool-expanded="isToolExpanded(item.persistedEntry)"
+              :entry="item.persistedEntry || item.resultEntry"
+              :tool-expanded="isToolExpanded(item.persistedEntry || item.resultEntry)"
               @copy="copyEntry"
               @fork="forkSession"
               @mark-feedback="markEntryFeedback"
