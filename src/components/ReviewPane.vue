@@ -52,6 +52,7 @@ let diffRenderGeneration = 0
 let pendingPreviewKeys = new Set()
 let resizeCleanup
 let reviewEventSource
+let reviewEventLoadTimer
 let watchedRefreshQueued = false
 let watchedRefreshTimer
 
@@ -97,8 +98,7 @@ const panelSubtitle = computed(() => {
 onMounted(() => {
   emit('resize', constrainWidth(props.width))
   window.addEventListener('resize', constrainCurrentWidth)
-  openReviewEventStream()
-  void loadReview()
+  if (!openReviewEventStream(true)) void loadReview()
 })
 
 onBeforeUnmount(() => {
@@ -110,17 +110,33 @@ onBeforeUnmount(() => {
 })
 
 watch(() => props.cwd, () => {
+  reviewGeneration++
+  diffGeneration++
+  diffRenderGeneration++
+  pendingPreviewKeys = new Set()
   selectedPath.value = ''
   diff.value = { diffs: [], path: '' }
+  loading.value = true
+  refreshing.value = false
+  diffLoading.value = false
+  diffRendering.value = false
+  error.value = ''
+  diffError.value = ''
   hasLoaded.value = false
   closeReviewEventStream()
-  openReviewEventStream()
-  void loadReview()
+  if (!openReviewEventStream(true)) void loadReview()
 })
 
 watch(() => props.watchEnabled, (enabled) => {
-  if (enabled) openReviewEventStream()
-  else closeReviewEventStream()
+  const initialLoadNeeded = !hasLoaded.value && !refreshing.value
+  if (enabled) {
+    if (!openReviewEventStream(initialLoadNeeded) && initialLoadNeeded) {
+      void loadReview()
+    }
+  } else {
+    closeReviewEventStream()
+    if (initialLoadNeeded) void loadReview()
+  }
 })
 
 watch(() => props.refreshToken, () => {
@@ -129,25 +145,48 @@ watch(() => props.refreshToken, () => {
 
 watch(() => props.sidebarHidden, constrainCurrentWidth)
 
-function openReviewEventStream() {
-  if (!props.watchEnabled || !props.cwd) return
+function openReviewEventStream(loadAfterConnect = false) {
+  if (!props.watchEnabled || !props.cwd) return false
   closeReviewEventStream()
   const params = new URLSearchParams({ cwd: props.cwd })
   const source = new EventSource(
     backendHttpUrl(`/api/pi/review/events?${params}`),
   )
+  let connected = false
+  let initialLoadStarted = false
+  const startInitialLoad = () => {
+    if (initialLoadStarted || reviewEventSource !== source) return
+    initialLoadStarted = true
+    clearTimeout(reviewEventLoadTimer)
+    reviewEventLoadTimer = undefined
+    void loadReview()
+  }
+  if (loadAfterConnect) {
+    reviewEventLoadTimer = window.setTimeout(startInitialLoad, 500)
+  }
   reviewEventSource = source
   source.addEventListener('open', () => {
-    if (reviewEventSource === source) requestWatchedRefresh()
+    if (reviewEventSource !== source) return
+    if (connected || (loadAfterConnect && initialLoadStarted)) {
+      requestWatchedRefresh()
+    } else if (loadAfterConnect) {
+      startInitialLoad()
+    } else {
+      requestWatchedRefresh()
+    }
+    connected = true
   })
   source.addEventListener('review_change', () => {
     if (reviewEventSource === source) requestWatchedRefresh()
   })
+  return true
 }
 
 function closeReviewEventStream() {
   reviewEventSource?.close()
   reviewEventSource = undefined
+  clearTimeout(reviewEventLoadTimer)
+  reviewEventLoadTimer = undefined
   clearTimeout(watchedRefreshTimer)
   watchedRefreshTimer = undefined
   watchedRefreshQueued = false
