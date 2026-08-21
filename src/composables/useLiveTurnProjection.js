@@ -213,7 +213,8 @@ export function useLiveTurnProjection({ onIntent } = {}) {
 
   function isRunningEvent(event) {
     const type = event?.type || ''
-    if (['agent_start', 'message_start', 'tool_call'].includes(type)) return true
+    if (['agent_start', 'tool_call'].includes(type)) return true
+    if (type === 'message_start' && event.message?.role !== 'custom') return true
     if (type === 'tool_execution_start') return true
     if (['agent_end', 'error', 'aborted'].includes(type)) return false
     return agentRunning.value

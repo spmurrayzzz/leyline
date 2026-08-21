@@ -144,6 +144,7 @@ export function useSessionWorkspace({
   })
   let sessionSelectionToken = 0
   let sessionListRequestToken = 0
+  let sessionRefreshToken = 0
   let sessionActivationQueue = Promise.resolve()
   const startRuntimeRequests = new Map()
   let refreshTimer
@@ -361,6 +362,7 @@ export function useSessionWorkspace({
 
   async function selectSession(session, options = {}) {
     const token = ++sessionSelectionToken
+    invalidateSessionRefresh()
     sessionSwitching.value = true
     const switchStarted = Date.now()
     selectedSessionId.value = session.id
@@ -408,6 +410,8 @@ export function useSessionWorkspace({
   }
 
   function clearSelectedSession() {
+    sessionSelectionToken += 1
+    invalidateSessionRefresh()
     selectedSessionId.value = ''
     liveTurn?.clearSession?.()
     sessionDetail.value = null
@@ -473,23 +477,58 @@ export function useSessionWorkspace({
     window.history[method]({}, '', next)
   }
 
-  async function scheduleSessionRefresh(activeSessionId, event) {
+  function scheduleSessionRefresh(activeSessionId, event) {
     if (activeSessionId !== selectedSessionId.value) return
-    if (event?.type === 'message_update') return
+    if (['agent_start', 'compaction_start'].includes(event?.type)) {
+      invalidateSessionRefresh()
+      return
+    }
 
+    const delay = sessionRefreshDelay(activeSessionId, event)
+    if (delay === undefined) return
+    const token = ++sessionRefreshToken
     clearTimeout(refreshTimer)
     refreshTimer = setTimeout(async () => {
+      refreshTimer = undefined
+      if (token !== sessionRefreshToken
+        || activeSessionId !== selectedSessionId.value) return
+
       try {
         const wasFollowing = shouldFollowOutput?.() ?? true
-        const detail = await fetchSessionDetail(selectedSessionId.value)
+        const detail = await fetchSessionDetail(activeSessionId)
+        if (token !== sessionRefreshToken
+          || activeSessionId !== selectedSessionId.value) return
         sessionDetail.value = detail
         updateSelectedSessionSummary(detail.session)
         if (wasFollowing) await scrollToLatest?.()
         else markNewOutput?.()
       } catch (error) {
-        sessionError.value = error.message
+        if (token === sessionRefreshToken
+          && activeSessionId === selectedSessionId.value) {
+          sessionError.value = error.message
+        }
       }
-    }, event?.type === 'compaction_end' ? 0 : 250)
+    }, delay)
+  }
+
+  function invalidateSessionRefresh() {
+    sessionRefreshToken += 1
+    clearTimeout(refreshTimer)
+    refreshTimer = undefined
+  }
+
+  function sessionRefreshDelay(activeSessionId, event) {
+    if (event?.type === 'agent_settled') return 0
+    if (event?.type === 'compaction_end') {
+      return event.reason === 'manual' ? 0 : undefined
+    }
+
+    const isStreaming = runtimeSessionsById.value[activeSessionId]?.isStreaming
+    if (isStreaming) return undefined
+    if (event?.type === 'session_info_changed') return 250
+    if (event?.type === 'message_end'
+      && event.message?.role === 'custom') return 250
+    return undefined
   }
 
   function updateRuntimeQueue(event) {
@@ -592,7 +631,9 @@ export function useSessionWorkspace({
   }
 
   function runtimePatchFromEvent(event, previous) {
-    if (['agent_start', 'turn_start', 'message_start'].includes(event.type)) {
+    if (['agent_start', 'turn_start'].includes(event.type)
+      || (event.type === 'message_start'
+        && event.message?.role !== 'custom')) {
       return { isStreaming: true, isCompacting: false, error: '' }
     }
     if (['tool_call', 'tool_execution_start'].includes(event.type)) {
@@ -1028,6 +1069,7 @@ export function useSessionWorkspace({
 
   function setSelectedSessionData(detail, active) {
     sessionSelectionToken += 1
+    invalidateSessionRefresh()
     activeRuntimeSession.value = active || null
     sessionDetail.value = detail
     selectedSessionId.value = detail.session.id
