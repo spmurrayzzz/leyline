@@ -7,6 +7,7 @@ import {
   skillSummaries,
   textFromBlocks,
   textFromContent,
+  toolAnnotation,
 } from '../../lib/transcript-projection'
 
 const hljs = loadHighlightJs()
@@ -145,4 +146,5 @@ export {
   skillSummaries,
   textFromBlocks,
   textFromContent,
+  toolAnnotation,
 }

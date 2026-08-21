@@ -1,10 +1,10 @@
 import { computed, ref } from 'vue'
-import { toolLabel } from '../lib/format'
 import {
   imageBlocksFor,
   messageBlocks,
   skillSummaries,
   textFromBlocks,
+  toolAnnotation,
 } from '../lib/transcript'
 
 export function useLiveTurnProjection({ onIntent } = {}) {
@@ -287,7 +287,7 @@ export function useLiveTurnProjection({ onIntent } = {}) {
       type: 'tool',
       toolCallId: event.toolCallId || event.id || event.callId || '',
       toolName: event.toolName || 'tool',
-      label: liveToolLabel(event),
+      label: liveToolLabel(event, existing),
       code: liveToolCode(event) || existing?.code || '',
       status,
       startedAt: existing?.startedAt || now,
@@ -324,11 +324,11 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     return event.toolCallId || event.id || event.callId || ''
   }
 
-  function liveToolLabel(event) {
-    if (event.toolName !== 'subagent') return toolLabel(event.toolName)
-    const args = event.args || event.input || {}
-    const agent = args.agent || (args.tasks?.length ? `${args.tasks.length} tasks` : args.chain?.length ? `${args.chain.length} steps` : 'subagent')
-    return `Subagent · ${agent}`
+  function liveToolLabel(event, existing) {
+    if (event.toolName === 'compact') return 'Compact'
+    const args = event.args || event.input
+    if (!args && existing?.label) return existing.label
+    return toolAnnotation(event.toolName, { arguments: args || {} }).label
   }
 
   function liveToolCode(event) {
