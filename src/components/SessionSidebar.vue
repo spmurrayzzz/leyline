@@ -133,6 +133,8 @@ const lastSessionByProject = new Map()
 const SESSION_ROW_HEIGHT = 36
 const SESSION_GROUP_HEIGHT = 26
 const SESSION_OVERSCAN_PX = SESSION_ROW_HEIGHT * 4
+const SKELETON_GROUP_ROWS = [5, 7, 6]
+const SKELETON_VARIANT_COUNT = 8
 const DAY_MS = 24 * 60 * 60 * 1000
 const sessionClockFormat = new Intl.DateTimeFormat(undefined, {
   hour: '2-digit',
@@ -159,6 +161,57 @@ const sessionFullFormat = new Intl.DateTimeFormat(undefined, {
 })
 let navigatorOpener = null
 let sessionResizeObserver
+
+const sessionSkeletonItems = computed(() => {
+  const targetHeight = Math.max(
+    sessionViewportHeight.value,
+    SESSION_GROUP_HEIGHT,
+  )
+  const items = [{
+    key: 'skeleton-group-0',
+    type: 'group',
+    separator: false,
+    variant: 0,
+  }]
+  let filledHeight = SESSION_GROUP_HEIGHT
+  let groupIndex = 0
+  let remainingRows = SKELETON_GROUP_ROWS[0]
+  let rowIndex = 0
+
+  while (filledHeight < targetHeight) {
+    if (remainingRows === 0) {
+      const hasRoomForGroup = targetHeight - filledHeight
+        >= SESSION_GROUP_HEIGHT + SESSION_ROW_HEIGHT
+      if (hasRoomForGroup) {
+        groupIndex += 1
+        items.push({
+          key: `skeleton-group-${groupIndex}`,
+          type: 'group',
+          separator: true,
+          variant: groupIndex % 3,
+        })
+        filledHeight += SESSION_GROUP_HEIGHT
+        remainingRows = SKELETON_GROUP_ROWS[
+          groupIndex % SKELETON_GROUP_ROWS.length
+        ]
+      } else {
+        remainingRows = Number.POSITIVE_INFINITY
+      }
+    }
+
+    if (filledHeight >= targetHeight) break
+    items.push({
+      key: `skeleton-session-${rowIndex}`,
+      type: 'session',
+      variant: rowIndex % SKELETON_VARIANT_COUNT,
+    })
+    filledHeight += SESSION_ROW_HEIGHT
+    remainingRows -= 1
+    rowIndex += 1
+  }
+
+  return items
+})
 
 watch(
   () => props.visibleProjects,
@@ -773,12 +826,35 @@ const vFocusSelect = {
           <span>Sessions</span>
           <span>…</span>
         </div>
-        <div class="project-session-scroll">
+        <div ref="sessionScroll" class="project-session-scroll">
           <div class="project-session-skeleton">
-            <div v-for="index in 7" :key="index" class="session-skeleton-row">
-              <div class="skeleton-line"></div>
-              <div class="skeleton-line short"></div>
-            </div>
+            <template
+              v-for="item in sessionSkeletonItems"
+              :key="item.key"
+            >
+              <div
+                v-if="item.type === 'group'"
+                class="session-skeleton-group"
+                :class="[
+                  `variant-${item.variant}`,
+                  { 'has-separator': item.separator },
+                ]"
+              >
+                <span class="skeleton-line"></span>
+              </div>
+              <div
+                v-else
+                class="session-skeleton-row"
+                :class="`variant-${item.variant}`"
+              >
+                <span
+                  class="skeleton-line session-skeleton-title"
+                ></span>
+                <span
+                  class="skeleton-line session-skeleton-meta"
+                ></span>
+              </div>
+            </template>
           </div>
         </div>
       </section>
@@ -878,10 +954,33 @@ const vFocusSelect = {
             class="project-session-skeleton"
             aria-hidden="true"
           >
-            <div v-for="index in 7" :key="index" class="session-skeleton-row">
-              <div class="skeleton-line"></div>
-              <div class="skeleton-line short"></div>
-            </div>
+            <template
+              v-for="item in sessionSkeletonItems"
+              :key="item.key"
+            >
+              <div
+                v-if="item.type === 'group'"
+                class="session-skeleton-group"
+                :class="[
+                  `variant-${item.variant}`,
+                  { 'has-separator': item.separator },
+                ]"
+              >
+                <span class="skeleton-line"></span>
+              </div>
+              <div
+                v-else
+                class="session-skeleton-row"
+                :class="`variant-${item.variant}`"
+              >
+                <span
+                  class="skeleton-line session-skeleton-title"
+                ></span>
+                <span
+                  class="skeleton-line session-skeleton-meta"
+                ></span>
+              </div>
+            </template>
           </div>
           <div v-else-if="sessionsError" class="sidebar-note error-note">
             {{ sessionsError }}
