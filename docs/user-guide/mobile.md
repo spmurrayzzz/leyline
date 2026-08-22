@@ -47,9 +47,11 @@ The model control uses the `provider/model-id` label. The thinking control uses 
 
 ## Open research sources
 
-A [deep research](./deep-research) source ledger opens across the full viewport. It keeps the All, Cited, Supporting, and Excluded filters.
+A [deep research](./deep-research) source pane opens across the full viewport. It has **Cited** and **Research ledger** views.
 
-Select the source control in the header. Select **×** to close the ledger and return to the report.
+Select the source control in the header to open the pane. Select **×** to close the pane and return to the report.
+
+Select a report citation to open its source preview as a bottom sheet.
 
 ## Use drawers and the terminal
 

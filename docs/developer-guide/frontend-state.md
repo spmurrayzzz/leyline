@@ -121,9 +121,9 @@ When the parent model cannot receive attached images, `App.vue` shows the effect
 
 `selectedResearch` uses the active runtime state first and persisted session state second. It drives the phase bar, report state, source count, and composer language.
 
-`App.vue` owns source-pane visibility, selected source ID, and citation reveal keys. `ResearchSourcesPane.vue` owns its filter and list scrolling.
+`App.vue` owns source-pane visibility and citation-preview state. `ResearchSourcesPane.vue` owns the **Cited** and **Research ledger** views.
 
-A valid citation event opens the source pane, resets the filter, selects the source, and moves its card into view. Desktop source state also controls the third app-grid column.
+A valid citation event resolves the source, closes an open third rail, and opens an anchored preview after the layout settles. Desktop source-pane state also controls the third app-grid column.
 
 ## Git review
 

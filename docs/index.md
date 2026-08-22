@@ -22,7 +22,7 @@ features:
   - title: Run and direct agents
     details: Submit prompts, images, shell commands, steering messages, queued follow-ups, slash commands, and long-running goals.
   - title: Run deep research
-    details: Split a question into parallel research threads, follow source gathering, read a cited report, and inspect the persistent source ledger.
+    details: Split a question into parallel research threads, follow source gathering, verify report citations, and inspect the persistent research ledger.
   - title: Use images with any model
     details: Send images directly to compatible models or configure a vision agent to describe them for models without image support.
   - title: Watch live work

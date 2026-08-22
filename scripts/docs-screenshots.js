@@ -669,9 +669,7 @@ try {
     route: '/sessions/research-session',
     ready: '.research-report-message',
     scenario: 'research',
-    interact: async (page) => {
-      await selectResearchSource(page, 1)
-    },
+    interact: waitForResearchSources,
   })
   await capture({
     browser,
@@ -912,8 +910,14 @@ try {
     viewport: { width: 390, height: 844 },
     scenario: 'research',
     interact: async (page) => {
-      await page.getByRole('button', { name: 'Research sources · 6' }).click()
-      await selectResearchSource(page, 1)
+      const citation = page.locator(
+        '.research-report-message .markdown-body a',
+      ).filter({ hasText: /^1$/ }).first()
+      await citation.scrollIntoViewIfNeeded()
+      await citation.click()
+      await page.getByRole('dialog', {
+        name: 'Citation 1 source preview',
+      }).waitFor()
     },
   })
   await capture({
@@ -958,9 +962,7 @@ try {
     ready: '.research-report-message',
     viewport: { width: 1503, height: 818 },
     scenario: 'research',
-    interact: async (page) => {
-      await selectResearchSource(page, 1)
-    },
+    interact: waitForResearchSources,
     macWindow: true,
   })
 } finally {
@@ -969,11 +971,11 @@ try {
 
 console.log('Saved documentation and README screenshots')
 
-async function selectResearchSource(page, sourceId) {
+async function waitForResearchSources(page) {
   const pane = page.locator('aside[aria-label="Research sources"].open')
   await pane.waitFor()
-  await pane.locator(`[data-source-id="${sourceId}"] .research-source-select`).click()
-  await pane.locator(`[data-source-id="${sourceId}"] .research-source-evidence`).waitFor()
+  await pane.getByRole('button', { name: 'Cited 4', pressed: true }).waitFor()
+  await pane.locator('.research-source-card').first().waitFor()
 }
 
 function session(

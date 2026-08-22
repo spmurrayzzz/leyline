@@ -12,7 +12,7 @@ The desktop header shows the project and session as a breadcrumb. Select the ses
 
 A subagent child session also shows **← parent session**. Select this control to open its parent session.
 
-A research session shows its phase or **report ready** beside the title. Its source control opens the persistent source ledger.
+A research session shows its phase or **report ready** beside the title. Its source control opens cited sources and the complete research ledger.
 
 The right side of the header contains these controls:
 
@@ -29,7 +29,7 @@ The transcript shows the current session branch. User messages, assistant messag
 
 Assistant output and tool activity appear while the run is active. Saved rows replace live rows after pi records the turn. Leyline keeps one visible copy of each item.
 
-A [deep research session](./deep-research) adds a phase bar, Research threads card, cited report artifact, and source ledger. Each thread can link to its child transcript.
+A [deep research session](./deep-research) adds a phase bar, Research threads card, cited report artifact, source pane, and citation previews. Each thread can link to its child transcript.
 
 ## Keep your reading position
 

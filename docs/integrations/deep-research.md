@@ -102,7 +102,8 @@ The browser renders:
 - A Plan, Gather, Synthesize, and Report phase bar.
 - A compact Research threads card with child-session links.
 - A report artifact with validated citation targets.
-- A source ledger with cited, supporting, and excluded filters.
+- A source rail with a primary cited view and a complete research ledger.
+- An anchored citation preview with claim and evidence details.
 
 Research state also travels in `active_session` snapshots. This state updates progress, counts, and sidebar status during the run.
 

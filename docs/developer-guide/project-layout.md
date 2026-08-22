@@ -6,7 +6,8 @@
 - `src/App.vue`: Composes the workspace and coordinates cross-feature state.
 - `src/components/`: Contains focused Vue surfaces for sessions, composers, transcript entries, drawers, pickers, and previews.
 - `src/components/ReviewPane.vue`: Renders changed files and prepared Pierre diffs for the selected project.
-- `src/components/ResearchSourcesPane.vue`: Renders the filtered research source ledger and selected evidence.
+- `src/components/ResearchSourcesPane.vue`: Renders cited sources and the complete research ledger.
+- `src/components/ResearchCitationPreview.vue`: Renders the anchored citation preview and mobile bottom sheet.
 - `src/components/VisionConfigDrawer.vue`: Manages transcript, project, and global vision-model overrides.
 - `src/composables/useSessionWorkspace.js`: Owns session, route, activation, and runtime-control state.
 - `src/composables/useBackendConnections.js`: Owns connection records, the default, and window-specific backend selection.

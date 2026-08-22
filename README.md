@@ -17,7 +17,7 @@ connections to other Leyline backends.
 
 ### Deep research
 
-<a href="assets/readme/deep-research.png"><img alt="Leyline deep research report with phase progress and a source ledger" src="assets/readme/deep-research.png" /></a>
+<a href="assets/readme/deep-research.png"><img alt="Leyline deep research report with phase progress and cited sources" src="assets/readme/deep-research.png" /></a>
 
 ## Features
 
@@ -28,8 +28,9 @@ controls, memory, subagents, runtime events, and an embedded terminal. Each
 window can use the native backend or a saved backend connection.
 
 Deep research sessions divide a question into parallel, source-backed threads.
-Leyline keeps the plan and worker sessions inspectable, validates numbered
-report citations, and connects each citation to a persistent source ledger.
+Leyline keeps the plan and worker sessions inspectable and validates numbered
+report citations. Each citation opens a source preview. The research ledger
+keeps cited, supporting, and excluded source records.
 
 On desktop, the Git review pane prepares changed files and the selected diff
 before it opens. It separates staged and working-tree changes and can expand

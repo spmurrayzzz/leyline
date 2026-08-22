@@ -26,7 +26,7 @@ Avoid decorative glow, gradients, and extra panels. Existing gradients serve fad
 | `composer.css` | Composer, menus, attachments, context, and send states |
 | `memory.css` | Memory Inspector |
 | `review.css` | Git review rail, file list, diff states, resizing, and expanded layout |
-| `research.css` | Research progress, reports, thread cards, source ledger, and sidebar markers |
+| `research.css` | Research progress, reports, thread cards, source rail, citation preview, and sidebar markers |
 | `settings.css` | Settings, Runtime Events, subagent configuration, and vision configuration |
 | `modals.css` | Project browser and confirmation dialogs |
 | `terminal.css` | Terminal drawer |

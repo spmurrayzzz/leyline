@@ -2,9 +2,9 @@
 
 Deep research turns one question into a source-backed report. A lead agent plans the work, runs bounded research threads, and synthesizes their evidence.
 
-![Completed deep research session with phase progress, a cited report, and the source ledger](../assets/screenshots/deep-research.png)
+![Completed deep research session with phase progress, a cited report, and cited sources](../assets/screenshots/deep-research.png)
 
-*The report stays in the transcript while the source ledger keeps cited, supporting, and excluded evidence visible.*
+*The report stays in the transcript while the source rail shows cited evidence.*
 
 ## Start a research session
 
@@ -42,20 +42,27 @@ Press **Option+Enter** to queue a follow-up after the active run. Select **Stop 
 
 A stopped or failed run keeps its persisted plan, threads, and sources. Send another prompt when you want the lead to continue.
 
-## Use the source ledger
+## Verify sources and inspect the research ledger
 
 The desktop source pane opens when a research session has sources. Use the source control in the header to close or reopen it.
 
-The ledger has these filters:
+The pane has two views:
 
-- **All** shows every source.
-- **Cited** shows sources that the final report cites.
-- **Supporting** shows retained sources that the report does not cite.
-- **Excluded** shows rejected sources and their exclusion reasons.
+- **Cited** shows sources that the final report cites. This is the default view for a completed report.
+- **Research ledger** shows each cited, supporting, and excluded source.
 
-Select a source card to read its claim, evidence, thread IDs, and exclusion reason. Web sources include **Open source**. Local sources show their path.
+A cited row shows the citation number, title, publisher, publication date when available, and a short claim summary. Select a web source row to open the source. A local source row shows its path.
 
-A numbered report citation opens the matching ledger source. Leyline resets the filter, selects the source, and moves it into view.
+The research ledger adds the thread, source kind, and status. An excluded row shows its exclusion reason.
+
+Select a numbered report citation to open its source preview. The preview shows the claim, evidence, source details, and external link without hiding the report.
+
+To close the preview, do one of these actions:
+
+- Select outside the preview.
+- Scroll the report.
+- Resize the window.
+- Press **Escape**.
 
 A valid citation uses a numeric Markdown link such as `[3](https://example.com/source)`. The number and target must match a non-excluded ledger source.
 
@@ -63,13 +70,13 @@ Leyline checks citation identity. It does not determine whether the source prove
 
 ## Use sources on mobile
 
-![Full-width research source ledger on mobile](../assets/screenshots/deep-research-mobile.png)
+![Mobile research report with a citation source preview](../assets/screenshots/deep-research-mobile.png)
 
-*The mobile source control opens the same ledger as a full-width overlay.*
+*A report citation opens its source preview as a bottom sheet.*
 
-Select the source control in the mobile header. Select **×** to return to the report.
+Select a numbered citation to verify its claim and evidence. Select **Open source** to open the web source. Select **×** to close the preview.
 
-The filters, evidence, and external source links work the same as on desktop.
+Select the source control in the mobile header to open the source pane. The **Cited** and **Research ledger** views use the full screen width.
 
 ## Read and revise the report
 

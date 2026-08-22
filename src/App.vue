@@ -14,6 +14,7 @@ const PierrePreview = defineAsyncComponent(() => import('./components/PierrePrev
 const ProjectBrowser = defineAsyncComponent(() => import('./components/ProjectBrowser.vue'))
 const ProjectDetailDrawer = defineAsyncComponent(() => import('./components/ProjectDetailDrawer.vue'))
 const ReviewPane = defineAsyncComponent(() => import('./components/ReviewPane.vue'))
+const ResearchCitationPreview = defineAsyncComponent(() => import('./components/ResearchCitationPreview.vue'))
 const ResearchSourcesPane = defineAsyncComponent(() => import('./components/ResearchSourcesPane.vue'))
 const MemoryInspector = defineAsyncComponent(() => import('./components/MemoryInspector.vue'))
 const SessionComposer = defineAsyncComponent(() => import('./components/SessionComposer.vue'))
@@ -102,8 +103,9 @@ const reviewDesktopAvailable = ref(false)
 const reviewRefreshToken = ref(0)
 const reviewSummary = ref(defaultReviewSummary())
 const researchSourcesOpen = ref(false)
-const selectedResearchSourceId = ref(0)
-const researchSourceRevealKey = ref(0)
+const researchCitationPreview = ref(null)
+let researchCitationAnchor = null
+let researchCitationPreviewToken = 0
 const startSessionKind = ref('session')
 const emptySessionKind = ref('session')
 let researchSourcesDismissedSessionId = ''
@@ -476,13 +478,14 @@ watch(
   ],
   ([sessionId, sourceCount], [previousSessionId] = []) => {
     if (sessionId !== previousSessionId) {
-      selectedResearchSourceId.value = selectedResearch.value?.sources?.[0]?.id || 0
+      closeResearchCitationPreview()
       if (researchSourcesDismissedSessionId !== sessionId) {
         researchSourcesDismissedSessionId = ''
       }
     }
     if (!selectedResearch.value || !sourceCount) {
       researchSourcesOpen.value = false
+      closeResearchCitationPreview()
       return
     }
     if (researchSourcesDismissedSessionId === sessionId) return
@@ -979,6 +982,7 @@ onUnmounted(() => {
   window.removeEventListener('leyline:toggle-memory', handleNativeToggleMemory)
   window.removeEventListener('leyline:toggle-sidebar', handleNativeToggleSidebar)
   window.removeEventListener('leyline:escape', handleNativeEscape)
+  closeResearchCitationPreview()
   delete window.__leylineBackendConnectionId
   delete window.__leylineCurrentCwd
   disposeTerminalResize()
@@ -1261,13 +1265,10 @@ function researchPhaseLabel(phase) {
   return phase.charAt(0).toUpperCase() + phase.slice(1)
 }
 
-function openResearchSources(sourceId = 0) {
+function openResearchSources() {
   if (!selectedResearch.value?.sourceCount) return
+  closeResearchCitationPreview()
   closeReview(true)
-  if (sourceId) selectedResearchSourceId.value = Number(sourceId)
-  if (!selectedResearchSourceId.value) {
-    selectedResearchSourceId.value = selectedResearch.value.sources?.[0]?.id || 0
-  }
   researchSourcesDismissedSessionId = ''
   researchSourcesOpen.value = true
 }
@@ -1282,16 +1283,51 @@ function toggleResearchSources() {
   else openResearchSources()
 }
 
-function selectResearchSource(sourceId) {
-  selectedResearchSourceId.value = Number(sourceId || 0)
+function closeResearchCitationPreview() {
+  researchCitationPreviewToken++
+  researchCitationAnchor?.classList.remove('citation-preview-active')
+  researchCitationAnchor = null
+  researchCitationPreview.value = null
 }
 
-function openResearchSource(payload) {
-  researchSourceRevealKey.value++
-  openResearchSources(payload?.id)
+async function openResearchSource(payload) {
+  const id = Number(payload?.id || 0)
+  const source = selectedResearch.value?.sources?.find((item) => {
+    return item.id === id
+  }) || payload?.source
+  if (!source || !payload?.rect) return
+  const paneWasOpen = researchSourcesOpen.value
+    || reviewOpen.value
+    || reviewClosing.value
+  closeReview(true)
+  closeResearchSources(false)
+  closeResearchCitationPreview()
+  const token = researchCitationPreviewToken
+  researchCitationAnchor = payload.anchor || null
+  researchCitationAnchor?.classList.add('citation-preview-active')
+  await nextTick()
+  if (paneWasOpen) await wait(reviewMotionDuration())
+  if (token !== researchCitationPreviewToken) return
+  if (researchCitationAnchor && !researchCitationAnchor.isConnected) {
+    closeResearchCitationPreview()
+    return
+  }
+  const anchorRect = researchCitationAnchor?.getBoundingClientRect()
+    || payload.rect
+  researchCitationPreview.value = {
+    anchorRect: {
+      bottom: anchorRect.bottom,
+      height: anchorRect.height,
+      left: anchorRect.left,
+      top: anchorRect.top,
+      width: anchorRect.width,
+    },
+    source,
+  }
 }
 
 function openReview() {
+  closeResearchCitationPreview()
   closeResearchSources(true)
   if (!reviewReady.value) {
     reviewOpenRequested.value = true
@@ -1396,6 +1432,7 @@ function navigateHome() {
   workspaceNavigateHome()
   closeReview(true)
   closeResearchSources(false)
+  closeResearchCitationPreview()
   sidebarNavigator.value = ''
   sidebarOpen.value = false
 }
@@ -2680,6 +2717,7 @@ function handleGlobalKeydown(event) {
     }
     closePickerMenus()
     closeProjectBrowser()
+    closeResearchCitationPreview()
     setSidebarNavigator('quick')
     return
   }
@@ -2707,6 +2745,7 @@ function anyEscapeTargetOpen() {
     || startProjectPickerOpen.value
     || slashPickerOpen.value
     || researchSourcesOpen.value
+    || researchCitationPreview.value
     || (reviewPaneExpanded.value && window.innerWidth > 1120)
   )
 }
@@ -2724,6 +2763,7 @@ function handleEscape(event) {
   projectDetailCwd.value = ''
   collapseReviewExpanded()
   if (researchSourcesOpen.value) closeResearchSources()
+  closeResearchCitationPreview()
   if (memoryOpen.value) closeMemoryDrawer()
   closeImageFullscreen()
   closeToolFullscreen()
@@ -3605,10 +3645,15 @@ function closePickerMenus() {
       v-if="selectedSession && isResearchSession"
       :open="researchSourcesOpen"
       :research="selectedResearch"
-      :reveal-key="researchSourceRevealKey"
-      :selected-source-id="selectedResearchSourceId"
       @close="closeResearchSources"
-      @select="selectResearchSource"
+    />
+
+    <ResearchCitationPreview
+      v-if="researchCitationPreview"
+      :key="researchCitationPreview.source.id"
+      :anchor-rect="researchCitationPreview.anchorRect"
+      :source="researchCitationPreview.source"
+      @close="closeResearchCitationPreview"
     />
 
     <div

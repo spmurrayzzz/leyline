@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 const props = defineProps({
   open: Boolean,
@@ -7,63 +7,44 @@ const props = defineProps({
     type: Object,
     default: null,
   },
-  revealKey: {
-    type: Number,
-    default: 0,
-  },
-  selectedSourceId: {
-    type: Number,
-    default: 0,
-  },
 })
 
-const emit = defineEmits(['close', 'select'])
-const filter = ref('all')
-const sourceList = ref(null)
-const filters = computed(() => [
-  { id: 'all', label: 'All', count: props.research?.sourceCount || 0 },
-  { id: 'cited', label: 'Cited', count: props.research?.citedSourceCount || 0 },
+const emit = defineEmits(['close'])
+const view = ref('cited')
+const views = computed(() => [
   {
-    id: 'candidate',
-    label: 'Supporting',
-    count: (props.research?.sources || []).filter((source) => {
-      return source.status === 'candidate'
-    }).length,
+    id: 'cited',
+    label: 'Cited',
+    count: props.research?.citedSourceCount || 0,
   },
   {
-    id: 'excluded',
-    label: 'Excluded',
-    count: props.research?.excludedSourceCount || 0,
+    id: 'ledger',
+    label: 'Research ledger',
+    count: props.research?.sourceCount || 0,
   },
 ])
 const visibleSources = computed(() => {
   const sources = props.research?.sources || []
-  if (filter.value === 'all') return sources
-  return sources.filter((source) => source.status === filter.value)
+  if (view.value === 'ledger') return sources
+  return sources.filter((source) => source.status === 'cited')
+})
+const summary = computed(() => {
+  if (view.value === 'cited') {
+    return `${props.research?.citedSourceCount || 0} cited in this report`
+  }
+  return `${props.research?.sourceCount || 0} found across ${props.research?.threadCount || 0} threads`
 })
 
-watch(() => props.research?.sessionId, () => {
-  filter.value = 'all'
+watch(() => props.research?.sessionId, setDefaultView)
+watch(() => props.open, (open) => {
+  if (open) setDefaultView()
+})
+watch(() => props.research?.citedSourceCount || 0, (count, previousCount) => {
+  if (props.open && count && !previousCount) view.value = 'cited'
 })
 
-watch(() => props.revealKey, () => {
-  filter.value = 'all'
-  revealSelectedSource()
-})
-
-async function revealSelectedSource() {
-  await nextTick()
-  const list = sourceList.value
-  if (!props.open || !list || !props.selectedSourceId) return
-  const card = list.querySelector(
-    `[data-source-id="${props.selectedSourceId}"]`,
-  )
-  if (!card) return
-  const listRect = list.getBoundingClientRect()
-  const cardRect = card.getBoundingClientRect()
-  const top = list.scrollTop + cardRect.top - listRect.top
-    - (listRect.height - cardRect.height) / 2
-  list.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
+function setDefaultView() {
+  view.value = props.research?.citedSourceCount ? 'cited' : 'ledger'
 }
 
 function sourceLocation(source) {
@@ -98,6 +79,13 @@ function sourceStatus(source) {
 function sourceThread(source) {
   return (source.threadIds || []).join(', ')
 }
+
+function sourceSummary(source) {
+  if (source.status === 'excluded' && source.exclusionReason) {
+    return source.exclusionReason
+  }
+  return source.claim || source.evidence || ''
+}
 </script>
 
 <template>
@@ -109,10 +97,7 @@ function sourceThread(source) {
     <header class="research-sources-header">
       <div>
         <strong>Sources</strong>
-        <span>
-          {{ research?.sourceCount || 0 }} found across
-          {{ research?.threadCount || 0 }} threads
-        </span>
+        <span>{{ summary }}</span>
       </div>
       <button type="button" aria-label="Close sources" @click="emit('close')">
         ×
@@ -121,31 +106,31 @@ function sourceThread(source) {
 
     <div class="research-source-filters">
       <button
-        v-for="item in filters"
+        v-for="item in views"
         :key="item.id"
         type="button"
-        :class="{ active: filter === item.id }"
-        @click="filter = item.id"
+        :class="{ active: view === item.id }"
+        :aria-pressed="view === item.id"
+        @click="view = item.id"
       >
         {{ item.label }} {{ item.count }}
       </button>
     </div>
 
-    <div ref="sourceList" class="research-source-list">
+    <div class="research-source-list">
       <article
         v-for="source in visibleSources"
         :key="source.id"
         class="research-source-card"
-        :data-source-id="source.id"
-        :class="{
-          selected: selectedSourceId === source.id,
-          excluded: source.status === 'excluded',
-        }"
+        :class="{ excluded: source.status === 'excluded' }"
       >
-        <button
+        <component
+          :is="source.url ? 'a' : 'div'"
           class="research-source-select"
-          type="button"
-          @click="emit('select', source.id)"
+          :href="source.url || undefined"
+          :target="source.url ? '_blank' : undefined"
+          :rel="source.url ? 'noreferrer' : undefined"
+          :title="source.path || source.url || undefined"
         >
           <span class="research-source-card-head">
             <b>{{ source.id }}</b>
@@ -156,37 +141,20 @@ function sourceThread(source) {
                 <template v-if="sourceDate(source)"> · {{ sourceDate(source) }}</template>
               </small>
             </span>
-            <em>{{ sourceThread(source) }}</em>
           </span>
-          <span class="research-source-card-meta">
-            <i>{{ source.kind }}</i>
-            <small>{{ sourceStatus(source) }}</small>
+          <span v-if="view === 'ledger'" class="research-source-ledger-meta">
+            <span v-if="sourceThread(source)">{{ sourceThread(source) }}</span>
+            <span>{{ source.kind }}</span>
+            <span>{{ sourceStatus(source) }}</span>
           </span>
-        </button>
-        <span
-          v-if="selectedSourceId === source.id"
-          class="research-source-evidence"
-        >
-          <span v-if="source.claim">{{ source.claim }}</span>
-          <span v-if="source.evidence">{{ source.evidence }}</span>
-          <span v-if="source.exclusionReason">{{ source.exclusionReason }}</span>
-          <a
-            v-if="source.url"
-            :href="source.url"
-            target="_blank"
-            rel="noreferrer"
-          >Open source ↗</a>
-          <code v-else-if="source.path">{{ source.path }}</code>
-        </span>
+          <span v-if="sourceSummary(source)" class="research-source-summary">
+            {{ sourceSummary(source) }}
+          </span>
+        </component>
       </article>
       <div v-if="!visibleSources.length" class="research-source-empty">
         No sources in this view.
       </div>
     </div>
-
-    <footer class="research-sources-footer">
-      Citation numbers resolve to this ledger. Thread use and exclusion reasons
-      remain visible after the run.
-    </footer>
   </aside>
 </template>

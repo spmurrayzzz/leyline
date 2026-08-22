@@ -224,7 +224,20 @@ function openMarkdownContent(event) {
     : canonicalResearchSourceKey({ path: target })
   if (!key || key !== source.key) return
   event.preventDefault()
-  emit('open-research-source', { id, url: link.href })
+  const rect = link.getBoundingClientRect()
+  emit('open-research-source', {
+    anchor: link,
+    id,
+    rect: {
+      bottom: rect.bottom,
+      height: rect.height,
+      left: rect.left,
+      top: rect.top,
+      width: rect.width,
+    },
+    source,
+    url: link.href,
+  })
 }
 </script>
 
