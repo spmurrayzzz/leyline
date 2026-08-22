@@ -20,6 +20,24 @@
   color: #8bc9a3;
 }
 
+.session-title-with-kind {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+}
+
+.session-research-icon {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  fill: none;
+  stroke: #a99cff;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.35;
+}
+
 .research-session-chip {
   flex: none;
   border: 1px solid var(--accent-border);

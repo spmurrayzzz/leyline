@@ -1068,11 +1068,22 @@ const vFocusSelect = {
                       item.sessionIndex - 1,
                     )"
                   >
-                    <span
-                      class="session-title"
-                      :title="sessionTitle(item.session)"
-                      @dblclick.stop="beginRename(item.session)"
-                    >{{ sessionTitle(item.session) }}</span>
+                    <span class="session-title-with-kind">
+                      <span
+                        class="session-title"
+                        :title="sessionTitle(item.session)"
+                        @dblclick.stop="beginRename(item.session)"
+                      >{{ sessionTitle(item.session) }}</span>
+                      <svg
+                        v-if="item.session.research"
+                        class="session-research-icon"
+                        viewBox="0 0 16 16"
+                        role="img"
+                        aria-label="Research session"
+                      >
+                        <path d="M6 2h4M7 2v4l-3.5 6A1.3 1.3 0 0 0 4.6 14h6.8a1.3 1.3 0 0 0 1.1-2L9 6V2M5.5 10h5"></path>
+                      </svg>
+                    </span>
                     <span
                       v-if="statusFor(item.session).label"
                       class="session-status"
