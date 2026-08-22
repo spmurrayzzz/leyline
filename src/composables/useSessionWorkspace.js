@@ -1212,6 +1212,14 @@ export function useSessionWorkspace({
     if (session?.name && session.name !== '(no messages)') return session.name
     if (session?.messageCount === 0
       || session?.firstMessage === '(no messages)') {
+      const liveTitle = session?.id === selectedSessionId.value
+        ? liveTurn?.liveFirstUserText?.value
+        : ''
+      if (liveTitle) {
+        return liveTitle.length > 140
+          ? `${liveTitle.slice(0, 139)}…`
+          : liveTitle
+      }
       return 'New session'
     }
     return session?.firstMessage || 'Untitled session'

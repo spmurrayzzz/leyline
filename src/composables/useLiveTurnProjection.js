@@ -20,6 +20,10 @@ export function useLiveTurnProjection({ onIntent } = {}) {
   const liveAssistantMessages = ref([])
   const liveUserMessages = ref([])
   const liveTools = ref([])
+  const liveFirstUserText = computed(() => {
+    return liveUserMessages.value.find((message) => message.text?.trim())
+      ?.text.trim() || ''
+  })
   const rawEntries = computed(() => [
     ...(persistedDetail.value?.entries || []),
     ...optimisticEntries.value,
@@ -1000,6 +1004,7 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     handle,
     liveActivity,
     liveAssistantBlocks,
+    liveFirstUserText,
     liveItems,
     liveTurnActive,
     reconcileCurrentDetail,
