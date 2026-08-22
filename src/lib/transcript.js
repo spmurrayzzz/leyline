@@ -24,6 +24,7 @@ export function entryClass(entry) {
     'user-message': entry.role === 'user',
     'assistant-message': entry.role === 'assistant',
     'summary-message': entry.type === 'summary',
+    'research-report-message': Boolean(entry.researchReport),
     'submit-handoff-message': entry.submitHandoff === true,
   }
 }

@@ -1,4 +1,5 @@
 import { goalStateFromSession, isGoalStateEvent } from './goal-state.js'
+import { isResearchEntry } from '../../lib/research-state.js'
 
 export function emptyExtensionUiState() {
   return {
@@ -27,11 +28,17 @@ export async function bindRuntimeHandle(handle, events) {
       activeSessionId: handle.sessionId,
       event,
     })
-    if (event.type === 'queue_update' || isGoalStateEvent(event)) {
+    if (event.type === 'queue_update'
+      || isGoalStateEvent(event)
+      || isResearchStateEvent(event)) {
       events.broadcastActiveSession(handle)
     }
   })
   events.broadcastActiveSession(handle)
+}
+
+function isResearchStateEvent(event) {
+  return event?.type === 'entry_appended' && isResearchEntry(event.entry)
 }
 
 function createExtensionUiContext(handle, events) {

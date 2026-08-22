@@ -72,6 +72,12 @@ import {
   getAgentDir,
   SessionManager,
 } from '@earendil-works/pi-coding-agent'
+import {
+  RESEARCH_CUSTOM_TYPE,
+  RESEARCH_VERSION,
+  researchStateFromEntries,
+} from '../../lib/research-state.js'
+import { auditResearchReportCitations } from '../../lib/research-citations.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const BUNDLED_GOAL_EXTENSION = resolve(
@@ -99,6 +105,15 @@ const BUNDLED_SUBAGENT_EXTENSION = resolve(
   '.pi',
   'extensions',
   'subagent',
+  'index.ts',
+)
+const BUNDLED_RESEARCH_EXTENSION = resolve(
+  __dirname,
+  '..',
+  '..',
+  '.pi',
+  'extensions',
+  'research',
   'index.ts',
 )
 const BUNDLED_VISION_EXTENSION = resolve(
@@ -196,6 +211,7 @@ async function createRuntimeResult(
         BUNDLED_GOAL_EXTENSION,
         BUNDLED_MEMORY_EXTENSION,
         BUNDLED_SUBAGENT_EXTENSION,
+        BUNDLED_RESEARCH_EXTENSION,
         BUNDLED_VISION_EXTENSION,
       ],
       extensionsOverride: systemPrompt
@@ -657,11 +673,13 @@ async function editSessionPrompt(handle, entryId, text, images = [], signal) {
     const result = await session.navigateTree(entryId)
     if (result.cancelled) throw new Error('Edit cancelled')
   }
+  await bindRuntimeHandle(handle)
 
   try {
     await promptSession(handle, text, images, undefined, signal)
   } catch (error) {
     moveSessionLeaf(session, oldLeafId)
+    await bindRuntimeHandle(handle)
     throw error
   }
 }
@@ -695,7 +713,9 @@ async function resetSessionToEntry(handle, entryId) {
   manager.fileEntries = [header, ...manager.getBranch(entryId)]
   manager._buildIndex()
   manager._rewriteFile()
+  restoreTrailingResearchReport(manager)
   updateSessionContext(session)
+  await bindRuntimeHandle(handle)
   return activeSessionDto(handle)
 }
 
@@ -718,6 +738,7 @@ async function forkActiveSession(entryId) {
   const previousSessionPath = activeRuntime.session.sessionManager.getSessionFile()
   const result = await activeRuntime.fork(entryId, { position: 'at' })
   if (result.cancelled) throw new Error('Fork cancelled')
+  rebaseResearchSession(activeRuntime.session.sessionManager)
   forceOneAtATime(activeRuntime.session)
   runtimeHandles.delete(previousId)
   activeHandle.sessionId = activeRuntime.session.sessionManager.getSessionId()
@@ -735,6 +756,119 @@ async function forkActiveSession(entryId) {
   })
   await bindActiveSession()
   return activeSessionDto()
+}
+
+function restoreTrailingResearchReport(manager) {
+  const research = researchStateFromEntries(
+    manager.getBranch(),
+    manager.getSessionId(),
+  )
+  if (!research || research.phase !== 'report' || research.reportEntryId) return
+  const reportEntry = researchReportEntry(
+    manager.getBranch(),
+    research.reportRequestedAt,
+  )
+  if (reportEntry?.type !== 'message') return
+  const reportText = extractMessageText(reportEntry.message.content)
+  const citationAudit = auditResearchReportCitations(reportText, research.sources)
+  const usableSources = research.sources.filter((source) => {
+    return source.status !== 'excluded'
+  })
+  const data = !citationAudit.invalid
+    && (!usableSources.length || citationAudit.ids.length)
+    ? {
+        kind: 'report',
+        reportEntryId: reportEntry.id,
+        title: research.reportTitle,
+        citedSourceIds: citationAudit.ids,
+      }
+    : {
+        kind: 'error',
+        message: 'The restored report citations did not match the source ledger.',
+      }
+  manager.appendCustomEntry(RESEARCH_CUSTOM_TYPE, {
+    version: RESEARCH_VERSION,
+    sessionId: manager.getSessionId(),
+    updatedAt: Date.now(),
+    ...data,
+  })
+}
+
+function rebaseResearchSession(manager) {
+  const branch = manager.getBranch()
+  const marker = [...branch].reverse().find((entry) => {
+    return entry.type === 'custom'
+      && entry.customType === RESEARCH_CUSTOM_TYPE
+      && entry.data?.kind === 'session'
+  })
+  if (!marker?.data?.sessionId) return
+  const research = researchStateFromEntries(branch, marker.data.sessionId)
+  if (!research) return
+
+  const sessionId = manager.getSessionId()
+  const append = (data) => manager.appendCustomEntry(RESEARCH_CUSTOM_TYPE, {
+    version: RESEARCH_VERSION,
+    sessionId,
+    updatedAt: Date.now(),
+    ...data,
+  })
+  append({ kind: 'session', createdAt: Date.now() })
+  if (research.objective) append({ kind: 'objective', objective: research.objective })
+  if (research.threads.length) {
+    append({
+      kind: 'plan',
+      strategy: research.strategy,
+      threads: research.threads,
+    })
+  }
+  for (const source of research.sources) append({ kind: 'source', source })
+  append({
+    kind: 'phase',
+    phase: research.phase,
+    note: research.note,
+    title: research.reportTitle,
+    citedSourceIds: research.citedSourceIds,
+  })
+  const reportEntry = manager.getEntry(research.reportEntryId)
+    || researchReportEntry(branch, research.reportRequestedAt)
+  if (reportEntry?.type === 'message') {
+    const reportText = extractMessageText(reportEntry.message.content)
+    const citationAudit = auditResearchReportCitations(
+      reportText,
+      research.sources,
+    )
+    const usableSources = research.sources.filter((source) => {
+      return source.status !== 'excluded'
+    })
+    if (!citationAudit.invalid
+      && (!usableSources.length || citationAudit.ids.length)) {
+      append({
+        kind: 'report',
+        reportEntryId: reportEntry.id,
+        title: research.reportTitle,
+        citedSourceIds: citationAudit.ids,
+      })
+    } else {
+      append({
+        kind: 'error',
+        message: 'Forked report citations did not match the source ledger.',
+      })
+    }
+  } else if (research.status === 'error') {
+    append({ kind: 'error', message: research.error })
+  }
+}
+
+function researchReportEntry(branch, requestedAt) {
+  const minimum = Number(requestedAt || 0)
+  return [...branch].reverse().find((entry) => {
+    if (entry.type !== 'message' || entry.message?.role !== 'assistant') {
+      return false
+    }
+    if (entry.message.stopReason !== 'stop') return false
+    const timestamp = new Date(entry.timestamp).getTime()
+    return timestamp >= minimum && extractMessageText(entry.message.content).trim()
+  })
 }
 
 async function renameSession(id, name) {
@@ -954,8 +1088,11 @@ function forceOneAtATime(session) {
   session.setFollowUpMode(ONE_AT_A_TIME)
 }
 
-async function createNewSession(cwd) {
+async function createNewSession(cwd, kind = 'session') {
   if (!cwd) throw new Error('cwd is required')
+  if (!['session', 'research'].includes(kind)) {
+    throw new Error('kind must be session or research')
+  }
   await mkdir(cwd, { recursive: true })
 
   const runtime = await createAgentSessionRuntime(createRuntime, {
@@ -963,9 +1100,18 @@ async function createNewSession(cwd) {
     agentDir: getAgentDir(),
     sessionManager: SessionManager.create(cwd, configuredSessionDir(cwd)),
   })
+  const sessionId = runtime.session.sessionManager.getSessionId()
+  if (kind === 'research') {
+    runtime.session.sessionManager.appendCustomEntry(RESEARCH_CUSTOM_TYPE, {
+      version: RESEARCH_VERSION,
+      kind: 'session',
+      sessionId,
+      createdAt: Date.now(),
+    })
+  }
   const handle = {
     runtime,
-    sessionId: runtime.session.sessionManager.getSessionId(),
+    sessionId,
     unsubscribe: undefined,
     extensionUiState: emptyExtensionUiState(),
   }

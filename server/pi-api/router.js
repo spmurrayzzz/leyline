@@ -82,6 +82,7 @@ async function piApiHandler(req, res) {
           capabilities: {
             events: true,
             exports: true,
+            research: true,
             review: true,
             reviewWatch: true,
             terminal: true,
@@ -113,7 +114,7 @@ async function piApiHandler(req, res) {
   
         if (req.method === 'POST') {
           const body = await readJson(req)
-          const active = await createNewSession(body.cwd)
+          const active = await createNewSession(body.cwd, body.kind)
           return json(res, {
             active,
             detail: toActiveSessionDetailDto(),

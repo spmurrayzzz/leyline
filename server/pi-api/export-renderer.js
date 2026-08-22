@@ -48,6 +48,7 @@ export async function renderSessionExportHtml(detail, shareMeta = {}) {
     .filter(isExportRenderableEntry)
     .map(toExportEntry)
   const body = entries.map(renderExportEntry).join('\n')
+  const researchSources = renderExportResearchSources(session.research)
   const exportData = Buffer.from(JSON.stringify({ entries })).toString('base64')
 
   return `<!DOCTYPE html>
@@ -76,6 +77,7 @@ ${exportLogoSvg()}
 </header>
 <section class="transcript">
 ${body || '<div class="empty-workbench">No transcript entries found.</div>'}
+${researchSources}
 </section>
 </main>
 <script id="export-data" type="application/json">${exportData}</script>
@@ -199,6 +201,7 @@ function renderExportSubagent(entry, index) {
   const hasErroredResult = results.some((result) => result.error || result.exitCode !== 0)
   const status = details?.background ? 'running' : (entry.isError || hasErroredResult ? 'error' : 'completed')
   const target = exportSubagentTarget(entry)
+  const research = entry.researchThreads === true
 
   let resultsHtml = ''
   for (const result of results) {
@@ -206,8 +209,8 @@ function renderExportSubagent(entry, index) {
     resultsHtml += `
 <div class="subagent-detail-block">
 <div class="subagent-detail-header">
-<strong>${escapeHtml(result.agent)}</strong>
-<span class="subagent-detail-task">${escapeHtml(result.task)}</span>
+<strong>${escapeHtml(research ? researchThreadId(result) : result.agent)}</strong>
+<span class="subagent-detail-task">${escapeHtml(research ? researchThreadTitle(result) : result.task)}</span>
 </div>
 ${output ? `<pre class="subagent-detail-output">${escapeHtml(output)}</pre>` : ''}
 </div>`
@@ -222,7 +225,7 @@ ${output ? `<pre class="subagent-detail-output">${escapeHtml(output)}</pre>` : '
 <path d="m10 7 3 3-3 3"></path>
 </svg>
 </span>
-<span class="subagent-label">Subagent</span>
+<span class="subagent-label">${research ? 'Research threads' : 'Subagent'}</span>
 ${target ? `<code>${escapeHtml(target)}</code>` : ''}
 <em class="subagent-status status-${status}">${status}</em>
 </summary>
@@ -232,7 +235,20 @@ ${resultsHtml || '<div class="tool-lazy-placeholder">Open to render details</div
 </details>`
 }
 
+function researchThreadId(result) {
+  return result.research?.threadId
+    || result.task?.match(/^\s*\[([^\]]+)\]/)?.[1]
+    || result.agent
+}
+
+function researchThreadTitle(result) {
+  return result.research?.title
+    || result.task?.replace(/^\s*\[[^\]]+\]\s*/, '')
+    || result.agent
+}
+
 function exportSubagentTarget(entry) {
+  if (entry.researchThreads) return entry.code || ''
   const agent = entry.label.replace(/^Subagent · /, '')
   if (agent && agent !== 'subagent' && agent !== entry.code) return agent
   return entry.code || ''
@@ -314,13 +330,41 @@ function renderExportMessage(entry) {
     entry.role === 'user' ? 'user-message' : '',
     entry.role === 'assistant' ? 'assistant-message' : '',
     entry.type === 'summary' ? 'summary-message' : '',
+    entry.researchReport ? 'research-report-message' : '',
   ].filter(Boolean).join(' ')
 
   return `<article class="${classes}">
 <div class="message-meta message-meta-row"><span>${escapeHtml(entry.label)}</span></div>
+${renderExportResearchReportHeading(entry)}
 ${renderMessageBody(entry)}
 ${renderMessageImages(entry)}
 </article>`
+}
+
+function renderExportResearchReportHeading(entry) {
+  const report = entry.researchReport
+  if (!report) return ''
+  return `<div class="research-report-heading">
+<span class="research-report-icon">R</span>
+<span><strong>${escapeHtml(report.title)}</strong><small>Markdown report · ${escapeHtml(report.sourceCount)} sources · ${escapeHtml(report.citedSourceCount)} cited</small></span>
+</div>`
+}
+
+function renderExportResearchSources(research) {
+  if (!research?.sources?.length) return ''
+  const sources = research.sources.map((source) => {
+    const location = source.publisher || source.url || source.path || ''
+    const evidence = source.exclusionReason || source.evidence || source.claim || ''
+    const link = source.url
+      ? `<a href="${escapeHtml(source.url)}">Open source ↗</a>`
+      : source.path ? `<code>${escapeHtml(source.path)}</code>` : ''
+    return `<article class="export-research-source${source.status === 'excluded' ? ' is-excluded' : ''}">
+<b>${escapeHtml(source.id)}</b>
+<div><strong>${escapeHtml(source.title)}</strong><small>${escapeHtml(location)}</small>${evidence ? `<p>${escapeHtml(evidence)}</p>` : ''}${link}</div>
+<em>${escapeHtml(source.status)}</em>
+</article>`
+  }).join('')
+  return `<section class="export-research-sources"><header><strong>Sources</strong><span>${escapeHtml(research.sourceCount)} total · ${escapeHtml(research.citedSourceCount)} cited · ${escapeHtml(research.excludedSourceCount)} excluded</span></header>${sources}</section>`
 }
 
 function renderMessageBody(entry) {
@@ -697,6 +741,99 @@ button, input, textarea { color: inherit; font: inherit; }
   color: #dedee2;
 }
 .assistant-message .message-meta { color: var(--muted); }
+.research-report-message {
+  overflow: hidden;
+  border: 1px solid #35333e;
+  background: #171717;
+  padding: 0;
+}
+.research-report-message > .message-meta {
+  min-height: 34px;
+  margin: 0;
+  border-bottom: 1px solid var(--border-soft);
+  padding: 6px 12px;
+}
+.research-report-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 51px;
+  border-bottom: 1px solid var(--border-soft);
+  padding: 9px 13px;
+}
+.research-report-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border: 1px solid rgb(138 120 255 / 28%);
+  border-radius: 7px;
+  background: rgb(138 120 255 / 10%);
+  color: #b8adff;
+  font-size: 12px;
+}
+.research-report-heading strong,
+.research-report-heading small { display: block; }
+.research-report-heading strong { color: var(--text); font-size: 11px; }
+.research-report-heading small { margin-top: 3px; color: var(--muted); font-size: 8px; }
+.research-report-message > .entry-text,
+.research-report-message > .assistant-text-block { padding: 16px; }
+.research-report-message .markdown-body a {
+  display: inline-flex;
+  border: 1px solid rgb(138 120 255 / 28%);
+  border-radius: 5px;
+  background: rgb(138 120 255 / 10%);
+  padding: 0 4px;
+  color: #b9aeff;
+  font-size: 0.82em;
+  line-height: 1.55;
+}
+.export-research-sources {
+  display: grid;
+  gap: 8px;
+  width: min(var(--content-max), 100%);
+  margin: 26px auto 0;
+  border-top: 1px solid var(--border-soft);
+  padding-top: 18px;
+}
+.export-research-sources > header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 2px;
+}
+.export-research-sources > header strong { font-size: 13px; }
+.export-research-sources > header span { color: var(--muted); font-size: 10px; }
+.export-research-source {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  gap: 9px;
+  border: 1px solid var(--border-soft);
+  border-radius: 9px;
+  background: #171717;
+  padding: 10px;
+}
+.export-research-source > b {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid #37343f;
+  border-radius: 5px;
+  color: #a99cff;
+  font-size: 9px;
+}
+.export-research-source strong,
+.export-research-source small { display: block; }
+.export-research-source strong { color: #ddd; font-size: 11px; }
+.export-research-source small { margin-top: 3px; color: var(--muted); font-size: 9px; overflow-wrap: anywhere; }
+.export-research-source p { margin: 7px 0 0; color: #999; font-size: 10px; line-height: 1.45; }
+.export-research-source a,
+.export-research-source code { display: block; width: fit-content; margin-top: 7px; color: #a99cff; font-size: 9px; }
+.export-research-source em { color: var(--muted); font-size: 9px; font-style: normal; }
+.export-research-source.is-excluded { opacity: 0.68; }
 .thinking-block {
   margin: 0 0 8px;
   border: 0;

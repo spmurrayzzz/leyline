@@ -695,7 +695,7 @@
     display: none;
   }
 
-  .composer-context-row > .composer-chip:nth-of-type(n + 2) {
+  .composer-context-row > .composer-chip:nth-of-type(n + 2):not(.research-mode-chip) {
     display: none;
   }
 

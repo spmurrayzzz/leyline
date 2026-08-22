@@ -10,10 +10,10 @@ export async function fetchSessions() {
   return data.sessions || []
 }
 
-export function createPiSession(cwd) {
+export function createPiSession(cwd, kind = 'session') {
   return apiRequest('/api/pi/sessions', 'Failed to create session', {
     method: 'POST',
-    body: { cwd },
+    body: { cwd, kind },
   })
 }
 

@@ -6,6 +6,7 @@ const PierrePreview = defineAsyncComponent(() => import('./PierrePreview.vue'))
 
 <script setup>
 import { ref, watch } from 'vue'
+import { canonicalResearchSourceKey } from '../../lib/research-state.js'
 import {
   entryClass,
   imageBlocksFor,
@@ -39,6 +40,7 @@ const emit = defineEmits([
   'mark-feedback',
   'navigate-child-session',
   'open-image',
+  'open-research-source',
   'reset',
   'retry',
   'open-tool-fullscreen',
@@ -131,6 +133,10 @@ function isSubagentEntry(entry) {
 }
 
 function subagentStatus(result) {
+  if (result.status === 'queued') return 'queued'
+  if (result.status === 'running') return 'running'
+  if (result.status === 'error') return 'error'
+  if (result.status === 'done') return 'completed'
   if (result.error || result.exitCode !== 0) return 'error'
   if (!result.messages.length && !result.childSession) return 'running'
   return 'completed'
@@ -139,11 +145,15 @@ function subagentStatus(result) {
 function entrySubagentStatus(entry) {
   if (entry.subagentDetails?.background) return 'running'
   if (entry.isError || entry.subagentDetails?.results?.some((result) => subagentStatus(result) === 'error')) return 'error'
+  if (entry.subagentDetails?.results?.some((result) => {
+    return ['queued', 'running'].includes(subagentStatus(result))
+  })) return 'running'
   return 'completed'
 }
 
 function subagentFinalOutput(result) {
   if (result.error) return result.error
+  if (result.research?.summary) return result.research.summary
   for (let i = result.messages.length - 1; i >= 0; i--) {
     const message = result.messages[i]
     if (message.role === 'assistant' || message.role === 'error') return message.content.trim()
@@ -152,9 +162,26 @@ function subagentFinalOutput(result) {
 }
 
 function subagentTarget(entry) {
+  if (entry.researchThreads) return entry.code || ''
   const agent = entry.label.replace(/^Subagent · /, '')
   if (agent && agent !== 'subagent' && agent !== entry.code) return agent
   return entry.code || ''
+}
+
+function researchThreadId(result, index) {
+  return result.research?.threadId
+    || result.task?.match(/^\s*\[([^\]]+)\]/)?.[1]
+    || `T${index + 1}`
+}
+
+function researchThreadTitle(result) {
+  return result.research?.title
+    || result.task?.replace(/^\s*\[[^\]]+\]\s*/, '')
+    || result.agent
+}
+
+function researchSourceCount(result) {
+  return result.research?.sources?.length || 0
 }
 
 function navigateChildSession(childSession) {
@@ -162,15 +189,42 @@ function navigateChildSession(childSession) {
   emit('navigate-child-session', childSession)
 }
 
-function openMarkdownImage(event) {
-  const image = event.target
-  if (image?.tagName !== 'IMG') return
+function citationTarget(value) {
+  try {
+    return decodeURI(value)
+  } catch {
+    return value
+  }
+}
+
+function openMarkdownContent(event) {
+  const image = event.target?.closest?.('img')
+  if (image) {
+    event.preventDefault()
+    emit(
+      'open-image',
+      image.currentSrc || image.src,
+      image.alt || 'Transcript image',
+    )
+    return
+  }
+
+  const link = event.target?.closest?.('a')
+  if (!link || !props.entry.researchReport) return
+  const match = link.textContent?.trim().match(/^\[?(\d+)\]?$/)
+  if (!match) return
+  const id = Number(match[1])
+  const source = props.entry.researchReport.sources?.find((item) => {
+    return item.id === id
+  })
+  if (!source) return
+  const target = citationTarget(link.getAttribute('href') || '')
+  const key = /^https?:\/\//i.test(target)
+    ? canonicalResearchSourceKey({ url: target })
+    : canonicalResearchSourceKey({ path: target })
+  if (!key || key !== source.key) return
   event.preventDefault()
-  emit(
-    'open-image',
-    image.currentSrc || image.src,
-    image.alt || 'Transcript image',
-  )
+  emit('open-research-source', { id, url: link.href })
 }
 </script>
 
@@ -191,7 +245,10 @@ function openMarkdownImage(event) {
   <article
     v-else-if="isSubagentEntry(entry)"
     class="tool-card subagent-card transcript-tool"
-    :class="{ 'is-expanded': toolExpanded }"
+    :class="{
+      'is-expanded': toolExpanded,
+      'research-thread-card': entry.researchThreads,
+    }"
     @click="emit('toggle-tool', entry)"
   >
     <div class="subagent-header">
@@ -202,7 +259,9 @@ function openMarkdownImage(event) {
           <path d="m10 7 3 3-3 3" />
         </svg>
       </span>
-      <span class="subagent-label">Subagent</span>
+      <span class="subagent-label">
+        {{ entry.researchThreads ? 'Research threads' : 'Subagent' }}
+      </span>
       <code v-if="subagentTarget(entry)">{{ subagentTarget(entry) }}</code>
       <em
         class="subagent-status"
@@ -231,10 +290,20 @@ function openMarkdownImage(event) {
         :class="{ 'has-session': result.childSession }"
         @click.stop="navigateChildSession(result.childSession)"
       >
-        <span class="subagent-result-agent">{{ result.agent }}</span>
-        <span class="subagent-result-task">{{ result.task }}</span>
+        <span class="subagent-result-agent">
+          {{ entry.researchThreads ? researchThreadId(result, index) : result.agent }}
+        </span>
+        <span class="subagent-result-task">
+          {{ entry.researchThreads ? researchThreadTitle(result) : result.task }}
+        </span>
         <span
-          v-if="result.childSession"
+          v-if="entry.researchThreads"
+          class="research-thread-meta"
+        >
+          {{ researchSourceCount(result) }} sources · {{ subagentStatus(result) }}
+        </span>
+        <span
+          v-else-if="result.childSession"
           class="subagent-child-link"
         >
           → view session
@@ -515,6 +584,19 @@ function openMarkdownImage(event) {
       </button>
     </div>
     <div
+      v-if="entry.researchReport"
+      class="research-report-heading"
+    >
+      <span class="research-report-icon">R</span>
+      <span>
+        <strong>{{ entry.researchReport.title }}</strong>
+        <small>
+          Markdown report · {{ entry.researchReport.sourceCount }} sources ·
+          {{ entry.researchReport.citedSourceCount }} cited
+        </small>
+      </span>
+    </div>
+    <div
       v-if="canMarkFeedback(entry) && entry.rolloutFeedback && noteOpen"
       class="feedback-note-popover"
     >
@@ -556,7 +638,7 @@ function openMarkdownImage(event) {
           v-else
           class="entry-text markdown-body assistant-text-block"
           v-html="renderedBlock(block)"
-          @click="openMarkdownImage"
+          @click="openMarkdownContent"
         ></div>
       </template>
     </template>
@@ -578,7 +660,7 @@ function openMarkdownImage(event) {
           <div
             class="skill-expanded entry-text markdown-body"
             v-html="renderedMessage(entry)"
-            @click="openMarkdownImage"
+            @click="openMarkdownContent"
           ></div>
         </div>
       </div>
@@ -587,7 +669,7 @@ function openMarkdownImage(event) {
       v-else
       class="entry-text markdown-body"
       v-html="renderedMessage(entry)"
-      @click="openMarkdownImage"
+      @click="openMarkdownContent"
     ></div>
     <div v-if="imageBlocksFor(entry).length" class="message-images">
       <button

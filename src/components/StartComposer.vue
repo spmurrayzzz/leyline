@@ -50,6 +50,11 @@ const props = defineProps({
     required: true,
   },
   modelPickerOpen: Boolean,
+  researchEnabled: Boolean,
+  sessionKind: {
+    type: String,
+    default: 'session',
+  },
   newSessionCwd: {
     type: String,
     default: '',
@@ -115,6 +120,7 @@ const emit = defineEmits([
   'show-slash-picker',
   'submit',
   'toggle-picker',
+  'toggle-session-kind',
   'toggle-project-picker',
   'update:draft',
   'update:startProjectQuery',
@@ -124,6 +130,7 @@ const form = ref(null)
 const textarea = ref(null)
 const startProjectMenuMaxHeight = ref(360)
 const shellMode = computed(() => props.draft.trimStart().startsWith('!'))
+const researchMode = computed(() => props.sessionKind === 'research')
 const hiddenShellMode = computed(() => props.draft.trimStart().startsWith('!!'))
 const shellCommand = computed(() => {
   const text = props.draft.trimStart()
@@ -195,6 +202,7 @@ defineExpose({ form })
     :class="{
       'shell-mode-composer': shellMode,
       'hidden-shell-mode-composer': hiddenShellMode,
+      'research-mode-composer': researchMode,
     }"
     @submit.prevent="emit('submit')"
   >
@@ -205,7 +213,9 @@ defineExpose({ form })
       <textarea
         ref="textarea"
         :value="draft"
-        placeholder="Ask Leyline anything"
+        :placeholder="researchMode
+          ? 'Describe the research question, constraints, and desired report'
+          : 'Ask Leyline anything'"
         :disabled="inputDisabled"
         @keydown="emit('keydown', $event)"
         @input="updateDraft"
@@ -356,6 +366,21 @@ defineExpose({ form })
           <span class="start-project-icon">▱</span>
           <span class="start-project-label">{{ startProjectLabel }}</span>
           <span class="model-caret">▾</span>
+        </button>
+        <button
+          v-if="researchEnabled"
+          class="composer-chip start-composer-chip research-mode-chip"
+          :class="{ active: researchMode }"
+          type="button"
+          :disabled="shellMode || inputDisabled"
+          :aria-pressed="researchMode"
+          title="Toggle deep research mode"
+          @click="emit('toggle-session-kind')"
+        >
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M6 2h4M7 2v4l-3.5 6A1.3 1.3 0 0 0 4.6 14h6.8a1.3 1.3 0 0 0 1.1-2L9 6V2M5.5 10h5"></path>
+          </svg>
+          <span>research</span>
         </button>
         <span
           v-if="shellMode"

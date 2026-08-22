@@ -80,10 +80,10 @@ export function useSessionWorkspace({
   })
   const sidebarActivitySessions = computed(() => {
     return Object.entries(runtimeSessionsById.value).flatMap(([id, state]) => {
-      const status = runtimeStatus(state)
-      if (!status.label) return []
       const session = sessionsById.value.get(id)
         || (selectedSession.value?.id === id ? selectedSession.value : null)
+      const status = runtimeStatus(state, state.research || session?.research)
+      if (!status.label) return []
       if (!session?.cwd) return []
       return [{
         project: {
@@ -306,9 +306,9 @@ export function useSessionWorkspace({
     }
   }
 
-  async function createSession(project) {
+  async function createSession(project, options = {}) {
     if (selectedSession.value || startupRun.value) {
-      await createSessionForCwd(project.cwd)
+      await createSessionForCwd(project.cwd, options)
       return
     }
 
@@ -316,14 +316,16 @@ export function useSessionWorkspace({
 
     try {
       await wait(420)
-      await runStartupPhase('creating', () => createSessionForCwd(project.cwd))
+      await runStartupPhase('creating', () => {
+        return createSessionForCwd(project.cwd, options)
+      })
     } finally {
       await wait(260)
       finishStartupRun()
     }
   }
 
-  async function createSessionForCwd(cwd) {
+  async function createSessionForCwd(cwd, options = {}) {
     const targetCwd = cwd?.trim() || ''
     if (!targetCwd) return
 
@@ -338,9 +340,9 @@ export function useSessionWorkspace({
       if (handoff) await waitSessionHandoffPhaseFloor(handoff)
       const data = handoff
         ? await runSessionHandoffPhase(handoff, 'creating', () => {
-          return createPiSession(targetCwd)
+          return createPiSession(targetCwd, options.kind)
         })
-        : await createPiSession(targetCwd)
+        : await createPiSession(targetCwd, options.kind)
 
       if (handoff) setSessionHandoffPhase(handoff, 'loading')
       sessions.value = [
@@ -556,6 +558,7 @@ export function useSessionWorkspace({
       pendingToolCount: Array.isArray(state.pendingToolCalls)
         ? state.pendingToolCalls.length
         : 0,
+      research: state.research || null,
     }
     patchRuntimeSessionState(runtimeSession.id, patch, {
       preserveUnread: true,
@@ -589,14 +592,35 @@ export function useSessionWorkspace({
   }
 
   function sessionRuntimeStatus(id) {
-    return runtimeStatus(runtimeSessionsById.value[id] || {})
+    const state = runtimeSessionsById.value[id] || {}
+    const session = sessionsById.value.get(id)
+      || (selectedSession.value?.id === id ? selectedSession.value : null)
+    return runtimeStatus(
+      state,
+      state.research || session?.research,
+      id === selectedSessionId.value,
+    )
   }
 
-  function runtimeStatus(state) {
-    if (state.error) return { label: 'error', tone: 'error' }
+  function runtimeStatus(state, research, showCompleted = false) {
+    if (state.error || research?.status === 'error') {
+      return { label: 'error', tone: 'error' }
+    }
     if (state.isCompacting) return { label: 'compacting', tone: 'compacting' }
+    if (research && state.isStreaming) {
+      if (research.phase === 'gather' && research.threadCount) {
+        return {
+          label: `gather ${research.completedThreadCount}/${research.threadCount}`,
+          tone: 'running',
+        }
+      }
+      return { label: research.phase || 'research', tone: 'running' }
+    }
     if (state.isStreaming) return { label: 'running', tone: 'running' }
     if (state.unread) return { label: 'unread', tone: 'unread' }
+    if (research?.status === 'complete' && showCompleted) {
+      return { label: 'ready', tone: 'research' }
+    }
     if (state.queuedCount) {
       return { label: `+${state.queuedCount} queued`, tone: 'queued' }
     }
@@ -1205,6 +1229,7 @@ export function useSessionWorkspace({
         name: session.name,
         firstMessage: session.firstMessage,
         messageCount: session.messageCount,
+        research: session.research || item.research || null,
         modified: session.modified,
         timestamp: session.modified || item.timestamp,
       }

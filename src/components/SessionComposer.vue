@@ -88,6 +88,7 @@ const props = defineProps({
     default: 'Ask for follow-up changes or attach images',
   },
   reloadingSession: Boolean,
+  research: Boolean,
   selectedModelKey: {
     type: String,
     default: '',
@@ -418,6 +419,10 @@ function updateDraft(event) {
           <i aria-hidden="true"></i>
           {{ compacting ? 'compacting' : 'running' }}
         </span>
+        <span
+          v-if="research"
+          class="composer-chip research-mode-chip active"
+        >research</span>
         <span
           v-if="shellMode"
           class="composer-chip shell-mode-chip"

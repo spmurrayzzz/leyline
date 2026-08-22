@@ -20,15 +20,23 @@ interface AgentDef {
   model: string;
   thinking: string;
   tools: string[];
+  strictTools?: boolean;
   systemPrompt: string;
-  source: "user" | "project" | "unknown";
+  source: "user" | "project" | "bundled" | "unknown";
   key: string;
 }
 
 interface SingleResult {
   agent: string;
-  agentSource: "user" | "project" | "unknown";
+  agentSource: "user" | "project" | "bundled" | "unknown";
   task: string;
+  status?: "queued" | "running" | "done" | "error";
+  research?: {
+    threadId?: string;
+    title?: string;
+    summary?: string;
+    sources?: Array<Record<string, unknown>>;
+  };
   requestedModel?: string;
   requestedThinking?: string;
   childSession: { path: string; id: string; cwd?: string } | null;
@@ -53,6 +61,42 @@ interface SubagentDetails {
   background: boolean;
 }
 
+const SAFE_RESEARCH_BUILTINS = new Set([
+  "read",
+  "grep",
+  "find",
+  "ls",
+]);
+const SAFE_RESEARCH_EXTERNAL_TOOLS = new Set([
+  "exa_search",
+  "exa_contents",
+  "list_memory",
+  "search_memory",
+  "web_search",
+  "web_fetch",
+]);
+
+const BUNDLED_RESEARCHER: AgentDef = {
+  name: "researcher",
+  description: "Investigate one bounded research thread and return structured source evidence",
+  model: "inherit",
+  thinking: "inherit",
+  tools: [],
+  strictTools: true,
+  systemPrompt: `You are a research worker for one bounded thread in a larger investigation.
+
+Search broadly, then read the strongest sources in depth. Prefer primary sources, official documentation, direct datasets, and reproducible benchmarks. Check dates, methods, and conflicts. Do not make the final cross-thread recommendation.
+
+End your response with exactly one structured block in this form:
+<research_result>
+{"threadId":"T1","title":"short thread title","summary":"concise findings","sources":[{"url":"https://...","title":"source title","publisher":"publisher","publishedAt":"YYYY-MM-DD when known","kind":"primary|benchmark|vendor|analysis|project","claim":"what this source supports","evidence":"specific evidence or limitation"}]}
+</research_result>
+
+Use the thread ID from the task. Include only sources that you read. Use a project path instead of url for local evidence. Keep the JSON valid and put no Markdown inside the structured block.`,
+  source: "bundled",
+  key: "bundled:leyline-researcher",
+};
+
 function discoverAgents(cwd: string): Map<string, AgentDef> {
   const agents = new Map<string, AgentDef>();
   const userDir = join(homedir(), ".pi", "agent", "agents");
@@ -60,6 +104,10 @@ function discoverAgents(cwd: string): Map<string, AgentDef> {
 
   if (userDir) loadAgentsFromDir(userDir, "user", agents);
   if (projectDir) loadAgentsFromDir(projectDir, "project", agents);
+  agents.set(BUNDLED_RESEARCHER.name, {
+    ...BUNDLED_RESEARCHER,
+    tools: [...BUNDLED_RESEARCHER.tools],
+  });
 
   return agents;
 }
@@ -177,7 +225,7 @@ async function runSubagentViaApi(params: {
   parentSessionPath: string | null;
   model: string | { provider: string; id: string } | undefined;
   thinkingLevel: ThinkingLevel | undefined;
-  tools: string[];
+  tools?: string[];
   systemPrompt: string;
   signal?: AbortSignal;
 }): Promise<{
@@ -194,7 +242,7 @@ async function runSubagentViaApi(params: {
     parentSessionPath: params.parentSessionPath,
     model: params.model || undefined,
     thinkingLevel: params.thinkingLevel,
-    tools: params.tools.length > 0 ? params.tools : undefined,
+    tools: params.tools,
     systemPrompt: params.systemPrompt || undefined,
   }, params.signal) as Promise<any>;
 }
@@ -249,6 +297,16 @@ export default function subagentExtension(pi: ExtensionAPI) {
 
   function refreshAgents(ctx: ExtensionContext) {
     knownAgents = discoverAgents(ctx.cwd);
+    const researcher = knownAgents.get(BUNDLED_RESEARCHER.name);
+    if (!researcher) return;
+    researcher.tools = pi.getAllTools().filter((tool) => {
+      if (SAFE_RESEARCH_BUILTINS.has(tool.name)) {
+        return tool.sourceInfo?.source === "builtin";
+      }
+      if (!SAFE_RESEARCH_EXTERNAL_TOOLS.has(tool.name)) return false;
+      return tool.sourceInfo?.scope !== "project"
+        && tool.sourceInfo?.source !== "builtin";
+    }).map((tool) => tool.name);
   }
 
   pi.on("session_start", async (_event, ctx) => {
@@ -349,7 +407,7 @@ export default function subagentExtension(pi: ExtensionAPI) {
       _toolCallId: string,
       params: any,
       signal: AbortSignal,
-      _onUpdate: ((partial: string) => void) | undefined,
+      onUpdate: ((partial: any) => void) | undefined,
       ctx: ExtensionContext,
     ) {
       refreshAgents(ctx);
@@ -400,42 +458,72 @@ export default function subagentExtension(pi: ExtensionAPI) {
         }
 
         const maxConcurrency = 4;
-        const results: SingleResult[] = [];
+        const results = new Array<SingleResult>(tasks.length);
+        const progress = tasks.map((task: any, index: number) => pendingResult(
+          task,
+          index < maxConcurrency ? "running" : "queued",
+        ));
+        const publishProgress = () => {
+          const completed = progress.filter((result) => {
+            return result.status === "done" || result.status === "error";
+          }).length;
+          onUpdate?.({
+            content: [{
+              type: "text",
+              text: `${completed} of ${tasks.length} subagent tasks complete`,
+            }],
+            details: {
+              mode: "parallel",
+              results: progress.map(progressResult),
+              background: true,
+            } as SubagentDetails,
+          });
+        };
+        publishProgress();
+
         for (let i = 0; i < tasks.length; i += maxConcurrency) {
           const batch = tasks.slice(i, i + maxConcurrency);
-          const batchResults = await Promise.all(
-            batch.map(async (t) => {
-              const a = knownAgents.get(t.agent);
-              if (!a) {
-                return {
-                  agent: t.agent,
+          if (i > 0) {
+            batch.forEach((_task: any, batchIndex: number) => {
+              progress[i + batchIndex].status = "running";
+            });
+            publishProgress();
+          }
+          await Promise.all(batch.map(async (task: any, batchIndex: number) => {
+            const resultIndex = i + batchIndex;
+            const childAgent = knownAgents.get(task.agent);
+            const result = childAgent
+              ? await executeSingle(
+                childAgent, task.task, task.cwd || baseCwd, parentPath,
+                task.model ?? params.model, task.thinking ?? params.thinking,
+                parentThinkingLevel, signal, ctx,
+              )
+              : {
+                  agent: task.agent,
                   agentSource: "unknown" as const,
-                  task: t.task,
+                  task: task.task,
+                  status: "error" as const,
                   childSession: null,
                   exitCode: 1,
                   messages: [],
                   usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0, cost: 0, turns: 0 },
-                  error: `Unknown agent: ${t.agent}`,
-                } as SingleResult;
-              }
-              return executeSingle(
-                a, t.task, t.cwd || baseCwd, parentPath,
-                t.model ?? params.model, t.thinking ?? params.thinking,
-                parentThinkingLevel, signal, ctx,
-              );
-            }),
-          );
-          results.push(...batchResults);
+                  error: `Unknown agent: ${task.agent}`,
+                };
+            results[resultIndex] = result;
+            progress[resultIndex] = result;
+            publishProgress();
+          }));
         }
 
-        const output = results.map((r, i) => {
-          return `### Agent ${i + 1}: ${r.agent}\n${resultOutput(r)}`;
+        const finalResults = results.filter(Boolean);
+        const output = finalResults.map((result, index) => {
+          return `### Agent ${index + 1}: ${result.agent}\n${resultOutput(result)}`;
         }).join("\n\n");
 
         return {
           content: [{ type: "text", text: output }],
-          details: { mode: "parallel", results, background: false } as SubagentDetails,
-          isError: results.some(resultFailed),
+          details: { mode: "parallel", results: finalResults, background: false } as SubagentDetails,
+          isError: finalResults.some(resultFailed),
         };
       }
 
@@ -501,6 +589,55 @@ export default function subagentExtension(pi: ExtensionAPI) {
   });
 }
 
+function pendingResult(
+  task: any,
+  status: "queued" | "running",
+): SingleResult {
+  return {
+    agent: String(task.agent || "subagent"),
+    agentSource: task.agent === "researcher" ? "bundled" : "unknown",
+    task: String(task.task || ""),
+    status,
+    childSession: null,
+    exitCode: 0,
+    messages: [],
+    usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0, cost: 0, turns: 0 },
+  };
+}
+
+function progressResult(result: SingleResult): SingleResult {
+  const output = finalAssistantOutput(result).slice(0, 2000);
+  return {
+    ...result,
+    messages: output ? [{ role: "assistant", content: output }] : [],
+  };
+}
+
+function researchResultFromMessages(
+  messages: Array<{ role: string; content: string }>,
+): SingleResult["research"] {
+  const text = [...messages].reverse().find((message) => {
+    return message.role === "assistant" && message.content.includes("<research_result>");
+  })?.content;
+  if (!text) return undefined;
+  const match = text.match(/<research_result>\s*([\s\S]*?)\s*<\/research_result>/i);
+  if (!match) return undefined;
+  try {
+    const value = JSON.parse(match[1]);
+    if (!value || typeof value !== "object") return undefined;
+    return {
+      threadId: typeof value.threadId === "string" ? value.threadId.slice(0, 32) : undefined,
+      title: typeof value.title === "string" ? value.title.slice(0, 240) : undefined,
+      summary: typeof value.summary === "string" ? value.summary.slice(0, 2000) : undefined,
+      sources: Array.isArray(value.sources)
+        ? value.sources.filter((source: unknown) => source && typeof source === "object").slice(0, 20)
+        : [],
+    };
+  } catch {
+    return undefined;
+  }
+}
+
 function resultOutput(result: SingleResult): string {
   return result.error || finalAssistantOutput(result) || "(no output)";
 }
@@ -544,21 +681,29 @@ async function executeSingle(
       parentSessionPath,
       model: selectedAgentModel(agent, selectedModel, ctx),
       thinkingLevel: selectedAgentThinking(agent, selectedThinking, parentThinkingLevel),
-      tools: agent.tools,
+      tools: agent.strictTools
+        ? agent.tools
+        : agent.tools.length ? agent.tools : undefined,
       systemPrompt: agent.systemPrompt,
       signal,
     });
 
     const data = result as any;
+    const messages = data.messages || [];
+    const failed = failedResult(data);
     return {
       agent: agent.name,
       agentSource: agent.source,
       task,
+      status: failed ? "error" : "done",
+      research: agent.name === BUNDLED_RESEARCHER.name
+        ? researchResultFromMessages(messages)
+        : undefined,
       requestedModel: modelOverride,
       requestedThinking: thinkingOverride,
       childSession: data.childSession || null,
-      exitCode: failedResult(data) ? 1 : 0,
-      messages: data.messages || [],
+      exitCode: failed ? 1 : 0,
+      messages,
       usage: data.usage || emptyUsage,
       model: data.model,
       thinkingLevel: data.thinkingLevel,
@@ -571,6 +716,7 @@ async function executeSingle(
       agent: agent.name,
       agentSource: agent.source,
       task,
+      status: "error",
       requestedModel: modelOverride,
       requestedThinking: thinkingOverride,
       childSession: null,

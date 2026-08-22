@@ -265,6 +265,11 @@ export function useLiveTurnProjection({ onIntent } = {}) {
       return
     }
 
+    if (type === 'tool_execution_update') {
+      upsertLiveTool(event, 'running')
+      return
+    }
+
     if (type === 'tool_execution_end') {
       const failed = Boolean(event.error || event.isError)
       const tool = upsertLiveTool(event, failed ? 'error' : 'reading')
@@ -299,7 +304,9 @@ export function useLiveTurnProjection({ onIntent } = {}) {
       status,
       startedAt: existing?.startedAt || now,
     }
-    if (event.result !== undefined || event.error) {
+    if (event.result !== undefined
+      || event.partialResult !== undefined
+      || event.error) {
       next.resultEntry = liveToolResultEntry(next, event, now)
     }
 
@@ -352,7 +359,7 @@ export function useLiveTurnProjection({ onIntent } = {}) {
   }
 
   function liveToolResultEntry(tool, event, timestamp) {
-    const result = event.result
+    const result = event.result ?? event.partialResult
     const errorText = typeof event.error === 'string'
       ? event.error
       : event.error?.message || ''

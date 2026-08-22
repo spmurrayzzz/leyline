@@ -14,6 +14,7 @@ const PierrePreview = defineAsyncComponent(() => import('./components/PierrePrev
 const ProjectBrowser = defineAsyncComponent(() => import('./components/ProjectBrowser.vue'))
 const ProjectDetailDrawer = defineAsyncComponent(() => import('./components/ProjectDetailDrawer.vue'))
 const ReviewPane = defineAsyncComponent(() => import('./components/ReviewPane.vue'))
+const ResearchSourcesPane = defineAsyncComponent(() => import('./components/ResearchSourcesPane.vue'))
 const MemoryInspector = defineAsyncComponent(() => import('./components/MemoryInspector.vue'))
 const SessionComposer = defineAsyncComponent(() => import('./components/SessionComposer.vue'))
 const SubagentConfigDrawer = defineAsyncComponent(() => import('./components/SubagentConfigDrawer.vue'))
@@ -100,6 +101,11 @@ const reviewOpenRequested = ref(false)
 const reviewDesktopAvailable = ref(false)
 const reviewRefreshToken = ref(0)
 const reviewSummary = ref(defaultReviewSummary())
+const researchSourcesOpen = ref(false)
+const selectedResearchSourceId = ref(0)
+const researchSourceRevealKey = ref(0)
+const startSessionKind = ref('session')
+let researchSourcesDismissedSessionId = ''
 const reviewLineCountFormatter = new Intl.NumberFormat('en', {
   maximumFractionDigits: 1,
   notation: 'compact',
@@ -169,6 +175,9 @@ const reviewEnabled = computed(() => {
 })
 const reviewWatchEnabled = computed(() => {
   return activeBackendConnectionInfo.value?.capabilities?.reviewWatch === true
+})
+const researchEnabled = computed(() => {
+  return activeBackendConnectionInfo.value?.capabilities?.research === true
 })
 const reviewAvailable = computed(() => {
   return reviewEnabled.value && reviewDesktopAvailable.value
@@ -410,6 +419,74 @@ const {
   visibleProjects,
 } = sessionWorkspace
 workbenchScroll.bind({ selectedSessionId, liveItems })
+const selectedResearch = computed(() => {
+  return activeRuntimeSession.value?.state?.research
+    || selectedSession.value?.research
+    || null
+})
+const isResearchSession = computed(() => Boolean(selectedResearch.value))
+const researchPhaseSteps = ['plan', 'gather', 'synthesize', 'report']
+const researchPhaseIndex = computed(() => {
+  return Math.max(0, researchPhaseSteps.indexOf(selectedResearch.value?.phase))
+})
+const researchPhaseTitle = computed(() => {
+  const research = selectedResearch.value
+  if (!research) return ''
+  if (research.status === 'complete') return 'Research complete'
+  if (research.status === 'error') return 'Research interrupted'
+  if (research.phase === 'gather') return 'Gathering evidence'
+  if (research.phase === 'synthesize') return 'Synthesizing findings'
+  if (research.phase === 'report') return 'Writing report'
+  return 'Planning research'
+})
+const researchPhaseSummary = computed(() => {
+  const research = selectedResearch.value
+  if (!research) return ''
+  if (research.phase === 'gather' && research.threadCount) {
+    return `${research.completedThreadCount} of ${research.threadCount} threads complete · ${research.sourceCount} sources`
+  }
+  const parts = []
+  if (research.threadCount) parts.push(`${research.threadCount} threads`)
+  if (research.sourceCount) parts.push(`${research.sourceCount} sources`)
+  if (research.status === 'complete') {
+    parts.push(`${research.citedSourceCount} cited`)
+    if (research.excludedSourceCount) {
+      parts.push(`${research.excludedSourceCount} excluded`)
+    }
+  }
+  return parts.join(' · ') || 'Preparing the research plan'
+})
+const startHeadline = computed(() => {
+  return startSessionKind.value === 'research'
+    ? 'What should we investigate?'
+    : 'What should we work on?'
+})
+
+watch(researchEnabled, (enabled) => {
+  if (!enabled) startSessionKind.value = 'session'
+})
+
+watch(
+  () => [
+    selectedSessionId.value,
+    selectedResearch.value?.sourceCount || 0,
+  ],
+  ([sessionId, sourceCount], [previousSessionId] = []) => {
+    if (sessionId !== previousSessionId) {
+      selectedResearchSourceId.value = selectedResearch.value?.sources?.[0]?.id || 0
+      if (researchSourcesDismissedSessionId !== sessionId) {
+        researchSourcesDismissedSessionId = ''
+      }
+    }
+    if (!selectedResearch.value || !sourceCount) {
+      researchSourcesOpen.value = false
+      return
+    }
+    if (researchSourcesDismissedSessionId === sessionId) return
+    if (window.matchMedia('(min-width: 761px)').matches) openResearchSources()
+  },
+)
+
 watch(
   () => visionSessionKey(scopedConfigTarget()),
   () => {
@@ -685,8 +762,14 @@ const sendButtonLabel = computed(() => {
 const composerPlaceholder = computed(() => {
   if (compactingContext.value) return 'Compacting context before continuing…'
   if (sessionActivating.value) return 'Activating pi runtime…'
+  if (agentRunning.value && isResearchSession.value) {
+    return 'Steer this research; your message reaches the lead at the next checkpoint'
+  }
   if (agentRunning.value) {
     return 'Type to steer the current run; Option+Enter queues follow-up'
+  }
+  if (selectedResearch.value?.status === 'complete') {
+    return 'Ask a follow-up or request a report revision'
   }
   if (isEmptySelectedSession.value) return 'Describe the first task or attach images'
   return 'Ask for follow-up changes or attach images'
@@ -969,16 +1052,16 @@ function selectSidebarProject(project) {
   sidebarNavigator.value = ''
 }
 
-async function createSession(project) {
+async function createSession(project, options = {}) {
   sidebarNavigator.value = ''
-  await workspaceCreateSession(project)
+  await workspaceCreateSession(project, options)
   projectBrowserOpen.value = false
   projectDetailCwd.value = ''
   sidebarOpen.value = false
 }
 
-async function createSessionForCwd(cwd) {
-  await workspaceCreateSessionForCwd(cwd)
+async function createSessionForCwd(cwd, options = {}) {
+  await workspaceCreateSessionForCwd(cwd, options)
   projectBrowserOpen.value = false
   projectDetailCwd.value = ''
   sidebarOpen.value = false
@@ -1144,7 +1227,52 @@ function reviewMotionDuration() {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 1 : 240
 }
 
+function researchPhaseClass(phase) {
+  const index = researchPhaseSteps.indexOf(phase)
+  return {
+    done: selectedResearch.value?.status === 'complete'
+      || index < researchPhaseIndex.value,
+    current: selectedResearch.value?.status !== 'complete'
+      && index === researchPhaseIndex.value,
+  }
+}
+
+function researchPhaseLabel(phase) {
+  return phase.charAt(0).toUpperCase() + phase.slice(1)
+}
+
+function openResearchSources(sourceId = 0) {
+  if (!selectedResearch.value?.sourceCount) return
+  closeReview(true)
+  if (sourceId) selectedResearchSourceId.value = Number(sourceId)
+  if (!selectedResearchSourceId.value) {
+    selectedResearchSourceId.value = selectedResearch.value.sources?.[0]?.id || 0
+  }
+  researchSourcesDismissedSessionId = ''
+  researchSourcesOpen.value = true
+}
+
+function closeResearchSources(dismiss = true) {
+  researchSourcesOpen.value = false
+  if (dismiss) researchSourcesDismissedSessionId = selectedSessionId.value
+}
+
+function toggleResearchSources() {
+  if (researchSourcesOpen.value) closeResearchSources()
+  else openResearchSources()
+}
+
+function selectResearchSource(sourceId) {
+  selectedResearchSourceId.value = Number(sourceId || 0)
+}
+
+function openResearchSource(payload) {
+  researchSourceRevealKey.value++
+  openResearchSources(payload?.id)
+}
+
 function openReview() {
+  closeResearchSources(true)
   if (!reviewReady.value) {
     reviewOpenRequested.value = true
     return
@@ -1247,6 +1375,7 @@ function toggleReviewExpanded() {
 function navigateHome() {
   workspaceNavigateHome()
   closeReview(true)
+  closeResearchSources(false)
   sidebarNavigator.value = ''
   sidebarOpen.value = false
 }
@@ -2287,6 +2416,13 @@ async function selectThinkingLevel(level) {
   await selectWorkspaceThinkingLevel(level)
 }
 
+function toggleStartSessionKind() {
+  if (!researchEnabled.value) return
+  startSessionKind.value = startSessionKind.value === 'research'
+    ? 'session'
+    : 'research'
+}
+
 function togglePicker(name) {
   modelPickerOpen.value = name === 'model' && !modelPickerOpen.value
   thinkingPickerOpen.value = name === 'thinking' && !thinkingPickerOpen.value
@@ -2444,6 +2580,7 @@ async function submitStartDraft() {
   const thinkingLevel = startSelectedThinkingLevel.value
   const targetCwd = newSessionCwd.value.trim()
   const hasPrompt = Boolean(text || attachedImages.value.length)
+  const kind = text.startsWith('!') ? 'session' : startSessionKind.value
   if (!targetCwd || creatingSessionCwd.value) return
 
   clearTimeout(startupDockTimer)
@@ -2458,7 +2595,10 @@ async function submitStartDraft() {
 
   try {
     await wait(startupAcceptedFloorMs)
-    await runStartupPhase('creating', () => createSessionForCwd(targetCwd))
+    await runStartupPhase('creating', () => {
+      return createSessionForCwd(targetCwd, { kind })
+    })
+    if (selectedSession.value) startSessionKind.value = 'session'
     if (model && selectedSession.value) {
       await runStartupPhase('model', () => selectWorkspaceModel(model))
     }
@@ -2527,6 +2667,7 @@ function anyEscapeTargetOpen() {
     || toolsPickerOpen.value
     || startProjectPickerOpen.value
     || slashPickerOpen.value
+    || researchSourcesOpen.value
     || (reviewPaneExpanded.value && window.innerWidth > 1120)
   )
 }
@@ -2543,6 +2684,7 @@ function handleEscape(event) {
   visionConfigOpen.value = false
   projectDetailCwd.value = ''
   collapseReviewExpanded()
+  if (researchSourcesOpen.value) closeResearchSources()
   if (memoryOpen.value) closeMemoryDrawer()
   closeImageFullscreen()
   closeToolFullscreen()
@@ -2601,6 +2743,9 @@ function closePickerMenus() {
       'review-transcript-hidden': reviewAvailable
         && (reviewOpen || reviewClosing) && reviewPaneExpanded
         && !!selectedSession,
+      'research-open': researchSourcesOpen
+        && isResearchSession
+        && !!selectedSession,
     }"
     :style="{
       '--composer-height': `${composerHeight}px`,
@@ -2610,6 +2755,7 @@ function closePickerMenus() {
       '--startup-composer-dock-y': startupComposerDockY,
       '--terminal-drawer-height': `${terminalDrawerHeight}px`,
       '--review-pane-width': `${reviewPaneWidth}px`,
+      '--research-pane-width': '340px',
     }"
   >
     <button
@@ -2705,8 +2851,30 @@ function closePickerMenus() {
               </svg>
             </span>
           </button>
+          <span
+            v-if="isResearchSession"
+            class="research-session-chip"
+          >{{ selectedResearch.status === 'complete'
+            ? 'report ready'
+            : selectedResearch.phase }}</span>
         </div>
         <div v-if="selectedSession" class="topbar-meta">
+          <button
+            v-if="isResearchSession && selectedResearch.sourceCount"
+            class="topbar-icon-button research-sources-toggle"
+            :class="{ active: researchSourcesOpen }"
+            type="button"
+            :title="`Research sources · ${selectedResearch.sourceCount}`"
+            :aria-label="`Research sources · ${selectedResearch.sourceCount}`"
+            :aria-pressed="researchSourcesOpen"
+            @click="toggleResearchSources"
+          >
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M3 3.5h8.5A1.5 1.5 0 0 1 13 5v7.5H4.5A1.5 1.5 0 0 1 3 11z"></path>
+              <path d="M3 11a1.5 1.5 0 0 1 1.5-1.5H13"></path>
+            </svg>
+            <span class="research-source-count">{{ selectedResearch.sourceCount }}</span>
+          </button>
           <button
             v-if="reviewAvailable"
             class="topbar-icon-button review-toggle-button"
@@ -2878,6 +3046,25 @@ function closePickerMenus() {
             >{{ goalCommandSubmitting === 'clear' ? '…' : 'Clear' }}</button>
           </div>
         </section>
+        <section
+          v-if="isResearchSession"
+          class="research-phase-bar"
+        >
+          <div class="research-phase-summary">
+            <strong>{{ researchPhaseTitle }}</strong>
+            <span>{{ researchPhaseSummary }}</span>
+          </div>
+          <div class="research-phase-steps" aria-label="Research progress">
+            <span
+              v-for="(phase, index) in researchPhaseSteps"
+              :key="phase"
+              :class="researchPhaseClass(phase)"
+            >
+              <i>{{ researchPhaseClass(phase).done ? '✓' : index + 1 }}</i>
+              <b>{{ researchPhaseLabel(phase) }}</b>
+            </span>
+          </div>
+        </section>
       </div>
 
 
@@ -2987,7 +3174,7 @@ function closePickerMenus() {
           v-else-if="startFlowVisible || startupRevealHold"
           class="start-panel"
         >
-          <h2 class="start-headline-text">What should we work on?</h2>
+          <h2 class="start-headline-text">{{ startHeadline }}</h2>
           <div
             v-if="startupLoadingVisible"
             class="init-panel transcript-skeleton-panel startup-init-panel"
@@ -3035,6 +3222,8 @@ function closePickerMenus() {
             :vision-delegation-notice="visionDelegationNotice"
             :model-key="modelKey"
             :model-picker-open="modelPickerOpen"
+            :research-enabled="researchEnabled"
+            :session-kind="startSessionKind"
             :new-session-cwd="newSessionCwd"
             :selected-model-key="selectedModelKey"
             :slash-active-index="slashActiveIndex"
@@ -3063,6 +3252,7 @@ function closePickerMenus() {
             @show-slash-picker="showSlashPicker"
             @submit="submitStartDraft"
             @toggle-picker="togglePicker"
+            @toggle-session-kind="toggleStartSessionKind"
             @toggle-project-picker="startProjectPickerOpen = !startProjectPickerOpen"
           />
         </div>
@@ -3070,7 +3260,11 @@ function closePickerMenus() {
           v-if="emptySessionShellVisible && !startupRun"
           class="empty-session-panel"
         >
-          <h2>What should we work on in {{ topbarTitle }}?</h2>
+          <h2>
+            {{ isResearchSession
+              ? `What should we investigate in ${topbarTitle}?`
+              : `What should we work on in ${topbarTitle}?` }}
+          </h2>
         </div>
         <div
           v-if="(inProjectNewSessionRun || inProjectNewSessionSettling)
@@ -3125,6 +3319,7 @@ function closePickerMenus() {
             @mark-feedback="markEntryFeedback"
             @navigate-child-session="navigateChildSession"
             @open-image="openImageFullscreen"
+            @open-research-source="openResearchSource"
             @reset="resetSessionToEntry"
             @retry="retryEntry"
             @open-tool-fullscreen="openToolFullscreen"
@@ -3157,6 +3352,7 @@ function closePickerMenus() {
               @fork="forkSession"
               @mark-feedback="markEntryFeedback"
               @open-image="openImageFullscreen"
+              @open-research-source="openResearchSource"
               @reset="resetSessionToEntry"
               @retry="retryEntry"
               @toggle-skill="toggleSkill"
@@ -3174,6 +3370,7 @@ function closePickerMenus() {
               @mark-feedback="markEntryFeedback"
               @navigate-child-session="navigateChildSession"
               @open-image="openImageFullscreen"
+              @open-research-source="openResearchSource"
               @reset="resetSessionToEntry"
               @open-tool-fullscreen="openToolFullscreen"
               @toggle-tool="toggleTool"
@@ -3313,6 +3510,7 @@ function closePickerMenus() {
         :placeholder="composerPlaceholder"
         :prompt-submitting="promptSubmitting"
         :reloading-session="reloadingSession || sessionActivating"
+        :research="isResearchSession"
         :queued-messages="queuedMessages"
         :selected-model-key="selectedModelKey"
         :send-button-label="sendButtonLabel"
@@ -3360,6 +3558,16 @@ function closePickerMenus() {
       @resize="reviewPaneWidth = $event"
       @summary="handleReviewSummary"
       @toggle-expand="toggleReviewExpanded"
+    />
+
+    <ResearchSourcesPane
+      v-if="selectedSession && isResearchSession"
+      :open="researchSourcesOpen"
+      :research="selectedResearch"
+      :reveal-key="researchSourceRevealKey"
+      :selected-source-id="selectedResearchSourceId"
+      @close="closeResearchSources"
+      @select="selectResearchSource"
     />
 
     <div

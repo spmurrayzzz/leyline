@@ -5,6 +5,11 @@ import { emptyExtensionUiState } from './extension-ui.js'
 import { goalStateFromEntries, goalStateFromSession } from './goal-state.js'
 import { applyRolloutFeedback } from './rollout-feedback.js'
 import {
+  compactResearchState,
+  researchStateFromEntries,
+  researchStateFromSession,
+} from '../../lib/research-state.js'
+import {
   hasSubagentSessionMarker,
   messageText,
   sessionModifiedDate,
@@ -78,6 +83,7 @@ export function sessionStateDto(
     },
     extensionUi: extensionUiState,
     goal: goalStateFromSession(session),
+    research: researchStateFromSession(session),
   }
 }
 
@@ -160,6 +166,7 @@ function toSessionDetailFromManager(manager, session, contextUsage) {
   let firstMessage = ''
   let name = session.name
   const goal = goalStateFromEntries(entries)
+  const research = researchStateFromEntries(entries, manager.getSessionId())
 
   for (const entry of entries) {
     if (entry.type === 'session_info') {
@@ -185,7 +192,8 @@ function toSessionDetailFromManager(manager, session, contextUsage) {
     parentSessionPath: session.parentSessionPath || header.parentSession,
     isSubagentSession: session.isSubagentSession === true
       || hasSubagentSessionMarker(entries, manager.getSessionId()),
-    firstMessage: firstMessage || goal?.objective || '(no messages)',
+    research,
+    firstMessage: firstMessage || research?.objective || goal?.objective || '(no messages)',
     created: session.created || new Date(header.timestamp),
     modified: session.modified
       || sessionModifiedDate(entries, header, new Date()),
@@ -197,6 +205,7 @@ function toSessionDetailFromManager(manager, session, contextUsage) {
       ...toSessionDto(info),
       cwd: info.cwd,
       sessionFile: info.path,
+      research,
       messageCount: info.messageCount,
       contextTokens,
       modified: info.modified,
@@ -204,7 +213,7 @@ function toSessionDetailFromManager(manager, session, contextUsage) {
       contextUsage,
     },
     entries: applyRolloutFeedback(
-      projectTranscriptEntries(entries),
+      projectTranscriptEntries(entries, { research }),
       info.cwd,
       info.path,
       info.id,
@@ -235,6 +244,7 @@ export function sessionInfo(handle) {
   let messageCount = 0
   let firstMessage = ''
   const goal = goalStateFromEntries(entries)
+  const research = researchStateFromEntries(entries, manager.getSessionId())
 
   for (const entry of entries) {
     if (entry.type !== 'message') continue
@@ -252,7 +262,8 @@ export function sessionInfo(handle) {
     name: manager.getSessionName?.(),
     parentSessionPath: header.parentSession,
     isSubagentSession: hasSubagentSessionMarker(entries, manager.getSessionId()),
-    firstMessage: firstMessage || goal?.objective || '(no messages)',
+    research,
+    firstMessage: firstMessage || research?.objective || goal?.objective || '(no messages)',
     created,
     modified: sessionModifiedDate(entries, header, created),
     messageCount,
@@ -267,6 +278,7 @@ export function toSessionDto(session) {
     name: session.name,
     parentSessionPath: session.parentSessionPath,
     isSubagentSession: session.isSubagentSession === true,
+    research: compactResearchState(session.research),
     firstMessage: truncate(session.firstMessage || '', 140),
     messageCount: session.messageCount ?? 0,
     modified: session.modified || session.created || timestampFromPath(session.path),

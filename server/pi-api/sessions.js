@@ -9,6 +9,10 @@ import {
   SettingsManager,
 } from '@earendil-works/pi-coding-agent'
 import { goalStateFromEntries } from './goal-state.js'
+import {
+  RESEARCH_CUSTOM_TYPE,
+  researchStateFromEntries,
+} from '../../lib/research-state.js'
 
 const SESSION_DIR_ENV = 'PI_CODING_AGENT_SESSION_DIR'
 const PROJECT_HEADER_SCAN_LIMIT = 1024 * 1024
@@ -278,6 +282,8 @@ async function buildSessionInfo(filePath, goalFallback) {
     let lastActivityTime = 0
     let isSubagentSession = false
     const subagentChildPaths = []
+    const researchTree = new Map()
+    let researchLeafId = ''
 
     for await (const line of lines) {
       const prefix = line.slice(0, 192)
@@ -293,6 +299,12 @@ async function buildSessionInfo(filePath, goalFallback) {
         continue
       }
 
+      const treeLink = sessionTreeLinkFromLine(line)
+      if (treeLink) {
+        researchTree.set(treeLink.id, treeLink)
+        researchLeafId = treeLink.id
+      }
+
       if (prefix.includes('"type":"session_info"')) {
         try {
           const entry = JSON.parse(line)
@@ -303,12 +315,17 @@ async function buildSessionInfo(filePath, goalFallback) {
 
       if (prefix.includes('"type":"custom"')) {
         if (!line.includes(`"customType":"${SUBAGENT_SESSION_CUSTOM_TYPE}"`)
+          && !line.includes(`"customType":"${RESEARCH_CUSTOM_TYPE}"`)
           && !line.includes('"customType":"goal-state"')) continue
         try {
           const entry = JSON.parse(line)
           if (entry.customType === SUBAGENT_SESSION_CUSTOM_TYPE
             && entry.data?.sessionId === header.id) {
             isSubagentSession = true
+          }
+          if (entry.customType === RESEARCH_CUSTOM_TYPE) {
+            const node = researchTree.get(entry.id)
+            if (node) node.researchEntry = entry
           }
           const goal = goalStateFromEntries([entry])
           if (goal?.objective) goalObjective = goal.objective
@@ -362,6 +379,10 @@ async function buildSessionInfo(filePath, goalFallback) {
       parentSessionPath: header.parentSession,
       isSubagentSession,
       subagentChildPaths,
+      research: researchStateFromEntries(
+        activeResearchEntries(researchTree, researchLeafId),
+        header.id,
+      ),
       created: new Date(header.timestamp),
       modified,
       messageCount,
@@ -378,6 +399,33 @@ async function buildSessionInfo(filePath, goalFallback) {
   } catch {
     return null
   }
+}
+
+function sessionTreeLinkFromLine(line) {
+  const structural = line.length > 4096
+    ? `${line.slice(0, 2048)}${line.slice(-2048)}`
+    : line
+  const match = structural.match(/"id":"([^"]+)","parentId":(null|"([^"]+)")/)
+  if (!match) return null
+  return {
+    id: match[1],
+    parentId: match[2] === 'null' ? null : match[3],
+    researchEntry: null,
+  }
+}
+
+function activeResearchEntries(tree, leafId) {
+  const entries = []
+  const seen = new Set()
+  let currentId = leafId
+  while (currentId && !seen.has(currentId)) {
+    seen.add(currentId)
+    const node = tree.get(currentId)
+    if (!node) break
+    if (node.researchEntry) entries.push(node.researchEntry)
+    currentId = node.parentId
+  }
+  return entries.reverse()
 }
 
 export function hasSubagentSessionMarker(entries, sessionId) {
