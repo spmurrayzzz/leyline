@@ -89,6 +89,7 @@ const props = defineProps({
   },
   reloadingSession: Boolean,
   research: Boolean,
+  researchToggleEnabled: Boolean,
   selectedModelKey: {
     type: String,
     default: '',
@@ -146,6 +147,7 @@ const emit = defineEmits([
   'show-slash-picker',
   'submit',
   'toggle-picker',
+  'toggle-research',
   'toggle-terminal',
   'update:draft',
 ])
@@ -206,6 +208,7 @@ function updateDraft(event) {
     :class="{
       'shell-mode-composer': shellMode,
       'hidden-shell-mode-composer': hiddenShellMode,
+      'research-mode-composer': research,
     }"
     @submit.prevent="emit('submit')"
   >
@@ -419,8 +422,23 @@ function updateDraft(event) {
           <i aria-hidden="true"></i>
           {{ compacting ? 'compacting' : 'running' }}
         </span>
+        <button
+          v-if="researchToggleEnabled"
+          class="composer-chip research-mode-chip"
+          :class="{ active: research }"
+          type="button"
+          :disabled="shellMode || inputDisabled || promptSubmitting"
+          :aria-pressed="research"
+          title="Toggle deep research mode"
+          @click="emit('toggle-research')"
+        >
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M6 2h4M7 2v4l-3.5 6A1.3 1.3 0 0 0 4.6 14h6.8a1.3 1.3 0 0 0 1.1-2L9 6V2M5.5 10h5"></path>
+          </svg>
+          <span>research</span>
+        </button>
         <span
-          v-if="research"
+          v-else-if="research"
           class="composer-chip research-mode-chip active"
         >research</span>
         <span

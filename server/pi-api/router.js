@@ -200,6 +200,7 @@ async function piApiHandler(req, res) {
           body.images,
           body.streamingBehavior,
           responseAbortSignal(res),
+          body.kind,
         )
         return json(res, { ok: true, active: activeSessionDto(handle) })
       }
@@ -596,6 +597,7 @@ async function piApiHandler(req, res) {
             body.images,
             body.streamingBehavior,
             responseAbortSignal(res),
+            body.kind,
           )
           return json(res, { ok: true, active: activeSessionDto(handle) })
         }

@@ -105,6 +105,7 @@ const researchSourcesOpen = ref(false)
 const selectedResearchSourceId = ref(0)
 const researchSourceRevealKey = ref(0)
 const startSessionKind = ref('session')
+const emptySessionKind = ref('session')
 let researchSourcesDismissedSessionId = ''
 const reviewLineCountFormatter = new Intl.NumberFormat('en', {
   maximumFractionDigits: 1,
@@ -463,7 +464,9 @@ const startHeadline = computed(() => {
 })
 
 watch(researchEnabled, (enabled) => {
-  if (!enabled) startSessionKind.value = 'session'
+  if (enabled) return
+  startSessionKind.value = 'session'
+  emptySessionKind.value = 'session'
 })
 
 watch(
@@ -750,6 +753,19 @@ const isEmptySelectedSession = computed(() => {
     && entries.value.length === 0
     && !liveTurnActive.value
 })
+const selectedSessionHasMessages = computed(() => {
+  return Number(selectedSession.value?.messageCount || 0) > 0
+})
+const composerResearchMode = computed(() => {
+  return isResearchSession.value || emptySessionKind.value === 'research'
+})
+const canToggleEmptySessionResearch = computed(() => {
+  return researchEnabled.value
+    && Boolean(selectedSession.value)
+    && !isResearchSession.value
+    && !selectedSessionHasMessages.value
+    && !liveTurnActive.value
+})
 const sendButtonLabel = computed(() => {
   if (compactingContext.value) return '…'
   if (agentRunning.value) return '■'
@@ -770,6 +786,9 @@ const composerPlaceholder = computed(() => {
   }
   if (selectedResearch.value?.status === 'complete') {
     return 'Ask a follow-up or request a report revision'
+  }
+  if (isEmptySelectedSession.value && composerResearchMode.value) {
+    return 'Describe the research question, constraints, and desired report'
   }
   if (isEmptySelectedSession.value) return 'Describe the first task or attach images'
   return 'Ask for follow-up changes or attach images'
@@ -885,6 +904,7 @@ watch(settingsCwd, (cwd, previousCwd) => {
 })
 
 watch(selectedSessionId, () => {
+  emptySessionKind.value = 'session'
   updateNativeWindowCwd()
   if (!selectedSessionId.value) {
     reviewReady.value = false
@@ -2060,6 +2080,10 @@ async function submitDraft(streamingBehavior) {
     && isEmptySelectedSession.value
     && !editing
     && startsTurn
+  const initializesResearchSession = !editing
+    && !isResearchSession.value
+    && !selectedSessionHasMessages.value
+    && emptySessionKind.value === 'research'
   if (editing) {
     resetLiveState()
     trimSessionToEntry(editing.id)
@@ -2083,9 +2107,16 @@ async function submitDraft(streamingBehavior) {
   try {
     const data = editing
       ? await editPrompt(sessionId, editing.id, text, images)
-      : await submitPrompt(sessionId, text, images)
+      : await submitPrompt(
+        sessionId,
+        text,
+        images,
+        undefined,
+        initializesResearchSession ? 'research' : undefined,
+      )
     if (selectedSessionId.value === sessionId) {
       if (data.active) activeRuntimeSession.value = data.active
+      if (initializesResearchSession) emptySessionKind.value = 'session'
       if (isHandledSlashCommand(text)) removeOptimisticEntry(localEntry)
       editingEntry.value = null
       if (startsTurn) setAgentRunning(true, 'Thinking…')
@@ -2208,6 +2239,7 @@ async function submitShellCommand(shellCommand, images) {
     )
     if (data.active && selectedSessionId.value === sessionId) {
       activeRuntimeSession.value = data.active
+      emptySessionKind.value = 'session'
     }
     if (data.detail && selectedSessionId.value === sessionId) {
       sessionDetail.value = data.detail
@@ -2419,6 +2451,13 @@ async function selectThinkingLevel(level) {
 function toggleStartSessionKind() {
   if (!researchEnabled.value) return
   startSessionKind.value = startSessionKind.value === 'research'
+    ? 'session'
+    : 'research'
+}
+
+function toggleEmptySessionKind() {
+  if (!canToggleEmptySessionResearch.value) return
+  emptySessionKind.value = emptySessionKind.value === 'research'
     ? 'session'
     : 'research'
 }
@@ -3261,7 +3300,7 @@ function closePickerMenus() {
           class="empty-session-panel"
         >
           <h2>
-            {{ isResearchSession
+            {{ composerResearchMode
               ? `What should we investigate in ${topbarTitle}?`
               : `What should we work on in ${topbarTitle}?` }}
           </h2>
@@ -3510,7 +3549,8 @@ function closePickerMenus() {
         :placeholder="composerPlaceholder"
         :prompt-submitting="promptSubmitting"
         :reloading-session="reloadingSession || sessionActivating"
-        :research="isResearchSession"
+        :research="composerResearchMode"
+        :research-toggle-enabled="canToggleEmptySessionResearch"
         :queued-messages="queuedMessages"
         :selected-model-key="selectedModelKey"
         :send-button-label="sendButtonLabel"
@@ -3539,6 +3579,7 @@ function closePickerMenus() {
         @show-slash-picker="showSlashPicker"
         @submit="submitDraft"
         @toggle-picker="togglePicker"
+        @toggle-research="toggleEmptySessionKind"
         @toggle-terminal="toggleTerminal"
       />
     </section>

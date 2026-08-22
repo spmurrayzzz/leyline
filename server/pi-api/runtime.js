@@ -368,7 +368,41 @@ function setActiveHandle(handle) {
   activeSessionId = handle?.sessionId
 }
 
-async function promptSession(handle, text, images = [], streamingBehavior, signal) {
+async function initializeSessionKind(handle, kind) {
+  if (kind === undefined) return
+  if (!['session', 'research'].includes(kind)) {
+    throw new Error('kind must be session or research')
+  }
+  if (kind === 'session') return
+
+  const manager = handle.runtime.session.sessionManager
+  const branch = manager.getBranch()
+  if (researchStateFromEntries(branch, handle.sessionId)) return
+  if (branch.some((entry) => entry.type === 'message')) {
+    throw new Error('Research mode can only start before the first message')
+  }
+
+  appendResearchSessionMarker(manager)
+  await bindRuntimeHandle(handle)
+}
+
+function appendResearchSessionMarker(manager) {
+  manager.appendCustomEntry(RESEARCH_CUSTOM_TYPE, {
+    version: RESEARCH_VERSION,
+    kind: 'session',
+    sessionId: manager.getSessionId(),
+    createdAt: Date.now(),
+  })
+}
+
+async function promptSession(
+  handle,
+  text,
+  images = [],
+  streamingBehavior,
+  signal,
+  kind,
+) {
   const session = handle.runtime.session
   const controller = new AbortController()
   const abortPrompt = () => controller.abort()
@@ -389,6 +423,7 @@ async function promptSession(handle, text, images = [], streamingBehavior, signa
       && !['steer', 'followUp'].includes(streamingBehavior)) {
       throw new Error('invalid streaming behavior')
     }
+    await initializeSessionKind(handle, kind)
 
     const model = session.state?.model || session.model
     const modelSupportsImages = Boolean(model?.input?.includes('image'))
@@ -1102,12 +1137,7 @@ async function createNewSession(cwd, kind = 'session') {
   })
   const sessionId = runtime.session.sessionManager.getSessionId()
   if (kind === 'research') {
-    runtime.session.sessionManager.appendCustomEntry(RESEARCH_CUSTOM_TYPE, {
-      version: RESEARCH_VERSION,
-      kind: 'session',
-      sessionId,
-      createdAt: Date.now(),
-    })
+    appendResearchSessionMarker(runtime.session.sessionManager)
   }
   const handle = {
     runtime,

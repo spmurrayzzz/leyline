@@ -200,13 +200,19 @@ export function deletePiMemories(session, ids) {
   })
 }
 
-export function submitPrompt(sessionId, text, images = [], streamingBehavior) {
+export function submitPrompt(
+  sessionId,
+  text,
+  images = [],
+  streamingBehavior,
+  kind,
+) {
   return apiRequest(
     sessionActionUrl(sessionId, 'prompt'),
     'Failed to submit prompt',
     {
       method: 'POST',
-      body: { text, images, streamingBehavior },
+      body: { text, images, streamingBehavior, kind },
     },
   )
 }
