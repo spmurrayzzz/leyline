@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, shell } from 'electron'
 
 const execFileAsync = promisify(execFile)
 
@@ -46,6 +46,17 @@ async function createWindow(initialCommand) {
     },
   })
   mainWindow = window
+  const appOrigin = new URL(url).origin
+
+  window.webContents.setWindowOpenHandler(({ url: openedUrl }) => {
+    openExternalUrl(openedUrl)
+    return { action: 'deny' }
+  })
+  window.webContents.on('will-navigate', (event, navigationUrl) => {
+    if (new URL(navigationUrl).origin === appOrigin) return
+    event.preventDefault()
+    openExternalUrl(navigationUrl)
+  })
 
   if (windowState.isMaximized) window.maximize()
   if (windowState.isFullScreen) window.setFullScreen(true)
@@ -115,6 +126,23 @@ async function createWindow(initialCommand) {
 
   await window.loadURL(url)
   focusWindow(window)
+}
+
+function openExternalUrl(url) {
+  if (!isOpenableUrl(url)) return
+  void shell.openExternal(url).catch(() => {})
+}
+
+function isOpenableUrl(url) {
+  try {
+    const protocol = new URL(url).protocol
+    return protocol === 'http:'
+      || protocol === 'https:'
+      || protocol === 'mailto:'
+      || protocol === 'tel:'
+  } catch {
+    return false
+  }
 }
 
 function sendEscapeCommand(window) {
