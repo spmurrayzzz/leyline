@@ -159,9 +159,137 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     if (!state) return
     compactingContext.value = state.isCompacting === true
     agentRunning.value = state.isStreaming === true
+    syncPendingTools(state)
     if (!agentRunning.value && !compactingContext.value) return
     if (liveActivity.value || liveAssistantMessages.value.length) return
     liveActivity.value = 'Thinking…'
+  }
+
+  function syncPendingTools(state) {
+    if (!Array.isArray(state.pendingTools)) return
+    const pendingIds = new Set(
+      Array.isArray(state.pendingToolCalls) ? state.pendingToolCalls : [],
+    )
+
+    for (const pendingTool of state.pendingTools) {
+      const toolCallId = pendingTool?.toolCallId
+      const toolName = pendingTool?.toolName
+      if (!toolCallId || !toolName) continue
+      pendingIds.add(toolCallId)
+      const existing = liveTools.value.find((tool) => {
+        return tool.toolCallId === toolCallId
+      })
+      const partialResult = runtimeResearchToolResult(
+        pendingTool,
+        state.research,
+        true,
+      )
+      if (existing?.liveResultReceived) continue
+      if (existing
+        && !existing.restoredFromRuntime
+        && (existing.resultEntry || !partialResult)) continue
+      upsertLiveTool({
+        ...pendingTool,
+        partialResult,
+        restoredFromRuntime: true,
+      }, 'running')
+    }
+
+    const settledTools = liveTools.value.filter((tool) => {
+      return tool.restoredFromRuntime
+        && tool.toolCallId
+        && !pendingIds.has(tool.toolCallId)
+    })
+    for (const tool of settledTools) {
+      if (tool.terminalLiveResultReceived) continue
+      const threads = runtimeResearchThreads(tool, state.research)
+      const failed = tool.toolName === 'subagent'
+        && (threads.some((thread) => thread.status === 'error')
+          || (state.research?.status === 'error'
+            && state.research.phase === 'gather'
+            && threads.some((thread) => thread.status !== 'done')))
+      const partialResult = runtimeResearchToolResult(
+        tool,
+        state.research,
+        false,
+      )
+      upsertLiveTool({
+        toolCallId: tool.toolCallId,
+        toolName: tool.toolName,
+        args: tool.args || {},
+        partialResult,
+        restoredFromRuntime: true,
+      }, failed ? 'error' : 'completed')
+    }
+    releaseLiveAnchorIfSettled()
+  }
+
+  function runtimeResearchThreads(tool, research) {
+    if (tool.toolName !== 'subagent' || !research?.threads?.length) return []
+    const tasks = tool.args?.tasks
+    if (!Array.isArray(tasks)
+      || !tasks.length
+      || tasks.some((task) => task.agent !== 'researcher')) return []
+
+    return tasks.flatMap((task) => {
+      const threadId = task.task?.match(/^\s*\[([^\]]+)\]/)?.[1]?.trim()
+      const thread = research.threads.find((item) => {
+        return item.id === threadId || item.task === task.task
+      })
+      return thread ? [thread] : []
+    })
+  }
+
+  function runtimeResearchToolResult(tool, research, background) {
+    const threads = runtimeResearchThreads(tool, research)
+    if (!threads.length) return undefined
+    const completed = threads.filter((thread) => {
+      return thread.status === 'done' || thread.status === 'error'
+    }).length
+
+    return {
+      content: [{
+        type: 'text',
+        text: `${completed} of ${threads.length} research threads complete`,
+      }],
+      details: {
+        mode: tool.args?.mode || 'parallel',
+        background,
+        results: threads.map((thread) => ({
+          agent: 'researcher',
+          agentSource: 'bundled',
+          task: thread.task || `[${thread.id}] ${thread.title}`,
+          status: thread.status,
+          research: {
+            threadId: thread.id,
+            title: thread.title,
+            summary: thread.summary,
+            sources: researchThreadSources(research, thread),
+          },
+          childSession: thread.childSession || null,
+          exitCode: thread.status === 'error' ? 1 : 0,
+          messages: thread.summary
+            ? [{ role: 'assistant', content: thread.summary }]
+            : [],
+          usage: {
+            inputTokens: 0,
+            outputTokens: 0,
+            totalTokens: 0,
+            cost: 0,
+            turns: 0,
+          },
+          error: thread.error || undefined,
+        })),
+      },
+    }
+  }
+
+  function researchThreadSources(research, thread) {
+    const sourceIds = new Set(thread.sourceIds || [])
+    return (research.sources || []).filter((source) => {
+      return sourceIds.has(source.id)
+        || source.threadIds?.includes(thread.id)
+    })
   }
 
   function addTool(event, status) {
@@ -292,6 +420,14 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     const existing = findLiveTool(event, key)
     const id = existing?.id || key || `live-tool-${++liveToolSeq}`
     const now = Date.now()
+    const liveResultReceived = existing?.liveResultReceived === true
+      || (event.restoredFromRuntime !== true
+        && (event.result !== undefined
+          || event.partialResult !== undefined
+          || Boolean(event.error)))
+    const terminalLiveResultReceived = existing?.terminalLiveResultReceived === true
+      || (event.restoredFromRuntime !== true
+        && (event.result !== undefined || Boolean(event.error)))
     const next = {
       id,
       seq: existing?.seq || ++liveItemSeq,
@@ -302,6 +438,10 @@ export function useLiveTurnProjection({ onIntent } = {}) {
       code: liveToolCode(event) || existing?.code || '',
       args: event.args || event.input || existing?.args || {},
       status,
+      restoredFromRuntime: event.restoredFromRuntime === true
+        || existing?.restoredFromRuntime === true,
+      liveResultReceived,
+      terminalLiveResultReceived,
       startedAt: existing?.startedAt || now,
     }
     if (event.result !== undefined
@@ -392,6 +532,9 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     const next = {
       ...tool,
       status,
+      restoredFromRuntime: false,
+      liveResultReceived: true,
+      terminalLiveResultReceived: true,
       resultEntry: projectLiveToolEntry(
         tool,
         message,
@@ -477,9 +620,15 @@ export function useLiveTurnProjection({ onIntent } = {}) {
   }
 
   function attachPersistedLiveTool(tool, entry) {
-    const next = { ...tool, persistedEntry: entry }
+    const next = {
+      ...tool,
+      persistedEntry: entry,
+      restoredFromRuntime: false,
+    }
     delete next.args
     delete next.resultEntry
+    delete next.liveResultReceived
+    delete next.terminalLiveResultReceived
     return next
   }
 

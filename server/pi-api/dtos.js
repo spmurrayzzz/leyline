@@ -62,6 +62,7 @@ export function sessionStateDto(
   extensionUiState = emptyExtensionUiState(),
 ) {
   const activeToolNames = session.getActiveToolNames()
+  const pendingToolCalls = [...(session.agent?.state?.pendingToolCalls || [])]
 
   return {
     model: modelDto(session.model),
@@ -70,7 +71,8 @@ export function sessionStateDto(
     availableThinkingLevels: session.getAvailableThinkingLevels(),
     isStreaming: session.isStreaming,
     isCompacting: session.isCompacting,
-    pendingToolCalls: [...(session.agent?.state?.pendingToolCalls || [])],
+    pendingToolCalls,
+    pendingTools: pendingToolsDto(session, pendingToolCalls),
     steeringMode: session.steeringMode,
     followUpMode: session.followUpMode,
     activeToolCount: activeToolNames.length,
@@ -85,6 +87,27 @@ export function sessionStateDto(
     goal: goalStateFromSession(session),
     research: researchStateFromSession(session),
   }
+}
+
+function pendingToolsDto(session, pendingToolCalls) {
+  if (!pendingToolCalls.length) return []
+  const messages = session.agent?.state?.messages || []
+  return pendingToolCalls.flatMap((toolCallId) => {
+    for (let index = messages.length - 1; index >= 0; index--) {
+      const content = messages[index]?.content
+      if (!Array.isArray(content)) continue
+      const call = content.find((block) => {
+        return block?.type === 'toolCall' && block.id === toolCallId
+      })
+      if (!call?.name) continue
+      return [{
+        toolCallId,
+        toolName: call.name,
+        args: call.arguments || {},
+      }]
+    }
+    return []
+  })
 }
 
 function slashCommandDtos(session) {
