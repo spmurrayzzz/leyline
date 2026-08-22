@@ -1213,10 +1213,15 @@ export function useSessionWorkspace({
   }
 
   function sessionTitle(session) {
-    if (session?.name && session.name !== '(no messages)') return session.name
-    if (session?.messageCount === 0
-      || session?.firstMessage === '(no messages)') {
-      const liveTitle = session?.id === selectedSessionId.value
+    const detailSession = sessionDetail.value?.session
+    const summary = session?.id === selectedSessionId.value
+      && detailSession?.id === session.id
+      ? detailSession
+      : session
+    if (summary?.name && summary.name !== '(no messages)') return summary.name
+    if (summary?.messageCount === 0
+      || summary?.firstMessage === '(no messages)') {
+      const liveTitle = summary?.id === selectedSessionId.value
         ? liveTurn?.liveFirstUserText?.value
         : ''
       if (liveTitle) {
@@ -1226,7 +1231,7 @@ export function useSessionWorkspace({
       }
       return 'New session'
     }
-    return session?.firstMessage || 'Untitled session'
+    return summary?.firstMessage || 'Untitled session'
   }
 
   function highlightedText(value) {
