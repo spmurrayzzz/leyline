@@ -31,6 +31,8 @@ The token value is the latest available context usage. It is not a total of all 
 
 The export includes rendered Markdown, assistant thoughts, collapsed tool rows, skill rows, subagent results, and attached images.
 
+A deep research export also includes the styled report, research-thread results, and every ledger source. Each source shows one evidence summary. An excluded source shows its exclusion reason instead.
+
 Tool rows render their previews when you expand them. Exported runtime event rows are omitted.
 
 Images and transcript data are embedded in the HTML. File, diff, and patch previews load their renderer from `esm.sh` when expanded. Those previews require network access.
@@ -40,6 +42,8 @@ Images and transcript data are embedded in the HTML. File, diff, and patch previ
 The export changes to a compact layout below 820 pixels. Metadata uses two columns, and message padding decreases.
 
 The HTML also respects the system reduced-motion preference.
+
+Research citations remain normal links in the standalone file. They do not focus a source-ledger card.
 
 ## Share an inline export
 

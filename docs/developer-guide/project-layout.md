@@ -6,6 +6,7 @@
 - `src/App.vue`: Composes the workspace and coordinates cross-feature state.
 - `src/components/`: Contains focused Vue surfaces for sessions, composers, transcript entries, drawers, pickers, and previews.
 - `src/components/ReviewPane.vue`: Renders changed files and prepared Pierre diffs for the selected project.
+- `src/components/ResearchSourcesPane.vue`: Renders the filtered research source ledger and selected evidence.
 - `src/components/VisionConfigDrawer.vue`: Manages transcript, project, and global vision-model overrides.
 - `src/composables/useSessionWorkspace.js`: Owns session, route, activation, and runtime-control state.
 - `src/composables/useBackendConnections.js`: Owns connection records, the default, and window-specific backend selection.
@@ -29,6 +30,8 @@
 ## Shared library
 
 - `lib/leyline-settings.js`: Defines app setting keys for the native backend and browser.
+- `lib/research-state.js`: Folds branch-local research events and normalizes threads and sources.
+- `lib/research-citations.js`: Validates numbered report links against the research source ledger.
 - `lib/transcript-projection.js`: Projects pi branch entries into shared transcript DTOs.
 
 These files are outside `src/` because Node.js backend code and browser code import them.
@@ -46,6 +49,7 @@ These files are outside `src/` because Node.js backend code and browser code imp
 - `src/styles/composer.css`: Defines composer layout, menus, attachments, and submission states.
 - `src/styles/memory.css`: Defines the Memory Inspector.
 - `src/styles/review.css`: Defines the resizable and expanded Git review pane.
+- `src/styles/research.css`: Defines research progress, reports, thread cards, source navigation, and sidebar markers.
 - `src/styles/settings.css`: Defines Settings, Runtime Events, subagent configuration, and vision configuration.
 - `src/styles/modals.css`: Defines the project browser and confirmation dialogs.
 - `src/styles/terminal.css`: Defines the terminal drawer.
@@ -87,7 +91,8 @@ These files are outside `src/` because Node.js backend code and browser code imp
 - `.pi/LEYLINE_SYSTEM.md`: Adds Leyline operating context to each runtime.
 - `.pi/extensions/goal/`: Implements goal commands, state, and controls.
 - `.pi/extensions/memory/`: Implements memory injection, commands, and tools.
-- `.pi/extensions/subagent/`: Implements single, parallel, and chain subagent tools.
+- `.pi/extensions/subagent/`: Implements single, parallel, and chain subagent tools, including the reserved researcher.
+- `.pi/extensions/research/`: Implements research-session binding, state updates, orchestration protocol, and report checks.
 - `.pi/extensions/vision-agent/`: Implements image-file inspection through a vision child.
 
 ## Capture and documentation

@@ -3,6 +3,10 @@ import os from 'node:os'
 import path from 'node:path'
 import { chromium } from 'playwright'
 import { THINKING_DEFAULT_SETTING_KEY } from '../lib/leyline-settings.js'
+import {
+  canonicalResearchSourceKey,
+  compactResearchState,
+} from '../lib/research-state.js'
 import { renderSessionExportHtml } from '../server/pi-api/export-renderer.js'
 
 const baseUrl = process.env.DOCS_SCREENSHOT_URL || 'http://localhost:5173/'
@@ -66,6 +70,7 @@ const backendInfo = {
   capabilities: {
     events: true,
     exports: true,
+    research: true,
     review: true,
     terminal: true,
   },
@@ -181,6 +186,163 @@ const reviewDiffPayload = {
   ],
 }
 
+const researchSources = [
+  {
+    id: 1,
+    url: 'https://www.electronjs.org/docs/latest/api/auto-updater',
+    title: 'autoUpdater',
+    publisher: 'Electron',
+    kind: 'documentation',
+    status: 'cited',
+    threadIds: ['T1'],
+    claim: 'Electron provides platform-specific update events and installation controls.',
+    evidence: 'The API documents update checks, downloads, error events, and restart-based installation.',
+  },
+  {
+    id: 2,
+    url: 'https://www.electronjs.org/docs/latest/tutorial/code-signing',
+    title: 'Code Signing',
+    publisher: 'Electron',
+    kind: 'documentation',
+    status: 'cited',
+    threadIds: ['T2'],
+    claim: 'Desktop releases need platform signing before distribution.',
+    evidence: 'The guide describes signing requirements for macOS and Windows packages.',
+  },
+  {
+    id: 3,
+    url: 'https://docs.npmjs.com/generating-provenance-statements',
+    title: 'Generating provenance statements',
+    publisher: 'npm Docs',
+    kind: 'documentation',
+    status: 'cited',
+    threadIds: ['T2'],
+    claim: 'Published packages can include verifiable build provenance.',
+    evidence: 'npm documents trusted publishing and provenance statements for supported CI systems.',
+  },
+  {
+    id: 4,
+    url: 'https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments',
+    title: 'Deployments and environments',
+    publisher: 'GitHub Docs',
+    kind: 'documentation',
+    status: 'cited',
+    threadIds: ['T3'],
+    claim: 'Protected environments can gate releases and retain deployment history.',
+    evidence: 'Environment rules can require approval and restrict deployment branches.',
+  },
+  {
+    id: 5,
+    path: 'docs/release-checklist.md',
+    title: 'Release checklist',
+    publisher: 'harbor project',
+    kind: 'project',
+    status: 'candidate',
+    threadIds: ['T1', 'T3'],
+    claim: 'The project already checks packaging, signatures, and update metadata.',
+    evidence: 'The checklist separates build verification from publication.',
+  },
+  {
+    id: 6,
+    url: 'https://example.com/fast-desktop-releases',
+    title: 'Ship desktop updates in one step',
+    publisher: 'Example Engineering',
+    publishedAt: '2023-03-11',
+    kind: 'analysis',
+    status: 'excluded',
+    threadIds: ['T3'],
+    claim: 'A single unreviewed publication step reduces release time.',
+    evidence: 'The article gives no rollback data or signing guidance.',
+    exclusionReason: 'Excluded because the article has no reproducible evidence or platform security analysis.',
+  },
+].map((source) => ({
+  ...source,
+  key: canonicalResearchSourceKey(source),
+}))
+
+const researchThreads = [
+  {
+    id: 'T1',
+    title: 'Distribution controls',
+    task: 'Compare staged update channels and release gates.',
+    status: 'done',
+    summary: 'Use staged channels with explicit promotion criteria and a tested rollback path.',
+    sourceIds: [1, 5],
+    childSession: {
+      id: 'research-child-distribution',
+      path: '/workspace/harbor/sessions/research-child-distribution.jsonl',
+      cwd: '/workspace/harbor',
+    },
+    startedAt: fixedNow - 420000,
+    completedAt: fixedNow - 240000,
+  },
+  {
+    id: 'T2',
+    title: 'Signing and provenance',
+    task: 'Review package signing and build provenance requirements.',
+    status: 'done',
+    summary: 'Sign every platform artifact and publish provenance from the release workflow.',
+    sourceIds: [2, 3],
+    childSession: {
+      id: 'research-child-signing',
+      path: '/workspace/harbor/sessions/research-child-signing.jsonl',
+      cwd: '/workspace/harbor',
+    },
+    startedAt: fixedNow - 420000,
+    completedAt: fixedNow - 210000,
+  },
+  {
+    id: 'T3',
+    title: 'Rollback and operations',
+    task: 'Find release approval, monitoring, and rollback practices.',
+    status: 'done',
+    summary: 'Use protected release environments, observable rollout stages, and a rehearsed rollback action.',
+    sourceIds: [4, 5, 6],
+    childSession: {
+      id: 'research-child-operations',
+      path: '/workspace/harbor/sessions/research-child-operations.jsonl',
+      cwd: '/workspace/harbor',
+    },
+    startedAt: fixedNow - 420000,
+    completedAt: fixedNow - 180000,
+  },
+]
+
+const researchState = {
+  version: 1,
+  sessionId: 'research-session',
+  status: 'complete',
+  phase: 'report',
+  objective: 'Compare release strategies for a small desktop app and recommend a safe rollout plan.',
+  strategy: 'Review distribution controls, artifact trust, and rollback operations in parallel.',
+  note: 'Write a decision-oriented report with verifiable citations.',
+  threads: researchThreads,
+  sources: researchSources,
+  reportTitle: 'Safer desktop release strategy',
+  reportEntryId: 'research-report',
+  reportRequestedAt: fixedNow - 120000,
+  citedSourceIds: [1, 2, 3, 4],
+  error: '',
+  createdAt: fixedNow - 480000,
+  updatedAt: fixedNow - 60000,
+  completedAt: fixedNow - 60000,
+  lastEventId: 'research-complete',
+  threadCount: 3,
+  completedThreadCount: 3,
+  sourceCount: 6,
+  citedSourceCount: 4,
+  excludedSourceCount: 1,
+}
+
+const researchSession = session(
+  'research-session',
+  'Choose a safer desktop release strategy',
+  '2026-08-06T15:52:00.000Z',
+  7,
+  '/workspace/harbor',
+  compactResearchState(researchState),
+)
+
 const sessions = [
   session('demo-session', 'Review the release flow', '2026-08-06T15:42:00.000Z', 5),
   session('release-checks', 'Add release verification', '2026-08-06T14:25:00.000Z', 18),
@@ -249,6 +411,104 @@ const baseEntries = [
     timestamp: '2026-08-06T15:47:00.000Z',
     rolloutFeedback: 'helpful',
   }),
+]
+
+const researchEntries = [
+  messageEntry({
+    id: 'research-user',
+    role: 'user',
+    label: 'You',
+    text: researchState.objective,
+    timestamp: '2026-08-06T15:53:00.000Z',
+  }),
+  messageEntry({
+    id: 'research-plan',
+    role: 'assistant',
+    label: 'Agent',
+    text: `I will compare three independent parts of the release process:
+
+1. Distribution controls and staged updates
+2. Artifact signing and build provenance
+3. Release approval, monitoring, and rollback`,
+    timestamp: '2026-08-06T15:54:00.000Z',
+  }),
+  {
+    id: 'research-threads',
+    type: 'tool',
+    label: 'Research threads',
+    code: '3 threads',
+    toolName: 'subagent',
+    text: 'Three research threads completed.',
+    subagentDetails: {
+      mode: 'parallel',
+      results: researchThreads.map((thread) => ({
+        agent: 'researcher',
+        agentSource: 'bundled',
+        task: `[${thread.id}] ${thread.task}`,
+        status: 'done',
+        research: {
+          threadId: thread.id,
+          title: thread.title,
+          summary: thread.summary,
+          sources: thread.sourceIds.map((id) => ({ id })),
+        },
+        childSession: thread.childSession,
+        exitCode: 0,
+        messages: [{ role: 'assistant', content: thread.summary }],
+        usage: {
+          inputTokens: 2100,
+          outputTokens: 680,
+          totalTokens: 2780,
+          cost: 0,
+          turns: 4,
+        },
+      })),
+    },
+    researchThreads: true,
+    isError: false,
+    copyText: 'Research threads\n3 threads completed',
+    timestamp: '2026-08-06T15:57:00.000Z',
+    rolloutFeedback: '',
+    rolloutFeedbackText: '',
+  },
+  {
+    ...messageEntry({
+      id: 'research-report',
+      role: 'assistant',
+      label: 'Assistant · research artifact',
+      text: `# Safer desktop release strategy
+
+**Recommendation:** Use signed artifacts, protected promotion stages, and a rehearsed rollback action.
+
+## Release controls
+
+Use a preview channel before broad rollout. Electron exposes the update lifecycle needed to check, download, and install releases [1](https://www.electronjs.org/docs/latest/api/auto-updater).
+
+Sign each platform artifact [2](https://www.electronjs.org/docs/latest/tutorial/code-signing) and publish build provenance from CI [3](https://docs.npmjs.com/generating-provenance-statements).
+
+## Rollout plan
+
+1. Verify packaging, signatures, update metadata, and smoke tests.
+2. Promote through a protected release environment [4](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments).
+3. Hold each rollout stage until crash and update metrics remain within limits.
+4. Stop promotion and restore the prior update manifest when a limit fails.`,
+      timestamp: '2026-08-06T15:59:00.000Z',
+    }),
+    researchReport: {
+      title: researchState.reportTitle,
+      sourceIds: researchState.citedSourceIds,
+      sourceCount: researchState.sourceCount,
+      citedSourceCount: researchState.citedSourceCount,
+      sources: researchSources.filter((source) => {
+        return researchState.citedSourceIds.includes(source.id)
+      }).map((source) => ({
+        id: source.id,
+        key: source.key,
+        url: source.url || '',
+        path: source.path || '',
+      })),
+    },
+  },
 ]
 
 const visionEntries = [
@@ -394,7 +654,7 @@ try {
     browser,
     file: path.join(docsOutputDir, 'home.png'),
     route: '/',
-    ready: '.project-sidebar .sidebar-project-shortcuts',
+    ready: '.research-mode-chip',
     scenario: 'home',
   })
   await capture({
@@ -402,6 +662,16 @@ try {
     file: path.join(docsOutputDir, 'workbench.png'),
     route: '/sessions/demo-session',
     ready: '.assistant-message .thinking-trigger',
+  })
+  await capture({
+    browser,
+    file: path.join(docsOutputDir, 'deep-research.png'),
+    route: '/sessions/research-session',
+    ready: '.research-report-message',
+    scenario: 'research',
+    interact: async (page) => {
+      await selectResearchSource(page, 1)
+    },
   })
   await capture({
     browser,
@@ -572,8 +842,13 @@ try {
       const drawer = page.locator('aside[aria-label="Vision agent"]')
       await drawer.locator('.subagent-config-card').first().waitFor()
       const modelSelect = drawer.locator('select').first()
-      if (await modelSelect.inputValue() !== 'local/qwen3.6-27b') {
-        throw new Error('Vision model selector does not use local/qwen3.6-27b')
+      await page.waitForFunction((expected) => {
+        const drawer = document.querySelector('aside[aria-label="Vision agent"]')
+        return drawer?.querySelector('select')?.value === expected
+      }, 'local/qwen3.6-27b')
+      const selectedVisionModel = await modelSelect.inputValue()
+      if (selectedVisionModel !== 'local/qwen3.6-27b') {
+        throw new Error(`Vision model selector uses ${selectedVisionModel || '(empty)'}`)
       }
       const options = await modelSelect.locator('option').allTextContents()
       if (options.some((option) => {
@@ -631,6 +906,18 @@ try {
   })
   await capture({
     browser,
+    file: path.join(docsOutputDir, 'deep-research-mobile.png'),
+    route: '/sessions/research-session',
+    ready: '.research-report-message',
+    viewport: { width: 390, height: 844 },
+    scenario: 'research',
+    interact: async (page) => {
+      await page.getByRole('button', { name: 'Research sources · 6' }).click()
+      await selectResearchSource(page, 1)
+    },
+  })
+  await capture({
+    browser,
     file: path.join(docsOutputDir, 'mobile-session.png'),
     route: '/sessions/demo-session',
     ready: '.composer .mobile-label',
@@ -651,7 +938,7 @@ try {
     browser,
     file: path.join(readmeOutputDir, 'home.png'),
     route: '/',
-    ready: '.project-sidebar .sidebar-project-shortcuts',
+    ready: '.research-mode-chip',
     viewport: { width: 1503, height: 818 },
     scenario: 'home',
     macWindow: true,
@@ -664,11 +951,30 @@ try {
     viewport: { width: 1503, height: 818 },
     macWindow: true,
   })
+  await capture({
+    browser,
+    file: path.join(readmeOutputDir, 'deep-research.png'),
+    route: '/sessions/research-session',
+    ready: '.research-report-message',
+    viewport: { width: 1503, height: 818 },
+    scenario: 'research',
+    interact: async (page) => {
+      await selectResearchSource(page, 1)
+    },
+    macWindow: true,
+  })
 } finally {
   await browser.close()
 }
 
 console.log('Saved documentation and README screenshots')
+
+async function selectResearchSource(page, sourceId) {
+  const pane = page.locator('aside[aria-label="Research sources"].open')
+  await pane.waitFor()
+  await pane.locator(`[data-source-id="${sourceId}"] .research-source-select`).click()
+  await pane.locator(`[data-source-id="${sourceId}"] .research-source-evidence`).waitFor()
+}
 
 function session(
   id,
@@ -676,6 +982,7 @@ function session(
   timestamp,
   messageCount,
   cwd = '/workspace/harbor',
+  research = null,
 ) {
   return {
     id,
@@ -684,6 +991,7 @@ function session(
     name,
     parentSessionPath: null,
     isSubagentSession: false,
+    research,
     firstMessage: name,
     messageCount,
     modified: timestamp,
@@ -774,9 +1082,11 @@ function memory(id, scope, contentMd, tags, status = 'active') {
 
 function runtimeFor(scenario) {
   const queued = scenario === 'queue'
+  const research = scenario === 'research'
+  const id = research ? researchSession.id : 'demo-session'
   return {
-    id: 'demo-session',
-    path: '/workspace/harbor/sessions/demo-session.jsonl',
+    id,
+    path: `/workspace/harbor/sessions/${id}.jsonl`,
     cwd: '/workspace/harbor',
     diagnostics: [],
     state: {
@@ -789,8 +1099,10 @@ function runtimeFor(scenario) {
       pendingToolCalls: [],
       steeringMode: 'one-at-a-time',
       followUpMode: 'one-at-a-time',
-      activeToolCount: 4,
-      activeToolNames: ['read', 'grep', 'bash', 'edit'],
+      activeToolCount: research ? 6 : 4,
+      activeToolNames: research
+        ? ['read', 'grep', 'subagent', 'research_update', 'exa_search', 'exa_contents']
+        : ['read', 'grep', 'bash', 'edit'],
       contextUsage: { tokens: 12480, contextWindow: model.contextWindow, percent: 3.25 },
       slashCommands: [
         { name: 'compact', description: 'Compact context', source: 'command' },
@@ -809,27 +1121,34 @@ function runtimeFor(scenario) {
         notifications: [],
       },
       goal: scenario === 'goal' ? goal : null,
+      research: research ? researchState : null,
     },
   }
 }
 
 function detailFor(scenario) {
-  const summary = sessions[0]
-  const entries = scenario === 'shell'
-    ? shellEntries
-    : scenario === 'vision'
-      ? visionEntries
-      : baseEntries
+  const research = scenario === 'research'
+  const summary = research ? researchSession : sessions[0]
+  const entries = research
+    ? researchEntries
+    : scenario === 'shell'
+      ? shellEntries
+      : scenario === 'vision'
+        ? visionEntries
+        : baseEntries
   return {
     session: {
       ...summary,
       sessionFile: summary.path,
+      research: research ? researchState : null,
       messageCount: entries.length,
       contextTokens: 12480,
       modified: scenario === 'export'
         ? '2026-08-06T15:49:00.000Z'
         : summary.modified,
-      created: '2026-08-06T15:42:00.000Z',
+      created: research
+        ? '2026-08-06T15:52:00.000Z'
+        : '2026-08-06T15:42:00.000Z',
       contextUsage: { tokens: 12480, contextWindow: model.contextWindow, percent: 3.25 },
     },
     entries,
@@ -930,10 +1249,16 @@ async function capture({
 
     if (key === 'GET /api/pi/info') return json(backendInfo)
     if (key === 'GET /api/pi/projects') return json({ projects })
-    if (key === 'GET /api/pi/sessions') return json({ sessions })
+    if (key === 'GET /api/pi/sessions') {
+      return json({
+        sessions: scenario === 'research'
+          ? [researchSession, ...sessions]
+          : sessions,
+      })
+    }
     if (key === 'GET /api/pi/state') return json({ active: runtime })
     if (key === 'POST /api/pi/active-session') return json({ active: runtime })
-    if (key === 'GET /api/pi/sessions/demo-session') return json(detailFor(scenario))
+    if (key === `GET /api/pi/sessions/${runtime.id}`) return json(detailFor(scenario))
     if (key === 'GET /api/pi/review') {
       return json(scenario === 'review' ? reviewPayload : cleanReviewPayload)
     }
@@ -943,7 +1268,7 @@ async function capture({
     if (key === 'GET /api/pi/vision/config') {
       return json(visionConfigPayload(url.searchParams.has('sessionPath')))
     }
-    if (key === 'GET /api/pi/sessions/demo-session/export') {
+    if (key === `GET /api/pi/sessions/${runtime.id}/export`) {
       const html = await renderSessionExportHtml(detailFor(scenario))
       return request.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: html })
     }
@@ -1259,11 +1584,11 @@ function initBrowser({ fixedNow: now, runtime, goal: activeGoal, terminal, emitR
           data: JSON.stringify(runtime),
         }))
         const events = [
-          { activeSessionId: 'demo-session', event: { type: 'session_start' } },
-          { activeSessionId: 'demo-session', event: { type: 'tool_execution_start', toolName: 'read' } },
-          { activeSessionId: 'demo-session', event: { type: 'tool_execution_end', toolName: 'read' } },
+          { activeSessionId: runtime.id, event: { type: 'session_start' } },
+          { activeSessionId: runtime.id, event: { type: 'tool_execution_start', toolName: 'read' } },
+          { activeSessionId: runtime.id, event: { type: 'tool_execution_end', toolName: 'read' } },
           ...(!runtime.state.isStreaming
-            ? [{ activeSessionId: 'demo-session', event: { type: 'agent_end' } }]
+            ? [{ activeSessionId: runtime.id, event: { type: 'agent_end' } }]
             : []),
         ]
         if (emitRuntimeEvents) {
@@ -1276,7 +1601,7 @@ function initBrowser({ fixedNow: now, runtime, goal: activeGoal, terminal, emitR
         if (activeGoal) {
           this.dispatchEvent(new MessageEvent('extension_ui', {
             data: JSON.stringify({
-              activeSessionId: 'demo-session',
+              activeSessionId: runtime.id,
               state: {
                 statuses: { goal: 'goal: active' },
                 widgets: {},

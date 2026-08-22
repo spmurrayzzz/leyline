@@ -13,6 +13,8 @@ The projection performs these operations:
 - Create tool labels and targets.
 - Detect skill prompt rows.
 - Parse subagent results and child-session links.
+- Detect research-thread results and annotate the final research report.
+- Map validated report citations to canonical source-ledger entries.
 - Create image, file, diff, and patch preview data.
 - Create copy text for messages and tools.
 
@@ -20,7 +22,7 @@ Keep facts in the shared projection when both the app and export need them. Do n
 
 ## Backend detail DTO
 
-`server/pi-api/dtos.js` reads the active branch from `SessionManager`. It passes the branch to the shared projection.
+`server/pi-api/dtos.js` reads the active branch from `SessionManager`. It passes the branch and folded research state to the shared projection.
 
 The backend then adds rollout feedback to the projected entries. `GET /api/pi/sessions/:id` returns these entries in `SessionDetail`.
 
@@ -30,7 +32,9 @@ Persisted runtime event entries can exist in a detail response. The current live
 
 `src/lib/transcript.js` configures `markdown-it` with raw HTML disabled. It also exports projection helpers for Vue components.
 
-`TranscriptEntry.vue` renders persisted messages, thoughts, tools, skills, subagents, feedback, and previews. `useLiveTurnProjection.js` supplies separate live rows while a turn runs.
+`TranscriptEntry.vue` renders persisted messages, thoughts, tools, skills, subagents, research threads, report artifacts, feedback, and previews. `useLiveTurnProjection.js` supplies separate live rows while a turn runs.
+
+A valid report citation emits a source-open event only when its numeric label and target match the report's projected ledger source.
 
 The live controller matches new persisted entries to visible live rows. It removes duplicate persisted rows until the handoff settles.
 
@@ -62,4 +66,4 @@ The app transcript uses these files:
 
 The export renderer and export CSS live in `server/pi-api/export-renderer.js`.
 
-Compare both renderers when you change messages, thoughts, tools, skills, subagents, Markdown, syntax colors, or previews. The standalone export header can remain different from the app shell.
+Compare both renderers when you change messages, thoughts, tools, skills, subagents, research artifacts, Markdown, syntax colors, or previews. The standalone export header can remain different from the app shell.

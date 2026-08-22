@@ -14,6 +14,8 @@ Subagents run delegated tasks in child sessions with separate context.
 
 The drawer lists available project and global agent definitions. Each card shows the definition source, configured model, description, and tool list.
 
+Deep research uses a reserved bundled `researcher`. It does not appear in this drawer and inherits the parent model and thinking level by default.
+
 ## Select a model scope
 
 Use one of these scope tabs:

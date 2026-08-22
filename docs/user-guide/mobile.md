@@ -14,6 +14,8 @@ The project part of the breadcrumb is hidden. The session rename glyph is also h
 
 The **Memory**, **Events**, and **Export transcript** icons remain available. Their numeric counts are hidden.
 
+A research session also shows its compact state and source control. The source count is hidden, but the control remains available.
+
 ## Open the mobile sidebar
 
 ![Mobile session sidebar open above the workbench](../assets/screenshots/mobile-sidebar.png)
@@ -42,6 +44,12 @@ The composer stays above the bottom edge. Model, thinking, dictation, and send c
 The context row contains runtime status, shell mode, tool count, context text, and the terminal control. Some secondary status chips are hidden to keep the row compact.
 
 The model control uses the `provider/model-id` label. The thinking control uses a shortened label. The context progress bar is hidden, but its token text remains.
+
+## Open research sources
+
+A [deep research](./deep-research) source ledger opens across the full viewport. It keeps the All, Cited, Supporting, and Excluded filters.
+
+Select the source control in the header. Select **×** to close the ledger and return to the report.
 
 ## Use drawers and the terminal
 

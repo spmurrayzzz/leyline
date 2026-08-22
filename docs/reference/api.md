@@ -45,6 +45,7 @@ SessionSummary = {
   name?: string,
   parentSessionPath?: string,
   isSubagentSession: boolean,
+  research: ResearchSummary | null,
   firstMessage: string,
   messageCount: number,
   modified?: string,
@@ -56,6 +57,70 @@ SessionSummary = {
 
 For persisted sessions without message times, `modified` uses the session creation time or file modification time. `messageCount` counts all message records. `firstMessage` is limited to 140 characters.
 
+Session detail and open-runtime summaries use the research objective for `firstMessage` when the branch has no user message.
+
+```text
+ResearchSummary = {
+  sessionId: string,
+  status: "running" | "complete" | "error",
+  phase: "plan" | "gather" | "synthesize" | "report",
+  objective: string,
+  reportTitle: string,
+  reportEntryId: string,
+  threadCount: number,
+  completedThreadCount: number,
+  sourceCount: number,
+  citedSourceCount: number,
+  excludedSourceCount: number,
+  updatedAt: number
+}
+
+ResearchThread = {
+  id: string,
+  title: string,
+  task: string,
+  status: "queued" | "running" | "done" | "error",
+  summary: string,
+  sourceIds: number[],
+  childSession: { id: string, path: string, cwd: string } | null,
+  error: string,
+  startedAt: number,
+  completedAt: number
+}
+
+ResearchSource = {
+  id: number,
+  key: string,
+  url: string,
+  path: string,
+  title: string,
+  publisher: string,
+  publishedAt: string,
+  kind: string,
+  status: "candidate" | "cited" | "excluded",
+  threadIds: string[],
+  claim: string,
+  evidence: string,
+  exclusionReason: string
+}
+
+ResearchState = ResearchSummary & {
+  version: 1,
+  strategy: string,
+  note: string,
+  threads: ResearchThread[],
+  sources: ResearchSource[],
+  citedSourceIds: number[],
+  error: string,
+  createdAt: number,
+  completedAt: number,
+  reportRequestedAt: number,
+  lastEventId: string
+}
+```
+
+`ResearchSummary` omits thread and source records from session-list responses. Session detail and active runtime responses use `ResearchState`.
+
 ### Session detail
 
 ```text
@@ -66,13 +131,16 @@ SessionDetail = {
     contextTokens: number | null,
     modified: string,
     created: string,
-    contextUsage?: object
+    contextUsage?: object,
+    research: ResearchState | null
   },
   entries: TranscriptEntry[]
 }
 ```
 
-A transcript entry is a projected `message`, `tool`, `event`, or `summary` object. Each entry has `id`, `type`, `timestamp`, `copyText`, `rolloutFeedback`, and `rolloutFeedbackText` where applicable. Message entries include role, text, and text, image, or thinking blocks. Tool entries can include file, diff, patch, image, bash, and subagent data.
+A transcript entry is a projected `message`, `tool`, `event`, or `summary` object. Each entry has `id`, `type`, `timestamp`, `copyText`, `rolloutFeedback`, and `rolloutFeedbackText` where applicable.
+
+Message entries include role, text, and text, image, or thinking blocks. A completed report message can include `researchReport`. Tool entries can include file, diff, patch, image, bash, subagent, and research-thread data.
 
 ### Active runtime
 
@@ -102,7 +170,8 @@ Active = {
       widgets: object,
       notifications: object[]
     },
-    goal: Goal | null
+    goal: Goal | null,
+    research: ResearchState | null
   }
 }
 
@@ -151,6 +220,7 @@ Response:
   capabilities: {
     events: true,
     exports: true,
+    research: true,
     review: true,
     reviewWatch: true,
     terminal: true
@@ -158,7 +228,9 @@ Response:
 }
 ```
 
-The frontend rejects a backend when `name` or `apiVersion` is incompatible. It shows the desktop review control only when `capabilities.review` is `true`. It opens the automatic review stream only when `capabilities.reviewWatch` is `true`.
+The frontend rejects a backend when `name` or `apiVersion` is incompatible. It shows the research control only when `capabilities.research` is `true`.
+
+It shows the desktop review control only when `capabilities.review` is `true`. It opens the automatic review stream only when `capabilities.reviewWatch` is `true`.
 
 ## Connection registry
 
@@ -287,7 +359,7 @@ Persisted sessions use descending `modified` order. Runtime-only sessions appear
 Request:
 
 ```text
-{ cwd: string }
+{ cwd: string, kind?: "session" | "research" }
 ```
 
 Response:
@@ -296,7 +368,9 @@ Response:
 { active: Active, detail: SessionDetail }
 ```
 
-The route creates the directory if necessary, creates a pi session, loads a runtime, and makes it active. Missing `cwd` produces `500`.
+The route creates the directory if necessary, creates a pi session, loads a runtime, and makes it active. The default kind is `session`.
+
+For `research`, the route appends a session-ID-bound research marker before extension binding. Missing `cwd` or an invalid kind produces `500`.
 
 ### `GET /api/pi/sessions/:id`
 
@@ -746,7 +820,9 @@ Response:
 { ok: true, active: Active, detail: SessionDetail }
 ```
 
-The route forks at the specified entry, changes the runtime session ID, and selects the fork. It also copies session-level subagent model overrides and vision overrides. Streaming or compaction returns `500`.
+The route forks at the specified entry, changes the runtime session ID, and selects the fork. It also copies session-level subagent model overrides and vision overrides.
+
+For a research session, the route rebinds retained research state to the new session ID. It revalidates a retained report before it marks the fork complete. Streaming or compaction returns `500`.
 
 ### `POST /api/pi/reset-to-entry`
 
@@ -765,6 +841,8 @@ Response:
 ```
 
 The entry must be on the active branch. The route rewrites the JSONL file so that it ends at that entry. It does not keep later branch records.
+
+For a research session, the route rebuilds state from retained entries. It can restore a valid report marker when the report remains after its checkpoint.
 
 ### `POST /api/pi/mode`
 

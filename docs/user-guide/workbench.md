@@ -12,6 +12,8 @@ The desktop header shows the project and session as a breadcrumb. Select the ses
 
 A subagent child session also shows **← parent session**. Select this control to open its parent session.
 
+A research session shows its phase or **report ready** beside the title. Its source control opens the persistent source ledger.
+
 The right side of the header contains these controls:
 
 - **Review changes** opens the desktop [Git review pane](./git-review). It appears when the selected backend supports review.
@@ -26,6 +28,8 @@ The right side of the header contains these controls:
 The transcript shows the current session branch. User messages, assistant messages, tools, thoughts, skills, summaries, and images use different rows.
 
 Assistant output and tool activity appear while the run is active. Saved rows replace live rows after pi records the turn. Leyline keeps one visible copy of each item.
+
+A [deep research session](./deep-research) adds a phase bar, Research threads card, cited report artifact, and source ledger. Each thread can link to its child transcript.
 
 ## Keep your reading position
 
@@ -49,6 +53,6 @@ The workbench expands into the available space while the sidebar is hidden.
 
 Only one main right-side drawer is open at a time. Opening **Memory**, **Events**, **Settings**, **Subagents**, **Vision agent**, or **Project details** closes conflicting drawers.
 
-Git review uses a separate desktop rail. You can resize it or expand it across the workspace.
+Git review and research sources share the desktop right rail. Opening one closes the other. You can resize Git review or expand it across the workspace.
 
 The terminal is a bottom drawer. It can remain open while you use the transcript and composer.

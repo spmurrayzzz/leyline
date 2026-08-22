@@ -43,6 +43,7 @@ export default defineConfig({
           { text: 'Workbench', link: '/user-guide/workbench' },
           { text: 'Git review', link: '/user-guide/git-review' },
           { text: 'Composer', link: '/user-guide/composer' },
+          { text: 'Deep research', link: '/user-guide/deep-research' },
           { text: 'Runtime controls', link: '/user-guide/runtime-controls' },
           {
             text: 'Tools and thinking',
@@ -124,6 +125,7 @@ export default defineConfig({
           { text: 'Goal extension', link: '/integrations/goal-extension' },
           { text: 'Memory', link: '/integrations/memory-integration' },
           { text: 'Subagents', link: '/integrations/subagents' },
+          { text: 'Deep research', link: '/integrations/deep-research' },
           { text: 'Vision agent', link: '/integrations/vision-agent' },
           {
             text: 'Terminal backend',

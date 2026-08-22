@@ -113,6 +113,8 @@ Normal session changes use pi session and runtime methods. Transcript detail ope
 
 Leyline projects the branch through `lib/transcript-projection.js`. The same projected DTO supplies the browser transcript and HTML export.
 
+`lib/research-state.js` folds session-ID-bound `leyline-research` entries from the active branch. Session summaries keep compact phase and count data. Detail and runtime DTOs keep the complete research state.
+
 ## Session lineage and child agents
 
 A parent session path records lineage for forks and subagent sessions. The parent path alone does not identify a subagent session.
@@ -121,11 +123,15 @@ New subagent and vision-child sessions contain a `leyline-subagent-session` cust
 
 Session discovery uses this explicit marker. It also has a compatibility fallback that finds child paths in parent `subagent` tool results.
 
+Deep research uses the same child-session runtime path. A reserved researcher definition limits workers to approved read and search tools.
+
 Vision delegation adds `leyline-vision-delegation` records to the parent branch. A session context transform replaces image blocks with saved file paths and a `vision_agent` instruction. This applies when the parent model cannot receive images. After matching tool calls exist, the transform uses neutral context text. It does not request another inspection. The persisted user message keeps the images.
 
 Pasted delegated images are stored in `LEYLINE_MEMORY_DIR/attachments/<session-id>/`. Without `LEYLINE_MEMORY_DIR`, the path is `~/.local/share/leyline/attachments/<session-id>/`. The session and project trash operations remove the related attachment directory after they move the JSONL file.
 
 Forks use `AgentSessionRuntime.fork(entryId, { position: 'at' })`. A fork gets a new JSONL file and keeps normal session visibility. It copies session-level subagent and vision-model overrides.
+
+A research fork replays the retained branch state as events bound to the new session ID. The backend revalidates a retained report before it marks the fork complete.
 
 ## Rename, delete, and reset
 
@@ -160,7 +166,9 @@ that directory.
 
 ## Bundled extensions and prompt
 
-Each runtime loads the bundled goal, memory, subagent, and vision-agent extensions from `.pi/extensions/`. It also appends `.pi/LEYLINE_SYSTEM.md` to the system prompt.
+Each runtime loads the bundled goal, memory, subagent, research, and vision-agent extensions from `.pi/extensions/`. It also appends `.pi/LEYLINE_SYSTEM.md` to the system prompt.
+
+A new research session gets its marker before extension binding. The research extension exposes `research_update` only when the active branch contains a marker for that session ID.
 
 Vision children use the normal subagent runtime path with no active tools. A session-local settings override permits image input without changing the user's persisted pi image setting.
 
@@ -168,7 +176,9 @@ Reload creates replacement cwd-bound services. It then binds the new session, ex
 
 The goal extension stores `goal-state` custom entries. Backend projection finds the latest goal state and includes it in session state.
 
-SSE updates carry goal and extension UI changes to `App.vue`. The workbench uses this state for goal controls and an empty session title.
+The research extension stores objective, plan, phase, thread, source, report, and error entries. Citation checks require numbered report links to match non-excluded ledger sources.
+
+SSE updates carry goal, research, and extension UI changes to `App.vue`. The workbench uses this state for controls, progress, source navigation, and session titles.
 
 ## Terminal boundary
 

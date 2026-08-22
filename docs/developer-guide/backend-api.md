@@ -26,6 +26,8 @@ The terminal does not use the HTTP router. It uses a WebSocket upgrade at `/api/
 | --- | --- |
 | `server/backend-connections.js` | Named connections, the default connection, and app settings on the native backend |
 | `lib/leyline-settings.js` | Setting keys that the native backend and browser share |
+| `lib/research-state.js` | Branch-local research state folding and source normalization |
+| `lib/research-citations.js` | Report citation checks against canonical ledger sources |
 | `server/pi-api/index.js` | Shared runtime instance, Vite integration, and WebSocket setup |
 | `server/pi-api/router.js` | HTTP method and path dispatch |
 | `server/pi-api/cors.js` | Shared HTTP and WebSocket origin policy |
@@ -50,7 +52,7 @@ The terminal does not use the HTTP router. It uses a WebSocket upgrade at `/api/
 
 The router has these main route groups:
 
-- session list, creation, detail, lookup by path, rename, delete, and export
+- session list, normal or research creation, detail, lookup by path, rename, delete, and export
 - runtime state and active-session selection
 - prompt, shell, compaction, edit, fork, Reset to here, reload, model, thinking, mode, and interrupt
 - filesystem browsing
@@ -93,7 +95,9 @@ Git commands disable external diff drivers and text conversion. The browser keep
 
 `createAgentSessionRuntime()` wraps the session and services in `AgentSessionRuntime`. Runtime handles keep these objects alive for background work.
 
-Each runtime loads the bundled goal, memory, subagent, and vision-agent extensions. It also appends the Leyline system prompt.
+Each runtime loads the bundled goal, memory, subagent, research, and vision-agent extensions. It also appends the Leyline system prompt.
+
+Research creation writes a `leyline-research` marker before extension binding. The bound extension adds its lead protocol and exposes `research_update` only for that session.
 
 Runtime creation installs a vision context transform on the session agent. The transform replaces matched images with saved file paths and `vision_agent` instructions. After matching tool calls exist, it uses neutral text instead of another instruction.
 
@@ -111,6 +115,8 @@ Use pi runtime and session methods for normal writes:
 - `session.setModel()` and `session.setThinkingLevel()` for runtime controls
 
 Rename appends a `session_info` record. Delete moves the JSONL file to Leyline trash.
+
+Research state uses custom JSONL entries for its objective, plan, phase, threads, sources, report, and errors. The backend folds these entries from the active branch.
 
 Reset to here is the explicit exception. It replaces the manager entries with the retained branch and rewrites the current file.
 
@@ -131,11 +137,15 @@ Subagent model precedence is session, project, global, then the agent definition
 
 The subagent and vision execution routes create child pi sessions. They write an explicit marker before they start each child runtime. Vision children use an empty tool allowlist and a session-local image setting override.
 
-## Goal state projection
+## Goal and research state projection
 
 The goal extension writes `goal-state` custom entries. `goal-state.js` finds the latest entry and normalizes budgets, status, and elapsed time.
 
-Session DTOs include the normalized goal. Extension events also trigger active-session and extension UI broadcasts.
+The research extension writes `leyline-research` custom entries. `research-state.js` folds matching entries, normalizes source identity, and derives progress counts.
+
+Session DTOs include normalized goal and research state. Extension events also trigger active-session and extension UI broadcasts.
+
+Before research completion, `research-citations.js` checks each numeric Markdown citation against a non-excluded ledger source.
 
 The browser does not reconstruct goal state from transcript text. It uses the projected backend state.
 
@@ -147,7 +157,9 @@ calls and request field names.
 
 `src/lib/leyline-api.js` manages the native connection registry and app settings. It also checks `GET /api/pi/info` before a switch.
 
-The backend information response gates the review control with the `review` capability and automatic watching with `reviewWatch`. `ReviewPane.vue` loads review data through `src/lib/pi-api.js` and opens the review stream through `backendHttpUrl()`.
+The backend information response gates the research control with `research`. It gates Git review with `review` and automatic watching with `reviewWatch`.
+
+`ReviewPane.vue` loads review data through `src/lib/pi-api.js` and opens the review stream through `backendHttpUrl()`.
 
 Vision configuration and parent prompt requests use `src/lib/pi-api.js`. For a parent model without image input, the backend saves attachments and the parent calls `vision_agent` during its turn.
 

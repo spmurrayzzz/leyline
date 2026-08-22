@@ -21,6 +21,8 @@ The server sends these event types:
 
 Queue changes and goal-state messages also trigger a new `active_session` snapshot. Extension UI changes trigger both `extension_ui` and `active_session`.
 
+Research updates change the extension status after they append state. The resulting snapshot includes the latest branch research state.
+
 ## Frontend adapter
 
 `useRuntimeEvents.js` creates one `EventSource` for `/api/pi/events` on the
@@ -39,7 +41,7 @@ The current frontend does not register an `extension_error` listener. Those serv
 
 If the snapshot belongs to the selected session, `App.vue` also replaces `activeRuntimeSession`.
 
-`runtime_event` payloads update background running, compacting, queue, unread, and error state. The same payload enters `useLiveTurnProjection.js`.
+`runtime_event` payloads update background running, compacting, queue, unread, and error state. `active_session` snapshots update branch research progress. Runtime events also enter `useLiveTurnProjection.js`.
 
 ## Live transcript projection
 
@@ -58,13 +60,13 @@ Other runtime events schedule a session-detail refresh. Normal refreshes use a 2
 
 Live user, assistant, and tool rows reconcile with projected persisted entries after refresh. This prevents duplicate rows during the handoff.
 
-## Goal and extension UI state
+## Goal, research, and extension UI state
 
-The backend derives the latest goal from `goal-state` custom entries. It includes goal state in runtime snapshots and extension UI events.
+The backend derives the latest goal from `goal-state` custom entries. It folds research state from matching `leyline-research` entries on the active branch.
 
-`App.vue` applies extension UI state only when `activeSessionId` matches the selected session. Warning and error notifications become composer errors.
+Runtime snapshots include both states. `App.vue` applies extension UI state only when `activeSessionId` matches the selected session.
 
-The goal controls use projected state. The browser does not parse goal text from transcript messages.
+The goal controls and research surfaces use projected state. The browser does not parse this state from transcript text.
 
 ## Concurrent sessions
 

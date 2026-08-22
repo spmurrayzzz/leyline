@@ -21,6 +21,8 @@ The **Sessions** heading shows the session count. The list scrolls when it is lo
 
 Enter a session name or ID in **Search sessions** to filter the current project.
 
+A flask after the title identifies a [deep research session](./deep-research). The marker remains visible after the run finishes.
+
 ## Read runtime status
 
 A session row can show these states:
@@ -30,6 +32,9 @@ A session row can show these states:
 - **unread**: a background run finished or reported an error.
 - **+N queued**: steering or follow-up messages are waiting.
 - **error**: the background runtime reported an error.
+- **plan**, **gather**, **synthesize**, or **report**: a research run is in that phase.
+- **gather N/N**: that many research threads have finished.
+- **ready**: the selected research session has a completed report.
 
 Select **Activity across other projects** to find active sessions outside the current project. Background sessions continue when you open another session.
 
@@ -37,7 +42,9 @@ Select **Activity across other projects** to find active sessions outside the cu
 
 Select **New session** at the bottom of the sidebar. You can also select **New session** in **Project details**.
 
-Leyline creates an empty session in the current project CWD. Use the centered composer to send its first prompt.
+Leyline creates an empty normal session in the current project CWD. Use the centered composer to send its first prompt.
+
+To create a research session, return to the start screen and select **research** before you send the prompt.
 
 ## Rename a session from the sidebar
 

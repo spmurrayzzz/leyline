@@ -21,6 +21,8 @@ features:
     details: Keep one project in focus, search its sessions, use Go to across projects, and move between parent and child sessions.
   - title: Run and direct agents
     details: Submit prompts, images, shell commands, steering messages, queued follow-ups, slash commands, and long-running goals.
+  - title: Run deep research
+    details: Split a question into parallel research threads, follow source gathering, read a cited report, and inspect the persistent source ledger.
   - title: Use images with any model
     details: Send images directly to compatible models or configure a vision agent to describe them for models without image support.
   - title: Watch live work

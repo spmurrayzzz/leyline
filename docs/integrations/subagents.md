@@ -13,6 +13,10 @@ Each file must have YAML frontmatter with `name` and `description`. It can also 
 
 A project definition replaces a user definition with the same name. Resource discovery and session start refresh the definition list.
 
+Deep research adds a reserved bundled `researcher` after normal discovery. This definition cannot be replaced by a user or project file.
+
+The reserved researcher uses a strict read and search allowlist. It returns a structured thread summary and source list for the research extension. See [Deep research integration](./deep-research).
+
 ## Execution modes
 
 The `subagent` tool supports these modes:

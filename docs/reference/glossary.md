@@ -8,6 +8,7 @@
 - **Composer**: The input area for prompts, images, shell commands, slash
   commands, steering, and follow-up messages.
 - **Context usage**: The current number and percentage of model context tokens.
+- **Deep research session**: A pi session whose lead agent plans parallel source work and writes a cited report.
 - **Follow-up**: A message that pi runs after the active turn finishes. Use
   Option+Enter during an active run.
 - **Fork**: A new pi session that starts from a selected transcript entry.
@@ -25,10 +26,12 @@
 - **Project**: A working directory that groups sessions in Leyline.
 - **Project Details**: A project drawer for filtering, sorting, creating,
   opening, renaming, and deleting sessions.
+- **Research artifact**: A completed Markdown report whose numeric citations match the research source ledger.
 - **Runtime**: The live pi session object that runs prompts, tools, shell
   commands, and model operations.
 - **Runtime events**: The **Events** drawer data from the selected backend's
   event stream.
+- **Source ledger**: The persisted research list that maps citation numbers to cited, supporting, or excluded sources.
 - **Session scope**: Data that applies to one session file.
 - **Steering**: A message sent to the current active run. Use Enter during an
   active run.

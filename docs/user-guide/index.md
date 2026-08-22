@@ -16,6 +16,7 @@ Use these pages for the main session tasks:
 - [Workbench](./workbench): use the header, transcript, drawers, and live output.
 - [Git review](./git-review): inspect staged, working-tree, and untracked project changes.
 - [Composer](./composer): send prompts, shell commands, images, steering messages, and follow-up messages.
+- [Deep research](./deep-research): run parallel research threads and inspect cited reports and source evidence.
 - [Runtime controls](./runtime-controls): select a model and thinking level, and inspect tools and context usage.
 - [Tools and thinking](./tools-and-thinking): inspect assistant thoughts, tools, skills, and rollout feedback.
 - [Editing, forking, resetting, and compaction](./editing-forking-compaction): change or branch session history.

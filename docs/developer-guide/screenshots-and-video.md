@@ -38,7 +38,7 @@ The registry contains the native backend and a fictional saved connection. The t
 
 The visible native address is `localhost:5173`, even when the capture uses another server URL. The command does not change local data or model configuration.
 
-The command writes product images to `docs/assets/screenshots/`. It also refreshes the two README images in `assets/readme/`.
+The command writes product images to `docs/assets/screenshots/`. It also refreshes the three README images in `assets/readme/`.
 
 Set a different app URL with:
 
@@ -58,6 +58,7 @@ The documentation workflow uses these fixed settings:
 - Model label: `local/deepseek-v4-flash`
 - Thought display default: **Collapsed**
 - Git review captures: `release-safety` with four sanitized changed files
+- Deep research captures: three completed threads, six ledger sources, four citations, and one excluded source
 
 Each state uses a new browser context. The script freezes time, replaces SSE and terminal transports, waits for a state selector, and disables remaining motion.
 

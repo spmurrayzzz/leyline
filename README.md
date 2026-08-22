@@ -9,12 +9,15 @@ connections to other Leyline backends.
 
 ### Start screen
 
-<a href="assets/readme/home.png"><img alt="Leyline start screen with project and runtime controls" src="assets/readme/home.png" /></a>
+<a href="assets/readme/home.png"><img alt="Leyline start screen with project, research, and runtime controls" src="assets/readme/home.png" /></a>
 
 ### Workbench
 
 <a href="assets/readme/workbench.png"><img alt="Leyline workbench with a sanitized agent session" src="assets/readme/workbench.png" /></a>
 
+### Deep research
+
+<a href="assets/readme/deep-research.png"><img alt="Leyline deep research report with phase progress and a source ledger" src="assets/readme/deep-research.png" /></a>
 
 ## Features
 
@@ -23,6 +26,10 @@ keeps one project in focus, and **Go to** searches sessions across projects.
 Leyline shows rendered transcripts, live runtime output, Git changes, model
 controls, memory, subagents, runtime events, and an embedded terminal. Each
 window can use the native backend or a saved backend connection.
+
+Deep research sessions divide a question into parallel, source-backed threads.
+Leyline keeps the plan and worker sessions inspectable, validates numbered
+report citations, and connects each citation to a persistent source ledger.
 
 On desktop, the Git review pane prepares changed files and the selected diff
 before it opens. It separates staged and working-tree changes and can expand
@@ -143,6 +150,7 @@ directory. Use `leyline -n` to create the session in a new Leyline window.
 - [Getting started](docs/getting-started/index.md)
 - [Sessions](docs/user-guide/sessions.md)
 - [Composer](docs/user-guide/composer.md)
+- [Deep research](docs/user-guide/deep-research.md)
 - [Git review](docs/user-guide/git-review.md)
 - [Images and vision](docs/user-guide/images-and-previews.md)
 - [Memory](docs/user-guide/memory.md)

@@ -6,7 +6,7 @@
 
 | Owner | State and behavior |
 | --- | --- |
-| `App.vue` | Drawer and sidebar navigator visibility, Git review state, composer draft, attachments, edit state, prompt submission, goal commands, subagent and vision settings, project detail selection, and startup motion phases |
+| `App.vue` | Drawer and sidebar navigator visibility, Git review and research-source state, composer draft, attachments, edit state, prompt submission, session kind, goal commands, agent settings, project detail selection, and startup motion phases |
 | `useSessionWorkspace.js` | Session list, project grouping, routes, selected detail, activation, runtime snapshots, sidebar activity rows, model and thinking controls, rename, delete, fork, reset, and reload |
 | `useBackendConnections.js` | App-wide connection records, window-specific selection, connection tests, and default selection |
 | `useTranscriptPreferences.js` | App-wide transcript display settings, loading state, and save errors |
@@ -61,7 +61,7 @@ The selected session route is `/sessions/:id`. Browser history changes call the 
 
 ## Active runtime state
 
-`activeRuntimeSession` contains the selected session's runtime DTO. It includes model, thinking, tools, context, queues, extension UI, and goal state.
+`activeRuntimeSession` contains the selected session's runtime DTO. It includes model, thinking, tools, context, queues, extension UI, goal state, and research state.
 
 SSE can send snapshots for all server handles. `App.vue` updates the selected runtime only when the IDs match.
 
@@ -115,6 +115,16 @@ Dirty Memory state can block session changes and drawer changes. Memory Changes 
 
 When the parent model cannot receive attached images, `App.vue` shows the effective vision model. It tells the user that the model will call the vision subagent when the prompt runs. The backend saves the attachments and gives the parent a `vision_agent` instruction. The tool call and result appear in the transcript.
 
+## Deep research
+
+`App.vue` keeps the staged start-session kind as `session` or `research`. Start-composer creation uses this value. Other creation flows use `session`.
+
+`selectedResearch` uses the active runtime state first and persisted session state second. It drives the phase bar, report state, source count, and composer language.
+
+`App.vue` owns source-pane visibility, selected source ID, and citation reveal keys. `ResearchSourcesPane.vue` owns its filter and list scrolling.
+
+A valid citation event opens the source pane, resets the filter, selects the source, and moves its card into view. Desktop source state also controls the third app-grid column.
+
 ## Git review
 
 `App.vue` enables review only when `/api/pi/info` reports the `review` capability and the viewport is wider than 1120 pixels.
@@ -143,9 +153,9 @@ A selected-session change resets scroll state. The terminal height and composer 
 
 ## Drawer coordination
 
-`App.vue` coordinates Project Details, Settings, Runtime Events, Memory, Subagents, Vision agent, and sidebar navigators. Opening a navigator closes conflicting drawers and configuration surfaces.
+`App.vue` coordinates Project Details, Settings, Runtime Events, Memory, Subagents, Vision agent, research sources, and sidebar navigators. Opening a navigator closes conflicting drawers and configuration surfaces.
 
-Git review uses a separate desktop grid track. It can remain open with the contextual drawer state.
+Git review and research sources share the desktop third rail. Opening one closes the other. The rail can remain open with contextual drawer state.
 
 The terminal is independent and can remain open below the workbench. Session changes reconnect it so the PTY uses the new active cwd.
 

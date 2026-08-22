@@ -2,9 +2,9 @@
 
 The start screen appears when no session is selected. One submission can create a session and send its first prompt.
 
-![Leyline start screen with a selected project, model, thinking level, and tool count](../assets/screenshots/home.png)
+![Leyline start screen with project, model, thinking, research, and tool controls](../assets/screenshots/home.png)
 
-*The start screen stages project and runtime choices before session creation.*
+*The start screen stages the project, session kind, and runtime choices before session creation.*
 
 ## Select a project
 
@@ -42,6 +42,14 @@ These choices are staged for the new session. A model change can also change the
 Select the tool-count control, such as **12 tools**. The **Enabled tools** list shows the tools for the staged runtime.
 
 The list is read-only. It can show **0 tools** when no tools are enabled.
+
+## Start deep research
+
+Select **research** below the composer before you send the first prompt. The heading changes to **What should we investigate?**
+
+Leyline creates a research session and starts its planning phase. The control appears only when the selected backend supports deep research.
+
+Shell mode always creates a normal session. See [Deep research](./deep-research) for phases, source evidence, citations, and reports.
 
 ## Send the first prompt
 

@@ -14,4 +14,6 @@ Forking uses `runtime.fork(entryId, { position: 'at' })`. Prompt edits use `sess
 
 Pi session logs are tree-structured JSONL records. Normal writes use runtime and session-manager primitives. Reset to here is an explicit exception. It rewrites the file so that the selected active branch ends at the target entry.
 
-Each runtime loads the bundled goal, memory, subagent, and vision-agent extensions. It also appends the bundled Leyline system prompt. See the [integration overview](./index) and [API reference](../reference/api).
+Each runtime loads the bundled goal, memory, subagent, research, and vision-agent extensions. It also appends the bundled Leyline system prompt.
+
+Research sessions add a `leyline-research` marker before extension binding. Their state remains in custom JSONL entries and follows the active branch. See [Deep research integration](./deep-research), the [integration overview](./index), and the [API reference](../reference/api).
