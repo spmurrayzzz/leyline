@@ -828,7 +828,7 @@ export function useSessionWorkspace({
 
   async function confirmDeleteSession() {
     const session = deleteConfirmSession.value
-    if (!session || deletingSessionId.value) return
+    if (!session || deletingSessionId.value) return false
 
     deletingSessionId.value = session.id
     deleteSessionPhase.value = 'deleting'
@@ -854,8 +854,10 @@ export function useSessionWorkspace({
         }
         updateSessionRoute('')
       }
+      return true
     } catch (error) {
       deleteSessionError.value = error.message
+      return false
     } finally {
       deletingSessionId.value = ''
       deleteSessionPhase.value = ''
@@ -883,7 +885,7 @@ export function useSessionWorkspace({
 
   async function confirmDeleteProject() {
     const project = deleteConfirmProject.value
-    if (!project?.cwd || deletingProjectCwd.value) return
+    if (!project?.cwd || deletingProjectCwd.value) return false
 
     deletingProjectCwd.value = project.cwd
     deleteProjectPhase.value = 'deleting'
@@ -922,8 +924,10 @@ export function useSessionWorkspace({
           || sessions.value[0]?.cwd
           || ''
       }
+      return true
     } catch (error) {
       deleteProjectError.value = error.message
+      return false
     } finally {
       deletingProjectCwd.value = ''
       deleteProjectPhase.value = ''

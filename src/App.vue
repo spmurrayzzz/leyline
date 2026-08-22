@@ -121,6 +121,10 @@ const promptSubmitting = ref(false)
 const interrupting = ref(false)
 const goalCommandSubmitting = ref('')
 const editingEntry = ref(null)
+const composerDrafts = new Map()
+const pendingComposerPastes = new Set()
+const startComposerDraftKey = 'start'
+let activeComposerDraftKey = startComposerDraftKey
 const seenEntryIds = ref(new Set())
 const animatingEntryIds = ref(new Set())
 const composerRef = ref(null)
@@ -346,8 +350,8 @@ const {
   cancelRenameSession,
   commitRenameSession,
   composerRuntime,
-  confirmDeleteProject,
-  confirmDeleteSession,
+  confirmDeleteProject: workspaceConfirmDeleteProject,
+  confirmDeleteSession: workspaceConfirmDeleteSession,
   contextUsage,
   createSession: workspaceCreateSession,
   createSessionForCwd: workspaceCreateSessionForCwd,
@@ -880,6 +884,7 @@ watch(slashCommandItems, () => {
 })
 
 watch(sessionDetail, (detail) => {
+  switchComposerDraft(detail?.session?.id || '')
   liveTurn.setPersistedDetail(detail)
   updateNativeWindowCwd()
 })
@@ -916,7 +921,6 @@ watch(selectedSessionId, () => {
   }
   expandedTools.value = new Set()
   expandedSkills.value = new Set()
-  editingEntry.value = null
   promptError.value = ''
   seenEntryIds.value = new Set()
   animatingEntryIds.value = new Set()
@@ -1180,9 +1184,28 @@ function cancelConfirmDelete() {
   cancelDeleteSession()
   cancelDeleteProject()
 }
+async function confirmDeleteSession() {
+  const session = deleteConfirmSession.value
+  if (!session || !await workspaceConfirmDeleteSession()) return
+  discardComposerDraft(session.id)
+}
+async function confirmDeleteProject() {
+  const project = deleteConfirmProject.value
+  if (!project) return
+  const sessionIds = new Set(
+    sessions.value
+      .filter((session) => session.cwd === project.cwd)
+      .map((session) => session.id),
+  )
+  if (selectedSession.value?.cwd === project.cwd) {
+    sessionIds.add(selectedSession.value.id)
+  }
+  if (!await workspaceConfirmDeleteProject()) return
+  for (const sessionId of sessionIds) discardComposerDraft(sessionId)
+}
 function confirmPendingDelete() {
-  if (deleteConfirmProject.value) confirmDeleteProject()
-  else confirmDeleteSession()
+  if (deleteConfirmProject.value) return confirmDeleteProject()
+  return confirmDeleteSession()
 }
 
 async function handleNativeToggleTerminal() {
@@ -1598,8 +1621,12 @@ function confirmBackendDisconnect(targetName) {
   if (agentRunning.value) {
     notices.push(`The current run will continue on ${activeBackendConnection.value.name}.`)
   }
-  if (draft.value.trim() || attachedImages.value.length) {
-    notices.push('The unsent composer draft will be cleared.')
+  if (draft.value.trim()
+    || attachedImages.value.length
+    || editingEntry.value
+    || composerDrafts.size
+    || [...pendingComposerPastes].some((paste) => paste.valid)) {
+    notices.push('Unsent composer drafts will be cleared.')
   }
   if (!notices.length) return true
   notices.push(`Switch this window to ${targetName}?`)
@@ -2044,6 +2071,138 @@ function pulseComposerCommit() {
   }, 240)
 }
 
+function composerDraftKey(sessionId) {
+  return sessionId ? `session:${sessionId}` : startComposerDraftKey
+}
+
+function currentComposerDraft() {
+  return {
+    text: draft.value,
+    images: [...attachedImages.value],
+    editingEntry: editingEntry.value,
+  }
+}
+
+function storeComposerDraft(key, state) {
+  if (state.text || state.images.length || state.editingEntry) {
+    composerDrafts.set(key, {
+      ...state,
+      images: [...state.images],
+    })
+    return
+  }
+  composerDrafts.delete(key)
+}
+
+function applyComposerDraft(state) {
+  draft.value = state?.text || ''
+  attachedImages.value = [...(state?.images || [])]
+  editingEntry.value = state?.editingEntry || null
+}
+
+function activateComposerDraft(key, state = composerDrafts.get(key)) {
+  activeComposerDraftKey = key
+  composerDrafts.delete(key)
+  applyComposerDraft(state)
+}
+
+function switchComposerDraft(sessionId) {
+  const nextKey = composerDraftKey(sessionId)
+  if (nextKey === activeComposerDraftKey) return
+  storeComposerDraft(activeComposerDraftKey, currentComposerDraft())
+  activateComposerDraft(nextKey)
+}
+
+function composerDraftState(key) {
+  if (key === activeComposerDraftKey) return currentComposerDraft()
+  return composerDrafts.get(key) || {
+    text: '',
+    images: [],
+    editingEntry: null,
+  }
+}
+
+function moveComposerDraft(sourceKey, sessionId) {
+  const targetKey = composerDraftKey(sessionId)
+  const state = composerDraftState(sourceKey)
+  for (const paste of pendingComposerPastes) {
+    if (paste.valid && paste.key === sourceKey) paste.key = targetKey
+  }
+  composerDrafts.delete(sourceKey)
+  if (selectedSessionId.value === sessionId) {
+    activateComposerDraft(targetKey, state)
+  } else {
+    storeComposerDraft(targetKey, state)
+  }
+  return targetKey
+}
+
+function appendComposerImages(key, images) {
+  if (key === activeComposerDraftKey) {
+    attachedImages.value = [...attachedImages.value, ...images]
+    return
+  }
+  const state = composerDraftState(key)
+  storeComposerDraft(key, {
+    ...state,
+    images: [...state.images, ...images],
+  })
+}
+
+function hasPendingComposerPastes(key) {
+  return [...pendingComposerPastes].some((paste) => {
+    return paste.valid && paste.key === key
+  })
+}
+
+async function settleComposerPastes(key) {
+  while (true) {
+    const pending = [...pendingComposerPastes].filter((paste) => {
+      return paste.valid && paste.key === key
+    })
+    if (!pending.length) return
+    await Promise.allSettled(pending.map((paste) => paste.promise))
+  }
+}
+
+function discardComposerDraft(sessionId) {
+  const key = composerDraftKey(sessionId)
+  for (const paste of pendingComposerPastes) {
+    if (paste.key === key) paste.valid = false
+  }
+  if (activeComposerDraftKey === key
+    && selectedSessionId.value !== sessionId) {
+    activateComposerDraft(composerDraftKey(selectedSessionId.value))
+  }
+  composerDrafts.delete(key)
+}
+
+function completeComposerEdit(key, entry) {
+  if (key === activeComposerDraftKey) {
+    if (editingEntry.value?.id === entry.id) editingEntry.value = null
+    return
+  }
+  const state = composerDrafts.get(key)
+  if (state?.editingEntry?.id !== entry.id) return
+  storeComposerDraft(key, { ...state, editingEntry: null })
+}
+
+function restoreComposerEdit(key, entry, text, images) {
+  if (key === activeComposerDraftKey) {
+    if (editingEntry.value?.id !== entry.id
+      || draft.value
+      || attachedImages.value.length) return
+    draft.value = text
+    attachedImages.value = [...images]
+    return
+  }
+  const state = composerDrafts.get(key)
+  if (state?.editingEntry?.id !== entry.id
+    || state.text
+    || state.images.length) return
+  storeComposerDraft(key, { ...state, text, images })
+}
+
 async function submitDraft(streamingBehavior) {
   const text = draft.value.trim()
   const submittedAttachments = attachedImages.value
@@ -2151,6 +2310,7 @@ async function submitDraft(streamingBehavior) {
         undefined,
         initializesResearchSession ? 'research' : undefined,
       )
+    if (editing) completeComposerEdit(composerDraftKey(sessionId), editing)
     if (selectedSessionId.value === sessionId) {
       if (data.active) activeRuntimeSession.value = data.active
       if (initializesResearchSession) emptySessionKind.value = 'session'
@@ -2160,6 +2320,14 @@ async function submitDraft(streamingBehavior) {
       promptAccepted = true
     }
   } catch (error) {
+    if (editing) {
+      restoreComposerEdit(
+        composerDraftKey(sessionId),
+        editing,
+        submittedDraft,
+        submittedAttachments,
+      )
+    }
     if (selectedSessionId.value === sessionId) {
       if (editing) {
         sessionDetail.value = previousDetail
@@ -2584,12 +2752,22 @@ async function handleComposerPaste(event) {
 
   event.preventDefault()
   promptError.value = ''
+  const paste = {
+    key: activeComposerDraftKey,
+    promise: Promise.all(files.map(fileToImageContent)),
+    valid: true,
+  }
+  pendingComposerPastes.add(paste)
 
   try {
-    const images = await Promise.all(files.map(fileToImageContent))
-    attachedImages.value = [...attachedImages.value, ...images]
+    const images = await paste.promise
+    if (paste.valid) appendComposerImages(paste.key, images)
   } catch (error) {
-    promptError.value = error.message
+    if (paste.valid && paste.key === activeComposerDraftKey) {
+      promptError.value = error.message
+    }
+  } finally {
+    pendingComposerPastes.delete(paste)
   }
 }
 
@@ -2655,7 +2833,12 @@ async function submitStartDraft() {
   const model = startSelectedModel.value
   const thinkingLevel = startSelectedThinkingLevel.value
   const targetCwd = newSessionCwd.value.trim()
-  const hasPrompt = Boolean(text || attachedImages.value.length)
+  const sourceDraftKey = activeComposerDraftKey
+  const hasPrompt = Boolean(
+    text
+      || attachedImages.value.length
+      || hasPendingComposerPastes(sourceDraftKey),
+  )
   const kind = text.startsWith('!') ? 'session' : startSessionKind.value
   if (!targetCwd || creatingSessionCwd.value) return
 
@@ -2674,6 +2857,13 @@ async function submitStartDraft() {
     await runStartupPhase('creating', () => {
       return createSessionForCwd(targetCwd, { kind })
     })
+    if (selectedSession.value && hasPrompt) {
+      const targetDraftKey = moveComposerDraft(
+        sourceDraftKey,
+        selectedSession.value.id,
+      )
+      await settleComposerPastes(targetDraftKey)
+    }
     if (selectedSession.value) startSessionKind.value = 'session'
     if (model && selectedSession.value) {
       await runStartupPhase('model', () => selectWorkspaceModel(model))
