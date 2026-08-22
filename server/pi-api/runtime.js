@@ -167,28 +167,67 @@ function appendLeylineSystemPrompt(base) {
   return [...base, prompt]
 }
 
-function preferBundledExtensions(result) {
-  const bundledCommands = new Map([
-    [BUNDLED_GOAL_EXTENSION, 'goal'],
-    [BUNDLED_MEMORY_EXTENSION, 'memory'],
-  ])
-  const bundled = result.extensions.filter((extension) => {
-    const command = bundledCommands.get(extension.resolvedPath)
-    return command && extension.commands?.has(command)
-  })
-  if (bundled.length === 0) return result
+function extensionNames(extension) {
+  const names = new Set()
+  const add = (value) => {
+    const name = value?.replace(/\.[^.]+$/, '')
+    if (name) names.add(name)
+  }
+  const normalized = extension.resolvedPath.replaceAll('\\', '/')
+  const marker = '/extensions/'
+  const markerIndex = normalized.lastIndexOf(marker)
+  if (markerIndex !== -1) {
+    add(normalized.slice(markerIndex + marker.length).split('/')[0])
+  }
 
-  const commands = new Set(bundled.map((extension) => {
-    return bundledCommands.get(extension.resolvedPath)
-  }))
+  const file = basename(extension.resolvedPath)
+  add(/^index\.[^.]+$/.test(file)
+    ? basename(dirname(extension.resolvedPath))
+    : file)
+
+  const baseDir = extension.sourceInfo?.baseDir
+  if (extension.sourceInfo?.origin === 'package' && baseDir) {
+    try {
+      const manifest = JSON.parse(readFileSync(join(baseDir, 'package.json'), 'utf8'))
+      add(typeof manifest.name === 'string'
+        ? manifest.name.split('/').at(-1)
+        : '')
+    } catch {}
+  }
+
+  return names
+}
+
+function preferBundledExtensions(result) {
+  const specifications = [
+    { path: BUNDLED_GOAL_EXTENSION, name: 'goal', command: 'goal' },
+    { path: BUNDLED_MEMORY_EXTENSION, name: 'memory', command: 'memory' },
+    { path: BUNDLED_SUBAGENT_EXTENSION, name: 'subagent', tool: 'subagent' },
+    { path: BUNDLED_RESEARCH_EXTENSION, name: 'research' },
+    { path: BUNDLED_VISION_EXTENSION, name: 'vision-agent', tool: 'vision_agent' },
+  ]
+  const bundled = new Set()
+  const activeSpecifications = specifications.filter((specification) => {
+    const extension = result.extensions.find((item) => {
+      return item.resolvedPath === specification.path
+    })
+    if (!extension) return false
+    bundled.add(extension)
+    return true
+  })
+  if (bundled.size === 0) return result
+
   return {
     ...result,
     extensions: result.extensions.filter((extension) => {
-      if (bundled.includes(extension)) return true
-      for (const command of commands) {
-        if (extension.commands?.has(command)) return false
-      }
-      return true
+      if (bundled.has(extension)) return true
+      const names = extensionNames(extension)
+      return !activeSpecifications.some((specification) => {
+        return names.has(specification.name)
+          || (specification.command
+            && extension.commands?.has(specification.command))
+          || (specification.tool && extension.tools?.has(specification.tool))
+      })
     }),
   }
 }
@@ -227,6 +266,10 @@ async function createRuntimeResult(
         : { appendSystemPromptOverride: appendLeylineSystemPrompt }),
     },
   })
+  if (!systemPrompt) {
+    const extensions = services.resourceLoader.getExtensions()
+    extensions.extensions = preferBundledExtensions(extensions).extensions
+  }
   if (allowImages) {
     services.settingsManager.applyOverrides({ images: { blockImages: false } })
   }
