@@ -14,7 +14,7 @@ The start screen appears when no session is selected. One submission can create 
 
 The project control shows **Choose project** when no project is selected.
 
-To use a different folder, select **Add new project**. The **Add project folder** browser opens.
+To use a different folder, select **Add new project**. The **Add project** browser opens.
 
 ## Add a project folder
 

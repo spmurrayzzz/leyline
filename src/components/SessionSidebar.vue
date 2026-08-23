@@ -1342,11 +1342,24 @@ const vFocusSelect = {
               <strong id="sidebar-navigator-title">{{ navigatorTitle }}</strong>
               <span>{{ navigatorSubtitle }}</span>
             </div>
-            <button
-              type="button"
-              aria-label="Close"
-              @click="closeNavigator"
-            >×</button>
+            <div class="sidebar-navigator-header-actions">
+              <button
+                v-if="navigator === 'projects'"
+                class="sidebar-navigator-add-project"
+                type="button"
+                @click="openProjectBrowser"
+              >
+                <svg viewBox="0 0 16 16" aria-hidden="true">
+                  <path d="M8 3v10M3 8h10"></path>
+                </svg>
+                Add project
+              </button>
+              <button
+                type="button"
+                aria-label="Close"
+                @click="closeNavigator"
+              >×</button>
+            </div>
           </header>
           <label class="sidebar-navigator-search">
             <span aria-hidden="true">⌕</span>
@@ -1425,17 +1438,6 @@ const vFocusSelect = {
                 class="sidebar-navigator-empty"
               >No matching projects or sessions</div>
 
-              <button
-                v-if="navigator === 'projects'"
-                class="sidebar-navigator-folder"
-                type="button"
-                @click="openProjectBrowser"
-              >
-                <svg viewBox="0 0 16 16" aria-hidden="true">
-                  <path d="M8 3v10M3 8h10"></path>
-                </svg>
-                Open another folder
-              </button>
             </template>
 
             <template v-else>

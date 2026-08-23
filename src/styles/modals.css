@@ -9,128 +9,194 @@
 }
 
 .project-browser-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 35;
   display: grid;
-  place-items: center;
-  background: rgb(0 0 0 / 56%);
-  padding: 18px;
+  position: fixed;
+  z-index: 38;
+  inset: 0;
+  place-items: start center;
+  background: rgb(0 0 0 / 58%);
+  padding: min(11vh, 90px) 20px 20px;
+  backdrop-filter: blur(5px);
 }
 
 .project-browser-modal {
   display: flex;
+  overflow: hidden;
   flex-direction: column;
-  width: min(620px, 100%);
-  max-height: min(720px, calc(100vh - 36px));
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  background: #131419;
-  box-shadow: 0 24px 90px rgb(0 0 0 / 58%);
+  width: min(680px, 100%);
+  max-height: min(720px, calc(100vh - 140px));
+  border: 1px solid #343434;
+  border-radius: 15px;
+  background: #171717;
+  box-shadow: 0 28px 90px rgb(0 0 0 / 56%);
+}
+
+.project-browser-header,
+.project-browser-path,
+.project-browser-shortcuts,
+.project-browser-actions {
+  flex: none;
 }
 
 .project-browser-header {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  border-bottom: 1px solid var(--border-soft);
-  padding: 16px;
+  align-items: center;
+  min-height: 54px;
+  border-bottom: 1px solid var(--border);
+  padding: 0 14px;
+}
+
+.project-browser-header > div {
+  min-width: 0;
+}
+
+.project-browser-header strong,
+.project-browser-header span {
+  display: block;
 }
 
 .project-browser-header strong {
-  display: block;
   color: var(--text);
-  font-size: 15px;
+  font-size: 13px;
+  font-weight: 650;
 }
 
 .project-browser-header span {
-  display: block;
   overflow: hidden;
-  margin-top: 5px;
+  margin-top: 2px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .project-browser-header button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-left: auto;
   border: 0;
+  border-radius: 8px;
   background: transparent;
   color: var(--muted);
-  font-size: 22px;
-  line-height: 1;
+  font-size: 16px;
+}
+
+.project-browser-header button:hover {
+  background: var(--panel-strong);
+  color: var(--text);
 }
 
 .project-browser-path {
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px;
-  padding: 12px 16px 0;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  margin: 12px 12px 6px;
+  border: 1px solid #303030;
+  border-radius: 10px;
+  background: #111;
+  padding: 9px 11px;
+  color: var(--muted);
+}
+
+.project-browser-path:focus-within {
+  border-color: #424242;
 }
 
 .project-browser-path input {
   min-width: 0;
-  border: 1px solid var(--border-soft);
-  border-radius: 10px;
+  border: 0;
   outline: 0;
-  background: var(--panel-soft);
-  padding: 8px 10px;
-  color: #e5e6ec;
-  font-size: 13px;
-}
-
-.project-browser-path input:focus {
-  border-color: var(--accent-border);
-}
-
-.project-browser-path button,
-.project-browser-shortcuts button,
-.project-browser-actions button {
-  border: 1px solid var(--border-soft);
-  border-radius: 10px;
-  background: var(--panel-soft);
-  padding: 8px 11px;
-  color: var(--muted-strong);
+  background: transparent;
+  color: var(--text);
   font-size: 12px;
-  font-weight: 800;
+}
+
+.project-browser-path input::placeholder {
+  color: #6b6b70;
 }
 
 .project-browser-shortcuts {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 16px 12px;
+  padding: 2px 12px 5px;
+}
+
+.project-browser-shortcuts button,
+.project-browser-actions button {
+  height: 28px;
+  border: 1px solid #343434;
+  border-radius: 7px;
+  background: #202020;
+  padding: 0 9px;
+  color: var(--muted-strong);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.project-browser-shortcuts button:hover:not(:disabled),
+.project-browser-actions button:hover:not(:disabled) {
+  border-color: #484848;
+  background: #292929;
+  color: var(--text);
 }
 
 .project-browser-shortcuts span {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 10px;
+}
+
+.project-browser-results {
+  display: flex;
+  overflow: hidden;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
+.project-browser-heading {
+  display: flex;
+  justify-content: space-between;
+  margin: 13px 19px 6px;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .project-browser-list {
-  overflow: auto;
-  min-height: 220px;
-  padding: 0 10px 10px;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1 1 auto;
+  padding: 0 12px 14px;
+  scrollbar-color: #343434 transparent;
+  scrollbar-width: thin;
 }
 
 .project-browser-list button {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: 28px minmax(0, 1fr);
   align-items: center;
   gap: 10px;
   width: 100%;
-  border: 0;
-  border-radius: 10px;
+  min-height: 49px;
+  margin: 2px 0;
+  border: 1px solid transparent;
+  border-radius: 9px;
   background: transparent;
-  padding: 9px 10px;
-  color: #dedfe7;
+  padding: 7px 9px;
+  color: var(--muted-strong);
   text-align: left;
 }
 
 .project-browser-list button:hover,
 .project-browser-list button.highlighted {
-  background: #201a32;
+  border-color: #303030;
+  background: #222;
   transition-duration: var(--motion-quick);
   transition-timing-function: var(--ease-accelerate);
 }
@@ -139,31 +205,54 @@
   color: var(--muted);
 }
 
+.project-browser-row-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: #242424;
+  color: #8e8e94;
+}
+
+.project-browser-row-icon svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
 .project-browser-list strong {
   overflow: hidden;
-  font-size: 13px;
-  font-weight: 700;
+  color: #c7c7cb;
+  font-size: 11px;
+  font-weight: 620;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .project-browser-error,
 .project-browser-empty {
-  padding: 22px 16px;
+  min-height: 200px;
+  padding: 38px 12px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 11px;
+  text-align: center;
 }
 
 .project-browser-error {
-  color: #fca5a5;
+  color: #d99b9b;
 }
 
 .project-browser-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  border-top: 1px solid var(--border-soft);
-  padding: 12px 16px 16px;
+  gap: 7px;
+  border-top: 1px solid var(--border);
+  padding: 10px 12px 12px;
 }
 
 .project-browser-actions .project-browser-primary {
@@ -172,7 +261,6 @@
   color: #d8d1ff;
 }
 
-.project-browser-path button:disabled,
 .project-browser-shortcuts button:disabled,
 .project-browser-actions button:disabled {
   cursor: not-allowed;

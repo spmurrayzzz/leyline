@@ -1,5 +1,12 @@
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from 'vue'
 import { fetchFsDirectory } from '../lib/pi-api'
 
 const props = defineProps({
@@ -25,6 +32,9 @@ const loading = ref(false)
 const error = ref('')
 const highlightedIndex = ref(0)
 const inputEl = ref(null)
+const modalEl = ref(null)
+let appRoot = null
+let appRootWasInert = false
 let browseGeneration = 0
 
 const rows = computed(() => {
@@ -46,9 +56,18 @@ const exactMatch = computed(() => {
 })
 
 onMounted(() => {
+  appRoot = document.getElementById('app')
+  if (appRoot) {
+    appRootWasInert = appRoot.inert
+    appRoot.inert = true
+  }
   query.value = props.initialPath || '~/'
   browseQuery()
   nextTick(() => inputEl.value?.focus())
+})
+
+onBeforeUnmount(() => {
+  if (appRoot) appRoot.inert = appRootWasInert
 })
 
 watch(query, () => browseQuery())
@@ -144,6 +163,22 @@ function goHome() {
   if (home.value) query.value = ensureTrailingSlash(home.value)
 }
 
+function trapFocus(event) {
+  const focusable = [...modalEl.value.querySelectorAll(
+    'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])',
+  )].filter((element) => element.getClientRects().length)
+  if (!focusable.length) return
+  const first = focusable[0]
+  const last = focusable.at(-1)
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault()
+    first.focus()
+  }
+}
+
 function looksLikePath(value) {
   return /^(~\/?|\/|\.\.?\/)/.test(value.trim())
 }
@@ -199,69 +234,90 @@ function normalizeSubmitPath(value) {
 </script>
 
 <template>
-  <div class="project-browser-backdrop" @click.self="emit('close')">
-    <section class="project-browser-modal" aria-label="Choose project folder">
-      <header class="project-browser-header">
-        <div>
-          <strong>Add project folder</strong>
-          <span>{{ parentPath || 'Type a local path to browse' }}</span>
+  <Teleport to="body">
+    <div class="project-browser-backdrop" @click.self="emit('close')">
+      <section
+        ref="modalEl"
+        class="project-browser-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="project-browser-title"
+        @keydown.tab="trapFocus"
+      >
+        <header class="project-browser-header">
+          <div>
+            <strong id="project-browser-title">Add project</strong>
+            <span>Choose or type a local folder</span>
+          </div>
+          <button type="button" aria-label="Close" @click="emit('close')">×</button>
+        </header>
+
+        <form class="project-browser-path" @submit.prevent="submitPath">
+          <span aria-hidden="true">⌕</span>
+          <input
+            ref="inputEl"
+            v-model="query"
+            aria-label="Project folder path"
+            placeholder="~/dev/project"
+            :disabled="busy"
+            @keydown="handleKeydown"
+          />
+        </form>
+
+        <div class="project-browser-shortcuts">
+          <button type="button" :disabled="busy || !home" @click="goHome">
+            Home
+          </button>
+          <span>Enter opens a folder · ⌘/Ctrl+Enter adds the typed path</span>
         </div>
-        <button type="button" @click="emit('close')">×</button>
-      </header>
 
-      <form class="project-browser-path" @submit.prevent="submitPath">
-        <input
-          ref="inputEl"
-          v-model="query"
-          placeholder="~/dev/project"
-          :disabled="busy"
-          @keydown="handleKeydown"
-        />
-        <button type="submit" :disabled="!selectedPath || busy">
-          {{ actionLabel }}
-        </button>
-      </form>
+        <div v-if="error" class="project-browser-error">
+          {{ error }}
+        </div>
+        <div v-else class="project-browser-results">
+          <div class="project-browser-heading">
+            <span>Folders</span>
+            <span>{{ entries.length }}</span>
+          </div>
+          <div class="project-browser-list">
+            <button
+              v-for="(row, index) in rows"
+              :key="row.type === 'up' ? '..' : row.fullPath"
+              type="button"
+              :class="{
+                hidden: row.hidden,
+                highlighted: index === highlightedIndex,
+              }"
+              @mouseenter="highlightedIndex = index"
+              @click="chooseRow(row)"
+            >
+              <span class="project-browser-row-icon">
+                <svg v-if="row.type === 'up'" viewBox="0 0 16 16" aria-hidden="true">
+                  <path d="M8 13V3M4.5 6.5 8 3l3.5 3.5"></path>
+                </svg>
+                <svg v-else viewBox="0 0 16 16" aria-hidden="true">
+                  <path d="M2.2 5.2c0-1 .8-1.8 1.8-1.8h2l1.6 1.8h4.6c1 0 1.8.8 1.8 1.8v4.6c0 1-.8 1.8-1.8 1.8H4c-1 0-1.8-.8-1.8-1.8z"></path>
+                </svg>
+              </span>
+              <strong>{{ row.name }}</strong>
+            </button>
+            <div
+              v-if="!loading && rows.length === 0"
+              class="project-browser-empty"
+            >No matching folders</div>
+          </div>
+        </div>
 
-      <div class="project-browser-shortcuts">
-        <button type="button" :disabled="busy || !home" @click="goHome">
-          Home
-        </button>
-        <span>Enter opens highlighted folder, ⌘/Ctrl+Enter adds typed path.</span>
-      </div>
-
-      <div v-if="error" class="project-browser-error">
-        {{ error }}
-      </div>
-      <div v-else class="project-browser-list">
-        <button
-          v-for="(row, index) in rows"
-          :key="row.type === 'up' ? '..' : row.fullPath"
-          type="button"
-          :class="{
-            hidden: row.hidden,
-            highlighted: index === highlightedIndex,
-          }"
-          @mouseenter="highlightedIndex = index"
-          @click="chooseRow(row)"
-        >
-          <span>{{ row.type === 'up' ? '↥' : '▱' }}</span>
-          <strong>{{ row.name }}</strong>
-        </button>
-        <div
-          v-if="!loading && rows.length === 0"
-          class="project-browser-empty"
-        >No matching folders</div>
-      </div>
-
-      <footer class="project-browser-actions">
-        <button type="button" @click="emit('close')">Cancel</button>
-        <button
-          type="button"
-          class="project-browser-primary"
-          :disabled="!selectedPath || busy"
-          @click="submitPath"
-        >{{ actionLabel }}</button>
-      </footer>
-    </section>
-  </div>
+        <footer class="project-browser-actions">
+          <button type="button" @click="emit('close')">Cancel</button>
+          <button
+            type="button"
+            class="project-browser-primary"
+            :disabled="!selectedPath || busy"
+            @click="submitPath"
+          >{{ actionLabel }}</button>
+        </footer>
+      </section>
+    </div>
+  </Teleport>
 </template>

@@ -33,7 +33,7 @@ Leyline ignores the **Go to** shortcut during deletion confirmation, transcript 
 
 ## Use project folder shortcuts
 
-These shortcuts apply in **Add project folder**.
+These shortcuts apply in **Add project**.
 
 | Shortcut | Action |
 | --- | --- |

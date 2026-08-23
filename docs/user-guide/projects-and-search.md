@@ -15,7 +15,7 @@ Search does not inspect transcript content. Clear the field to restore the full 
 
 ## Change the current project
 
-![Project navigator with the current project and another available project](../assets/screenshots/project-navigation.png)
+![Project navigator with Add project in the header and two available projects](../assets/screenshots/project-navigation.png)
 
 *Change project keeps the session list focused on one working directory.*
 
@@ -29,7 +29,7 @@ When you select a project, Leyline opens the last session that you used in that 
 
 If the project has no sessions, Leyline opens the start screen for that CWD.
 
-Select **Open another folder** to add a project folder.
+Select **Add project** in the navigator header to add a project folder.
 
 ## Use Go to
 
@@ -100,8 +100,12 @@ Select **New session** to create an empty session in the project CWD.
 
 ## Add a project folder
 
-Select **Change project**, then select **Open another folder**. You can also select **Add new project** on the start screen.
+![Add project browser with a typed path and matching local folders](../assets/screenshots/add-project.png)
 
-The **Add project folder** browser can open an existing folder or create the typed folder. See [Start screen](./start-screen#add-a-project-folder) for its keyboard controls.
+*Add project accepts a path and lets you browse matching local folders.*
+
+Select **Change project**, then select **Add project** in the navigator header. You can also select **Add new project** on the start screen.
+
+The **Add project** browser can open an existing folder or create the typed folder. See [Start screen](./start-screen#add-a-project-folder) for its keyboard controls.
 
 Adding a folder creates a session in that folder. Leyline does not keep a separate project registry.

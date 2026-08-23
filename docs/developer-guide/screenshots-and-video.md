@@ -32,7 +32,7 @@ Start Vite, then run:
 npm run docs:screenshots
 ```
 
-This command intercepts Leyline API calls and supplies sanitized fixtures. It replaces backend, session, Git review, and thought display data.
+This command intercepts Leyline API calls and supplies sanitized fixtures. It replaces backend, session, project-folder, Git review, and thought display data.
 
 The registry contains the native backend and a fictional saved connection. The thought display setting is **Collapsed**.
 
@@ -57,6 +57,7 @@ The documentation workflow uses these fixed settings:
 - Reduced motion: enabled
 - Model label: `local/deepseek-v4-flash`
 - Thought display default: **Collapsed**
+- Project captures: `harbor`, `field-notes`, and three sanitized matching folders
 - Git review captures: `release-safety` with four sanitized changed files
 - Activity captures: one selected run, one same-project run, one runtime error, one queued session, and a shared-CWD warning
 - Deep research captures: three completed threads, six ledger sources, four citations, one excluded source, and a mobile citation preview

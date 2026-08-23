@@ -360,6 +360,20 @@ const projects = [
   { cwd: '/workspace/field-notes', name: 'field-notes', modified: '2026-08-01T13:20:00.000Z' },
 ]
 
+const projectDirectory = {
+  parentPath: '/workspace',
+  path: '/workspace',
+  parent: '/',
+  home: '/workspace',
+  root: '/',
+  entries: ['harbor', 'harbor-api', 'harbor-docs'].map((name) => ({
+    name,
+    fullPath: `/workspace/${name}`,
+    path: `/workspace/${name}`,
+    hidden: false,
+  })),
+}
+
 const baseEntries = [
   messageEntry({
     id: 'user-1',
@@ -707,6 +721,18 @@ try {
     interact: async (page) => {
       await page.getByRole('button', { name: 'Change project' }).click()
       await page.getByRole('dialog', { name: 'Projects' }).waitFor()
+    },
+  })
+  await capture({
+    browser,
+    file: path.join(docsOutputDir, 'add-project.png'),
+    route: '/sessions/demo-session',
+    ready: '.assistant-message',
+    interact: async (page) => {
+      await page.getByRole('button', { name: 'Change project' }).click()
+      await page.locator('.sidebar-navigator-add-project').click()
+      const dialog = page.getByRole('dialog', { name: 'Add project' })
+      await dialog.getByRole('button', { name: 'harbor-docs' }).waitFor()
     },
   })
   await capture({
@@ -1346,6 +1372,7 @@ async function capture({
 
     if (key === 'GET /api/pi/info') return json(backendInfo)
     if (key === 'GET /api/pi/projects') return json({ projects })
+    if (key === 'GET /api/pi/fs') return json(projectDirectory)
     if (key === 'GET /api/pi/sessions') {
       return json({
         sessions: scenario === 'research'
