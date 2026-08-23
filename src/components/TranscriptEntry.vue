@@ -6,7 +6,7 @@ const PierrePreview = defineAsyncComponent(() => import('./PierrePreview.vue'))
 
 <script setup>
 import { ref, watch } from 'vue'
-import { canonicalResearchSourceKey } from '../../lib/research-state.js'
+import { researchSourcesMatch } from '../../lib/research-state.js'
 import {
   entryClass,
   imageBlocksFor,
@@ -27,6 +27,10 @@ const props = defineProps({
   entry: {
     type: Object,
     required: true,
+  },
+  researchCwd: {
+    type: String,
+    default: '',
   },
   skillExpanded: Boolean,
   thinkingInitiallyExpanded: Boolean,
@@ -219,10 +223,10 @@ function openMarkdownContent(event) {
   })
   if (!source) return
   const target = citationTarget(link.getAttribute('href') || '')
-  const key = /^https?:\/\//i.test(target)
-    ? canonicalResearchSourceKey({ url: target })
-    : canonicalResearchSourceKey({ path: target })
-  if (!key || key !== source.key) return
+  const targetSource = /^https?:\/\//i.test(target)
+    ? { url: target }
+    : { path: target }
+  if (!researchSourcesMatch(source, targetSource, props.researchCwd)) return
   event.preventDefault()
   const rect = link.getBoundingClientRect()
   emit('open-research-source', {

@@ -848,7 +848,11 @@ function restoreTrailingResearchReport(manager) {
   )
   if (reportEntry?.type !== 'message') return
   const reportText = extractMessageText(reportEntry.message.content)
-  const citationAudit = auditResearchReportCitations(reportText, research.sources)
+  const citationAudit = auditResearchReportCitations(
+    reportText,
+    research.sources,
+    manager.getCwd(),
+  )
   const usableSources = research.sources.filter((source) => {
     return source.status !== 'excluded'
   })
@@ -863,6 +867,7 @@ function restoreTrailingResearchReport(manager) {
     : {
         kind: 'error',
         message: 'The restored report citations did not match the source ledger.',
+        invalidLinks: citationAudit.invalidLinks,
       }
   manager.appendCustomEntry(RESEARCH_CUSTOM_TYPE, {
     version: RESEARCH_VERSION,
@@ -914,6 +919,7 @@ function rebaseResearchSession(manager) {
     const citationAudit = auditResearchReportCitations(
       reportText,
       research.sources,
+      manager.getCwd(),
     )
     const usableSources = research.sources.filter((source) => {
       return source.status !== 'excluded'
@@ -930,6 +936,7 @@ function rebaseResearchSession(manager) {
       append({
         kind: 'error',
         message: 'Forked report citations did not match the source ledger.',
+        invalidLinks: citationAudit.invalidLinks,
       })
     }
   } else if (research.status === 'error') {

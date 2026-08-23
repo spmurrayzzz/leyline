@@ -10,6 +10,7 @@ import {
   applyResearchEvent,
   canonicalResearchSourceKey,
   researchStateFromEntries,
+  resolveResearchSourcePath,
 } from "../../../lib/research-state.js";
 import { auditResearchReportCitations } from "../../../lib/research-citations.js";
 
@@ -29,6 +30,7 @@ type ResearchSource = {
   claim?: string;
   evidence?: string;
   exclusionReason?: string;
+  previousKey?: string;
 };
 
 const RESEARCH_LEAD_PROMPT = `You are the lead researcher for a Leyline deep research session.
@@ -42,7 +44,7 @@ Use this protocol:
 4. Read every thread result. If a thread did not return structured sources, call research_update with action "sources" and register the useful sources yourself.
 5. Call research_update with phase "synthesize" before you compare findings. The tool response returns the canonical citation ledger.
 6. Prefer primary sources, official documentation, direct datasets, and reproducible benchmarks. Keep contrary evidence and exclusion reasons visible.
-7. Cite each material claim with the exact ledger number and URL in standard Markdown, for example [3](https://example.com/source).
+7. Cite each material claim with the exact ledger number and the source's stored URL or path exactly as listed in the ledger, in standard Markdown, for example [3](https://example.com/source).
 8. Before the final response, call research_update with phase "report", the report title, and the source IDs you intend to cite.
 9. Then write the complete report as the next assistant response. Do not call another tool after the report checkpoint.
 
@@ -113,6 +115,7 @@ function stateForModel(state: NonNullable<ResearchState>): string {
   return JSON.stringify({
     phase: state.phase,
     status: state.status,
+    error: state.status === "error" ? state.error : "",
     threads,
     sources,
   }, null, 2);
@@ -181,23 +184,63 @@ export default function researchExtension(pi: ExtensionAPI) {
     persist({ kind: "thread", thread: next }, ctx);
   }
 
-  function registerSources(threadId: string, sources: unknown, ctx?: ExtensionContext): number[] {
+  function registeredSourceCwds(source: ResearchSource, fallback: string): string[] {
+    const threadCwds = (source.threadIds || []).map((threadId) => {
+      return state?.threads.find((thread) => thread.id === threadId)?.childSession?.cwd || "";
+    });
+    return [...new Set([fallback, ...threadCwds].filter(Boolean))];
+  }
+
+  function registerSources(
+    threadId: string,
+    sources: unknown,
+    ctx?: ExtensionContext,
+    sourceCwd = ctx?.cwd || "",
+  ): number[] {
     if (!state || !Array.isArray(sources)) return [];
     const ids: number[] = [];
     for (const item of sources.slice(0, 20)) {
       if (!isObject(item)) continue;
-      const source: ResearchSource = { ...item, threadId: item.threadId || threadId };
+      const source: ResearchSource = {
+        ...item,
+        threadId: item.threadId || threadId,
+        path: resolveResearchSourcePath(
+          typeof item.path === "string" ? item.path : "",
+          sourceCwd,
+        ),
+      };
       const key = canonicalResearchSourceKey(source);
       if (!key) continue;
-      const existing = state.sources.find((candidate) => candidate.key === key);
+      const existing = state.sources.find((candidate) => candidate.key === key)
+        || state.sources.find((candidate) => {
+          return registeredSourceCwds(candidate, ctx?.cwd || "").some((candidateCwd) => {
+            return canonicalResearchSourceKey(candidate, candidateCwd) === key;
+          });
+        });
       if (!existing && state.sources.length >= 60) continue;
       const id = existing?.id || state.sources.reduce((max, candidate) => {
         return Math.max(max, candidate.id);
       }, 0) + 1;
-      persist({ kind: "source", source: { ...source, id } }, ctx);
+      persist({
+        kind: "source",
+        source: {
+          ...source,
+          id,
+          previousKey: existing && existing.key !== key ? existing.key : undefined,
+        },
+      }, ctx);
       ids.push(id);
     }
     return [...new Set(ids)];
+  }
+
+  function invalidLinkExamples(links: Array<{ id: number; href: string }>): string {
+    if (!links?.length) return "";
+    const samples = links
+      .slice(0, 8)
+      .map((link) => ` #${link.id} ${link.href}`)
+      .join(",");
+    return ` Mismatched examples:${samples}.`;
   }
 
   function processSubagentDetails(value: unknown, ctx?: ExtensionContext) {
@@ -213,7 +256,11 @@ export default function researchExtension(pi: ExtensionAPI) {
           || state?.threads[index]?.id
           || `T${index + 1}`,
       );
-      const sourceIds = registerSources(threadId, research.sources, ctx);
+      const sourceCwd = isObject(result.childSession)
+        && typeof result.childSession.cwd === "string"
+        ? result.childSession.cwd
+        : ctx?.cwd || "";
+      const sourceIds = registerSources(threadId, research.sources, ctx, sourceCwd);
       const status = resultStatus(result);
       const current = state?.threads.find((thread) => thread.id === threadId);
       persistThread({
@@ -373,7 +420,7 @@ export default function researchExtension(pi: ExtensionAPI) {
         && messageText(entry.message.content) === text;
     });
     if (!report || report.type !== "message") return;
-    const citationAudit = auditResearchReportCitations(text, state.sources);
+    const citationAudit = auditResearchReportCitations(text, state.sources, ctx.cwd);
     const usableSources = state.sources.filter((source) => {
       return source.status !== "excluded";
     });
@@ -381,8 +428,10 @@ export default function researchExtension(pi: ExtensionAPI) {
       persist({
         kind: "error",
         message: citationAudit.invalid
-          ? `The report contained ${citationAudit.invalid} citation link${citationAudit.invalid === 1 ? "" : "s"} that did not match the source ledger.`
+          ? `The report contained ${citationAudit.invalid} citation link${citationAudit.invalid === 1 ? "" : "s"} that did not match the source ledger. Cite each claim with the ledger source's stored URL or path verbatim.${invalidLinkExamples(citationAudit.invalidLinks)}`
           : "The report did not contain any citations that matched the source ledger.",
+        invalidLinks: citationAudit.invalidLinks,
+        matchedCount: citationAudit.ids.length,
       }, ctx);
       return;
     }
