@@ -25,11 +25,11 @@ A research session also shows its compact state and source control. The source c
 1. Select **Open sessions** in the header.
 2. Select a session in the current project.
 
-Select **Change project** before you select a session from another project.
+Select **Go to** to open a session from another project.
 
 The sidebar opens over the workbench. Select the shaded area or a session to close it.
 
-The sidebar can use up to 86 percent of the viewport width, with a maximum width of 320 pixels. Project, activity, **Go to**, and **Add project** use the full viewport. **Add project** keeps its confirmation actions at the bottom.
+The sidebar can use up to 86 percent of the viewport width, with a maximum width of 320 pixels. **Activity**, **Go to**, and **Add project** use the full viewport. **Add project** keeps its confirmation actions at the bottom.
 
 ## Supervise activity on mobile
 

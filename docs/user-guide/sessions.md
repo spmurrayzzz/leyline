@@ -7,7 +7,7 @@ A session contains one pi conversation tree. Leyline shows the active branch as 
 1. Find the session in the current project list.
 2. Select the session name.
 
-Select **Change project** first when the session belongs to a different project.
+Use **Go to** when the session belongs to a different project.
 
 You can also focus a session row and press **Enter** or **Space**. Press **Arrow Up** or **Arrow Down** to focus another row.
 

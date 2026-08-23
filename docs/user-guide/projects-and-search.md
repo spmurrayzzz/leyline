@@ -13,17 +13,17 @@ Search matches session names and IDs in the current project. Each search term mu
 
 Search does not inspect transcript content. Clear the field to restore the full session list.
 
-## Change the current project
+## Use Go to
 
-![Project navigator with Add project in the header and two available projects](../assets/screenshots/project-navigation.png)
+![Go to navigator with Add project, project results, and recent sessions](../assets/screenshots/project-navigation.png)
 
-*Change project keeps the session list focused on one working directory.*
+*Go to searches projects and sessions from one place.*
 
-1. Select **Change project**.
-2. Enter text in **Search projects, paths, or sessions** if necessary.
+1. Select **Go to**, or press **Command+K** or **Ctrl+K**.
+2. Enter text in **Search sessions or projects** if necessary.
 3. Select a project or session.
 
-Without a query, the navigator shows all projects. Search matches project names, CWDs, session names, and session IDs.
+The default view shows recent projects and current or recent sessions. A query searches all project names, CWDs, session names, and session IDs.
 
 When you select a project, Leyline opens the last session that you used in that project. Otherwise, it opens the most recent session.
 
@@ -31,13 +31,7 @@ If the project has no sessions, Leyline opens the start screen for that CWD.
 
 Select **Add project** in the navigator header to add a project folder.
 
-## Use Go to
-
-Press **Command+K** or **Ctrl+K** to open **Go to**.
-
-Leyline ignores this shortcut during deletion confirmation, transcript editing, or session renaming.
-
-The default view shows projects and current or recent sessions. Enter a query to search all projects and regular sessions.
+Leyline ignores the shortcut during deletion confirmation, transcript editing, or session renaming.
 
 Press **Escape** or select the shaded area to close the navigator.
 
@@ -104,7 +98,7 @@ Select **New session** to create an empty session in the project CWD.
 
 *Add project accepts a path and lets you browse matching local folders.*
 
-Select **Change project**, then select **Add project** in the navigator header. You can also select **Add new project** on the start screen.
+Select **Go to**, then select **Add project** in the navigator header. You can also select **Add new project** on the start screen.
 
 The **Add project** browser can open an existing folder or create the typed folder. See [Start screen](./start-screen#add-a-project-folder) for its keyboard controls.
 

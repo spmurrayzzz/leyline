@@ -719,8 +719,8 @@ try {
     route: '/sessions/demo-session',
     ready: '.assistant-message',
     interact: async (page) => {
-      await page.getByRole('button', { name: 'Change project' }).click()
-      await page.getByRole('dialog', { name: 'Projects' }).waitFor()
+      await page.locator('.sidebar-project-shortcut', { hasText: 'Go to' }).click()
+      await page.getByRole('dialog', { name: 'Go to' }).waitFor()
     },
   })
   await capture({
@@ -729,7 +729,7 @@ try {
     route: '/sessions/demo-session',
     ready: '.assistant-message',
     interact: async (page) => {
-      await page.getByRole('button', { name: 'Change project' }).click()
+      await page.locator('.sidebar-project-shortcut', { hasText: 'Go to' }).click()
       await page.locator('.sidebar-navigator-add-project').click()
       const dialog = page.getByRole('dialog', { name: 'Add project' })
       await dialog.getByRole('button', { name: 'harbor-docs' }).waitFor()

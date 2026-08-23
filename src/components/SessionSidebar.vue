@@ -267,9 +267,7 @@ watch(
   () => props.navigator,
   async (navigator, previous) => {
     if (navigator !== previous) navigatorQuery.value = ''
-    if (navigator === 'projects'
-      || navigator === 'quick'
-      || navigator === 'activity') {
+    if (navigator === 'quick' || navigator === 'activity') {
       await nextTick()
       navigatorSearch.value?.focus()
       return
@@ -392,11 +390,7 @@ const virtualSessionWindow = computed(() => {
 
 const navigatorProjects = computed(() => {
   const query = navigatorQuery.value.trim()
-  if (!query) {
-    return props.navigator === 'quick'
-      ? orderedProjects.value.slice(0, 4)
-      : orderedProjects.value
-  }
+  if (!query) return orderedProjects.value.slice(0, 4)
   return orderedProjects.value
     .map((project) => ({
       project,
@@ -534,19 +528,16 @@ const projectSessionCount = computed(() => {
 })
 
 const navigatorTitle = computed(() => {
-  if (props.navigator === 'quick') return 'Go to'
   if (props.navigator === 'activity') return 'Activity'
-  return 'Projects'
+  return 'Go to'
 })
 
 const navigatorSubtitle = computed(() => {
-  if (props.navigator === 'quick') return 'Sessions and projects'
   if (props.navigator === 'activity') {
     const count = activitySessions.value.length
     return `${count} other ${count === 1 ? 'session' : 'sessions'}`
   }
-  const count = orderedProjects.value.length
-  return `${count} ${count === 1 ? 'project' : 'projects'}`
+  return 'Sessions and projects'
 })
 
 watch(
@@ -1207,7 +1198,7 @@ const vFocusSelect = {
           class="sidebar-project-shortcut"
           type="button"
           aria-keyshortcuts="Meta+K Control+K"
-          @click="openNavigator('projects', $event)"
+          @click="openNavigator('quick', $event)"
         >
           <svg viewBox="0 0 16 16" aria-hidden="true">
             <path
@@ -1215,8 +1206,8 @@ const vFocusSelect = {
             ></path>
           </svg>
           <span>
-            <strong>Change project</strong>
-            <small>Browse all {{ orderedProjects.length }} projects</small>
+            <strong>Go to</strong>
+            <small>Projects and sessions</small>
           </span>
           <kbd class="sidebar-project-shortcut-key" aria-hidden="true">⌘K</kbd>
         </button>
@@ -1325,9 +1316,7 @@ const vFocusSelect = {
 
     <Teleport to="body">
       <div
-        v-if="navigator === 'projects'
-          || navigator === 'quick'
-          || navigator === 'activity'"
+        v-if="navigator === 'quick' || navigator === 'activity'"
         class="sidebar-navigator-backdrop"
         @mousedown.self="closeNavigator"
       >
@@ -1344,7 +1333,7 @@ const vFocusSelect = {
             </div>
             <div class="sidebar-navigator-header-actions">
               <button
-                v-if="navigator === 'projects'"
+                v-if="navigator === 'quick'"
                 class="sidebar-navigator-add-project"
                 type="button"
                 @click="openProjectBrowser"
@@ -1368,15 +1357,13 @@ const vFocusSelect = {
               v-model="navigatorQuery"
               :placeholder="navigator === 'activity'
                 ? 'Search active sessions'
-                : navigator === 'quick'
-                  ? 'Search sessions or projects'
-                  : 'Search projects, paths, or sessions'"
+                : 'Search sessions or projects'"
             />
             <kbd>esc</kbd>
           </label>
 
           <div class="sidebar-navigator-results">
-            <template v-if="navigator === 'projects' || navigator === 'quick'">
+            <template v-if="navigator === 'quick'">
               <section v-if="navigatorProjects.length" class="navigator-result-section">
                 <div class="navigator-result-heading">
                   <span>Projects</span>
@@ -1407,7 +1394,7 @@ const vFocusSelect = {
 
               <section v-if="navigatorSessions.length" class="navigator-result-section">
                 <div class="navigator-result-heading">
-                  <span>{{ navigator === 'quick' && !navigatorQuery.trim()
+                  <span>{{ !navigatorQuery.trim()
                     ? 'Current and recent'
                     : 'Sessions' }}</span>
                   <span>{{ navigatorSessions.length }}</span>
