@@ -50,6 +50,16 @@ Use this protocol:
 
 Use queued steering at the next checkpoint. If the user changes scope, update the plan or run more threads before synthesis. Keep the final report direct and decision-oriented. Include the recommendation, evidence, tradeoffs, and clear revisit conditions.`;
 
+const RESEARCH_FOLLOWUP_PROMPT = `The current Leyline deep research cycle has ended.
+
+Treat the user's message as a normal follow-up. Use any available report, source ledger, partial findings, and transcript as context. Tools and subagents do not start another research cycle.
+
+Start another research cycle only when the user explicitly asks for additional research. For a new cycle:
+1. Call research_update with action "plan" before you delegate.
+2. Delegate parallel threads with the "researcher" agent and register their useful sources.
+3. Call research_update with phase "synthesize" before you compare the findings.
+4. Call research_update with phase "report", the report title, and cited source IDs before you write the cited report as the next response.`;
+
 const sourceSchema = Type.Object({
   id: Type.Optional(Type.Integer({ minimum: 1 })),
   url: Type.Optional(Type.String()),
@@ -291,8 +301,11 @@ export default function researchExtension(pi: ExtensionAPI) {
     if (!state.objective && event.prompt.trim()) {
       persist({ kind: "objective", objective: event.prompt.trim() }, ctx);
     }
+    const instructions = state.status === "running"
+      ? RESEARCH_LEAD_PROMPT
+      : RESEARCH_FOLLOWUP_PROMPT;
     return {
-      systemPrompt: `${event.systemPrompt}\n\n${RESEARCH_LEAD_PROMPT}\n\nCurrent research state:\n${stateForModel(state)}`,
+      systemPrompt: `${event.systemPrompt}\n\n${instructions}\n\nCurrent research state:\n${stateForModel(state)}`,
     };
   });
 
@@ -322,6 +335,9 @@ export default function researchExtension(pi: ExtensionAPI) {
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       if (!active || !state) throw new Error("research_update requires a research session");
+      if (state.status !== "running" && params.action !== "plan") {
+        throw new Error("Start a new research plan before you update a finished research cycle");
+      }
 
       if (params.action === "plan") {
         if (!params.threads?.length) throw new Error("plan requires threads");
@@ -376,7 +392,7 @@ export default function researchExtension(pi: ExtensionAPI) {
   }
 
   pi.on("tool_execution_start", async (event, ctx) => {
-    if (!active || !state || event.toolName !== "subagent") return;
+    if (!active || !state || state.status !== "running" || event.toolName !== "subagent") return;
     const tasks = Array.isArray(event.args?.tasks) ? event.args.tasks : [];
     if (!tasks.length) return;
     persistPhase("gather", {}, ctx);
@@ -395,12 +411,12 @@ export default function researchExtension(pi: ExtensionAPI) {
   });
 
   pi.on("tool_execution_update", async (event, ctx) => {
-    if (!active || event.toolName !== "subagent") return;
+    if (!active || !state || state.status !== "running" || event.toolName !== "subagent") return;
     processSubagentDetails(event.partialResult, ctx);
   });
 
   pi.on("tool_execution_end", async (event, ctx) => {
-    if (!active || !state || event.toolName !== "subagent") return;
+    if (!active || !state || state.status !== "running" || event.toolName !== "subagent") return;
     processSubagentDetails(event.result, ctx);
     const settled = state.threads.length > 0 && state.threads.every((thread) => {
       return thread.status === "done" || thread.status === "error";
