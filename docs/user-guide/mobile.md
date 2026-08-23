@@ -31,6 +31,18 @@ The sidebar opens over the workbench. Select the shaded area or a session to clo
 
 The sidebar can use up to 86 percent of the viewport width, with a maximum width of 320 pixels. Project, activity, and **Go to** navigators use the full viewport.
 
+## Supervise activity on mobile
+
+![Full-screen mobile Activity view with session status and controls](../assets/screenshots/activity-mobile.png)
+
+*Activity keeps long session details bounded and moves row controls below the status on narrow screens.*
+
+1. Select **Open sessions**.
+2. Select **Activity**.
+3. Select **Open** or **Stop** for a session.
+
+The mobile view uses the same attention, running, queued, and shared-working-tree states as the desktop view.
+
 ## Use transcript actions
 
 Message and tool actions remain in their row headers. Use them to copy, edit, retry, fork, reset, or open tool output.

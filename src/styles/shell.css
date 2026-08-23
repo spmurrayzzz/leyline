@@ -870,6 +870,69 @@
   font-weight: 700;
 }
 
+.activity-working-tree-warning,
+.activity-action-error {
+  margin: 7px 7px 3px;
+  border: 1px solid #3b3528;
+  border-radius: 8px;
+  background: #211f19;
+  padding: 8px 10px;
+  color: #b7aa86;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.activity-working-tree-warning strong {
+  color: #d0c39f;
+}
+
+.activity-action-error {
+  border-color: #493030;
+  background: #241b1b;
+  color: #d99b9b;
+}
+
+.activity-navigator-result {
+  grid-template-columns: 28px minmax(0, 1fr) auto auto;
+}
+
+.activity-navigator-result:focus-within {
+  border-color: #303030;
+  background: #222;
+}
+
+.activity-result-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.activity-result-actions button {
+  min-width: 38px;
+  height: 25px;
+  border: 1px solid #343434;
+  border-radius: 6px;
+  background: #202020;
+  padding: 0 7px;
+  color: var(--muted-strong);
+  font-size: 9px;
+}
+
+.activity-result-actions button:hover:not(:disabled) {
+  border-color: #484848;
+  background: #292929;
+  color: var(--text);
+}
+
+.activity-result-actions .activity-stop-button:hover:not(:disabled) {
+  border-color: #5a3737;
+  color: #e1a1a1;
+}
+
+.activity-result-actions button:disabled {
+  opacity: 0.55;
+}
+
 .sidebar-navigator-empty {
   padding: 38px 12px;
   color: var(--muted);

@@ -57,6 +57,8 @@ A promise queue serializes activation requests. The latest token determines whic
 
 `runtimeSessionsById` stores frontend status snapshots, not server runtime handles. These snapshots drive running, compacting, unread, error, and queued labels.
 
+The snapshots also retain pending tool descriptors, detailed runtime errors, diagnostics, and activity timestamps for supervision UI.
+
 The selected session route is `/sessions/:id`. Browser history changes call the same selection flow.
 
 ## Active runtime state
@@ -65,7 +67,9 @@ The selected session route is `/sessions/:id`. Browser history changes call the 
 
 SSE can send snapshots for all server handles. `App.vue` updates the selected runtime only when the IDs match.
 
-Background event summaries remain in `runtimeSessionsById`. They supply row status in the current project and the **Activity across projects** navigator.
+Background event summaries remain in `runtimeSessionsById`. They supply current-project row status and the **Activity** navigator for all nonselected live sessions.
+
+Activity derives shared-CWD warnings from active or queued runtime snapshots. Its **Stop** action uses the session-scoped interrupt route and stays unavailable during compaction.
 
 ## Persisted and live transcript state
 

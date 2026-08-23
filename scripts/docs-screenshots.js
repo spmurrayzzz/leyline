@@ -711,6 +711,14 @@ try {
   })
   await capture({
     browser,
+    file: path.join(docsOutputDir, 'activity.png'),
+    route: '/sessions/demo-session',
+    ready: '.assistant-message',
+    scenario: 'activity',
+    interact: openActivity,
+  })
+  await capture({
+    browser,
     file: path.join(docsOutputDir, 'project-details.png'),
     route: '/sessions/demo-session',
     ready: '.assistant-message',
@@ -913,7 +921,15 @@ try {
       const citation = page.locator(
         '.research-report-message .markdown-body a',
       ).filter({ hasText: /^1$/ }).first()
-      await citation.scrollIntoViewIfNeeded()
+      await citation.evaluate(async (element) => {
+        const workbench = element.closest('.workbench')
+        const target = window.innerHeight * 0.56
+        workbench.scrollTop += element.getBoundingClientRect().top - target
+        await new Promise((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(resolve))
+        })
+      })
+      await page.waitForTimeout(100)
       await citation.click()
       await page.getByRole('dialog', {
         name: 'Citation 1 source preview',
@@ -936,6 +952,18 @@ try {
     interact: async (page) => {
       await page.getByRole('button', { name: 'Open sessions' }).click()
       await page.locator('.leyline-app.sidebar-open .sidebar').waitFor()
+    },
+  })
+  await capture({
+    browser,
+    file: path.join(docsOutputDir, 'activity-mobile.png'),
+    route: '/sessions/demo-session',
+    ready: '.composer .mobile-label',
+    viewport: { width: 390, height: 844 },
+    scenario: 'activity',
+    interact: async (page) => {
+      await page.getByRole('button', { name: 'Open sessions' }).click()
+      await openActivity(page)
     },
   })
   await capture({
@@ -976,6 +1004,13 @@ async function waitForResearchSources(page) {
   await pane.waitFor()
   await pane.getByRole('button', { name: 'Cited 4', pressed: true }).waitFor()
   await pane.locator('.research-source-card').first().waitFor()
+}
+
+async function openActivity(page) {
+  await page.locator('.sidebar-project-shortcut', { hasText: 'Activity' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Activity' })
+  await dialog.locator('.activity-navigator-result').nth(2).waitFor()
+  await dialog.locator('.activity-working-tree-warning').waitFor()
 }
 
 function session(
@@ -1083,6 +1118,7 @@ function memory(id, scope, contentMd, tags, status = 'active') {
 }
 
 function runtimeFor(scenario) {
+  const activity = scenario === 'activity'
   const queued = scenario === 'queue'
   const research = scenario === 'research'
   const id = research ? researchSession.id : 'demo-session'
@@ -1096,9 +1132,16 @@ function runtimeFor(scenario) {
       availableModels,
       thinkingLevel: 'high',
       availableThinkingLevels: model.availableThinkingLevels,
-      isStreaming: queued,
+      isStreaming: queued || activity,
       isCompacting: false,
-      pendingToolCalls: [],
+      pendingToolCalls: activity ? ['activity-selected-tool'] : [],
+      pendingTools: activity
+        ? [{
+            toolCallId: 'activity-selected-tool',
+            toolName: 'read',
+            args: { path: 'scripts/release.js' },
+          }]
+        : [],
       steeringMode: 'one-at-a-time',
       followUpMode: 'one-at-a-time',
       activeToolCount: research ? 6 : 4,
@@ -1124,6 +1167,55 @@ function runtimeFor(scenario) {
       },
       goal: scenario === 'goal' ? goal : null,
       research: research ? researchState : null,
+    },
+  }
+}
+
+function runtimeFixturesFor(scenario, runtime) {
+  if (scenario !== 'activity') {
+    return { runtimeSessions: [runtime], runtimeEvents: [] }
+  }
+
+  const releaseChecks = runtimeForSession('release-checks', {
+    isStreaming: true,
+    pendingToolCalls: ['activity-build-tool'],
+    pendingTools: [{
+      toolCallId: 'activity-build-tool',
+      toolName: 'bash',
+      args: { command: 'npm run verify' },
+    }],
+  })
+  const failed = runtimeForSession('landing-copy', { isStreaming: true })
+  const queued = runtimeForSession('search-state', {
+    queuedMessages: {
+      steering: [],
+      followUp: ['Run the focused navigation check next.'],
+    },
+  })
+
+  return {
+    runtimeSessions: [runtime, releaseChecks, failed, queued],
+    runtimeEvents: [{
+      activeSessionId: failed.id,
+      event: {
+        type: 'error',
+        error: { message: 'Model request timed out after 300 seconds' },
+      },
+    }],
+  }
+}
+
+function runtimeForSession(id, state) {
+  const summary = sessions.find((item) => item.id === id)
+  const runtime = runtimeFor('default')
+  return {
+    ...runtime,
+    id: summary.id,
+    path: summary.path,
+    cwd: summary.cwd,
+    state: {
+      ...runtime.state,
+      ...state,
     },
   }
 }
@@ -1173,6 +1265,7 @@ async function capture({
   macWindow = false,
 }) {
   const runtime = runtimeFor(scenario)
+  const runtimeFixtures = runtimeFixturesFor(scenario, runtime)
   const context = await browser.newContext({
     viewport,
     deviceScaleFactor: 2,
@@ -1184,6 +1277,8 @@ async function capture({
   await context.addInitScript(initBrowser, {
     fixedNow,
     runtime,
+    runtimeSessions: runtimeFixtures.runtimeSessions,
+    runtimeEvents: runtimeFixtures.runtimeEvents,
     goal: scenario === 'goal' ? goal : null,
     terminal,
     emitRuntimeEvents: scenario !== 'home',
@@ -1549,7 +1644,15 @@ async function unionClip(page, selectors, padding, viewport) {
   return { x: left, y: top, width: right - left, height: bottom - top }
 }
 
-function initBrowser({ fixedNow: now, runtime, goal: activeGoal, terminal, emitRuntimeEvents }) {
+function initBrowser({
+  fixedNow: now,
+  runtime,
+  runtimeSessions,
+  runtimeEvents,
+  goal: activeGoal,
+  terminal,
+  emitRuntimeEvents,
+}) {
   const NativeDate = Date
   let tick = 0
   class FixedDate extends NativeDate {
@@ -1582,9 +1685,11 @@ function initBrowser({ fixedNow: now, runtime, goal: activeGoal, terminal, emitR
         if (this.readyState === 2) return
         this.readyState = 1
         this.onopen?.(new Event('open'))
-        this.dispatchEvent(new MessageEvent('active_session', {
-          data: JSON.stringify(runtime),
-        }))
+        for (const activeRuntime of runtimeSessions) {
+          this.dispatchEvent(new MessageEvent('active_session', {
+            data: JSON.stringify(activeRuntime),
+          }))
+        }
         const events = [
           { activeSessionId: runtime.id, event: { type: 'session_start' } },
           { activeSessionId: runtime.id, event: { type: 'tool_execution_start', toolName: 'read' } },
@@ -1594,7 +1699,7 @@ function initBrowser({ fixedNow: now, runtime, goal: activeGoal, terminal, emitR
             : []),
         ]
         if (emitRuntimeEvents) {
-          for (const data of events) {
+          for (const data of [...events, ...runtimeEvents]) {
             this.dispatchEvent(new MessageEvent('runtime_event', {
               data: JSON.stringify(data),
             }))

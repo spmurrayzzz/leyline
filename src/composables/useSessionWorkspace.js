@@ -1,6 +1,12 @@
 import { computed, ref } from 'vue'
 import { highlightedText as highlightFuzzyText } from '../lib/fuzzy'
-import { formatMode, modelChip, projectName } from '../lib/format'
+import {
+  formatMode,
+  modelChip,
+  projectName,
+  toolLabel,
+  toolTarget,
+} from '../lib/format'
 import {
   activatePiSession,
   createPiSession,
@@ -79,18 +85,28 @@ export function useSessionWorkspace({
     return new Map(sessions.value.map((session) => [session.id, session]))
   })
   const sidebarActivitySessions = computed(() => {
+    const sharedWorkingTreeCounts = new Map()
+    for (const state of Object.values(runtimeSessionsById.value)) {
+      if (!state.cwd || !runtimeWorkActive(state)) continue
+      const count = sharedWorkingTreeCounts.get(state.cwd) || 0
+      sharedWorkingTreeCounts.set(state.cwd, count + 1)
+    }
+
     return Object.entries(runtimeSessionsById.value).flatMap(([id, state]) => {
       const session = sessionsById.value.get(id)
         || (selectedSession.value?.id === id ? selectedSession.value : null)
       const status = runtimeStatus(state, state.research || session?.research)
-      if (!status.label) return []
-      if (!session?.cwd) return []
+      if (!status.label || !session?.cwd) return []
       return [{
+        activityAt: state.activityAt || 0,
+        canStop: state.isStreaming && !state.isCompacting,
+        detail: runtimeActivityDetail(state),
         project: {
           cwd: session.cwd,
           name: projectName(session.cwd),
         },
         session,
+        sharedWorkingTreeCount: sharedWorkingTreeCounts.get(session.cwd) || 0,
         status,
       }]
     })
@@ -550,14 +566,23 @@ export function useSessionWorkspace({
   function updateRuntimeSessionSnapshot(runtimeSession) {
     if (!runtimeSession?.id) return
     const state = runtimeSession.state || {}
+    const pendingTools = Array.isArray(state.pendingTools)
+      ? state.pendingTools
+      : []
     const patch = {
       cwd: runtimeSession.cwd || '',
+      diagnostics: Array.isArray(runtimeSession.diagnostics)
+        ? runtimeSession.diagnostics
+        : [],
       isStreaming: state.isStreaming === true,
       isCompacting: state.isCompacting === true,
       queuedCount: queuedCount(state.queuedMessages),
-      pendingToolCount: Array.isArray(state.pendingToolCalls)
-        ? state.pendingToolCalls.length
-        : 0,
+      pendingTools,
+      pendingToolCount: pendingTools.length || (
+        Array.isArray(state.pendingToolCalls)
+          ? state.pendingToolCalls.length
+          : 0
+      ),
       research: state.research || null,
     }
     patchRuntimeSessionState(runtimeSession.id, patch, {
@@ -655,38 +680,127 @@ export function useSessionWorkspace({
   }
 
   function runtimePatchFromEvent(event, previous) {
-    if (['agent_start', 'turn_start'].includes(event.type)
-      || (event.type === 'message_start'
-        && event.message?.role !== 'custom')) {
+    if (['agent_start', 'turn_start'].includes(event.type)) {
+      return {
+        isStreaming: true,
+        isCompacting: false,
+        error: '',
+        pendingTools: [],
+        pendingToolCount: 0,
+      }
+    }
+    if (event.type === 'message_start'
+      && event.message?.role !== 'custom') {
       return { isStreaming: true, isCompacting: false, error: '' }
     }
     if (['tool_call', 'tool_execution_start'].includes(event.type)) {
-      return { isStreaming: true, error: '' }
+      const pendingTools = upsertRuntimeTool(previous.pendingTools, event)
+      return {
+        isStreaming: true,
+        error: '',
+        pendingTools,
+        pendingToolCount: pendingTools.length,
+      }
+    }
+    if (event.type === 'tool_execution_end') {
+      const pendingTools = removeRuntimeTool(previous.pendingTools, event)
+      return { pendingTools, pendingToolCount: pendingTools.length }
     }
     if (event.type === 'agent_end') {
-      return { isStreaming: false, error: previous.error || '' }
+      return {
+        isStreaming: false,
+        error: previous.error || '',
+        pendingTools: [],
+        pendingToolCount: 0,
+      }
     }
     if (event.type === 'message_end'
       && event.message?.role === 'assistant'
       && event.message?.stopReason === 'error') {
-      return { isStreaming: false, isCompacting: false, error: 'error' }
+      return {
+        isStreaming: false,
+        isCompacting: false,
+        error: runtimeErrorMessage(event, 'Model request failed'),
+        pendingTools: [],
+        pendingToolCount: 0,
+      }
     }
     if (event.type === 'error') {
-      return { isStreaming: false, isCompacting: false, error: 'error' }
+      return {
+        isStreaming: false,
+        isCompacting: false,
+        error: runtimeErrorMessage(event, 'Runtime error'),
+        pendingTools: [],
+        pendingToolCount: 0,
+      }
     }
     if (event.type === 'aborted') {
-      return { isStreaming: false, isCompacting: false, error: '' }
+      return {
+        isStreaming: false,
+        isCompacting: false,
+        error: '',
+        pendingTools: [],
+        pendingToolCount: 0,
+      }
     }
     if (event.type === 'compaction_start') {
-      return { isCompacting: true, error: '' }
+      return {
+        isCompacting: true,
+        error: '',
+        pendingTools: [],
+        pendingToolCount: 0,
+      }
     }
     if (event.type === 'compaction_end') {
-      return { isCompacting: false, error: event.errorMessage ? 'error' : '' }
+      return {
+        isCompacting: false,
+        error: event.errorMessage || '',
+      }
     }
     if (event.type === 'queue_update') {
       return { queuedCount: queuedCount(event) }
     }
     return previous ? {} : null
+  }
+
+  function upsertRuntimeTool(current, event) {
+    const tools = Array.isArray(current) ? [...current] : []
+    const tool = {
+      toolCallId: event.toolCallId || event.id || event.callId || '',
+      toolName: event.toolName || 'tool',
+      args: event.args || event.input || {},
+    }
+    const index = tool.toolCallId
+      ? tools.findIndex((item) => item.toolCallId === tool.toolCallId)
+      : tools.findIndex((item) => {
+          return !item.toolCallId && item.toolName === tool.toolName
+        })
+    if (index === -1) return [...tools, tool]
+    tools[index] = { ...tools[index], ...tool }
+    return tools
+  }
+
+  function removeRuntimeTool(current, event) {
+    const tools = Array.isArray(current) ? [...current] : []
+    const toolCallId = event.toolCallId || event.id || event.callId || ''
+    if (toolCallId) {
+      return tools.filter((item) => item.toolCallId !== toolCallId)
+    }
+    for (let index = tools.length - 1; index >= 0; index--) {
+      if (tools[index].toolName !== event.toolName) continue
+      tools.splice(index, 1)
+      break
+    }
+    return tools
+  }
+
+  function runtimeErrorMessage(event, fallback) {
+    if (typeof event.error === 'string') return event.error
+    return event.error?.message
+      || event.message?.errorMessage
+      || (typeof event.message === 'string' ? event.message : '')
+      || event.errorMessage
+      || fallback
   }
 
   function queuedCount(queue) {
@@ -1344,6 +1458,34 @@ export function useSessionWorkspace({
       || state.pendingToolCount > 0
       || state.unread
       || state.error
+  }
+
+  function runtimeWorkActive(state) {
+    return state.isStreaming
+      || state.isCompacting
+      || state.queuedCount > 0
+      || state.pendingToolCount > 0
+  }
+
+  function runtimeActivityDetail(state) {
+    if (state.error) {
+      if (state.error !== 'error') return state.error
+      const diagnostic = [...(state.diagnostics || [])].reverse().find((item) => {
+        return item.type === 'error'
+      })
+      return diagnostic?.message || 'Run failed'
+    }
+    const tools = Array.isArray(state.pendingTools) ? state.pendingTools : []
+    const tool = tools.at(-1)
+    if (tool) {
+      const additional = tools.length > 1 ? ` · +${tools.length - 1}` : ''
+      return `${toolLabel(tool.toolName)}${toolTarget(tool.args)}${additional}`
+    }
+    if (state.isCompacting) return 'Compacting context'
+    if (state.isStreaming) return 'Waiting for model'
+    if (state.queuedCount) return `${state.queuedCount} queued`
+    if (state.unread) return 'Run finished'
+    return ''
   }
 
   function sessionScore(session, query) {

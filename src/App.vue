@@ -119,6 +119,8 @@ let reviewDesktopQuery = null
 let reviewExpansionTimer = null
 const promptSubmitting = ref(false)
 const interrupting = ref(false)
+const activityInterruptingSessionId = ref('')
+const activityActionError = ref('')
 const goalCommandSubmitting = ref('')
 const editingEntry = ref(null)
 const composerDrafts = new Map()
@@ -1061,6 +1063,7 @@ async function waitInitPhaseFloor() {
 
 function setSidebarNavigator(navigator) {
   sidebarNavigator.value = navigator
+  if (navigator === 'activity') activityActionError.value = ''
   if (!navigator) return
   settingsOpen.value = false
   subagentConfigOpen.value = false
@@ -2641,6 +2644,20 @@ async function interruptAgent() {
   }
 }
 
+async function interruptActivitySession(session) {
+  if (!session?.id || activityInterruptingSessionId.value) return
+
+  activityInterruptingSessionId.value = session.id
+  activityActionError.value = ''
+  try {
+    await interruptPiSession(session.id)
+  } catch (error) {
+    activityActionError.value = `Could not stop ${sessionTitle(session)}: ${error.message}`
+  } finally {
+    activityInterruptingSessionId.value = ''
+  }
+}
+
 async function selectModel(model) {
   modelPickerOpen.value = false
   promptError.value = ''
@@ -3244,6 +3261,7 @@ function closePickerMenus() {
     </header>
 
     <SessionSidebar
+      :activity-action-error="activityActionError"
       :active-backend-connection="activeBackendConnection"
       :agent-running="agentRunning"
       :backend-connection-busy-id="backendConnectionBusyId"
@@ -3253,6 +3271,7 @@ function closePickerMenus() {
       :default-backend-connection-id="defaultBackendConnectionId"
       :deleting-project-cwd="deletingProjectCwd"
       :deleting-session-id="deletingSessionId"
+      :interrupting-session-id="activityInterruptingSessionId"
       :navigator="sidebarNavigator"
       :new-session-cwd="newSessionCwd"
       :reloading-session="reloadingSession"
@@ -3275,6 +3294,7 @@ function closePickerMenus() {
       @cancel-rename-session="cancelRenameSession"
       @commit-rename-session="commitRenameSession"
       @create-session="createSession"
+      @interrupt-session="interruptActivitySession"
       @open-project-browser="openProjectBrowser"
       @open-project-detail="openProjectDetail"
       @open-settings="toggleSettingsDrawer"

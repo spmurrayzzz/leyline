@@ -338,6 +338,15 @@
     max-height: calc(100vh - 126px);
   }
 
+  .activity-navigator-result {
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+  }
+
+  .activity-result-actions {
+    grid-column: 2 / -1;
+    justify-content: flex-end;
+  }
+
   .sidebar-scrim {
     display: block;
     position: fixed;

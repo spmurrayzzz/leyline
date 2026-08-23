@@ -41,17 +41,29 @@ The default view shows projects and current or recent sessions. Enter a query to
 
 Press **Escape** or select the shaded area to close the navigator.
 
-## Follow activity in other projects
+## Supervise session activity
 
-Select **Activity across other projects** at the bottom of the sidebar.
+![Activity showing a working-tree warning and sessions that need attention, are running, or have queued work](../assets/screenshots/activity.png)
 
-The navigator excludes the current project and groups active sessions by state:
+*Activity keeps live session state and controls in one compact view.*
+
+Select **Activity** at the bottom of the sidebar.
+
+The navigator excludes the selected session. It includes activity from every project, including other sessions in the current project:
 
 - **Needs attention** contains unread sessions and errors.
 - **Running** contains running and compacting sessions.
 - **Queued** contains sessions with queued messages.
 
-Select an activity result to open that session.
+A row shows the project and the current tool target, exact runtime error, or queue state when available.
+
+Select **Open** to open the session. Select **Stop** to interrupt a streaming agent run without opening it.
+
+Compaction does not show **Stop** because the interrupt action cannot cancel compaction.
+
+Activity warns when multiple active or queued sessions share one CWD. The warning identifies collision risk. It does not attribute working-tree changes to a session.
+
+Use **Search active sessions** to match a session title, project, CWD, tool target, or error detail.
 
 ## Open Project details
 

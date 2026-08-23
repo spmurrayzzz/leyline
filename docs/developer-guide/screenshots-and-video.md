@@ -58,6 +58,7 @@ The documentation workflow uses these fixed settings:
 - Model label: `local/deepseek-v4-flash`
 - Thought display default: **Collapsed**
 - Git review captures: `release-safety` with four sanitized changed files
+- Activity captures: one selected run, one same-project run, one runtime error, one queued session, and a shared-CWD warning
 - Deep research captures: three completed threads, six ledger sources, four citations, one excluded source, and a mobile citation preview
 
 Each state uses a new browser context. The script freezes time, replaces SSE and terminal transports, waits for a state selector, and disables remaining motion.

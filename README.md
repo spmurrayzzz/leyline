@@ -23,9 +23,12 @@ connections to other Leyline backends.
 
 Browse, search, create, and run pi sessions from a focused web UI. The sidebar
 keeps one project in focus, and **Go to** searches sessions across projects.
-Leyline shows rendered transcripts, live runtime output, Git changes, model
-controls, memory, subagents, runtime events, and an embedded terminal. Each
-window can use the native backend or a saved backend connection.
+**Activity** groups nonselected sessions that need attention, are running, or
+have queued work. It shows the current operation or runtime error. It provides
+**Open** and a session-scoped **Stop** control. Leyline also shows rendered
+transcripts, live runtime output, Git changes, model controls, memory,
+subagents, runtime events, and an embedded terminal. Each window can use the
+native backend or a saved backend connection.
 
 Deep research sessions divide a question into parallel, source-backed threads.
 Leyline keeps the plan and worker sessions inspectable and validates numbered

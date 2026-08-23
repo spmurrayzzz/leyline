@@ -4,6 +4,10 @@ import { backendDisplayAddress } from '../lib/backend'
 import { sessionTime } from '../lib/format'
 
 const props = defineProps({
+  activityActionError: {
+    type: String,
+    default: '',
+  },
   activeBackendConnection: {
     type: Object,
     default: null,
@@ -34,6 +38,10 @@ const props = defineProps({
     default: '',
   },
   deletingProjectCwd: {
+    type: String,
+    default: '',
+  },
+  interruptingSessionId: {
     type: String,
     default: '',
   },
@@ -104,6 +112,7 @@ const emit = defineEmits([
   'cancel-rename-session',
   'commit-rename-session',
   'create-session',
+  'interrupt-session',
   'open-project-browser',
   'open-project-detail',
   'open-settings',
@@ -448,18 +457,19 @@ const navigatorSessions = computed(() => {
 })
 
 const activitySessions = computed(() => {
-  const currentCwd = currentProject.value?.cwd || ''
   const query = navigatorQuery.value.trim()
   return props.runtimeActivitySessions
-    .filter((item) => item.project.cwd !== currentCwd)
+    .filter((item) => item.session.id !== props.selectedSessionId)
     .filter((item) => {
       if (!query) return true
       return navigationScore([
         props.sessionTitle(item.session),
         item.project.name,
         item.project.cwd,
+        item.detail,
       ], query) > 0
     })
+    .sort((a, b) => (b.activityAt || 0) - (a.activityAt || 0))
 })
 
 const attentionSessions = computed(() => {
@@ -481,6 +491,21 @@ const queuedSessions = computed(() => {
   })
 })
 
+const activityGroups = computed(() => [
+  { key: 'attention', label: 'Needs attention', items: attentionSessions.value },
+  { key: 'running', label: 'Running', items: workingSessions.value },
+  { key: 'queued', label: 'Queued', items: queuedSessions.value },
+].filter((group) => group.items.length))
+
+const sharedWorkingTrees = computed(() => {
+  const projects = new Map()
+  for (const item of activitySessions.value) {
+    if (item.sharedWorkingTreeCount < 2 || projects.has(item.project.cwd)) continue
+    projects.set(item.project.cwd, item)
+  }
+  return [...projects.values()]
+})
+
 const activitySummary = computed(() => {
   const counts = {
     running: 0,
@@ -499,7 +524,7 @@ const activitySummary = computed(() => {
     countLabel(counts.error, 'error'),
     countLabel(counts.queued, 'queued'),
   ].filter(Boolean)
-  return parts.join(' · ') || 'No activity elsewhere'
+  return parts.join(' · ') || 'No other activity'
 })
 
 const projectSessionCount = computed(() => {
@@ -510,14 +535,15 @@ const projectSessionCount = computed(() => {
 
 const navigatorTitle = computed(() => {
   if (props.navigator === 'quick') return 'Go to'
-  if (props.navigator === 'activity') return 'Activity across projects'
+  if (props.navigator === 'activity') return 'Activity'
   return 'Projects'
 })
 
 const navigatorSubtitle = computed(() => {
   if (props.navigator === 'quick') return 'Sessions and projects'
   if (props.navigator === 'activity') {
-    return `${activitySessions.value.length} active outside this project`
+    const count = activitySessions.value.length
+    return `${count} other ${count === 1 ? 'session' : 'sessions'}`
   }
   const count = orderedProjects.value.length
   return `${count} ${count === 1 ? 'project' : 'projects'}`
@@ -654,6 +680,11 @@ function selectProject(project) {
 function selectNavigatorSession(session) {
   closeNavigator()
   emit('select-session', session)
+}
+
+function interruptActivitySession(item) {
+  if (!item.canStop || props.interruptingSessionId) return
+  emit('interrupt-session', item.session)
 }
 
 function createCurrentProjectSession() {
@@ -1168,7 +1199,7 @@ const vFocusSelect = {
           </svg>
           <span>
             <strong>{{ activitySummary }}</strong>
-            <small>Activity across other projects</small>
+            <small>Activity</small>
           </span>
           <span aria-hidden="true">›</span>
         </button>
@@ -1408,17 +1439,35 @@ const vFocusSelect = {
             </template>
 
             <template v-else>
-              <section v-if="attentionSessions.length" class="navigator-result-section">
+              <div
+                v-for="item in sharedWorkingTrees"
+                :key="item.project.cwd"
+                class="activity-working-tree-warning"
+                :title="item.project.cwd"
+              >
+                {{ item.sharedWorkingTreeCount }} active sessions share the
+                <strong>{{ item.project.name }}</strong> working tree
+              </div>
+
+              <div
+                v-if="activityActionError"
+                class="activity-action-error"
+                role="alert"
+              >{{ activityActionError }}</div>
+
+              <section
+                v-for="group in activityGroups"
+                :key="group.key"
+                class="navigator-result-section"
+              >
                 <div class="navigator-result-heading">
-                  <span>Needs attention</span>
-                  <span>{{ attentionSessions.length }}</span>
+                  <span>{{ group.label }}</span>
+                  <span>{{ group.items.length }}</span>
                 </div>
-                <button
-                  v-for="item in attentionSessions"
+                <div
+                  v-for="item in group.items"
                   :key="item.session.path || item.session.id"
-                  class="sidebar-navigator-result"
-                  type="button"
-                  @click="selectNavigatorSession(item.session)"
+                  class="sidebar-navigator-result activity-navigator-result"
                 >
                   <span class="navigator-result-icon">
                     <svg viewBox="0 0 16 16" aria-hidden="true">
@@ -1427,74 +1476,43 @@ const vFocusSelect = {
                   </span>
                   <span>
                     <strong>{{ sessionTitle(item.session) }}</strong>
-                    <small>{{ item.project.name }} · {{ item.project.cwd }}</small>
+                    <small
+                      :title="`${item.project.cwd}${item.detail
+                        ? ` · ${item.detail}`
+                        : ''}`"
+                    >
+                      {{ item.project.name }}
+                      <template v-if="item.detail"> · {{ item.detail }}</template>
+                    </small>
                   </span>
                   <span
                     class="navigator-result-status"
                     :class="`status-${item.status.tone}`"
                   >{{ item.status.label }}</span>
-                </button>
-              </section>
-
-              <section v-if="workingSessions.length" class="navigator-result-section">
-                <div class="navigator-result-heading">
-                  <span>Running</span>
-                  <span>{{ workingSessions.length }}</span>
+                  <span class="activity-result-actions">
+                    <button
+                      type="button"
+                      :aria-label="`Open ${sessionTitle(item.session)}`"
+                      @click="selectNavigatorSession(item.session)"
+                    >Open</button>
+                    <button
+                      v-if="item.canStop"
+                      class="activity-stop-button"
+                      type="button"
+                      :aria-label="`Stop ${sessionTitle(item.session)}`"
+                      :disabled="!!interruptingSessionId"
+                      @click="interruptActivitySession(item)"
+                    >{{ interruptingSessionId === item.session.id
+                      ? 'Stopping…'
+                      : 'Stop' }}</button>
+                  </span>
                 </div>
-                <button
-                  v-for="item in workingSessions"
-                  :key="item.session.path || item.session.id"
-                  class="sidebar-navigator-result"
-                  type="button"
-                  @click="selectNavigatorSession(item.session)"
-                >
-                  <span class="navigator-result-icon">
-                    <svg viewBox="0 0 16 16" aria-hidden="true">
-                      <path d="M3 3.5h10v7H7l-3.5 2v-2H3z"></path>
-                    </svg>
-                  </span>
-                  <span>
-                    <strong>{{ sessionTitle(item.session) }}</strong>
-                    <small>{{ item.project.name }} · {{ item.project.cwd }}</small>
-                  </span>
-                  <span
-                    class="navigator-result-status"
-                    :class="`status-${item.status.tone}`"
-                  >{{ item.status.label }}</span>
-                </button>
-              </section>
-
-              <section v-if="queuedSessions.length" class="navigator-result-section">
-                <div class="navigator-result-heading">
-                  <span>Queued</span>
-                  <span>{{ queuedSessions.length }}</span>
-                </div>
-                <button
-                  v-for="item in queuedSessions"
-                  :key="item.session.path || item.session.id"
-                  class="sidebar-navigator-result"
-                  type="button"
-                  @click="selectNavigatorSession(item.session)"
-                >
-                  <span class="navigator-result-icon">
-                    <svg viewBox="0 0 16 16" aria-hidden="true">
-                      <path d="M3 3.5h10v7H7l-3.5 2v-2H3z"></path>
-                    </svg>
-                  </span>
-                  <span>
-                    <strong>{{ sessionTitle(item.session) }}</strong>
-                    <small>{{ item.project.name }} · {{ item.project.cwd }}</small>
-                  </span>
-                  <span class="navigator-result-status status-queued">
-                    {{ item.status.label }}
-                  </span>
-                </button>
               </section>
 
               <div
                 v-if="activitySessions.length === 0"
                 class="sidebar-navigator-empty"
-              >No activity in other projects</div>
+              >No other session activity</div>
             </template>
           </div>
         </section>

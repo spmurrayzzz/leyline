@@ -36,7 +36,9 @@ A session row can show these states:
 - **gather N/N**: that many research threads have finished.
 - **ready**: the selected research session has a completed report.
 
-Select **Activity across other projects** to find active sessions outside the current project. Background sessions continue when you open another session.
+Select **Activity** to supervise other live sessions, including sessions in the current project. It shows current work and provides **Open** and session-scoped **Stop** actions.
+
+Background sessions continue when you open another session. Activity warns when multiple active or queued sessions share one CWD.
 
 ## Create a session in a project
 

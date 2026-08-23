@@ -25,8 +25,8 @@ features:
     details: Split a question into parallel research threads, follow source gathering, verify report citations, and inspect the persistent research ledger.
   - title: Use images with any model
     details: Send images directly to compatible models or configure a vision agent to describe them for models without image support.
-  - title: Watch live work
-    details: Follow assistant text, thinking, tool calls, runtime events, queues, context use, and goal progress.
+  - title: Supervise live work
+    details: Use Activity to inspect nonselected sessions, current tool targets, runtime errors, queues, shared working trees, and scoped stop controls.
   - title: Review Git changes
     details: Inspect staged, working-tree, untracked, and conflicted files in a prepared pane that can expand across the workspace.
   - title: Connect backend hosts
