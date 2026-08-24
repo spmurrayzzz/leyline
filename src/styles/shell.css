@@ -363,9 +363,29 @@
   min-height: 0;
   flex: 1;
   overflow-y: auto;
-  scrollbar-color: #2d2d2d transparent;
   scrollbar-gutter: stable;
-  scrollbar-width: thin;
+}
+
+.project-session-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.project-session-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.project-session-scroll::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: #2d2d2d;
+  background-clip: padding-box;
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  .project-session-scroll {
+    scrollbar-color: #2d2d2d transparent;
+    scrollbar-width: thin;
+  }
 }
 
 .session-time-heading {
