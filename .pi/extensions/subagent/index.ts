@@ -292,21 +292,100 @@ function selectedAgentThinking(
   throw new Error(`Invalid subagent thinking level: ${setting}`);
 }
 
+const SUBAGENT_TOOL_DESCRIPTION =
+  "Delegate tasks to specialized child agents with isolated context.\n" +
+  "Modes:\n" +
+  "- single (default): { agent, task, model?, thinking? }\n" +
+  "- parallel: { tasks: [{ agent, task, model?, thinking? }] } — runs concurrently\n" +
+  "- chain: { chain: [{ agent, task, model?, thinking? }] } — sequential, {previous} replaced by prior output";
+
+function subagentDescription(agents: AgentDef[]) {
+  if (!agents.length) return SUBAGENT_TOOL_DESCRIPTION;
+  const available = agents.map((agent) => {
+    return `- ${agent.name}: ${agent.description}`;
+  }).join("\n");
+  return `${SUBAGENT_TOOL_DESCRIPTION}\nAvailable agents:\n${available}`;
+}
+
+function subagentParameters(agentNames: string[]) {
+  const agentName = (description: string) => agentNames.length
+    ? StringEnum(agentNames, { description })
+    : Type.String({ description });
+
+  return Type.Object({
+    agent: Type.Optional(agentName(
+      "Agent name. From .md files in ~/.pi/agent/agents/ and .pi/agents/",
+    )),
+    task: Type.Optional(Type.String({
+      description: "The task to delegate to the subagent",
+    })),
+    model: Type.Optional(Type.String({
+      description: "Optional model override for the child agent. Use 'inherit', a model id, or provider/model-id.",
+    })),
+    thinking: Type.Optional(StringEnum(THINKING_SETTINGS, {
+      description: "Optional thinking-level override for child agents. Use 'inherit' for the parent session's current level.",
+    })),
+    mode: Type.Optional(
+      Type.Enum({
+        single: "single",
+        parallel: "parallel",
+        chain: "chain",
+      } as const, {
+        description: "Execution mode (default: single)",
+      }),
+    ),
+    cwd: Type.Optional(
+      Type.String({
+        description: "Working directory for the child agent",
+      }),
+    ),
+    tasks: Type.Optional(
+      Type.Array(
+        Type.Object({
+          agent: agentName("Agent name"),
+          task: Type.String({ description: "Task for this agent" }),
+          model: Type.Optional(Type.String({ description: "Optional model override for this child agent" })),
+          thinking: Type.Optional(StringEnum(THINKING_SETTINGS, { description: "Optional thinking-level override for this child agent" })),
+          cwd: Type.Optional(Type.String({ description: "Working directory" })),
+        }),
+        { description: "For parallel mode: concurrent tasks" },
+      ),
+    ),
+    chain: Type.Optional(
+      Type.Array(
+        Type.Object({
+          agent: agentName("Agent name"),
+          task: Type.String({
+            description: "Task with {previous} replaced by prior step output",
+          }),
+          model: Type.Optional(Type.String({ description: "Optional model override for this child agent" })),
+          thinking: Type.Optional(StringEnum(THINKING_SETTINGS, { description: "Optional thinking-level override for this child agent" })),
+          cwd: Type.Optional(Type.String({ description: "Working directory" })),
+        }),
+        { description: "For chain mode: sequential tasks" },
+      ),
+    ),
+  });
+}
+
 export default function subagentExtension(pi: ExtensionAPI) {
   let knownAgents = new Map<string, AgentDef>();
+  let updateSubagentTool = () => {};
 
   function refreshAgents(ctx: ExtensionContext) {
     knownAgents = discoverAgents(ctx.cwd);
     const researcher = knownAgents.get(BUNDLED_RESEARCHER.name);
-    if (!researcher) return;
-    researcher.tools = pi.getAllTools().filter((tool) => {
-      if (SAFE_RESEARCH_BUILTINS.has(tool.name)) {
-        return tool.sourceInfo?.source === "builtin";
-      }
-      if (!SAFE_RESEARCH_EXTERNAL_TOOLS.has(tool.name)) return false;
-      return tool.sourceInfo?.scope !== "project"
-        && tool.sourceInfo?.source !== "builtin";
-    }).map((tool) => tool.name);
+    if (researcher) {
+      researcher.tools = pi.getAllTools().filter((tool) => {
+        if (SAFE_RESEARCH_BUILTINS.has(tool.name)) {
+          return tool.sourceInfo?.source === "builtin";
+        }
+        if (!SAFE_RESEARCH_EXTERNAL_TOOLS.has(tool.name)) return false;
+        return tool.sourceInfo?.scope !== "project"
+          && tool.sourceInfo?.source !== "builtin";
+      }).map((tool) => tool.name);
+    }
+    updateSubagentTool();
   }
 
   pi.on("session_start", async (_event, ctx) => {
@@ -340,69 +419,11 @@ export default function subagentExtension(pi: ExtensionAPI) {
     },
   });
 
-  pi.registerTool({
+  const subagentTool = {
     name: "subagent",
     label: "Subagent",
-    description:
-      "Delegate tasks to specialized child agents with isolated context.\n" +
-      "Modes:\n" +
-      "- single (default): { agent, task, model?, thinking? }\n" +
-      "- parallel: { tasks: [{ agent, task, model?, thinking? }] } — runs concurrently\n" +
-      "- chain: { chain: [{ agent, task, model?, thinking? }] } — sequential, {previous} replaced by prior output",
-    parameters: Type.Object({
-      agent: Type.Optional(Type.String({
-        description: "Agent name. From .md files in ~/.pi/agent/agents/ and .pi/agents/",
-      })),
-      task: Type.Optional(Type.String({
-        description: "The task to delegate to the subagent",
-      })),
-      model: Type.Optional(Type.String({
-        description: "Optional model override for the child agent. Use 'inherit', a model id, or provider/model-id.",
-      })),
-      thinking: Type.Optional(StringEnum(THINKING_SETTINGS, {
-        description: "Optional thinking-level override for child agents. Use 'inherit' for the parent session's current level.",
-      })),
-      mode: Type.Optional(
-        Type.Enum({
-          single: "single",
-          parallel: "parallel",
-          chain: "chain",
-        } as const, {
-          description: "Execution mode (default: single)",
-        }),
-      ),
-      cwd: Type.Optional(
-        Type.String({
-          description: "Working directory for the child agent",
-        }),
-      ),
-      tasks: Type.Optional(
-        Type.Array(
-          Type.Object({
-            agent: Type.String({ description: "Agent name" }),
-            task: Type.String({ description: "Task for this agent" }),
-            model: Type.Optional(Type.String({ description: "Optional model override for this child agent" })),
-            thinking: Type.Optional(StringEnum(THINKING_SETTINGS, { description: "Optional thinking-level override for this child agent" })),
-            cwd: Type.Optional(Type.String({ description: "Working directory" })),
-          }),
-          { description: "For parallel mode: concurrent tasks" },
-        ),
-      ),
-      chain: Type.Optional(
-        Type.Array(
-          Type.Object({
-            agent: Type.String({ description: "Agent name" }),
-            task: Type.String({
-              description: "Task with {previous} replaced by prior step output",
-            }),
-            model: Type.Optional(Type.String({ description: "Optional model override for this child agent" })),
-            thinking: Type.Optional(StringEnum(THINKING_SETTINGS, { description: "Optional thinking-level override for this child agent" })),
-            cwd: Type.Optional(Type.String({ description: "Working directory" })),
-          }),
-          { description: "For chain mode: sequential tasks" },
-        ),
-      ),
-    }),
+    description: subagentDescription([]),
+    parameters: subagentParameters([]),
     async execute(
       _toolCallId: string,
       params: any,
@@ -586,7 +607,15 @@ export default function subagentExtension(pi: ExtensionAPI) {
 
       throw new Error(`Unknown mode: ${mode}`);
     },
-  });
+  };
+
+  updateSubagentTool = () => {
+    const agents = [...knownAgents.values()];
+    subagentTool.description = subagentDescription(agents);
+    subagentTool.parameters = subagentParameters(agents.map((agent) => agent.name));
+    pi.registerTool(subagentTool);
+  };
+  pi.registerTool(subagentTool);
 }
 
 function pendingResult(
