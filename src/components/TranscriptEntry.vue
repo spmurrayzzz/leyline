@@ -323,7 +323,9 @@ function openMarkdownContent(event) {
           v-else-if="result.childSession"
           class="subagent-child-link"
         >
-          → view session
+          {{ subagentStatus(result) === 'running'
+            ? '→ view live session'
+            : '→ view session' }}
         </span>
       </div>
     </div>

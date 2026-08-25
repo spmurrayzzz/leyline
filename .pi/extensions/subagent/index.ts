@@ -26,6 +26,12 @@ interface AgentDef {
   key: string;
 }
 
+interface ChildSession {
+  path: string;
+  id: string;
+  cwd?: string;
+}
+
 interface SingleResult {
   agent: string;
   agentSource: "user" | "project" | "bundled" | "unknown";
@@ -39,7 +45,7 @@ interface SingleResult {
   };
   requestedModel?: string;
   requestedThinking?: string;
-  childSession: { path: string; id: string; cwd?: string } | null;
+  childSession: ChildSession | null;
   exitCode: number;
   messages: Array<{ role: string; content: string }>;
   usage: {
@@ -228,23 +234,55 @@ async function runSubagentViaApi(params: {
   tools?: string[];
   systemPrompt: string;
   signal?: AbortSignal;
+  onStart?: (childSession: ChildSession) => void;
 }): Promise<{
-  childSession: { path: string; id: string; cwd?: string };
+  childSession: ChildSession;
   messages: Array<{ role: string; content: string }>;
   usage: { inputTokens: number; outputTokens: number; totalTokens: number; cost: number; turns: number };
   model?: string;
   thinkingLevel?: ThinkingLevel;
   stopReason?: string;
 }> {
-  return callLeylineApi("/subagent", {
-    task: params.task,
-    cwd: params.cwd,
-    parentSessionPath: params.parentSessionPath,
-    model: params.model || undefined,
-    thinkingLevel: params.thinkingLevel,
-    tools: params.tools,
-    systemPrompt: params.systemPrompt || undefined,
-  }, params.signal) as Promise<any>;
+  const response = await fetch(`${leylineApiBaseUrl()}/api/pi/subagent`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      task: params.task,
+      cwd: params.cwd,
+      parentSessionPath: params.parentSessionPath,
+      model: params.model || undefined,
+      thinkingLevel: params.thinkingLevel,
+      tools: params.tools,
+      systemPrompt: params.systemPrompt || undefined,
+    }),
+    signal: params.signal,
+    dispatcher: LEYLINE_API_DISPATCHER,
+  });
+
+  const childSession = decodeChildSession(
+    response.headers.get("x-leyline-subagent-session"),
+  );
+  if (childSession) params.onStart?.(childSession);
+
+  const data = await response.json() as any;
+  if (!response.ok || data?.error) {
+    throw new Error(data?.error || `API error: ${response.status}`);
+  }
+  return data;
+}
+
+function decodeChildSession(value: string | null): ChildSession | null {
+  if (!value) return null;
+  try {
+    const childSession = JSON.parse(
+      Buffer.from(value, "base64url").toString("utf8"),
+    );
+    if (typeof childSession?.id !== "string"
+      || typeof childSession?.path !== "string") return null;
+    return childSession;
+  } catch {
+    return null;
+  }
 }
 
 function errorText(error: any): string {
@@ -458,7 +496,16 @@ export default function subagentExtension(pi: ExtensionAPI) {
       if (mode === "single") {
         const result = await executeSingle(
           agent!, params.task, baseCwd, parentPath, params.model, params.thinking,
-          parentThinkingLevel, signal, ctx,
+          parentThinkingLevel, signal, ctx, (started) => {
+            onUpdate?.({
+              content: [{ type: "text", text: `${started.agent} subagent running` }],
+              details: {
+                mode: "single",
+                results: [started],
+                background: true,
+              } as SubagentDetails,
+            });
+          },
         );
         const output = resultOutput(result);
         return {
@@ -517,7 +564,10 @@ export default function subagentExtension(pi: ExtensionAPI) {
               ? await executeSingle(
                 childAgent, task.task, task.cwd || baseCwd, parentPath,
                 task.model ?? params.model, task.thinking ?? params.thinking,
-                parentThinkingLevel, signal, ctx,
+                parentThinkingLevel, signal, ctx, (started) => {
+                  progress[resultIndex] = started;
+                  publishProgress();
+                },
               )
               : {
                   agent: task.agent,
@@ -582,7 +632,16 @@ export default function subagentExtension(pi: ExtensionAPI) {
           const result = await executeSingle(
             a, taskWithPrev, step.cwd || baseCwd, parentPath,
             step.model ?? params.model, step.thinking ?? params.thinking,
-            parentThinkingLevel, signal, ctx,
+            parentThinkingLevel, signal, ctx, (started) => {
+              onUpdate?.({
+                content: [{ type: "text", text: `${started.agent} chain step running` }],
+                details: {
+                  mode: "chain",
+                  results: [...results, started],
+                  background: true,
+                } as SubagentDetails,
+              });
+            },
           );
           results.push(result);
           if (result.error || result.exitCode !== 0) {
@@ -697,8 +756,10 @@ async function executeSingle(
   parentThinkingLevel: ThinkingLevel,
   signal: AbortSignal | undefined,
   ctx: ExtensionContext,
+  onStart?: (result: SingleResult) => void,
 ): Promise<SingleResult> {
   const emptyUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0, cost: 0, turns: 0 };
+  let childSession: ChildSession | null = null;
 
   try {
     const configured = await resolveSubagentConfig({ agent, cwd: ctx.cwd, parentSessionPath, signal });
@@ -715,6 +776,21 @@ async function executeSingle(
         : agent.tools.length ? agent.tools : undefined,
       systemPrompt: agent.systemPrompt,
       signal,
+      onStart: (session) => {
+        childSession = session;
+        onStart?.({
+          agent: agent.name,
+          agentSource: agent.source,
+          task,
+          status: "running",
+          requestedModel: modelOverride,
+          requestedThinking: thinkingOverride,
+          childSession,
+          exitCode: 0,
+          messages: [],
+          usage: emptyUsage,
+        });
+      },
     });
 
     const data = result as any;
@@ -748,7 +824,7 @@ async function executeSingle(
       status: "error",
       requestedModel: modelOverride,
       requestedThinking: thinkingOverride,
-      childSession: null,
+      childSession,
       exitCode: 1,
       messages: [],
       usage: emptyUsage,

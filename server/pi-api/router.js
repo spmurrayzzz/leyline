@@ -473,10 +473,16 @@ async function piApiHandler(req, res) {
         const body = await readJson(req)
         const controller = new AbortController()
         let responseFinished = false
+        let responseStarted = false
         res.on('finish', () => { responseFinished = true })
         res.on('close', () => {
           if (!responseFinished) controller.abort()
         })
+        const finish = (data, status = 200) => {
+          if (!responseStarted) return json(res, data, status)
+          if (res.destroyed || res.writableEnded) return
+          return res.end(JSON.stringify(data))
+        }
         try {
           const result = await runSubagent({
             task: body.task,
@@ -487,10 +493,21 @@ async function piApiHandler(req, res) {
             tools: body.tools,
             systemPrompt: body.systemPrompt,
             signal: controller.signal,
+            onStart: (childSession) => {
+              if (res.destroyed || res.writableEnded) return
+              responseStarted = true
+              res.statusCode = 200
+              res.setHeader('Content-Type', 'application/json')
+              res.setHeader(
+                'X-Leyline-Subagent-Session',
+                Buffer.from(JSON.stringify(childSession)).toString('base64url'),
+              )
+              res.flushHeaders()
+            },
           })
-          return json(res, result)
+          return finish(result)
         } catch (error) {
-          return json(res, { error: error.message }, 500)
+          return finish({ error: error.message }, 500)
         }
       }
 

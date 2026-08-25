@@ -1273,7 +1273,7 @@ async function exportSessionDetail(id) {
   return detail
 }
 
-async function runSubagent({ task, cwd, parentSessionPath, model, thinkingLevel, tools, systemPrompt, isolatedSystemPrompt, images, allowImages = false, signal }) {
+async function runSubagent({ task, cwd, parentSessionPath, model, thinkingLevel, tools, systemPrompt, isolatedSystemPrompt, images, allowImages = false, signal, onStart }) {
   if (!cwd) throw new Error('cwd is required')
   if (!task) throw new Error('task is required')
   if (tools !== undefined && !Array.isArray(tools)) {
@@ -1298,6 +1298,8 @@ async function runSubagent({ task, cwd, parentSessionPath, model, thinkingLevel,
   })
 
   let session
+  let handle
+  let childStarted = false
   let abortSubagent
   try {
     const createSubagentRuntime = (options) => createRuntimeResult(options, {
@@ -1333,6 +1335,20 @@ async function runSubagent({ task, cwd, parentSessionPath, model, thinkingLevel,
       if (missingTools.length) {
         throw new Error(`Unknown subagent tools: ${missingTools.join(', ')}`)
       }
+    }
+
+    if (onStart) {
+      handle = {
+        runtime,
+        sessionId: childId,
+        unsubscribe: undefined,
+        extensionUiState: emptyExtensionUiState(),
+      }
+      runtimeHandles.set(childId, handle)
+      forceOneAtATime(session)
+      await bindRuntimeHandle(handle)
+      childStarted = true
+      onStart({ path: childPath, id: childId, cwd })
     }
 
     const taskWithPrompt = systemPrompt && systemPrompt.trim()
@@ -1388,9 +1404,9 @@ async function runSubagent({ task, cwd, parentSessionPath, model, thinkingLevel,
 
     signal?.removeEventListener?.('abort', abortSubagent)
     const effectiveThinkingLevel = session.thinkingLevel
-    session.dispose()
+    if (!childStarted) session.dispose()
 
-    return {
+    const result = {
       childSession: { path: childPath, id: childId, cwd },
       messages,
       usage,
@@ -1398,9 +1414,17 @@ async function runSubagent({ task, cwd, parentSessionPath, model, thinkingLevel,
       thinkingLevel: effectiveThinkingLevel,
       stopReason,
     }
+    if (handle && activeHandle !== handle) discardRuntimeHandle(handle)
+    return result
   } catch (error) {
     signal?.removeEventListener?.('abort', abortSubagent)
-    try { session?.dispose() } catch {}
+    if (!childStarted) {
+      handle?.unsubscribe?.()
+      runtimeHandles.delete(childId)
+      try { session?.dispose() } catch {}
+    } else if (activeHandle !== handle) {
+      discardRuntimeHandle(handle)
+    }
     if (signal?.aborted) throw new Error('Subagent cancelled')
     throw error
   }
