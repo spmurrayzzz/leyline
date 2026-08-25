@@ -260,6 +260,39 @@
 
 .workbench > .message,
 .workbench > .tool-card,
+.workbench > .event-row,
+.live-stack > .live-item {
+  content-visibility: auto;
+}
+
+.workbench > .message {
+  contain-intrinsic-block-size: auto 80px;
+}
+
+.workbench > .tool-card {
+  contain-intrinsic-block-size: auto 20px;
+}
+
+.workbench > .event-row {
+  contain-intrinsic-block-size: auto 24px;
+}
+
+.live-stack > .live-message-item,
+.live-stack > .live-assistant-item {
+  contain-intrinsic-block-size: auto 100px;
+}
+
+.live-stack > .live-tool-item {
+  contain-intrinsic-block-size: auto 40px;
+}
+
+.workbench > .message:has(.feedback-note-popover),
+.live-stack > .live-item:has(.feedback-note-popover) {
+  content-visibility: visible;
+}
+
+.workbench > .message,
+.workbench > .tool-card,
 .workbench > .live-stack,
 .workbench > .empty-session-panel,
 .workbench > .session-loading-panel,

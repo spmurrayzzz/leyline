@@ -303,6 +303,7 @@ const {
   handleWorkbenchScroll,
   handleWorkbenchWheel,
   handleWorkbenchTouchMove,
+  handleWorkbenchPointerDown,
   resetWorkbenchScrollState,
   shouldFollowOutput,
   markNewOutput,
@@ -3370,6 +3371,7 @@ function closePickerMenus() {
           'in-project-startup-workbench': inProjectNewSessionRun,
           'empty-selected-workbench': emptySessionShellVisible && !startupRun,
         }"
+        @pointerdown.passive="handleWorkbenchPointerDown"
         @scroll="handleWorkbenchScroll"
         @touchmove.passive="handleWorkbenchTouchMove"
         @wheel.passive="handleWorkbenchWheel"

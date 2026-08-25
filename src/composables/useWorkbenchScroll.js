@@ -16,6 +16,10 @@ export function useWorkbenchScroll({ workbench, composerRef }) {
   let scrollSettleFrame
   let userScrollTimer
   let composerResizeObserver
+  let workbenchResizeObserver
+  let workbenchResizeFrame
+  let bottomScrollActive = false
+  let resizePinActive = false
   let selectedSessionIdRef = null
   let liveItemsRef = null
 
@@ -25,6 +29,10 @@ export function useWorkbenchScroll({ workbench, composerRef }) {
 
   watch(() => composerRef.value?.form, (el) => {
     observeComposer(el)
+  }, { flush: 'post' })
+
+  watch(workbench, (el) => {
+    observeWorkbench(el)
   }, { flush: 'post' })
 
   function bind({ selectedSessionId, liveItems }) {
@@ -71,8 +79,46 @@ export function useWorkbenchScroll({ workbench, composerRef }) {
     if (stickToBottom.value && !userScrollActive.value) scheduleBottomScroll()
   }
 
+  function observeWorkbench(el) {
+    workbenchResizeObserver?.disconnect()
+    workbenchResizeObserver = null
+    cancelAnimationFrame(workbenchResizeFrame)
+    if (!el) return
+
+    workbenchResizeObserver = new ResizeObserver(pinWorkbenchAfterResize)
+    workbenchResizeObserver.observe(el)
+  }
+
+  function pinWorkbenchAfterResize() {
+    if (!workbench.value || !stickToBottom.value || userScrollActive.value) return
+    cancelAnimationFrame(workbenchResizeFrame)
+    resizePinActive = true
+    let framesRemaining = 5
+    const pin = () => {
+      if (!workbench.value
+        || !stickToBottom.value
+        || userScrollActive.value) {
+        resizePinActive = false
+        return
+      }
+      workbench.value.scrollTop = Number.MAX_SAFE_INTEGER
+      framesRemaining -= 1
+      if (framesRemaining > 0) {
+        workbenchResizeFrame = requestAnimationFrame(pin)
+      } else {
+        resizePinActive = false
+      }
+    }
+    workbenchResizeFrame = requestAnimationFrame(pin)
+  }
+
   function handleWorkbenchScroll() {
     if (!workbench.value) return
+    if (bottomScrollActive || resizePinActive) {
+      stickToBottom.value = true
+      hasNewOutput.value = false
+      return
+    }
     const distance = distanceFromWorkbenchBottom()
     if (distance >= bottomStickBufferPx) stickToBottom.value = false
     else if (!userScrollActive.value) stickToBottom.value = true
@@ -89,8 +135,20 @@ export function useWorkbenchScroll({ workbench, composerRef }) {
     stickToBottom.value = false
   }
 
+  function handleWorkbenchPointerDown(event) {
+    const rect = workbench.value?.getBoundingClientRect()
+    if (!rect || event.clientX < rect.right - 16) return
+    markUserScrolling()
+  }
+
   function markUserScrolling() {
+    bottomScrollActive = false
+    resizePinActive = false
     userScrollActive.value = true
+    cancelAnimationFrame(scrollFrame)
+    cancelAnimationFrame(scrollAnimationFrame)
+    cancelAnimationFrame(scrollSettleFrame)
+    cancelAnimationFrame(workbenchResizeFrame)
     clearTimeout(userScrollTimer)
     userScrollTimer = setTimeout(() => {
       userScrollActive.value = false
@@ -110,6 +168,11 @@ export function useWorkbenchScroll({ workbench, composerRef }) {
 
   function resetWorkbenchScrollState() {
     clearTimeout(userScrollTimer)
+    cancelAnimationFrame(scrollAnimationFrame)
+    cancelAnimationFrame(scrollSettleFrame)
+    cancelAnimationFrame(workbenchResizeFrame)
+    bottomScrollActive = false
+    resizePinActive = false
     userScrollActive.value = false
     stickToBottom.value = true
     hasNewOutput.value = false
@@ -123,6 +186,7 @@ export function useWorkbenchScroll({ workbench, composerRef }) {
   function setWorkbenchScrollToBottom() {
     if (!workbench.value) return
     cancelAnimationFrame(scrollAnimationFrame)
+    bottomScrollActive = true
     const bottom = workbenchBottom()
     const minStart = Math.max(0, bottom - maxScrollTravelPx)
     const start = Math.min(Math.max(workbench.value.scrollTop, minStart), bottom)
@@ -153,12 +217,20 @@ export function useWorkbenchScroll({ workbench, composerRef }) {
 
   function settleWorkbenchAtBottom() {
     cancelAnimationFrame(scrollSettleFrame)
+    bottomScrollActive = true
     const startedAt = performance.now()
     const settle = (now) => {
-      if (!workbench.value || !stickToBottom.value) return
+      if (!workbench.value
+        || !stickToBottom.value
+        || userScrollActive.value) {
+        bottomScrollActive = false
+        return
+      }
       workbench.value.scrollTop = workbenchBottom()
       if (now - startedAt < scrollSettleMs) {
         scrollSettleFrame = requestAnimationFrame(settle)
+      } else {
+        bottomScrollActive = false
       }
     }
     scrollSettleFrame = requestAnimationFrame(settle)
@@ -186,9 +258,11 @@ export function useWorkbenchScroll({ workbench, composerRef }) {
   function dispose() {
     clearTimeout(userScrollTimer)
     composerResizeObserver?.disconnect()
+    workbenchResizeObserver?.disconnect()
     cancelAnimationFrame(scrollFrame)
     cancelAnimationFrame(scrollAnimationFrame)
     cancelAnimationFrame(scrollSettleFrame)
+    cancelAnimationFrame(workbenchResizeFrame)
   }
 
   return {
@@ -204,6 +278,7 @@ export function useWorkbenchScroll({ workbench, composerRef }) {
     handleWorkbenchScroll,
     handleWorkbenchWheel,
     handleWorkbenchTouchMove,
+    handleWorkbenchPointerDown,
     resetWorkbenchScrollState,
     shouldFollowOutput,
     markNewOutput,
