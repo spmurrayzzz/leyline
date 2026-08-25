@@ -30,7 +30,11 @@ export async function bindRuntimeHandle(handle, events) {
       activeSessionId: handle.sessionId,
       event,
     })
-    if (event.type === 'queue_update'
+    if (event.type === 'compaction_end') {
+      queueMicrotask(() => events.broadcastActiveSession(handle))
+    } else if (event.type === 'queue_update'
+      || event.type === 'turn_end'
+      || event.type === 'agent_settled'
       || isGoalStateEvent(event)
       || isResearchStateEvent(event)) {
       events.broadcastActiveSession(handle)

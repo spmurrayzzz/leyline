@@ -138,8 +138,8 @@ export function useSessionWorkspace({
     return level ? `thinking · ${formatMode(level)}` : 'thinking'
   })
   const contextUsage = computed(() => {
-    return selectedSession.value?.contextUsage
-      || composerRuntime.value?.state?.contextUsage
+    return composerRuntime.value?.state?.contextUsage
+      || selectedSession.value?.contextUsage
       || null
   })
   const activeGoal = computed(() => {
