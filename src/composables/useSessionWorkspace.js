@@ -693,7 +693,7 @@ export function useSessionWorkspace({
       && event.message?.role !== 'custom') {
       return { isStreaming: true, isCompacting: false, error: '' }
     }
-    if (['tool_call', 'tool_execution_start'].includes(event.type)) {
+    if (['tool_call', 'tool_execution_start', 'tool_execution_update'].includes(event.type)) {
       const pendingTools = upsertRuntimeTool(previous.pendingTools, event)
       return {
         isStreaming: true,
@@ -769,6 +769,9 @@ export function useSessionWorkspace({
       toolCallId: event.toolCallId || event.id || event.callId || '',
       toolName: event.toolName || 'tool',
       args: event.args || event.input || {},
+      ...(event.partialResult === undefined
+        ? {}
+        : { partialResult: event.partialResult }),
     }
     const index = tool.toolCallId
       ? tools.findIndex((item) => item.toolCallId === tool.toolCallId)

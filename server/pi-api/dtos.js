@@ -54,12 +54,14 @@ export function activeSessionStateDto(handle) {
   return sessionStateDto(
     handle.runtime.session,
     handle.extensionUiState,
+    handle.pendingToolResults,
   )
 }
 
 export function sessionStateDto(
   session,
   extensionUiState = emptyExtensionUiState(),
+  pendingToolResults,
 ) {
   const activeToolNames = session.getActiveToolNames()
   const pendingToolCalls = [...(session.agent?.state?.pendingToolCalls || [])]
@@ -72,7 +74,11 @@ export function sessionStateDto(
     isStreaming: session.isStreaming,
     isCompacting: session.isCompacting,
     pendingToolCalls,
-    pendingTools: pendingToolsDto(session, pendingToolCalls),
+    pendingTools: pendingToolsDto(
+      session,
+      pendingToolCalls,
+      pendingToolResults,
+    ),
     steeringMode: session.steeringMode,
     followUpMode: session.followUpMode,
     activeToolCount: activeToolNames.length,
@@ -89,7 +95,7 @@ export function sessionStateDto(
   }
 }
 
-function pendingToolsDto(session, pendingToolCalls) {
+function pendingToolsDto(session, pendingToolCalls, pendingToolResults) {
   if (!pendingToolCalls.length) return []
   const messages = session.agent?.state?.messages || []
   return pendingToolCalls.flatMap((toolCallId) => {
@@ -100,10 +106,12 @@ function pendingToolsDto(session, pendingToolCalls) {
         return block?.type === 'toolCall' && block.id === toolCallId
       })
       if (!call?.name) continue
+      const partialResult = pendingToolResults?.get?.(toolCallId)
       return [{
         toolCallId,
         toolName: call.name,
         args: call.arguments || {},
+        ...(partialResult === undefined ? {} : { partialResult }),
       }]
     }
     return []

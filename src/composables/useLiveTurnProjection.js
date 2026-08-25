@@ -183,11 +183,12 @@ export function useLiveTurnProjection({ onIntent } = {}) {
       const existing = liveTools.value.find((tool) => {
         return tool.toolCallId === toolCallId
       })
-      const partialResult = runtimeResearchToolResult(
-        pendingTool,
-        state.research,
-        true,
-      )
+      const partialResult = pendingTool.partialResult
+        ?? runtimeResearchToolResult(
+          pendingTool,
+          state.research,
+          true,
+        )
       if (existing?.liveResultReceived) continue
       if (existing
         && !existing.restoredFromRuntime

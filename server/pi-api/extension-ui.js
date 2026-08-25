@@ -12,6 +12,7 @@ export function emptyExtensionUiState() {
 export async function bindRuntimeHandle(handle, events) {
   handle.unsubscribe?.()
   handle.extensionUiState = emptyExtensionUiState()
+  handle.pendingToolResults = new Map()
   await handle.runtime.session.bindExtensions({
     uiContext: createExtensionUiContext(handle, events),
     onError: (error) => {
@@ -23,6 +24,7 @@ export async function bindRuntimeHandle(handle, events) {
   })
   syncGoalStateFromSession(handle)
   handle.unsubscribe = handle.runtime.session.subscribe((event) => {
+    trackPendingToolResult(handle, event)
     syncGoalStateFromSession(handle)
     events.broadcastEvent('runtime_event', {
       activeSessionId: handle.sessionId,
@@ -39,6 +41,29 @@ export async function bindRuntimeHandle(handle, events) {
 
 function isResearchStateEvent(event) {
   return event?.type === 'entry_appended' && isResearchEntry(event.entry)
+}
+
+function trackPendingToolResult(handle, event) {
+  const results = handle.pendingToolResults
+  if (!results) return
+  if (['agent_end', 'error', 'aborted'].includes(event.type)) {
+    results.clear()
+    return
+  }
+
+  const id = event.toolCallId || event.id || event.callId
+  if (!id) return
+  if (event.type === 'tool_execution_start' && event.toolName === 'subagent') {
+    results.delete(id)
+    return
+  }
+  if (event.type === 'tool_execution_update'
+    && event.toolName === 'subagent'
+    && event.partialResult !== undefined) {
+    results.set(id, event.partialResult)
+    return
+  }
+  if (event.type === 'tool_execution_end') results.delete(id)
 }
 
 function createExtensionUiContext(handle, events) {
