@@ -3659,6 +3659,7 @@ function closePickerMenus() {
               :entry="item.persistedEntry || item.resultEntry"
               :research-cwd="selectedSession?.cwd || ''"
               :tool-expanded="isToolExpanded(item.persistedEntry || item.resultEntry)"
+              :tool-status="item.status"
               @copy="copyEntry"
               @fork="forkSession"
               @mark-feedback="markEntryFeedback"

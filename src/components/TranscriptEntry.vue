@@ -35,6 +35,10 @@ const props = defineProps({
   skillExpanded: Boolean,
   thinkingInitiallyExpanded: Boolean,
   toolExpanded: Boolean,
+  toolStatus: {
+    type: String,
+    default: '',
+  },
 })
 
 const emit = defineEmits([
@@ -136,6 +140,25 @@ function isSubagentEntry(entry) {
   return entry.type === 'tool' && entry.toolName === 'subagent'
 }
 
+function liveEntryToolStatus() {
+  if (props.toolStatus === 'preparing') return 'preparing'
+  if (props.toolStatus === 'running') return 'running'
+  if (props.toolStatus === 'reading') return 'reading result'
+  if (props.toolStatus === 'error') return 'error'
+  if (props.toolStatus === 'aborted') return 'aborted'
+  return ''
+}
+
+function toolStatusTone(status) {
+  if (['preparing', 'running', 'reading result'].includes(status)) return 'running'
+  if (['error', 'aborted'].includes(status)) return 'error'
+  return 'completed'
+}
+
+function entryToolStatus(entry) {
+  return liveEntryToolStatus() || (entry.isError ? 'error' : 'completed')
+}
+
 function subagentStatus(result) {
   if (result.status === 'queued') return 'queued'
   if (result.status === 'running') return 'running'
@@ -147,6 +170,8 @@ function subagentStatus(result) {
 }
 
 function entrySubagentStatus(entry) {
+  const liveStatus = liveEntryToolStatus()
+  if (liveStatus) return liveStatus
   if (entry.subagentDetails?.background) return 'running'
   if (entry.isError || entry.subagentDetails?.results?.some((result) => subagentStatus(result) === 'error')) return 'error'
   if (entry.subagentDetails?.results?.some((result) => {
@@ -282,7 +307,7 @@ function openMarkdownContent(event) {
       <code v-if="subagentTarget(entry)">{{ subagentTarget(entry) }}</code>
       <em
         class="subagent-status"
-        :class="`status-${entrySubagentStatus(entry)}`"
+        :class="`status-${toolStatusTone(entrySubagentStatus(entry))}`"
       >
         {{ entrySubagentStatus(entry) }}
       </em>
@@ -392,7 +417,9 @@ function openMarkdownContent(event) {
       >
         {{ entry.contextLabel }}
       </span>
-      <em>{{ entry.isError ? 'error' : 'completed' }}</em>
+      <em :class="`status-${toolStatusTone(entryToolStatus(entry))}`">
+        {{ entryToolStatus(entry) }}
+      </em>
       <button
         class="copy-button"
         type="button"

@@ -743,15 +743,18 @@
   text-transform: uppercase;
 }
 
-.subagent-header em.status-completed {
+.subagent-header em.status-completed,
+.tool-card-header em.status-completed {
   color: #78bd8b;
 }
 
-.subagent-header em.status-running {
+.subagent-header em.status-running,
+.tool-card-header em.status-running {
   color: #a99cff;
 }
 
-.subagent-header em.status-error {
+.subagent-header em.status-error,
+.tool-card-header em.status-error {
   color: #d88a96;
 }
 
