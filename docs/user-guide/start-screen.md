@@ -14,6 +14,10 @@ The start screen appears when no session is selected. One submission can create 
 
 The project control shows **Choose project** when no project is selected.
 
+Command-click, Ctrl-click, or middle-click a project choice to open the start
+screen for that project in a new tab or window. The current window does not
+change.
+
 To use a different folder, select **Add new project**. The **Add project** browser opens.
 
 ## Add a project folder

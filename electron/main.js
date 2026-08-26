@@ -31,8 +31,10 @@ app.on('second-instance', (_event, argv) => {
   if (command) sendWindowCommand(window, command.name, command.detail)
 })
 
-async function createWindow(initialCommand) {
-  const url = await appUrl(initialCommand)
+async function createWindow(initialCommand, initialUrl = '') {
+  const url = initialUrl
+    ? urlWithInitialCommand(initialUrl, initialCommand)
+    : await appUrl(initialCommand)
   const windowState = await readWindowState()
 
   const window = new BrowserWindow({
@@ -49,7 +51,11 @@ async function createWindow(initialCommand) {
   const appOrigin = new URL(url).origin
 
   window.webContents.setWindowOpenHandler(({ url: openedUrl }) => {
-    openExternalUrl(openedUrl)
+    if (isWorkspaceUrl(openedUrl, appOrigin)) {
+      void createWindowFromSource(null, window, openedUrl)
+    } else {
+      openExternalUrl(openedUrl)
+    }
     return { action: 'deny' }
   })
   window.webContents.on('will-navigate', (event, navigationUrl) => {
@@ -68,7 +74,7 @@ async function createWindow(initialCommand) {
 
   window.webContents.on('before-input-event', (event, input) => {
     const key = input.key?.toLowerCase()
-    const isNewSessionWindow = input.type === 'keyDown'
+    const isNewWindow = input.type === 'keyDown'
       && key === 'n'
       && input.meta
       && input.shift
@@ -98,7 +104,7 @@ async function createWindow(initialCommand) {
     const isEscape = input.type === 'keyDown' && key === 'escape'
 
     if (
-      !isNewSessionWindow
+      !isNewWindow
       && !isNewSession
       && !isCloseWindow
       && !isToggleTerminal
@@ -115,7 +121,7 @@ async function createWindow(initialCommand) {
     }
 
     event.preventDefault()
-    if (isNewSessionWindow) void createNewSessionWindow(window)
+    if (isNewWindow) void createWindowFromSource(null, window)
     if (isNewSession) sendNewSessionCommand(window)
     if (isCloseWindow) window.close()
     if (isToggleTerminal) sendToggleTerminalCommand(window)
@@ -140,6 +146,34 @@ function isOpenableUrl(url) {
       || protocol === 'https:'
       || protocol === 'mailto:'
       || protocol === 'tel:'
+  } catch {
+    return false
+  }
+}
+
+function isWorkspaceUrl(value, appOrigin) {
+  try {
+    const url = new URL(value)
+    if (url.origin !== appOrigin) return false
+    const backendParam = 'leylineBackendConnectionId'
+    const actionParams = [
+      'leylineNewSessionCwd',
+      'leylineProjectCwd',
+      'leylineSessionPath',
+    ]
+    const allowedParams = new Set([backendParam, ...actionParams])
+    for (const name of url.searchParams.keys()) {
+      if (!allowedParams.has(name)) return false
+    }
+    for (const name of allowedParams) {
+      const values = url.searchParams.getAll(name)
+      if (values.length > 1 || values.some((item) => !item.trim())) return false
+    }
+    const actionCount = actionParams
+      .filter((name) => url.searchParams.has(name)).length
+    if (url.pathname === '/') return actionCount <= 1
+    return actionCount === 0
+      && /^\/sessions\/[^/]+\/?$/.test(url.pathname)
   } catch {
     return false
   }
@@ -184,28 +218,20 @@ function sendWindowCommand(window, name, detail = null) {
   window.webContents.executeJavaScript(script).catch(() => {})
 }
 
-async function createNewSessionWindow(sourceWindow) {
-  const [cwd, backendConnectionId] = await Promise.all([
-    currentWindowCwd(sourceWindow),
-    currentWindowBackendConnectionId(sourceWindow),
-  ])
-  const command = cwd ? newSessionCommand(cwd, { newWindow: true }) : null
-  await createWindow(withBackendConnection(command, backendConnectionId))
+async function createWindowFromSource(command, sourceWindow, initialUrl = '') {
+  const backendConnectionId = initialBackendConnectionId(initialUrl)
+    || await currentWindowBackendConnectionId(sourceWindow)
+  await createWindow(
+    withBackendConnection(command, backendConnectionId),
+    initialUrl,
+  )
 }
 
-async function createWindowFromSource(command, sourceWindow) {
-  const backendConnectionId = await currentWindowBackendConnectionId(sourceWindow)
-  await createWindow(withBackendConnection(command, backendConnectionId))
-}
-
-async function currentWindowCwd(window) {
-  if (!window || window.isDestroyed()) return ''
-
+function initialBackendConnectionId(value) {
+  if (!value) return ''
   try {
-    const cwd = await window.webContents.executeJavaScript(
-      'window.__leylineCurrentCwd || ""',
-    )
-    return typeof cwd === 'string' ? cwd.trim() : ''
+    return new URL(value).searchParams
+      .get('leylineBackendConnectionId')?.trim() || ''
   } catch {
     return ''
   }
@@ -252,12 +278,15 @@ function focusWindow(window) {
 }
 
 function nativeCommandFromArgv(argv) {
-  if (!argv.includes('--leyline-new-session')) return null
+  const newWindow = argv.includes('--leyline-new-window')
+  if (!argv.includes('--leyline-new-session')) {
+    return newWindow ? { newWindow: true } : null
+  }
 
   const cwd = argvValue(argv, '--leyline-cwd')
   return newSessionCommand(
     validCwdArg(cwd) ? resolve(cwd) : '',
-    { newWindow: argv.includes('--leyline-new-window') },
+    { newWindow },
   )
 }
 

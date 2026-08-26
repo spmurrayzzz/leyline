@@ -9,12 +9,21 @@ an optional desktop shell around the same Vue app and API.
 | Native backend | `server/pi-api/index.js` as Vite middleware | Vite middleware or `server/leyline-server.js` in a packaged app |
 | Environment | Inherits the environment that starts Vite | Loads the macOS login-shell environment |
 | Terminal | WebSocket connection to the selected backend | WebSocket connection to the selected backend |
-| Windows | Browser-managed | Multiple native windows with saved state |
+| Windows | Browser-managed tabs and windows | Foreground native windows with saved state |
 | Dictation | Available when the browser supports the Web Speech API | Not supported |
 
 Use the browser for normal development and visual changes. Use Electron to test
 packaging, desktop shortcuts, shell environment loading, multiple windows, and
 saved window state.
+
+## Open another window
+
+Command-click an internal session, project, **New session**, or backend target.
+Use Ctrl-click on other platforms or middle-click with a mouse.
+
+Electron opens a foreground Leyline window. The browser build uses the browser's
+normal tab or window behavior. The source window does not change. External
+links continue to use the browser.
 
 ## Backend selection
 
@@ -25,7 +34,8 @@ can change the host and port.
 
 Leyline stores named connections and the configured default for the full app.
 Each window selects its active backend independently. A fresh window uses the
-default. A new Electron window inherits the source window's active backend.
+default. A new Electron window inherits the source window's active backend
+unless the selected target specifies a backend.
 
 Runtime HTTP commands, runtime events, terminal traffic, and exports use the
 active backend. Connection management stays on the native backend. The native

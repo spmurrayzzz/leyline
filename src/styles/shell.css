@@ -2161,7 +2161,7 @@ kbd {
 
 .project-detail-primary:hover:not(:disabled),
 .project-detail-sort button:hover:not(:disabled),
-.project-session-actions button:hover:not(:disabled) {
+.project-session-actions button:hover:not(:disabled):not([aria-current='page']) {
   border-color: #4c465c;
   background: var(--panel-soft);
   color: var(--text);
@@ -2174,6 +2174,11 @@ kbd {
 .project-detail-primary:disabled,
 .project-session-actions button:disabled {
   cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.project-session-actions button[aria-current='page'] {
+  cursor: default;
   opacity: 0.45;
 }
 

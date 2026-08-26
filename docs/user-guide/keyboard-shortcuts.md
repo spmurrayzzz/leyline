@@ -31,6 +31,19 @@ These shortcuts apply while the slash command picker is open.
 
 Leyline ignores the **Go to** shortcut during deletion confirmation, transcript editing, or session renaming.
 
+## Open a target in another window
+
+Command-click an internal target on macOS. Use Ctrl-click on other platforms or
+middle-click with a mouse.
+
+This behavior applies to session and project targets, **New session**, and
+backend choices. Electron opens a foreground Leyline window. The browser build
+uses the browser's tab or window behavior. The current window does not change.
+
+A modified **New session** action creates one session in the new window. A
+modified backend choice opens the home workspace on that backend. External
+links keep their normal browser behavior.
+
 ## Use project folder shortcuts
 
 These shortcuts apply in **Add project**.
@@ -79,7 +92,7 @@ Focus the **Resize terminal** handle first.
 | Shortcut | Action |
 | --- | --- |
 | **Command+N** | Create a session in the current session CWD. |
-| **Command+Shift+N** | Open a new window for a session in the current CWD. |
+| **Command+Shift+N** | Open the home workspace in a new window. |
 | **Command+W** | Close the current window. |
 | **Command+Shift+T** | Open or close the terminal. |
 | **Command+Shift+E** | Open or close **Settings**. |
@@ -87,4 +100,5 @@ Focus the **Resize terminal** handle first.
 | **Command+E** | Hide or show the desktop sidebar. On mobile, open or close it. |
 | **Escape** | Close an open transient surface. With no open surface, stop the active run. |
 
-The new-session shortcuts require a current session CWD. Leyline ignores the same-window new-session command during an active run or session creation.
+**Command+N** requires a current session CWD. Leyline ignores it during an
+active run or session creation. **Command+Shift+N** does not create a session.

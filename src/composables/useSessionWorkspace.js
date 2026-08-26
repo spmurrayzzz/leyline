@@ -365,7 +365,9 @@ export function useSessionWorkspace({
         data.detail.session,
         ...sessions.value.filter((session) => session.id !== data.detail.session.id),
       ]
-      setSelectedSessionData(data.detail, data.active)
+      setSelectedSessionData(data.detail, data.active, {
+        replaceRoute: options.replaceRoute,
+      })
       newSessionCwd.value = ''
       await scrollToLatest?.()
       if (handoff) await finishSessionHandoffFloor(handoff)
@@ -475,7 +477,9 @@ export function useSessionWorkspace({
     if (!cwd) return
     if (liveTurn?.agentRunning?.value || creatingSessionCwd.value) return
 
-    await createSessionForCwd(cwd)
+    await createSessionForCwd(cwd, {
+      replaceRoute: event?.detail?.replaceRoute === true,
+    })
   }
 
   function sessionIdFromRoute() {
@@ -1212,7 +1216,7 @@ export function useSessionWorkspace({
     return true
   }
 
-  function setSelectedSessionData(detail, active) {
+  function setSelectedSessionData(detail, active, routeOptions = {}) {
     sessionSelectionToken += 1
     invalidateSessionRefresh()
     activeRuntimeSession.value = active || null
@@ -1220,7 +1224,7 @@ export function useSessionWorkspace({
     selectedSessionId.value = detail.session.id
     liveTurn?.selectSession?.(detail.session.id)
     liveTurn?.setPersistedDetail?.(detail)
-    updateSessionRoute(detail.session.id)
+    updateSessionRoute(detail.session.id, routeOptions)
   }
 
   function isCurrentSessionSelection(token, id) {
@@ -1339,7 +1343,7 @@ export function useSessionWorkspace({
     if (summary?.messageCount === 0
       || summary?.firstMessage === '(no messages)') {
       const liveTitle = summary?.id === selectedSessionId.value
-        ? liveTurn?.liveFirstUserText?.value
+        ? activeGoal.value?.objective || liveTurn?.liveFirstUserText?.value
         : ''
       if (liveTitle) {
         return liveTitle.length > 140

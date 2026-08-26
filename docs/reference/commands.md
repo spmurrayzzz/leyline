@@ -58,8 +58,10 @@ shell directory in the active window.
 leyline -n
 ```
 
-The `-n` option creates the session in a new Electron window. It is the only
-supported CLI option. The CLI does not accept a directory argument.
+The `-n` option opens a new Electron window at the home workspace. It does not
+create a pi session. It is the only supported CLI option, and the CLI does not
+accept a directory argument.
 
-Set `LEYLINE_CWD` to select a different directory. Set `LEYLINE_APP` to select a
-different app package. See [Environment variables](./environment#cli-variables).
+Set `LEYLINE_CWD` to change the directory for plain `leyline`. It does not affect
+`leyline -n`. Set `LEYLINE_APP` to select a different app package. See
+[Environment variables](./environment#cli-variables).

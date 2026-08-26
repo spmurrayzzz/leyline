@@ -13,6 +13,10 @@ You can also focus a session row and press **Enter** or **Space**. Press **Arrow
 
 A selected session uses the route `/sessions/<encoded-id>`. The start screen uses `/`.
 
+Command-click a session target to open it in a new tab or window. Use Ctrl-click
+on other platforms or middle-click with a mouse. This behavior also applies to
+**Open** and **Selected** controls in **Project details**.
+
 ## Browse the session list
 
 The sidebar shows all regular sessions in the current project. It orders them from most recent modification to oldest.
@@ -46,6 +50,9 @@ Select **New session** at the bottom of the sidebar. You can also select **New s
 
 Leyline creates an empty normal session in the current project CWD. Use the centered composer to send its first prompt.
 
+Command-click, Ctrl-click, or middle-click **New session** to create one empty
+session in a new tab or window. The current window does not change.
+
 To create a research session, return to the start screen and select **research** before you send the prompt.
 
 ## Rename a session from the sidebar
@@ -74,4 +81,6 @@ You can also start deletion from **Project details**. Leyline does not provide a
 
 Subagent child sessions do not appear in the sidebar. Open a child session from its subagent card.
 
-The child-session header shows **← parent session**. Select it to return to the parent session.
+The child-session header shows **← parent session**. Select it to return to the
+parent session. Use a modified click on either session target to open it in a
+new tab or window.

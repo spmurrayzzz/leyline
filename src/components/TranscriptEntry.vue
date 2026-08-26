@@ -213,9 +213,9 @@ function researchSourceCount(result) {
   return result.research?.sources?.length || 0
 }
 
-function navigateChildSession(childSession) {
+function navigateChildSession(childSession, event) {
   if (!childSession) return
-  emit('navigate-child-session', childSession)
+  emit('navigate-child-session', childSession, event)
 }
 
 function citationTarget(value) {
@@ -330,7 +330,11 @@ function openMarkdownContent(event) {
         :key="index"
         class="subagent-result-item"
         :class="{ 'has-session': result.childSession }"
-        @click.stop="navigateChildSession(result.childSession)"
+        @click.stop="navigateChildSession(result.childSession, $event)"
+        @auxclick.middle.stop.prevent="navigateChildSession(
+          result.childSession,
+          $event,
+        )"
       >
         <span class="subagent-result-agent">
           {{ entry.researchThreads ? researchThreadId(result, index) : result.agent }}

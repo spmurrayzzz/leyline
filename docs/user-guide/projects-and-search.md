@@ -28,6 +28,8 @@ The default view shows recent projects and current or recent sessions. A query s
 When you select a project, Leyline opens the last session that you used in that project. Otherwise, it opens the most recent session.
 
 If the project has no sessions, Leyline opens the start screen for that CWD.
+Command-click, Ctrl-click, or middle-click a project or session result to open
+that same target in a new tab or window.
 
 Select **Add project** in the navigator header to add a project folder.
 
@@ -51,7 +53,9 @@ The navigator excludes the selected session. It includes activity from every pro
 
 A row shows the project and the current tool target, exact runtime error, or queue state when available.
 
-Select **Open** to open the session. Select **Stop** to interrupt a streaming agent run without opening it.
+Select **Open** to open the session. Use a modified click on **Open** to open it
+in a new tab or window. Select **Stop** to interrupt a streaming agent run
+without opening it.
 
 Compaction does not show **Stop** because the interrupt action cannot cancel compaction.
 
@@ -86,9 +90,11 @@ Each session card provides these actions:
 - **Rename** changes its displayed name.
 - **Delete** opens the session deletion confirmation.
 
-The selected session shows **Selected** instead of **Open**.
+The selected session shows **Selected** instead of **Open**. Use a modified
+click on either control to open that session in a new tab or window.
 
-Select **New session** to create an empty session in the project CWD.
+Select **New session** to create an empty session in the project CWD. Use a
+modified click to create one empty session in a new tab or window.
 
 **Delete** moves the session JSONL file to Leyline trash. Confirm this effect in the **Delete session?** dialog.
 

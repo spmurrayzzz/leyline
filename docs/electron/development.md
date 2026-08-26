@@ -25,7 +25,7 @@ Vite applies normal frontend changes while it continues to run.
 | Shortcut | Action |
 | --- | --- |
 | `Command+N` | Create a session in the current window. |
-| `Command+Shift+N` | Create a session in a new window for the current project. |
+| `Command+Shift+N` | Open the home workspace in a new window. |
 | `Command+W` | Close the current window. |
 | `Command+E` | Show or hide the sidebar. |
 | `Command+Shift+E` | Open Settings. |
@@ -34,4 +34,8 @@ Vite applies normal frontend changes while it continues to run.
 | `Escape` | Stop the active run and close open drawers, dialogs, and menus. |
 
 `Command+N` also accepts `Control+N` in the Electron input handler. The other
-listed shortcuts use the macOS Command key.
+listed shortcuts use the macOS Command key. `Command+Shift+N` does not create a
+pi session.
+
+Command-click, Ctrl-click, or middle-click a session, project, **New session**,
+or backend choice to open its target in a foreground Electron window.

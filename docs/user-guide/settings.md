@@ -36,7 +36,11 @@ Each connection has these actions:
 
 Saved connections and the default are app-wide. Each window keeps its active
 backend separately. New Electron windows inherit the active backend from the
-source window.
+source window unless you open a backend choice in the new window.
+
+Command-click, Ctrl-click, or middle-click a backend choice in the sidebar or
+**Settings** to open the home workspace on that backend. Electron opens a
+foreground Leyline window and leaves the source window unchanged.
 
 When you select another backend, Leyline reloads the current window. An active
 agent run continues on the previous backend. Leyline clears an unsent composer

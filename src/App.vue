@@ -282,6 +282,9 @@ const settingsPath = computed(() => {
 let initPhaseTimer = null
 let sessionHydrationFrame = null
 const pendingInitialNativeCwd = ref('')
+const pendingInitialProjectCwd = ref('')
+const pendingInitialSessionPath = ref('')
+const requiredInitialBackendConnectionId = ref('')
 let composerScannerSettlingTimer = null
 let composerCommitTimer = null
 let startupDockTimer = null
@@ -879,7 +882,6 @@ const slashCommandItems = computed(() => {
 
 watch(newSessionCwd, (cwd) => {
   loadStartRuntimeState(cwd)
-  updateNativeWindowCwd()
 })
 
 watch(slashCommandItems, () => {
@@ -889,7 +891,6 @@ watch(slashCommandItems, () => {
 watch(sessionDetail, (detail) => {
   switchComposerDraft(detail?.session?.id || '')
   liveTurn.setPersistedDetail(detail)
-  updateNativeWindowCwd()
 })
 
 watch(activeRuntimeSession, (session) => {
@@ -916,7 +917,6 @@ watch(settingsCwd, (cwd, previousCwd) => {
 
 watch(selectedSessionId, () => {
   emptySessionKind.value = 'session'
-  updateNativeWindowCwd()
   if (!selectedSessionId.value) {
     reviewReady.value = false
     reviewOpenRequested.value = false
@@ -971,10 +971,17 @@ onMounted(async () => {
   window.addEventListener('leyline:toggle-memory', handleNativeToggleMemory)
   window.addEventListener('leyline:toggle-sidebar', handleNativeToggleSidebar)
   window.addEventListener('leyline:escape', handleNativeEscape)
-  await initializeBackendConnections()
+  const backendInitialization = await initializeBackendConnections()
+  requiredInitialBackendConnectionId.value = backendInitialization.requestedId
   await loadTranscriptPreferences()
-  updateNativeWindowCwd()
   pendingInitialNativeCwd.value = consumeInitialNativeNewSessionCwd()
+  pendingInitialProjectCwd.value = initialProjectCwd()
+  pendingInitialSessionPath.value = initialSessionPath()
+  if (!pendingInitialNativeCwd.value
+    && !pendingInitialSessionPath.value
+    && pendingInitialProjectCwd.value) {
+    newSessionCwd.value = pendingInitialProjectCwd.value
+  }
   await loadBackendWorkspace()
 })
 
@@ -991,7 +998,6 @@ onUnmounted(() => {
   window.removeEventListener('leyline:escape', handleNativeEscape)
   closeResearchCitationPreview()
   delete window.__leylineBackendConnectionId
-  delete window.__leylineCurrentCwd
   disposeTerminalResize()
   closeEventStream()
   sessionWorkspace.dispose()
@@ -1074,14 +1080,92 @@ function setSidebarNavigator(navigator) {
   if (memoryOpen.value) closeMemoryDrawer()
 }
 
-function selectSidebarProject(project) {
+function isNewWindowClick(event) {
+  return Boolean(
+    event && (event.metaKey || event.ctrlKey || event.button === 1),
+  )
+}
+
+function openWorkspaceWindow(path = '/', params = {}) {
+  const url = new URL(path, window.location.origin)
+  const backendConnectionId = params.backendConnectionId
+    || activeBackendConnectionId.value
+  if (backendConnectionId) {
+    url.searchParams.set('leylineBackendConnectionId', backendConnectionId)
+  }
+  if (params.newSessionCwd) {
+    url.searchParams.set('leylineNewSessionCwd', params.newSessionCwd)
+  }
+  if (params.projectCwd) {
+    url.searchParams.set('leylineProjectCwd', params.projectCwd)
+  }
+  if (params.sessionPath) {
+    url.searchParams.set('leylineSessionPath', params.sessionPath)
+  }
+  window.open(url.toString(), '_blank', 'noopener')
+}
+
+function selectStartProjectTarget(cwd, event) {
+  if (isNewWindowClick(event)) {
+    openWorkspaceWindow('/', { projectCwd: cwd })
+    return
+  }
+  clearPendingWorkspaceTargets()
+  selectStartProject(cwd)
+}
+
+function selectSidebarProject(project, event) {
   if (!project?.cwd) return
+  if (isNewWindowClick(event)) {
+    openWorkspaceWindow('/', { projectCwd: project.cwd })
+    return
+  }
   if (memoryDirty.value && !confirmDiscardMemoryChanges()) return
+  clearPendingWorkspaceTargets()
   workspaceNavigateHome()
   selectStartProject(project.cwd)
   closeReview(true)
   projectDetailCwd.value = ''
   sidebarNavigator.value = ''
+}
+
+function createSessionTarget(project, event) {
+  if (!project?.cwd || creatingSessionCwd.value === project.cwd) return
+  if (isNewWindowClick(event)) {
+    openWorkspaceWindow('/', { newSessionCwd: project?.cwd })
+    return
+  }
+  clearPendingWorkspaceTargets()
+  void createSession(project)
+}
+
+function selectSessionTarget(session, event) {
+  if (isNewWindowClick(event)) {
+    if (session?.id) {
+      openWorkspaceWindow(`/sessions/${encodeURIComponent(session.id)}`)
+    }
+    return
+  }
+  clearPendingWorkspaceTargets()
+  void selectSession(session)
+}
+
+function selectBackendTarget(connection, event) {
+  if (!connection || backendConnectionBusyId.value) return
+  if (isNewWindowClick(event)) {
+    openWorkspaceWindow('/', { backendConnectionId: connection.id })
+    return
+  }
+  if (requiredInitialBackendConnectionId.value
+    && connection.id === activeBackendConnectionId.value
+    && connection.id !== requiredInitialBackendConnectionId.value) {
+    requiredInitialBackendConnectionId.value = ''
+    pendingInitialNativeCwd.value = ''
+    clearPendingWorkspaceTargets()
+    window.location.replace('/')
+    return
+  }
+  void switchBackendConnection(connection)
 }
 
 async function createSession(project, options = {}) {
@@ -1107,26 +1191,40 @@ async function selectSession(session, options) {
   sidebarOpen.value = false
 }
 
-async function navigateParentSession() {
+async function navigateParentSession(event) {
   const parentPath = selectedSession.value?.parentSessionPath
   if (!parentPath) return
 
   const parent = sessions.value.find((session) => session.path === parentPath)
   if (parent) {
-    await selectSession(parent)
+    if (isNewWindowClick(event)) selectSessionTarget(parent, event)
+    else await selectSession(parent)
+    return
+  }
+  if (isNewWindowClick(event)) {
+    openWorkspaceWindow('/', { sessionPath: parentPath })
     return
   }
 
   const detail = await fetchSessionDetailByPath(parentPath)
-  await selectSession({
+  const parentSession = {
     id: detail.session.id,
     path: detail.session.path,
     cwd: detail.session.cwd,
-  })
+  }
+  await selectSession(parentSession)
 }
 
-async function navigateChildSession(childSession) {
+async function navigateChildSession(childSession, event) {
   if (!childSession) return
+  if (isNewWindowClick(event)) {
+    if (childSession.path) {
+      openWorkspaceWindow('/', { sessionPath: childSession.path })
+    } else {
+      selectSessionTarget(childSession, event)
+    }
+    return
+  }
 
   const session = sessions.value.find((s) => s.id === childSession.id)
   if (session) {
@@ -1456,6 +1554,7 @@ function toggleReviewExpanded() {
 }
 
 function navigateHome() {
+  clearPendingWorkspaceTargets()
   workspaceNavigateHome()
   closeReview(true)
   closeResearchSources(false)
@@ -1548,6 +1647,15 @@ async function verifyActiveBackendConnection() {
 }
 
 async function loadBackendWorkspace() {
+  if (requiredInitialBackendConnectionId.value
+    && activeBackendConnectionId.value
+      !== requiredInitialBackendConnectionId.value) {
+    sessionError.value = backendConnectionError.value
+      || 'Selected backend connection is unavailable'
+    sessionsLoading.value = false
+    initPhase.value = 'sessions'
+    return
+  }
   if (!await verifyActiveBackendConnection()) return
   if (pendingInitialNativeCwd.value) {
     newSessionCwd.value = pendingInitialNativeCwd.value
@@ -1561,8 +1669,32 @@ async function loadBackendWorkspace() {
     await waitInitPhaseFloor()
     const cwd = pendingInitialNativeCwd.value
     try {
-      await handleNativeNewSession({ detail: { cwd } })
+      await handleNativeNewSession({ detail: { cwd, replaceRoute: true } })
       if (selectedSession.value?.cwd === cwd) pendingInitialNativeCwd.value = ''
+    } finally {
+      sessionsLoading.value = false
+      initPhase.value = 'sessions'
+    }
+    return
+  }
+
+  if (pendingInitialSessionPath.value) {
+    void loadSidebarProjects()
+    scheduleSessionHydration()
+    const path = pendingInitialSessionPath.value
+    try {
+      const detail = await fetchSessionDetailByPath(path)
+      if (pendingInitialSessionPath.value !== path) return
+      await selectSession({
+        id: detail.session.id,
+        path: detail.session.path,
+        cwd: detail.session.cwd,
+      }, { replaceRoute: true })
+      if (sessionDetail.value?.session?.id === detail.session.id) {
+        pendingInitialSessionPath.value = ''
+      }
+    } catch (error) {
+      sessionError.value = error.message
     } finally {
       sessionsLoading.value = false
       initPhase.value = 'sessions'
@@ -1573,6 +1705,9 @@ async function loadBackendWorkspace() {
   const routeSessionId = sessionIdFromRoute()
   if (!routeSessionId) {
     if (await loadHomeProjects()) {
+      if (pendingInitialProjectCwd.value && !sessionError.value) {
+        clearPendingWorkspaceTargets()
+      }
       scheduleSessionHydration()
       return
     }
@@ -1597,6 +1732,13 @@ async function retryBackendConnection() {
   sessionsLoading.value = true
   sessionError.value = ''
   sessionsError.value = ''
+  if (requiredInitialBackendConnectionId.value
+    && activeBackendConnectionId.value
+      !== requiredInitialBackendConnectionId.value) {
+    await initializeBackendConnections(
+      requiredInitialBackendConnectionId.value,
+    )
+  }
   await loadBackendWorkspace()
 }
 
@@ -2986,8 +3128,26 @@ function consumeInitialNativeNewSessionCwd() {
   return url.searchParams.get('leylineNewSessionCwd')?.trim() || ''
 }
 
-function updateNativeWindowCwd() {
-  window.__leylineCurrentCwd = selectedSession.value?.cwd || ''
+function initialProjectCwd() {
+  const url = new URL(window.location.href)
+  return url.searchParams.get('leylineProjectCwd')?.trim() || ''
+}
+
+function initialSessionPath() {
+  const url = new URL(window.location.href)
+  return url.searchParams.get('leylineSessionPath')?.trim() || ''
+}
+
+function clearPendingWorkspaceTargets() {
+  pendingInitialProjectCwd.value = ''
+  pendingInitialSessionPath.value = ''
+  const url = new URL(window.location.href)
+  const previous = url.search
+  url.searchParams.delete('leylineProjectCwd')
+  url.searchParams.delete('leylineSessionPath')
+  if (url.search === previous) return
+  const next = `${url.pathname}${url.search}${url.hash}`
+  window.history.replaceState({}, '', next)
 }
 
 function closeMenusOnOutsideClick(event) {
@@ -3103,6 +3263,7 @@ function closePickerMenus() {
             class="parent-session-button"
             type="button"
             @click="navigateParentSession"
+            @auxclick.middle.prevent="navigateParentSession"
           >← parent session</button>
           <span class="crumb-project">
             {{ projectName(selectedSession.cwd) }}
@@ -3294,7 +3455,7 @@ function closePickerMenus() {
       @begin-rename-session="beginRenameSession"
       @cancel-rename-session="cancelRenameSession"
       @commit-rename-session="commitRenameSession"
-      @create-session="createSession"
+      @create-session="createSessionTarget"
       @interrupt-session="interruptActivitySession"
       @open-project-browser="openProjectBrowser"
       @open-project-detail="openProjectDetail"
@@ -3303,9 +3464,9 @@ function closePickerMenus() {
       @request-delete-project="requestDeleteProject"
       @request-delete-session="requestDeleteSession"
       @retry-sessions="retrySessions"
-      @select-backend="switchBackendConnection"
+      @select-backend="selectBackendTarget"
       @select-project="selectSidebarProject"
-      @select-session="selectSession"
+      @select-session="selectSessionTarget"
       @update:navigator="setSidebarNavigator"
     />
 
@@ -3436,7 +3597,10 @@ function closePickerMenus() {
         <div v-else-if="sessionError" class="empty-workbench error-note session-error-panel">
           <span>{{ sessionError }}</span>
           <button
-            v-if="pendingInitialNativeCwd"
+            v-if="pendingInitialNativeCwd
+              || pendingInitialProjectCwd
+              || pendingInitialSessionPath
+              || requiredInitialBackendConnectionId"
             type="button"
             :disabled="!!backendConnectionBusyId"
             @click="retryBackendConnection"
@@ -3457,7 +3621,11 @@ function closePickerMenus() {
             <button
               v-if="!activeBackendConnection.builtIn"
               type="button"
-              @click="switchBackendConnection(backendConnections[0])"
+              @click="selectBackendTarget(backendConnections[0], $event)"
+              @auxclick.middle.prevent="selectBackendTarget(
+                backendConnections[0],
+                $event,
+              )"
             >Use native backend</button>
           </div>
         </div>
@@ -3537,7 +3705,7 @@ function closePickerMenus() {
             @paste="handleComposerPaste"
             @remove-image="removeAttachedImage"
             @select-model="selectModel"
-            @select-project="selectStartProject"
+            @select-project="selectStartProjectTarget"
             @select-slash-command="selectSlashCommand"
             @select-thinking="selectThinkingLevel"
             @show-slash-picker="showSlashPicker"
@@ -3948,9 +4116,9 @@ function closePickerMenus() {
           @cancel-rename-session="cancelRenameSession"
           @close="closeProjectDetail"
           @commit-rename-session="commitRenameSession"
-          @create-session="createSession"
+          @create-session="createSessionTarget"
           @request-delete-session="requestDeleteSession"
-          @select-session="selectSession"
+          @select-session="selectSessionTarget"
         />
       </div>
     </Transition>
@@ -4085,7 +4253,11 @@ function closePickerMenus() {
                     v-if="connection.id !== activeBackendConnectionId"
                     type="button"
                     :disabled="!!backendConnectionBusyId"
-                    @click="switchBackendConnection(connection)"
+                    @click="selectBackendTarget(connection, $event)"
+                    @auxclick.middle.prevent="selectBackendTarget(
+                      connection,
+                      $event,
+                    )"
                   >{{ backendConnectionBusyId === connection.id ? 'Connecting…' : 'Use' }}</button>
                   <button
                     type="button"

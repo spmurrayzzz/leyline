@@ -34,9 +34,10 @@ if [[ ! -x "$executable" ]]; then
   exit 1
 fi
 
-args=(--leyline-new-session --leyline-cwd="$cwd")
 if [[ "$new_window" -eq 1 ]]; then
-  args+=(--leyline-new-window)
+  args=(--leyline-new-window)
+else
+  args=(--leyline-new-session --leyline-cwd="$cwd")
 fi
 
 "$executable" "${args[@]}" >/dev/null 2>&1 &

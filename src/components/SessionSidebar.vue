@@ -646,9 +646,16 @@ function closeNavigator() {
   emit('update:navigator', '')
 }
 
-function selectBackend(connection) {
-  backendMenuOpen.value = false
-  emit('select-backend', connection)
+function isNewWindowClick(event) {
+  return Boolean(
+    event && (event.metaKey || event.ctrlKey || event.button === 1),
+  )
+}
+
+function selectBackend(connection, event) {
+  if (props.backendConnectionBusyId) return
+  if (!isNewWindowClick(event)) backendMenuOpen.value = false
+  emit('select-backend', connection, event)
 }
 
 function openBackendSettings() {
@@ -657,20 +664,21 @@ function openBackendSettings() {
   emit('open-settings')
 }
 
-function selectProject(project) {
+function selectProject(project, event) {
   const lastSessionId = lastSessionByProject.get(project.cwd)
   const target = project.sessions.find((session) => {
     return session.id === lastSessionId
   }) || project.sessions[0]
-  closeNavigator()
-  if (target?.id === props.selectedSessionId) return
-  if (target) emit('select-session', target)
-  else emit('select-project', project)
+  const newWindow = isNewWindowClick(event)
+  if (!newWindow) closeNavigator()
+  if (target?.id === props.selectedSessionId && !newWindow) return
+  if (target) emit('select-session', target, event)
+  else emit('select-project', project, event)
 }
 
-function selectNavigatorSession(session) {
-  closeNavigator()
-  emit('select-session', session)
+function selectNavigatorSession(session, event) {
+  if (!isNewWindowClick(event)) closeNavigator()
+  emit('select-session', session, event)
 }
 
 function interruptActivitySession(item) {
@@ -678,11 +686,11 @@ function interruptActivitySession(item) {
   emit('interrupt-session', item.session)
 }
 
-function createCurrentProjectSession() {
+function createCurrentProjectSession(event) {
   const project = currentProject.value
-  if (!project) return
-  closeNavigator()
-  emit('create-session', project)
+  if (!project || props.creatingSessionCwd === project.cwd) return
+  if (!isNewWindowClick(event)) closeNavigator()
+  emit('create-session', project, event)
 }
 
 function openProjectBrowser() {
@@ -1082,7 +1090,12 @@ const vFocusSelect = {
                       : undefined"
                     :aria-posinset="item.sessionIndex + 1"
                     :aria-setsize="matchingProjectSessions.length"
-                    @click="emit('select-session', item.session)"
+                    @click="emit('select-session', item.session, $event)"
+                    @auxclick.middle.prevent="emit(
+                      'select-session',
+                      item.session,
+                      $event,
+                    )"
                     @keydown.down.prevent="focusSession(
                       item.sessionIndex + 1,
                     )"
@@ -1216,6 +1229,7 @@ const vFocusSelect = {
           type="button"
           :disabled="creatingSessionCwd === currentProject.cwd"
           @click="createCurrentProjectSession"
+          @auxclick.middle.prevent="createCurrentProjectSession"
         >
           <svg viewBox="0 0 16 16" aria-hidden="true">
             <path d="M8 3v10M3 8h10"></path>
@@ -1274,7 +1288,8 @@ const vFocusSelect = {
             type="button"
             :class="{ active: connection.id === activeBackendConnection?.id }"
             :disabled="!!backendConnectionBusyId"
-            @click="selectBackend(connection)"
+            @click="selectBackend(connection, $event)"
+            @auxclick.middle.prevent="selectBackend(connection, $event)"
           >
             <span>
               <strong>{{ connection.name }}</strong>
@@ -1375,7 +1390,8 @@ const vFocusSelect = {
                   class="sidebar-navigator-result"
                   :class="{ selected: project.cwd === currentProject.cwd }"
                   type="button"
-                  @click="selectProject(project)"
+                  @click="selectProject(project, $event)"
+                  @auxclick.middle.prevent="selectProject(project, $event)"
                 >
                   <span class="navigator-result-icon">
                     <svg viewBox="0 0 16 16" aria-hidden="true">
@@ -1404,7 +1420,11 @@ const vFocusSelect = {
                   :key="item.session.path || item.session.id"
                   class="sidebar-navigator-result"
                   type="button"
-                  @click="selectNavigatorSession(item.session)"
+                  @click="selectNavigatorSession(item.session, $event)"
+                  @auxclick.middle.prevent="selectNavigatorSession(
+                    item.session,
+                    $event,
+                  )"
                 >
                   <span class="navigator-result-icon">
                     <svg viewBox="0 0 16 16" aria-hidden="true">
@@ -1482,7 +1502,11 @@ const vFocusSelect = {
                     <button
                       type="button"
                       :aria-label="`Open ${sessionTitle(item.session)}`"
-                      @click="selectNavigatorSession(item.session)"
+                      @click="selectNavigatorSession(item.session, $event)"
+                      @auxclick.middle.prevent="selectNavigatorSession(
+                        item.session,
+                        $event,
+                      )"
                     >Open</button>
                     <button
                       v-if="item.canStop"

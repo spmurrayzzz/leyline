@@ -47,7 +47,7 @@ prevent direct network clients from sending requests.
 
 | Variable | Purpose |
 | --- | --- |
-| `LEYLINE_CWD` | Directory used by `leyline` instead of the current shell directory. |
+| `LEYLINE_CWD` | Directory used by plain `leyline` instead of the current shell directory. It does not affect `leyline -n`. |
 | `LEYLINE_APP` | App package used by `leyline` instead of `/Applications/Leyline.app`. |
 
 If `LEYLINE_APP` does not exist, the CLI checks the repository path

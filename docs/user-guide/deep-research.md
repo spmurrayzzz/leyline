@@ -30,7 +30,9 @@ The phase bar shows four steps:
 
 A research plan normally contains two to five threads. The **Research threads** card shows each thread ID, title, source count, and status.
 
-Select a thread row to open its child session. The child transcript contains the worker's tool calls, source work, and final result.
+Select a thread row to open its child session. Use Command-click, Ctrl-click, or
+middle-click to open it in a new tab or window. The child transcript contains
+the worker's tool calls, source work, and final result.
 
 The sidebar marks each research session with a flask. During a run, the row can show its current phase or **gather N/N**. A selected completed session shows **ready**.
 

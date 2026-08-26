@@ -117,6 +117,17 @@ function statusFor(session) {
   return props.sessionStatus(session.id) || { label: '', tone: '' }
 }
 
+function createSession(event) {
+  if (props.creatingSessionCwd === props.project.cwd) return
+  emit('create-session', props.project, event)
+}
+
+function selectSession(session, event) {
+  const newWindow = event?.metaKey || event?.ctrlKey || event?.button === 1
+  if (session.id === props.selectedSessionId && !newWindow) return
+  emit('select-session', session, event)
+}
+
 function renameButtonLabel(session) {
   if (props.renamingSessionSavingId === session.id) return 'Saving…'
   return 'Rename'
@@ -170,7 +181,8 @@ function deleteButtonLabel(session) {
         class="project-detail-primary"
         type="button"
         :disabled="creatingSessionCwd === project.cwd"
-        @click="emit('create-session', project)"
+        @click="createSession"
+        @auxclick.middle.prevent="createSession"
       >
         {{ creatingSessionCwd === project.cwd ? 'Creating…' : 'New session' }}
       </button>
@@ -230,8 +242,11 @@ function deleteButtonLabel(session) {
         <div v-if="!isRenaming(session)" class="project-session-actions">
           <button
             type="button"
-            :disabled="session.id === selectedSessionId"
-            @click="emit('select-session', session)"
+            :aria-current="session.id === selectedSessionId
+              ? 'page'
+              : undefined"
+            @click="selectSession(session, $event)"
+            @auxclick.middle.prevent="selectSession(session, $event)"
           >{{ session.id === selectedSessionId ? 'Selected' : 'Open' }}</button>
           <button
             type="button"

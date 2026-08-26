@@ -82,8 +82,8 @@ These files are outside `src/` because Node.js backend code and browser code imp
 
 ## Electron and CLI
 
-- `electron/main.js`: Owns windows, native shortcuts, window state, and the packaged server.
-- `bin/leyline`: Opens a new session in the installed macOS app.
+- `electron/main.js`: Owns windows, internal target validation, native shortcuts, window state, and the packaged server.
+- `bin/leyline`: Opens a session in the installed macOS app, or opens the home workspace in a new window with `-n`.
 - `scripts/electron-build.sh`: Builds and packages the Electron app.
 - `scripts/local-publish.sh`: Installs a local Apple Silicon macOS build and CLI link.
 

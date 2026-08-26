@@ -442,7 +442,12 @@ defineExpose({ form })
           v-for="project in startProjectOptions"
           :key="project.cwd"
           type="button"
-          @click="emit('select-project', project.cwd)"
+          @click="emit('select-project', project.cwd, $event)"
+          @auxclick.middle.prevent="emit(
+            'select-project',
+            project.cwd,
+            $event,
+          )"
         >
           <span>▱</span>
           <strong>{{ project.name }}</strong>

@@ -10,7 +10,9 @@ The workbench shows the selected session, live output, composer, drawers, and te
 
 The desktop header shows the project and session as a breadcrumb. Select the session name to rename it.
 
-A subagent child session also shows **← parent session**. Select this control to open its parent session.
+A subagent child session also shows **← parent session**. Select this control to
+open its parent session. Use Command-click, Ctrl-click, or middle-click to open
+the parent in a new tab or window.
 
 A research session shows its phase or **report ready** beside the title. Its source control opens cited sources and the complete research ledger.
 

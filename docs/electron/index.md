@@ -5,7 +5,8 @@ pi API as the browser workflow.
 
 Electron adds these functions:
 
-- Native windows and desktop shortcuts
+- Foreground native windows for modified internal targets
+- Desktop shortcuts
 - A packaged native backend available to all app windows
 - macOS login-shell environment loading
 - Saved window size, position, maximized state, and full-screen state

@@ -32,10 +32,10 @@ export function useBackendConnections() {
     return backendDisplayAddress(activeConnection.value)
   })
 
-  async function initialize() {
+  async function initialize(requestedConnectionId = '') {
     loading.value = true
     error.value = ''
-    const requestedId = consumeInitialConnectionId()
+    const requestedId = requestedConnectionId || initialConnectionId()
 
     try {
       applyRegistry(await fetchBackendConnections())
@@ -51,7 +51,11 @@ export function useBackendConnections() {
         ? defaultConnectionId.value
         : BUILTIN_BACKEND_CONNECTION_ID
     applyActiveConnection(resolvedId)
+    if (requestedId && requestedId === resolvedId) {
+      clearInitialConnectionId(requestedId)
+    }
     loading.value = false
+    return { requestedId, resolvedId }
   }
 
   async function createConnection(name, url) {
@@ -202,22 +206,32 @@ export function useBackendConnections() {
   }
 }
 
-function consumeInitialConnectionId() {
+function initialConnectionId() {
   const url = new URL(window.location.href)
-  const id = url.searchParams.get('leylineBackendConnectionId')?.trim() || ''
-  if (!id) return ''
+  return url.searchParams.get('leylineBackendConnectionId')?.trim() || ''
+}
+
+function clearInitialConnectionId(id) {
+  const url = new URL(window.location.href)
+  if (url.searchParams.get('leylineBackendConnectionId')?.trim() !== id) return
 
   url.searchParams.delete('leylineBackendConnectionId')
   const next = `${url.pathname}${url.search}${url.hash}`
   window.history.replaceState({}, '', next)
-  return id
 }
 
 function backendReloadPath() {
   const current = new URL(window.location.href)
-  const cwd = current.searchParams.get('leylineNewSessionCwd')?.trim() || ''
-  if (!cwd) return '/'
-  return `/?leylineNewSessionCwd=${encodeURIComponent(cwd)}`
+  const next = new URL('/', current.origin)
+  for (const name of [
+    'leylineNewSessionCwd',
+    'leylineProjectCwd',
+    'leylineSessionPath',
+  ]) {
+    const value = current.searchParams.get(name)?.trim() || ''
+    if (value) next.searchParams.set(name, value)
+  }
+  return `${next.pathname}${next.search}`
 }
 
 function readActiveConnectionId() {

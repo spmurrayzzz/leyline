@@ -67,10 +67,13 @@ A model or thinking value on one task takes priority over the mode-level value.
 
 A subagent tool call appears as a card in the parent transcript. It shows the agent name, task results, and status.
 
-Select the card to expand final output. Select **→ view session** to open a child session.
+Select the card to expand final output. Select **→ view session** to open a
+child session. Use Command-click, Ctrl-click, or middle-click to open the child
+in a new tab or window.
 
 ## Return to the parent session
 
 Child sessions are hidden from the sidebar. Their header shows **← parent session**.
 
-Select **← parent session** to return to the parent transcript.
+Select **← parent session** to return to the parent transcript. Use a modified
+click to open the parent in a new tab or window.

@@ -20,7 +20,10 @@ server-sent events (SSE), terminal WebSocket traffic, and exports. Connection ma
 
 Electron loads the Vite URL into a `BrowserWindow`. The Vite process owns the backend and all runtime handles in this flow.
 
-The renderer has context isolation enabled and Node.js integration disabled. Electron sends native commands through browser `CustomEvent` objects.
+The renderer has context isolation enabled and Node.js integration disabled.
+Electron sends native commands through browser `CustomEvent` objects. The main
+process validates renderer-opened workspace URLs before it creates a foreground
+`BrowserWindow`. It sends other openable links to the system browser.
 
 ## Packaged Electron flow
 
@@ -34,7 +37,9 @@ server.
 All Electron windows load the same native server. A window can select another
 saved backend without changing the active backend in other windows.
 
-Electron uses a single-instance lock. A `leyline -n` request creates another window in the first Electron process.
+Electron uses a single-instance lock. A `leyline -n` request opens the home
+workspace in another window in the first Electron process. It does not create a
+pi session.
 
 ## Backend boundaries
 
@@ -64,7 +69,8 @@ app origin. Saved connections can use hostnames, IPv4 or IPv6 addresses, ports,
 and base paths.
 
 Electron passes the source window's connection ID when it creates a window. A
-fresh window uses the configured default. `GET /api/pi/info` verifies the
+backend target supplies its selected connection ID instead. A fresh window uses
+the configured default. `GET /api/pi/info` verifies the
 backend name and API version before Leyline switches to it. The response also
 reports transport capabilities.
 
