@@ -1273,11 +1273,17 @@ async function exportSessionDetail(id) {
   return detail
 }
 
-async function runSubagent({ task, cwd, parentSessionPath, model, thinkingLevel, tools, systemPrompt, isolatedSystemPrompt, images, allowImages = false, signal, onStart }) {
+async function runSubagent({ task, cwd, parentSessionPath, model, thinkingLevel, tools, excludeTools, systemPrompt, isolatedSystemPrompt, images, allowImages = false, signal, onStart }) {
   if (!cwd) throw new Error('cwd is required')
   if (!task) throw new Error('task is required')
   if (tools !== undefined && !Array.isArray(tools)) {
     throw new Error('tools must be an array')
+  }
+  if (excludeTools !== undefined && !Array.isArray(excludeTools)) {
+    throw new Error('excludeTools must be an array')
+  }
+  if (tools !== undefined && excludeTools !== undefined) {
+    throw new Error('tools and excludeTools cannot be used together')
   }
   if (signal?.aborted) throw new Error('Subagent cancelled')
   const requestedThinkingLevel = normalizeSubagentThinkingLevel(thinkingLevel)
@@ -1323,7 +1329,19 @@ async function runSubagent({ task, cwd, parentSessionPath, model, thinkingLevel,
     abortSubagent = () => session?.abort?.()
     signal?.addEventListener?.('abort', abortSubagent, { once: true })
 
-    if (tools !== undefined) {
+    if (excludeTools !== undefined) {
+      if (typeof session.setActiveToolsByName !== 'function'
+        || typeof session.getAllTools !== 'function') {
+        throw new Error('Subagent runtime does not support tool exclusions')
+      }
+
+      const excludedTools = new Set(excludeTools)
+      session.setActiveToolsByName(
+        session.getAllTools()
+          .map((tool) => tool.name)
+          .filter((tool) => !excludedTools.has(tool)),
+      )
+    } else if (tools !== undefined) {
       if (typeof session.setActiveToolsByName !== 'function') {
         throw new Error('Subagent runtime does not support tool allowlists')
       }

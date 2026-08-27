@@ -20,7 +20,7 @@ interface AgentDef {
   model: string;
   thinking: string;
   tools: string[];
-  strictTools?: boolean;
+  excludeTools?: string[];
   systemPrompt: string;
   source: "user" | "project" | "bundled" | "unknown";
   key: string;
@@ -67,31 +67,18 @@ interface SubagentDetails {
   background: boolean;
 }
 
-const SAFE_RESEARCH_BUILTINS = new Set([
-  "read",
-  "grep",
-  "find",
-  "ls",
-]);
-const SAFE_RESEARCH_EXTERNAL_TOOLS = new Set([
-  "exa_search",
-  "exa_contents",
-  "list_memory",
-  "search_memory",
-  "web_search",
-  "web_fetch",
-]);
-
 const BUNDLED_RESEARCHER: AgentDef = {
   name: "researcher",
   description: "Investigate one bounded research thread and return structured source evidence",
   model: "inherit",
   thinking: "inherit",
   tools: [],
-  strictTools: true,
+  excludeTools: ["write", "edit"],
   systemPrompt: `You are a research worker for one bounded thread in a larger investigation.
 
 Search broadly, then read the strongest sources in depth. Prefer primary sources, official documentation, direct datasets, and reproducible benchmarks. Check dates, methods, and conflicts. Do not make the final cross-thread recommendation.
+
+Do not write, edit, move, rename, or delete files. You can use bash to call CLI tools, but only with commands that do not change files.
 
 End your response with exactly one structured block in this form:
 <research_result>
@@ -232,6 +219,7 @@ async function runSubagentViaApi(params: {
   model: string | { provider: string; id: string } | undefined;
   thinkingLevel: ThinkingLevel | undefined;
   tools?: string[];
+  excludeTools?: string[];
   systemPrompt: string;
   signal?: AbortSignal;
   onStart?: (childSession: ChildSession) => void;
@@ -253,6 +241,7 @@ async function runSubagentViaApi(params: {
       model: params.model || undefined,
       thinkingLevel: params.thinkingLevel,
       tools: params.tools,
+      excludeTools: params.excludeTools,
       systemPrompt: params.systemPrompt || undefined,
     }),
     signal: params.signal,
@@ -412,17 +401,6 @@ export default function subagentExtension(pi: ExtensionAPI) {
 
   function refreshAgents(ctx: ExtensionContext) {
     knownAgents = discoverAgents(ctx.cwd);
-    const researcher = knownAgents.get(BUNDLED_RESEARCHER.name);
-    if (researcher) {
-      researcher.tools = pi.getAllTools().filter((tool) => {
-        if (SAFE_RESEARCH_BUILTINS.has(tool.name)) {
-          return tool.sourceInfo?.source === "builtin";
-        }
-        if (!SAFE_RESEARCH_EXTERNAL_TOOLS.has(tool.name)) return false;
-        return tool.sourceInfo?.scope !== "project"
-          && tool.sourceInfo?.source !== "builtin";
-      }).map((tool) => tool.name);
-    }
     updateSubagentTool();
   }
 
@@ -771,9 +749,8 @@ async function executeSingle(
       parentSessionPath,
       model: selectedAgentModel(agent, selectedModel, ctx),
       thinkingLevel: selectedAgentThinking(agent, selectedThinking, parentThinkingLevel),
-      tools: agent.strictTools
-        ? agent.tools
-        : agent.tools.length ? agent.tools : undefined,
+      tools: agent.tools.length ? agent.tools : undefined,
+      excludeTools: agent.excludeTools,
       systemPrompt: agent.systemPrompt,
       signal,
       onStart: (session) => {

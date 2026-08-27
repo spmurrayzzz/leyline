@@ -1184,9 +1184,12 @@ Request:
   model?: string | { provider: string, id: string },
   thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max",
   tools?: string[],
+  excludeTools?: string[],
   systemPrompt?: string
 }
 ```
+
+`tools` sets an allowlist. `excludeTools` enables all tools discovered by the child runtime except the listed names. A request cannot contain both fields.
 
 Success response:
 

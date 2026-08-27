@@ -34,9 +34,9 @@ The bundled subagent extension reserves the `researcher` name for deep research.
 
 A researcher inherits the parent model and thinking level by default. An explicit model or thinking value on the subagent task takes priority.
 
-Research workers use a strict read and search allowlist. Built-in access is limited to `read`, `grep`, `find`, and `ls`.
+Research workers receive all tools discovered by their child runtime except `write` and `edit`. This includes `bash`, project-scoped tools, and external tools when they are available.
 
-Selected external web and memory search tools can also run when they are available. Project-scoped external tools, shell tools, and write tools are excluded.
+The worker prompt prohibits file changes. It permits `bash` for CLI tools only when a command does not create, modify, move, rename, or delete files.
 
 Each worker returns a bounded `<research_result>` block. The block contains its thread ID, summary, and sources that it read.
 

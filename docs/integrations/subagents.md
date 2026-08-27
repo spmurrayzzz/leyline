@@ -15,7 +15,7 @@ A project definition replaces a user definition with the same name. Resource dis
 
 Deep research adds a reserved bundled `researcher` after normal discovery. This definition cannot be replaced by a user or project file.
 
-The reserved researcher uses a strict read and search allowlist. It returns a structured thread summary and source list for the research extension. See [Deep research integration](./deep-research).
+The reserved researcher receives all tools discovered by its child runtime except `write` and `edit`. Its prompt prohibits file changes, including changes through `bash`. It returns a structured thread summary and source list for the research extension. See [Deep research integration](./deep-research).
 
 ## Execution modes
 

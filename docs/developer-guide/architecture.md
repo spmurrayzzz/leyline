@@ -129,7 +129,7 @@ New subagent and vision-child sessions contain a `leyline-subagent-session` cust
 
 Session discovery uses this explicit marker. It also has a compatibility fallback that finds child paths in parent `subagent` tool results.
 
-Deep research uses the same child-session runtime path. A reserved researcher definition limits workers to approved read and search tools.
+Deep research uses the same child-session runtime path. A reserved researcher definition enables all tools discovered by the child runtime except `write` and `edit`. Its prompt prohibits file changes through other tools.
 
 Vision delegation adds `leyline-vision-delegation` records to the parent branch. A session context transform replaces image blocks with saved file paths and a `vision_agent` instruction. This applies when the parent model cannot receive images. After matching tool calls exist, the transform uses neutral context text. It does not request another inspection. The persisted user message keeps the images.
 

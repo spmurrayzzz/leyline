@@ -491,6 +491,7 @@ async function piApiHandler(req, res) {
             model: body.model,
             thinkingLevel: body.thinkingLevel,
             tools: body.tools,
+            excludeTools: body.excludeTools,
             systemPrompt: body.systemPrompt,
             signal: controller.signal,
             onStart: (childSession) => {
