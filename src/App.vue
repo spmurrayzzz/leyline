@@ -542,6 +542,9 @@ const {
   expandedSkills,
   copiedEntryId,
   fullscreenTool,
+  fullscreenToolView,
+  fullscreenToolSupportsMarkdown,
+  fullscreenToolMarkdown,
   isToolExpanded,
   toggleTool,
   openToolFullscreen,
@@ -4521,7 +4524,7 @@ function closePickerMenus() {
     <Transition name="tool-fullscreen">
       <div
         v-if="fullscreenTool"
-        class="tool-fullscreen-backdrop"
+        class="tool-fullscreen-backdrop tool-preview-fullscreen-backdrop"
         @click="closeToolFullscreen"
       >
         <section class="tool-fullscreen" @click.stop>
@@ -4531,6 +4534,29 @@ function closePickerMenus() {
               <code v-if="fullscreenTool.code" :title="fullscreenTool.code">{{ fullscreenTool.code }}</code>
             </div>
             <div>
+              <div
+                v-if="fullscreenToolSupportsMarkdown"
+                class="tool-fullscreen-view-toggle"
+                role="group"
+                aria-label="Markdown view"
+              >
+                <button
+                  type="button"
+                  :class="{ active: fullscreenToolView === 'rendered' }"
+                  :aria-pressed="fullscreenToolView === 'rendered'"
+                  @click="fullscreenToolView = 'rendered'"
+                >
+                  Rendered
+                </button>
+                <button
+                  type="button"
+                  :class="{ active: fullscreenToolView === 'source' }"
+                  :aria-pressed="fullscreenToolView === 'source'"
+                  @click="fullscreenToolView = 'source'"
+                >
+                  Source
+                </button>
+              </div>
               <button
                 class="copy-button"
                 type="button"
@@ -4564,6 +4590,11 @@ function closePickerMenus() {
             >
               <img :src="imageSrc(fullscreenTool.preview)" alt="Read image preview" />
             </div>
+            <div
+              v-else-if="fullscreenToolSupportsMarkdown && fullscreenToolView === 'rendered'"
+              class="tool-fullscreen-markdown markdown-body"
+              v-html="fullscreenToolMarkdown"
+            ></div>
             <PierrePreview
               v-else-if="fullscreenTool.preview"
               :preview="fullscreenTool.preview"

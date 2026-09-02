@@ -30,7 +30,9 @@ Shell rows also show **in context** or **not in context**. This label tells you 
 
 Select **Open full screen** in an expanded tool row. You can also select its fullscreen action in the row header.
 
-The fullscreen view shows the complete available output or preview. Select **×** or the backdrop to close it.
+The fullscreen view shows the complete available output or preview. Markdown read results open in **Rendered** mode. Select **Source** to inspect the original text. The **Copy** action copies the source in both modes.
+
+Select **×** or the backdrop to close the fullscreen view.
 
 ## Expand a skill row
 

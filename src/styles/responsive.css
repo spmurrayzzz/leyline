@@ -824,3 +824,36 @@
     gap: 7px;
   }
 }
+
+@media (max-width: 520px) {
+  .tool-preview-fullscreen-backdrop {
+    padding: 12px;
+  }
+
+  .tool-preview-fullscreen-backdrop .tool-fullscreen-header {
+    align-items: stretch;
+    flex-wrap: wrap;
+    padding: 10px;
+  }
+
+  .tool-preview-fullscreen-backdrop .tool-fullscreen-header > div:first-child,
+  .tool-preview-fullscreen-backdrop .tool-fullscreen-header > div:last-child {
+    width: 100%;
+  }
+
+  .tool-preview-fullscreen-backdrop .tool-fullscreen-header > div:last-child {
+    justify-content: flex-end;
+  }
+
+  .tool-preview-fullscreen-backdrop .tool-fullscreen-header code {
+    max-width: calc(100vw - 100px);
+  }
+
+  .tool-preview-fullscreen-backdrop .tool-fullscreen-body {
+    padding: 10px;
+  }
+
+  .tool-fullscreen-markdown {
+    padding: 24px 22px 40px;
+  }
+}

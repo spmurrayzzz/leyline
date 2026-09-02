@@ -514,6 +514,36 @@
   transition-timing-function: var(--ease-accelerate);
 }
 
+.tool-fullscreen-view-toggle {
+  gap: 2px !important;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #181a21;
+  padding: 2px;
+}
+
+.tool-fullscreen-header .tool-fullscreen-view-toggle button {
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  padding: 4px 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.tool-fullscreen-header .tool-fullscreen-view-toggle button:hover {
+  border-color: transparent;
+  background: #22252d;
+  transform: none;
+}
+
+.tool-fullscreen-header .tool-fullscreen-view-toggle button.active {
+  background: #30333d;
+  color: var(--text);
+}
+
 .tool-fullscreen-body {
   overflow: auto;
   min-height: 0;
@@ -522,6 +552,79 @@
 
 .tool-fullscreen-body .tool-output {
   max-height: none;
+}
+
+.tool-fullscreen-markdown {
+  box-sizing: border-box;
+  width: min(900px, 100%);
+  min-height: 100%;
+  margin: 0 auto;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: #0f1014;
+  padding: 32px clamp(22px, 5vw, 64px) 48px;
+  color: #d8d9df;
+  font-size: 14px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.tool-fullscreen-markdown p,
+.tool-fullscreen-markdown ul,
+.tool-fullscreen-markdown ol,
+.tool-fullscreen-markdown pre,
+.tool-fullscreen-markdown blockquote {
+  margin-bottom: 14px;
+}
+
+.tool-fullscreen-markdown h1 {
+  overflow: visible;
+  font-size: 24px;
+  line-height: 1.25;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+.tool-fullscreen-markdown h2 {
+  font-size: 20px;
+}
+
+.tool-fullscreen-markdown h3 {
+  font-size: 17px;
+}
+
+.tool-fullscreen-markdown h4 {
+  font-size: 15px;
+}
+
+.tool-fullscreen-markdown .markdown-relative-link {
+  border-bottom: 1px dotted currentColor;
+  color: #bfb5ff;
+}
+
+.tool-fullscreen-markdown .markdown-image-reference {
+  display: inline-block;
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  background: var(--panel-soft);
+  padding: 2px 6px;
+  color: var(--muted-strong);
+  font-size: 12px;
+}
+
+.tool-fullscreen-markdown table {
+  display: block;
+  overflow: auto;
+  max-width: 100%;
+  margin-bottom: 14px;
+  border-collapse: collapse;
+}
+
+.tool-fullscreen-markdown th,
+.tool-fullscreen-markdown td {
+  border: 1px solid var(--border-soft);
+  padding: 7px 9px;
+  text-align: left;
 }
 
 .tool-fullscreen-image {

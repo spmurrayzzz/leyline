@@ -1,11 +1,19 @@
-import { ref } from 'vue'
-import { messageBlocksFor } from '../lib/transcript'
+import { computed, ref } from 'vue'
+import { messageBlocksFor, renderedMarkdownPreview } from '../lib/transcript'
 
 export function useToolExpansion({ liveAssistantBlocks }) {
   const expandedTools = ref(new Set())
   const expandedSkills = ref(new Set())
   const copiedEntryId = ref('')
   const fullscreenTool = ref(null)
+  const fullscreenToolView = ref('source')
+  const fullscreenToolSupportsMarkdown = computed(
+    () => isMarkdownRead(fullscreenTool.value),
+  )
+  const fullscreenToolMarkdown = computed(() => {
+    if (!fullscreenToolSupportsMarkdown.value) return ''
+    return renderedMarkdownPreview(fullscreenTool.value.preview)
+  })
   let copiedTimer
 
   function toolExpansionId(entry) {
@@ -26,10 +34,12 @@ export function useToolExpansion({ liveAssistantBlocks }) {
 
   function openToolFullscreen(entry) {
     fullscreenTool.value = entry
+    fullscreenToolView.value = isMarkdownRead(entry) ? 'rendered' : 'source'
   }
 
   function closeToolFullscreen() {
     fullscreenTool.value = null
+    fullscreenToolView.value = 'source'
   }
 
   function isSkillExpanded(entry) {
@@ -105,6 +115,9 @@ export function useToolExpansion({ liveAssistantBlocks }) {
     expandedSkills,
     copiedEntryId,
     fullscreenTool,
+    fullscreenToolView,
+    fullscreenToolSupportsMarkdown,
+    fullscreenToolMarkdown,
     isToolExpanded,
     toggleTool,
     openToolFullscreen,
@@ -121,4 +134,11 @@ export function useToolExpansion({ liveAssistantBlocks }) {
     copyGlyph,
     dispose,
   }
+}
+
+function isMarkdownRead(entry) {
+  const preview = entry?.preview
+  return entry?.toolName === 'read'
+    && preview?.kind === 'file'
+    && (preview.language === 'markdown' || /\.(?:md|markdown)$/i.test(preview.path || ''))
 }

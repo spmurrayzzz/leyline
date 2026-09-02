@@ -427,6 +427,39 @@ const baseEntries = [
   }),
 ]
 
+const markdownPreviewContent = `# Release checklist
+
+Complete these checks before publication.
+
+## Required checks
+
+- Run the production build.
+- Review the generated package.
+- Confirm the release notes.
+
+\`\`\`bash
+npm run build
+\`\`\`
+
+> Stop the release if a check fails.
+`
+const markdownPreviewEntries = [
+  toolEntry({
+    id: 'tool-markdown-read',
+    label: 'Read',
+    code: 'docs/release-checklist.md',
+    toolName: 'read',
+    text: markdownPreviewContent,
+    preview: {
+      kind: 'file',
+      path: 'docs/release-checklist.md',
+      content: markdownPreviewContent,
+      language: 'markdown',
+    },
+    timestamp: '2026-08-06T15:45:00.000Z',
+  }),
+]
+
 const researchEntries = [
   messageEntry({
     id: 'research-user',
@@ -818,15 +851,19 @@ try {
     file: path.join(docsOutputDir, 'preview-fullscreen.png'),
     route: '/sessions/demo-session',
     ready: '.transcript-tool',
+    scenario: 'markdown',
     interact: async (page) => {
-      const tool = page.locator('.transcript-tool').filter({ hasText: 'scripts/release.js' }).last()
+      const tool = page.locator('.transcript-tool').filter({ hasText: 'docs/release-checklist.md' })
       await tool.getByTitle('Open full screen').click()
-      await page.locator('.tool-fullscreen .pierre-preview-inner > *').waitFor()
-      await page.locator('.app-header').evaluate((element) => {
-        element.style.visibility = 'hidden'
+      await page.locator('.tool-fullscreen-markdown blockquote').waitFor()
+      await page.locator('.tool-fullscreen-backdrop').evaluate((element) => {
+        element.style.background = '#08090d'
+      })
+      await page.locator('.tool-fullscreen').evaluate((element) => {
+        element.style.alignSelf = 'flex-start'
       })
     },
-    clipSelectors: ['.tool-fullscreen-header', '.tool-fullscreen .pierre-preview-inner'],
+    clipSelectors: ['.tool-fullscreen'],
   })
   await capture({
     browser,
@@ -1251,11 +1288,13 @@ function detailFor(scenario) {
   const summary = research ? researchSession : sessions[0]
   const entries = research
     ? researchEntries
-    : scenario === 'shell'
-      ? shellEntries
-      : scenario === 'vision'
-        ? visionEntries
-        : baseEntries
+    : scenario === 'markdown'
+      ? markdownPreviewEntries
+      : scenario === 'shell'
+        ? shellEntries
+        : scenario === 'vision'
+          ? visionEntries
+          : baseEntries
   return {
     session: {
       ...summary,

@@ -12,12 +12,11 @@ import {
 } from '../../lib/transcript-projection'
 
 const hljs = loadHighlightJs()
-const markdown = new MarkdownIt({
-  html: false,
-  linkify: true,
-  breaks: true,
-  highlight: highlightCode,
-})
+const markdown = createMarkdown()
+const previewMarkdown = createMarkdown()
+previewMarkdown.renderer.rules.image = renderPreviewImage
+previewMarkdown.renderer.rules.link_open = renderPreviewLinkOpen
+previewMarkdown.renderer.rules.link_close = renderPreviewLinkClose
 
 export function entryClass(entry) {
   return {
@@ -37,6 +36,10 @@ export function renderedBlock(block) {
   return markdown.render(block.text || '')
 }
 
+export function renderedMarkdownPreview(preview) {
+  return previewMarkdown.render(preview?.content || '', {})
+}
+
 export function toolCommandCode(entry) {
   if (!entry?.code) return ''
   if (entry.toolName === 'bash' || entry.toolName === 'search_memory') return entry.code
@@ -53,6 +56,35 @@ export function renderedToolJson(entry) {
   } catch {
     return ''
   }
+}
+
+function createMarkdown() {
+  return new MarkdownIt({
+    html: false,
+    linkify: true,
+    breaks: true,
+    highlight: highlightCode,
+  })
+}
+
+function renderPreviewImage(tokens, index) {
+  return `<span class="markdown-image-reference">Image: ${escapeHtml(tokens[index].content || 'Untitled')}</span>`
+}
+
+function renderPreviewLinkOpen(tokens, index, options, env, renderer) {
+  const token = tokens[index]
+  const external = /^(?:https?:|mailto:)/i.test(token.attrGet('href') || '')
+  const stack = env.previewLinkStack || (env.previewLinkStack = [])
+  stack.push(external)
+  if (!external) return '<span class="markdown-relative-link">'
+
+  token.attrSet('target', '_blank')
+  token.attrSet('rel', 'noopener noreferrer')
+  return renderer.renderToken(tokens, index, options)
+}
+
+function renderPreviewLinkClose(_tokens, _index, _options, env) {
+  return env.previewLinkStack?.pop() ? '</a>' : '</span>'
 }
 
 function highlightCode(source, language) {

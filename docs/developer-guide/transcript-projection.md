@@ -30,7 +30,7 @@ Persisted runtime event entries can exist in a detail response. The current live
 
 ## Browser rendering
 
-`src/lib/transcript.js` configures `markdown-it` with raw HTML disabled. It also exports projection helpers for Vue components.
+`src/lib/transcript.js` configures `markdown-it`. Raw HTML is disabled. The module uses a separate renderer for full-screen Markdown read previews. This renderer blocks automatic image requests and leaves relative links inactive. It opens web links in a new tab. The module also exports projection helpers for Vue components.
 
 `TranscriptEntry.vue` renders persisted messages, thoughts, tools, skills, subagents, research threads, report artifacts, feedback, and previews. `useLiveTurnProjection.js` supplies separate live rows while a turn runs.
 
@@ -52,7 +52,7 @@ Syntax colors live in `src/styles/tokens.css`. Highlight rules live in `src/styl
 
 `PierrePreview.vue` uses `@pierre/diffs` for file, diff, and patch data. Inline file previews show at most 400 lines.
 
-Fullscreen previews use the complete projected data. Image previews use session data URLs.
+Fullscreen previews use the complete projected data. Markdown reads open as rendered content. Users can switch to the Pierre source view. Image previews use session data URLs.
 
 HTML export contains its own preview renderer. The current export module loads `@pierre/diffs` from `esm.sh` when the HTML runs.
 

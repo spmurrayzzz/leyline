@@ -71,12 +71,14 @@ An inline file preview shows up to 400 lines. It reports the number of clipped l
 
 ## Open a fullscreen preview
 
-![Fullscreen diff preview for an edited source file](../assets/screenshots/preview-fullscreen.png)
+![Fullscreen Markdown preview with Rendered and Source controls](../assets/screenshots/preview-fullscreen.png)
 
-*Fullscreen mode uses the complete projected preview data.*
+*Markdown read results open in **Rendered** mode. Select **Source** to inspect the original file.*
 
 1. Select the fullscreen action in the tool header.
-2. Inspect the full available preview.
-3. Select **×** or the backdrop to close it.
+2. For a Markdown read, select **Rendered** or **Source**.
+3. Select **×** or the backdrop to close the preview.
 
-The fullscreen view uses the available file, image, patch, diff, JSON, or plain-text data. Select **Copy** to copy the available tool output.
+The **Copy** action always copies the original Markdown source. Raw HTML stays disabled in the rendered view. Remote images appear as references. Leyline leaves relative links inactive.
+
+Other fullscreen previews use the available file, image, patch, diff, JSON, or plain-text data. Select **Copy** to copy the available tool output.
