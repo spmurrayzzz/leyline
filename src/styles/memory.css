@@ -193,6 +193,8 @@
 .memory-archived-list,
 .memory-form {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   gap: 8px;
 }
 
@@ -225,6 +227,9 @@
 .memory-card {
   position: relative;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  overflow-wrap: anywhere;
   gap: 8px;
   border: 1px solid var(--border-soft);
   border-radius: 12px;
@@ -238,6 +243,7 @@
 }
 
 .memory-card-markdown {
+  min-width: 0;
   color: var(--text);
   font-size: 12px;
   line-height: 1.45;
