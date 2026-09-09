@@ -1161,7 +1161,7 @@ function setSessionThinkingLevel(handle, level) {
 
   const levels = handle.runtime.session.getAvailableThinkingLevels()
   if (!levels.includes(level)) throw new Error('Thinking level not available')
-  handle.runtime.session.setThinkingLevel(level)
+  handle.runtime.session.setThinkingLevel(level, { persist: true })
 }
 
 function setSessionMode(handle) {
