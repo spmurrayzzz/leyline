@@ -7,17 +7,18 @@ connections to other Leyline backends.
 
 ## Screenshots
 
-### Start screen
-
-<a href="assets/readme/home.png"><img alt="Leyline start screen with project, research, and runtime controls" src="assets/readme/home.png" /></a>
-
-### Workbench
-
-<a href="assets/readme/workbench.png"><img alt="Leyline workbench with a sanitized agent session" src="assets/readme/workbench.png" /></a>
-
-### Deep research
-
-<a href="assets/readme/deep-research.png"><img alt="Leyline deep research report with phase progress and cited sources" src="assets/readme/deep-research.png" /></a>
+<table>
+  <tr>
+    <th>Start screen</th>
+    <th>Workbench</th>
+    <th>Deep research</th>
+  </tr>
+  <tr>
+    <td><a href="assets/readme/home.png"><img alt="Leyline start screen with project, research, and runtime controls" src="assets/readme/home.png" /></a></td>
+    <td><a href="assets/readme/workbench.png"><img alt="Leyline workbench with a sanitized agent session" src="assets/readme/workbench.png" /></a></td>
+    <td><a href="assets/readme/deep-research.png"><img alt="Leyline deep research report with phase progress and cited sources" src="assets/readme/deep-research.png" /></a></td>
+  </tr>
+</table>
 
 ## Features
 
