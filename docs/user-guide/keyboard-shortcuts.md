@@ -100,5 +100,5 @@ Focus the **Resize terminal** handle first.
 | **Command+E** | Hide or show the desktop sidebar. On mobile, open or close it. |
 | **Escape** | Close an open transient surface. With no open surface, stop the active run. |
 
-**Command+N** requires a current session CWD. Leyline ignores it during an
-active run or session creation. **Command+Shift+N** does not create a session.
+**Command+N** requires a current session CWD. Leyline ignores it during session
+creation. **Command+Shift+N** does not create a session.

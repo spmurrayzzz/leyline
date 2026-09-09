@@ -475,7 +475,7 @@ export function useSessionWorkspace({
   async function handleNativeNewSession(event) {
     const cwd = event?.detail?.cwd?.trim() || selectedSession.value?.cwd || ''
     if (!cwd) return
-    if (liveTurn?.agentRunning?.value || creatingSessionCwd.value) return
+    if (creatingSessionCwd.value) return
 
     await createSessionForCwd(cwd, {
       replaceRoute: event?.detail?.replaceRoute === true,
