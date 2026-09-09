@@ -1153,7 +1153,7 @@ async function setSessionModel(handle, provider, id) {
 
   const model = handle.runtime.session.modelRuntime.getModel(provider, id)
   if (!model) throw new Error('Model not found')
-  await handle.runtime.session.setModel(model)
+  await handle.runtime.session.setModel(model, { persist: true })
 }
 
 function setSessionThinkingLevel(handle, level) {
