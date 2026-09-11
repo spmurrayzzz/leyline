@@ -1577,7 +1577,7 @@ export function useSessionWorkspace({
 
   async function reconnectTerminalIfOpen() {
     if (!terminal?.isOpen?.()) return
-    await terminal.reconnect?.()
+    await terminal.reconnect?.(selectedSessionId.value)
   }
 
   function modelKey(model) {

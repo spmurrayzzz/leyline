@@ -16,20 +16,17 @@ export function useTerminal() {
   let terminalResizeStartHeight = 0
   let terminalResizeFrame = 0
 
-  async function toggleTerminal() {
+  async function toggleTerminal(sessionId = '') {
     if (terminalOpen.value) {
       closeTerminalPanel()
       return
     }
 
     terminalOpen.value = true
-    await connectTerminal()
+    await connectTerminal(sessionId)
   }
 
-  function closeTerminalPanel() {
-    terminalRunId += 1
-    terminalOpen.value = false
-    terminalStatus.value = 'closed'
+  function disposeTerminalConnection() {
     terminalInputDisposable?.dispose()
     terminalInputDisposable = undefined
     terminalSocket?.close()
@@ -40,22 +37,29 @@ export function useTerminal() {
     window.removeEventListener('resize', resizeTerminal)
   }
 
-  async function connectTerminal() {
+  function closeTerminalPanel() {
+    terminalRunId += 1
+    terminalOpen.value = false
+    terminalStatus.value = 'closed'
+    terminalCwd.value = ''
+    disposeTerminalConnection()
+  }
+
+  async function connectTerminal(sessionId = '') {
+    const runId = terminalRunId + 1
+    terminalRunId = runId
     terminalStatus.value = 'connecting'
+    terminalCwd.value = ''
+    disposeTerminalConnection()
+
     await nextTick()
-    if (!terminalEl.value) return
+    if (!terminalOpen.value || runId !== terminalRunId || !terminalEl.value) return
 
     const { FitAddon } = await import('@xterm/addon-fit')
     const { Terminal } = await import('@xterm/xterm')
     await import('@xterm/xterm/css/xterm.css')
 
-    const runId = terminalRunId + 1
-    terminalRunId = runId
-    terminalInputDisposable?.dispose()
-    terminalSocket?.close()
-    terminalInstance?.dispose()
-    terminalFitAddon = undefined
-    window.removeEventListener('resize', resizeTerminal)
+    if (!terminalOpen.value || runId !== terminalRunId || !terminalEl.value) return
 
     terminalInstance = new Terminal({
       cursorBlink: true,
@@ -77,18 +81,27 @@ export function useTerminal() {
     resizeTerminal()
     focusTerminal()
 
-    const socket = new WebSocket(backendWebSocketUrl('/api/pi/terminal'))
+    const terminalPath = sessionId
+      ? `/api/pi/terminal?sessionId=${encodeURIComponent(sessionId)}`
+      : '/api/pi/terminal'
+    const socket = new WebSocket(backendWebSocketUrl(terminalPath))
+    const pendingInput = []
+    let terminalReady = false
     terminalSocket = socket
 
     terminalInputDisposable = term.onData((data) => {
+      if (!terminalReady) {
+        if ([WebSocket.CONNECTING, WebSocket.OPEN].includes(socket.readyState)) {
+          pendingInput.push(data)
+        }
+        return
+      }
       if (socket.readyState !== WebSocket.OPEN) return
       socket.send(JSON.stringify({ type: 'input', data }))
     })
 
     socket.addEventListener('open', () => {
       if (runId !== terminalRunId) return
-      terminalStatus.value = 'connected'
-      resizeTerminal()
       focusTerminal()
     })
 
@@ -98,8 +111,13 @@ export function useTerminal() {
       if (!payload) return
 
       if (payload.type === 'ready') {
+        terminalReady = true
         terminalCwd.value = payload.cwd
         terminalStatus.value = 'connected'
+        resizeTerminal()
+        for (const data of pendingInput.splice(0)) {
+          socket.send(JSON.stringify({ type: 'input', data }))
+        }
       }
       if (payload.type === 'data') {
         term.write(payload.data, () => term.scrollToBottom())
@@ -112,8 +130,11 @@ export function useTerminal() {
     })
 
     socket.addEventListener('close', () => {
+      pendingInput.length = 0
       if (runId !== terminalRunId) return
-      if (terminalStatus.value === 'connected') terminalStatus.value = 'closed'
+      if (!['error', 'exited'].includes(terminalStatus.value)) {
+        terminalStatus.value = 'closed'
+      }
     })
 
     window.addEventListener('resize', resizeTerminal)
@@ -127,7 +148,8 @@ export function useTerminal() {
     if (!terminalInstance || !terminalEl.value || !terminalFitAddon) return
     terminalFitAddon.fit()
     terminalInstance.scrollToBottom()
-    if (terminalSocket?.readyState === WebSocket.OPEN) {
+    if (terminalSocket?.readyState === WebSocket.OPEN
+      && terminalStatus.value === 'connected') {
       terminalSocket.send(JSON.stringify({
         type: 'resize',
         cols: terminalInstance.cols,

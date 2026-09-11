@@ -22,7 +22,14 @@ export function piApi() {
 }
 
 export function configurePiWebSocketServer(httpServer) {
-  configureTerminalWebSocketServer(httpServer, runtime.activeRuntimeCwd)
+  configureTerminalWebSocketServer(
+    httpServer,
+    runtime.activeRuntimeCwd,
+    async (sessionId) => {
+      const handle = await runtime.runtimeHandleForId(sessionId)
+      return handle?.runtime.cwd
+    },
+  )
 }
 
 export const piApiHandler = createPiApiHandler(runtime)

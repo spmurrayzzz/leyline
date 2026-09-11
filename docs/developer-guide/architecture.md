@@ -96,14 +96,11 @@ A server runtime handle contains:
 
 Handles remain available after the user selects another session. This permits background sessions to continue and send events.
 
-`activeHandle`, `activeRuntime`, and `activeSessionId` identify the process-wide active session. Legacy routes and the terminal use this selection.
+`activeHandle`, `activeRuntime`, and `activeSessionId` identify the process-wide active session. Legacy routes use this selection.
 
-Scoped session routes resolve a handle by session ID. Use scoped routes for prompt, shell, compaction, edit, interrupt, reload, model, and thinking operations.
+Scoped session routes and Leyline terminal connections resolve a handle by session ID. Use scoped routes for prompt, shell, compaction, edit, interrupt, reload, model, and thinking operations.
 
-Active session selection is process-wide within one backend. Two windows that
-use the same backend can change its terminal target and all legacy
-active-session routes. Windows that use different backends do not share this
-selection.
+Active session selection is process-wide within one backend. Two windows that use the same backend can change all legacy active-session routes. Their terminal connections remain independent. Windows that use different backends do not share this selection.
 
 ## Session storage and projection
 
@@ -190,6 +187,8 @@ SSE updates carry goal, research, and extension UI changes to `App.vue`. The wor
 
 `server/pi-api/terminal.js` handles WebSocket upgrades at `/api/pi/terminal`. It starts one `node-pty` process per connection.
 
-The PTY uses the process-wide active runtime cwd. Closing the browser terminal connection kills that PTY.
+The renderer supplies the selected session ID. The backend resolves that runtime handle without changing the active runtime.
+
+Requests without a session ID use the active runtime CWD for compatibility. Closing the browser terminal connection kills that PTY.
 
 Packaged builds unpack native `node-pty` files. On macOS, the server also repairs the `spawn-helper` executable bit when necessary.

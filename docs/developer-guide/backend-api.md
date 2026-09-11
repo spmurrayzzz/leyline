@@ -71,11 +71,9 @@ The frontend uses `/sessions/:id/<action>` for most runtime operations. The serv
 
 Legacy routes such as `/prompt`, `/bash`, and `/compact` use `requireActiveHandle()`. Keep them for compatibility, but do not use them for new frontend work.
 
-Fork and Reset to here currently use active-session routes. The terminal also uses the process-wide active runtime cwd.
+Fork and Reset to here currently use active-session routes. Leyline terminal connections include a session ID and resolve the requested runtime handle. Unscoped terminal requests use the active runtime CWD for compatibility.
 
-This distinction matters when windows use the same backend. Scoped operations
-select the requested handle. Active operations depend on the latest selection
-in that backend process.
+This distinction matters when windows use the same backend. Scoped operations and Leyline terminal connections select the requested handle. Active operations depend on the latest selection in that backend process.
 
 ## Git review
 

@@ -80,10 +80,9 @@ backend receive a different stream.
 
 ## Terminal events
 
-The terminal endpoint is `/api/pi/terminal` on the active backend. It sends JSON
-WebSocket messages with `ready`, `data`, `error`, or `exit` types.
+The terminal endpoint is `/api/pi/terminal` on the active backend. The renderer supplies the selected session ID in the query string.
 
-The browser sends `input` and `resize` messages. Closing the socket kills its PTY process.
+The endpoint sends JSON WebSocket messages with `ready`, `data`, `error`, or `exit` types. The browser waits for `ready` before it sends `input` and `resize` messages. Closing the socket kills its PTY process.
 
 Do not send terminal bytes through SSE. Terminal ordering and backpressure are independent from runtime events.
 

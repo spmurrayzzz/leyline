@@ -7,10 +7,16 @@ import { requestOriginAllowed } from './cors.js'
 
 const require = createRequire(import.meta.url)
 
-export function configurePiWebSocketServer(httpServer, getCwd) {
+export function configurePiWebSocketServer(
+  httpServer,
+  getActiveCwd,
+  getSessionCwd,
+) {
   const terminalServer = new WebSocketServer({ noServer: true })
 
-  terminalServer.on('connection', (ws) => openTerminal(ws, getCwd))
+  terminalServer.on('connection', (ws, req) => {
+    void openTerminal(ws, req, getActiveCwd, getSessionCwd)
+  })
   httpServer.on('upgrade', (req, socket, head) => {
     const url = new URL(req.url, 'http://localhost')
     if (url.pathname !== '/api/pi/terminal') return
@@ -26,11 +32,22 @@ export function configurePiWebSocketServer(httpServer, getCwd) {
   })
 }
 
-function openTerminal(ws, getCwd) {
-  const cwd = getCwd?.()
+async function openTerminal(ws, req, getActiveCwd, getSessionCwd) {
+  const sessionId = new URL(req.url, 'http://localhost').searchParams.get('sessionId')
+  let cwd
+
+  try {
+    cwd = sessionId
+      ? await getSessionCwd?.(sessionId)
+      : getActiveCwd?.()
+  } catch (error) {
+    closeWithError(ws, error.message)
+    return
+  }
+
+  if (ws.readyState !== WebSocket.OPEN) return
   if (!cwd) {
-    ws.send(JSON.stringify({ type: 'error', message: 'No active session' }))
-    ws.close()
+    closeWithError(ws, sessionId ? 'Session not found' : 'No active session')
     return
   }
 
@@ -39,8 +56,7 @@ function openTerminal(ws, getCwd) {
   let term
 
   if (!isDirectory(cwd)) {
-    ws.send(JSON.stringify({ type: 'error', message: `Invalid cwd: ${cwd}` }))
-    ws.close()
+    closeWithError(ws, `Invalid cwd: ${cwd}`)
     return
   }
 
@@ -54,11 +70,7 @@ function openTerminal(ws, getCwd) {
       env,
     })
   } catch (error) {
-    ws.send(JSON.stringify({
-      type: 'error',
-      message: `Failed to start PTY: ${error.message}`,
-    }))
-    ws.close()
+    closeWithError(ws, `Failed to start PTY: ${error.message}`)
     return
   }
 
@@ -102,6 +114,12 @@ function openTerminal(ws, getCwd) {
   ws.on('close', () => {
     if (!exited) term.kill()
   })
+}
+
+function closeWithError(ws, message) {
+  if (ws.readyState !== WebSocket.OPEN) return
+  ws.send(JSON.stringify({ type: 'error', message }))
+  ws.close()
 }
 
 function ensureNodePtyHelperExecutable() {

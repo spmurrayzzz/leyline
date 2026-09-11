@@ -7,13 +7,13 @@ communicate through `/api/pi/terminal` on the active backend.
 
 `src/composables/useTerminal.js` owns the drawer, xterm instance, fit addon, WebSocket, status, and height.
 
-Opening the terminal creates xterm and then opens the WebSocket. Browser input becomes an `input` message. Fit and resize changes become `resize` messages.
+Opening the terminal creates xterm and then opens the WebSocket with the selected session ID. The browser waits for the server's `ready` message. It then sends input and resize messages. Input entered during connection setup stays queued until the terminal is ready.
 
-Selecting another session closes the current connection. Leyline then opens a new PTY for the newly active session when the drawer remains open.
+Selecting another session closes the current connection. Leyline then opens a new PTY for the selected session when the drawer remains open.
 
 ## Server lifecycle
 
-`server/pi-api/terminal.js` accepts the WebSocket upgrade. It requires a process-wide active runtime and an existing runtime CWD.
+`server/pi-api/terminal.js` accepts the WebSocket upgrade. It resolves the requested session's runtime handle and requires an existing runtime CWD.
 
 The server selects the shell in this order:
 
@@ -28,13 +28,11 @@ The server sends `ready`, `data`, `exit`, and `error` messages. Closing the sock
 
 See the [API reference](../reference/api#terminal-websocket) for message contracts.
 
-## Active-session boundary
+## Session boundary
 
-The terminal uses the backend's active runtime CWD. It is not a session-scoped API operation.
+Leyline connects to `/api/pi/terminal?sessionId=<id>`. The backend resolves that session's CWD without changing the process-wide active runtime.
 
-All browser tabs and Electron windows connected to one backend share its
-active-session pointer. A selection in one window can change the CWD for a new
-terminal connection in another window on that backend.
+Browser tabs and Electron windows can share one backend without changing each other's terminal targets. A request without `sessionId` uses the active runtime CWD for compatibility.
 
 ## Packaged Electron
 

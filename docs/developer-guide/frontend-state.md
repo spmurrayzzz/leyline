@@ -161,7 +161,7 @@ A selected-session change resets scroll state. The terminal height and composer 
 
 Git review and research sources share the desktop third rail. Opening one closes the other. The rail can remain open with contextual drawer state.
 
-The terminal is independent and can remain open below the workbench. Session changes reconnect it so the PTY uses the new active cwd.
+The terminal is independent and can remain open below the workbench. Session changes reconnect it so the PTY uses the selected session CWD.
 
 ## Cleanup
 

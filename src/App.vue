@@ -1316,7 +1316,7 @@ function confirmPendingDelete() {
 async function handleNativeToggleTerminal() {
   if (!selectedSession.value || initializing.value) return
 
-  await toggleTerminal()
+  await toggleTerminal(selectedSessionId.value)
 }
 
 function handleNativeOpenSettings() {
@@ -4007,7 +4007,7 @@ function closePickerMenus() {
         @submit="submitDraft"
         @toggle-picker="togglePicker"
         @toggle-research="toggleEmptySessionKind"
-        @toggle-terminal="toggleTerminal"
+        @toggle-terminal="toggleTerminal(selectedSessionId)"
       />
     </section>
 

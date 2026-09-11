@@ -1409,7 +1409,13 @@ extension_error: {
 
 **Designation:** Browser and Electron terminal transport.
 
-The server accepts an HTTP WebSocket upgrade only at this exact path. It requires an active runtime with an existing working directory.
+The server accepts an HTTP WebSocket upgrade at this path. Leyline supplies the selected session in the query string:
+
+```text
+/api/pi/terminal?sessionId=<session-id>
+```
+
+The `sessionId` parameter is optional for protocol compatibility. When present, the server resolves that runtime handle without changing the process-wide active session. Without `sessionId`, the server uses the active runtime.
 
 Client messages:
 
@@ -1434,4 +1440,6 @@ Server messages:
 
 The first successful message is `ready`. Terminal output uses `data`. A PTY exit sends `exit` and then closes the socket.
 
-If no active session exists, the server sends `{"type":"error","message":"No active session"}` and closes the socket. An invalid working directory or PTY start failure also sends an error and closes the socket. Closing the client socket kills a running PTY.
+If the requested session does not exist, the server sends `{"type":"error","message":"Session not found"}` and closes the socket. An unscoped request with no active session sends `{"type":"error","message":"No active session"}`.
+
+An invalid working directory or PTY start failure also sends an error and closes the socket. Closing the client socket kills a running PTY.
