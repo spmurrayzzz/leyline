@@ -4,6 +4,11 @@ import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import { app, BrowserWindow, shell } from 'electron'
 
+app.commandLine.appendSwitch(
+  'ignore-connections-limit',
+  '127.0.0.1,localhost,::1',
+)
+
 const execFileAsync = promisify(execFile)
 
 let leylineServer
