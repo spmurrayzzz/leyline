@@ -5,6 +5,7 @@ import MarkdownIt from 'markdown-it'
 import {
   imageBlocksFor,
   messageBlocksFor,
+  parseSkillPrompt,
   skillSummaries,
 } from '../../lib/transcript-projection.js'
 
@@ -402,12 +403,17 @@ function renderSkillSummaries(entry, skills) {
   const rows = skills.map((skill) => {
     return `<div class="skill-summary"><span>[skill]</span><strong>${escapeHtml(skill.name)}</strong><em>expand</em></div>`
   }).join('')
+  const prompt = parseSkillPrompt(entry.text)
+  const content = prompt?.content || entry.text || ''
+  const userMessage = prompt?.userMessage
+    ? `<div class="entry-text markdown-body">${renderMarkdown(prompt.userMessage)}</div>`
+    : ''
 
   return `<div class="skill-summary-list"><details><summary>${rows}</summary>
 <div class="skill-expanded entry-text markdown-body">
-${renderMarkdown(entry.text || '')}
+${renderMarkdown(content)}
 </div>
-</details></div>`
+</details>${userMessage}</div>`
 }
 
 function renderMessageImages(entry) {

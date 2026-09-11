@@ -201,6 +201,7 @@ async function piApiHandler(req, res) {
           body.streamingBehavior,
           responseAbortSignal(res),
           body.kind,
+          body.handoffId,
         )
         return json(res, { ok: true, active: activeSessionDto(handle) })
       }
@@ -248,6 +249,7 @@ async function piApiHandler(req, res) {
           body.text,
           body.images,
           responseAbortSignal(res),
+          body.handoffId,
         )
         return json(res, { ok: true, active: activeSessionDto(handle) })
       }
@@ -616,6 +618,7 @@ async function piApiHandler(req, res) {
             body.streamingBehavior,
             responseAbortSignal(res),
             body.kind,
+            body.handoffId,
           )
           return json(res, { ok: true, active: activeSessionDto(handle) })
         }
@@ -642,6 +645,7 @@ async function piApiHandler(req, res) {
             body.text,
             body.images,
             responseAbortSignal(res),
+            body.handoffId,
           )
           return json(res, { ok: true, active: activeSessionDto(handle) })
         }

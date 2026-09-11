@@ -3,7 +3,8 @@ import {
   imageBlocksFor,
   messageBlocks,
   projectEntry,
-  skillSummaries,
+  skillCommandText,
+  skillPromptDisplayText,
   textFromBlocks,
   toolAnnotation,
 } from '../lib/transcript'
@@ -21,8 +22,9 @@ export function useLiveTurnProjection({ onIntent } = {}) {
   const liveUserMessages = ref([])
   const liveTools = ref([])
   const liveFirstUserText = computed(() => {
-    return liveUserMessages.value.find((message) => message.text?.trim())
+    const text = liveUserMessages.value.find((message) => message.text?.trim())
       ?.text.trim() || ''
+    return skillPromptDisplayText(text)
   })
   const rawEntries = computed(() => [
     ...(persistedDetail.value?.entries || []),
@@ -79,7 +81,7 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     if (input.kind === 'runtime') handleRuntimeEvent(input)
   }
 
-  function handleRuntimeEvent({ activeSessionId, event }) {
+  function handleRuntimeEvent({ activeSessionId, event, handoffId }) {
     emit({ type: 'refresh-session', activeSessionId, event })
     if (activeSessionId !== selectedSessionId.value) return
 
@@ -88,7 +90,7 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     agentRunning.value = isRunningEvent(event)
     liveActivity.value = activityText(event)
     updateLiveTool(event)
-    updateLiveUser(event)
+    updateLiveUser(event, handoffId)
     updateLiveAssistant(event)
     releaseLiveAnchorIfSettled()
     emit({ type: 'runtime-queue', event })
@@ -710,11 +712,11 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     return ['completed', 'error', 'aborted'].includes(tool.status)
   }
 
-  function updateLiveUser(event) {
+  function updateLiveUser(event, handoffId) {
     if (!['message_start', 'message_end'].includes(event?.type)) return
     if (event.message?.role !== 'user') return
 
-    const entry = liveUserEntry(event)
+    const entry = liveUserEntry(event, handoffId)
     const existing = findLiveUser(entry)
     if (existing) {
       liveUserMessages.value = liveUserMessages.value.map((item) => {
@@ -725,6 +727,15 @@ export function useLiveTurnProjection({ onIntent } = {}) {
           seq: item.seq,
           createdAt: item.createdAt,
           persistedEntry: item.persistedEntry,
+        }
+      })
+      optimisticEntries.value = optimisticEntries.value.map((item) => {
+        if (item.id !== existing.id) return item
+        return {
+          ...entry,
+          id: item.id,
+          createdAt: item.createdAt,
+          persisted: false,
         }
       })
       return
@@ -741,11 +752,12 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     ]
   }
 
-  function liveUserEntry(event) {
+  function liveUserEntry(event, handoffId) {
     const blocks = messageBlocks(event.message.content)
     const text = textFromBlocks(blocks)
     return {
       id: messageEventId(event),
+      handoffId,
       createdAt: Date.now(),
       type: 'message',
       role: 'user',
@@ -781,6 +793,9 @@ export function useLiveTurnProjection({ onIntent } = {}) {
   function liveUserMatchesEntry(message, entry) {
     if (message.persistedEntry?.id) {
       return message.persistedEntry.id === entry.id
+    }
+    if (message.handoffId && entry.handoffId) {
+      return message.handoffId === entry.handoffId
     }
     return localEntryMatches(message, entry)
   }
@@ -932,12 +947,14 @@ export function useLiveTurnProjection({ onIntent } = {}) {
 
   function pendingUserEntry(text, images = []) {
     const now = Date.now()
+    const id = `local-${crypto.randomUUID()}`
     const blocks = []
     if (text) blocks.push({ type: 'text', text })
     blocks.push(...images)
 
     return {
-      id: `local-${now}`,
+      id,
+      handoffId: id,
       createdAt: now,
       persisted: false,
       submitHandoff: true,
@@ -959,15 +976,13 @@ export function useLiveTurnProjection({ onIntent } = {}) {
   function localEntryMatches(localEntry, entry) {
     if (entry.type !== 'message' || entry.role !== localEntry.role) return false
     if (!entryIsAfterLocalEntry(entry, localEntry)) return false
-
-    if (entry.text === localEntry.text
-      && imageBlocksFor(entry).length === imageBlocksFor(localEntry).length) {
-      return true
+    if (imageBlocksFor(entry).length !== imageBlocksFor(localEntry).length) {
+      return false
     }
+    if (entry.text === localEntry.text) return true
 
-    const skillName = localSkillCommandName(localEntry.text)
-    if (!skillName) return false
-    return skillSummaries(entry).some((skill) => skill.name === skillName)
+    const localSkill = skillCommandText(localEntry.text)
+    return Boolean(localSkill && localSkill === skillCommandText(entry.text))
   }
 
   function entryIsAfterLocalEntry(entry, localEntry) {
@@ -975,10 +990,6 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     const entryTime = new Date(entry.timestamp).getTime()
     if (!Number.isFinite(entryTime)) return true
     return entryTime >= localEntry.createdAt - 1000
-  }
-
-  function localSkillCommandName(text) {
-    return text?.trim().match(/^\/skill:([^\s]+)/)?.[1] || ''
   }
 
   function hasLiveOutput() {

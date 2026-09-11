@@ -2451,13 +2451,20 @@ async function submitDraft(streamingBehavior) {
   let promptAccepted = false
   try {
     const data = editing
-      ? await editPrompt(sessionId, editing.id, text, images)
+      ? await editPrompt(
+        sessionId,
+        editing.id,
+        text,
+        images,
+        localEntry.handoffId,
+      )
       : await submitPrompt(
         sessionId,
         text,
         images,
         undefined,
         initializesResearchSession ? 'research' : undefined,
+        localEntry.handoffId,
       )
     if (editing) completeComposerEdit(composerDraftKey(sessionId), editing)
     if (selectedSessionId.value === sessionId) {
@@ -2681,7 +2688,13 @@ async function retryEntry(entry) {
   await scrollToLatest()
 
   try {
-    const data = await editPrompt(sessionId, target.id, text, images)
+    const data = await editPrompt(
+      sessionId,
+      target.id,
+      text,
+      images,
+      localEntry.handoffId,
+    )
     if (selectedSessionId.value === sessionId) {
       if (data.active) activeRuntimeSession.value = data.active
       setAgentRunning(true, 'Thinking…')

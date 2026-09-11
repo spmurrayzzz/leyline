@@ -445,6 +445,7 @@ async function promptSession(
   streamingBehavior,
   signal,
   kind,
+  handoffId,
 ) {
   const session = handle.runtime.session
   const controller = new AbortController()
@@ -459,6 +460,10 @@ async function promptSession(
     forceOneAtATime(session)
     const promptText = typeof text === 'string' ? text : ''
     const promptImages = validateImages(images)
+    const promptHandoffId = typeof handoffId === 'string'
+      && handoffId.length <= 100
+      ? handoffId
+      : undefined
     if (!promptText.trim() && promptImages.length === 0) {
       throw new Error('text or image is required')
     }
@@ -484,7 +489,14 @@ async function promptSession(
 
     if (!delegation) {
       try {
-        await runSessionPrompt(session, promptText, promptImages, streamingBehavior)
+        await runSessionPrompt(
+          handle,
+          promptText,
+          promptImages,
+          streamingBehavior,
+          promptHandoffId,
+          controller.signal,
+        )
       } catch (error) {
         if (controller.signal.aborted) throw new Error('Prompt cancelled')
         throw error
@@ -504,10 +516,12 @@ async function promptSession(
     )
     try {
       const accepted = await runSessionPrompt(
-        session,
+        handle,
         promptText,
         promptImages,
         streamingBehavior,
+        promptHandoffId,
+        controller.signal,
       )
       if (controller.signal.aborted) {
         registration.cancel()
@@ -526,33 +540,85 @@ async function promptSession(
   }
 }
 
-async function runSessionPrompt(session, text, promptImages, streamingBehavior) {
-  const wasStreaming = session.isStreaming
-  const queueBefore = queuedMessageCount(session, streamingBehavior)
-  let preflightSucceeded = false
-  let queued = false
-  await new Promise((resolve, reject) => {
-    session
-      .prompt(text, {
+async function runSessionPrompt(
+  handle,
+  text,
+  promptImages,
+  streamingBehavior,
+  handoffId,
+  signal,
+) {
+  const release = await lockPromptSubmission(handle)
+  const session = handle.runtime.session
+  let handoff
+  try {
+    if (signal?.aborted) throw new Error('Prompt cancelled')
+    const wasStreaming = session.isStreaming
+    const queueBefore = queuedMessageCount(session, streamingBehavior)
+    let preflightSucceeded = false
+    let queued = false
+    await new Promise((resolve, reject) => {
+      const promptPromise = session.prompt(text, {
         images: promptImages.length ? promptImages : undefined,
         streamingBehavior,
         source: 'api',
         preflightResult: (didSucceed) => {
           if (!didSucceed) return
           preflightSucceeded = true
+          if (!wasStreaming) handoff = createPromptHandoff(handle, handoffId)
           queued = wasStreaming
             && queuedMessageCount(session, streamingBehavior) > queueBefore
           resolve()
         },
       })
-      .catch((error) => {
-        if (!preflightSucceeded) reject(error)
-      })
-  })
-  if (!wasStreaming && !session.isStreaming) {
-    await new Promise((resolve) => setImmediate(resolve))
+      Promise.resolve(promptPromise).then(
+        () => settlePromptHandoff(handle, handoff),
+        (error) => {
+          settlePromptHandoff(handle, handoff)
+          if (!preflightSucceeded) reject(error)
+        },
+      )
+    })
+    if (handoff) await handoff.settled
+    if (!wasStreaming && !session.isStreaming) {
+      await new Promise((resolve) => setImmediate(resolve))
+    }
+    return queued || session.isStreaming
+  } finally {
+    settlePromptHandoff(handle, handoff)
+    release()
   }
-  return queued || session.isStreaming
+}
+
+async function lockPromptSubmission(handle) {
+  const previous = handle.promptSubmissionLock
+  let unlock
+  const current = new Promise((resolve) => { unlock = resolve })
+  handle.promptSubmissionLock = current
+  if (previous) await previous
+  return () => {
+    if (handle.promptSubmissionLock === current) {
+      handle.promptSubmissionLock = undefined
+    }
+    unlock()
+  }
+}
+
+function createPromptHandoff(handle, id) {
+  let resolve
+  const settled = new Promise((settle) => { resolve = settle })
+  const handoff = { id, settled, resolve }
+  settlePromptHandoff(handle, handle.pendingPromptHandoff)
+  handle.pendingPromptHandoff = handoff
+  return handoff
+}
+
+function settlePromptHandoff(handle, handoff) {
+  if (!handoff) return
+  if (handle.pendingPromptHandoff === handoff) {
+    handle.pendingPromptHandoff = undefined
+  }
+  handoff.resolve()
 }
 
 function queuedMessageCount(session, streamingBehavior) {
@@ -730,7 +796,14 @@ async function interruptSession(handle) {
   await handle.runtime.session.abort()
 }
 
-async function editSessionPrompt(handle, entryId, text, images = [], signal) {
+async function editSessionPrompt(
+  handle,
+  entryId,
+  text,
+  images = [],
+  signal,
+  handoffId,
+) {
   const session = handle.runtime.session
   if (!entryId) throw new Error('entryId is required')
   if (session.isStreaming) {
@@ -754,7 +827,15 @@ async function editSessionPrompt(handle, entryId, text, images = [], signal) {
   await bindRuntimeHandle(handle)
 
   try {
-    await promptSession(handle, text, images, undefined, signal)
+    await promptSession(
+      handle,
+      text,
+      images,
+      undefined,
+      signal,
+      undefined,
+      handoffId,
+    )
   } catch (error) {
     moveSessionLeaf(session, oldLeafId)
     await bindRuntimeHandle(handle)

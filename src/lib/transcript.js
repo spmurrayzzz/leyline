@@ -4,7 +4,10 @@ import {
   imageBlocksFor,
   messageBlocks,
   messageBlocksFor,
+  parseSkillPrompt,
   projectEntry,
+  skillCommandText,
+  skillPromptDisplayText,
   skillSummaries,
   textFromBlocks,
   textFromContent,
@@ -29,7 +32,11 @@ export function entryClass(entry) {
 }
 
 export function renderedMessage(entry) {
-  return markdown.render(entry.text || '')
+  return renderedText(entry.text)
+}
+
+export function renderedText(text) {
+  return markdown.render(text || '')
 }
 
 export function renderedBlock(block) {
@@ -177,7 +184,10 @@ export {
   imageBlocksFor,
   messageBlocks,
   messageBlocksFor,
+  parseSkillPrompt,
   projectEntry,
+  skillCommandText,
+  skillPromptDisplayText,
   skillSummaries,
   textFromBlocks,
   textFromContent,

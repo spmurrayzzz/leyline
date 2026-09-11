@@ -206,13 +206,14 @@ export function submitPrompt(
   images = [],
   streamingBehavior,
   kind,
+  handoffId,
 ) {
   return apiRequest(
     sessionActionUrl(sessionId, 'prompt'),
     'Failed to submit prompt',
     {
       method: 'POST',
-      body: { text, images, streamingBehavior, kind },
+      body: { text, images, streamingBehavior, kind, handoffId },
     },
   )
 }
@@ -243,13 +244,19 @@ export function compactPiSession(sessionId, customInstructions = '') {
   )
 }
 
-export function editPrompt(sessionId, entryId, text, images = []) {
+export function editPrompt(
+  sessionId,
+  entryId,
+  text,
+  images = [],
+  handoffId,
+) {
   return apiRequest(
     sessionActionUrl(sessionId, 'edit-prompt'),
     'Failed to edit prompt',
     {
       method: 'POST',
-      body: { entryId, text, images },
+      body: { entryId, text, images, handoffId },
     },
   )
 }

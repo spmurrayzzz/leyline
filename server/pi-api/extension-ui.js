@@ -10,6 +10,7 @@ export function emptyExtensionUiState() {
 }
 
 export async function bindRuntimeHandle(handle, events) {
+  settlePromptHandoff(handle)
   handle.unsubscribe?.()
   handle.extensionUiState = emptyExtensionUiState()
   handle.pendingToolResults = new Map()
@@ -24,11 +25,13 @@ export async function bindRuntimeHandle(handle, events) {
   })
   syncGoalStateFromSession(handle)
   handle.unsubscribe = handle.runtime.session.subscribe((event) => {
+    const handoffId = promptHandoffId(handle, event)
     trackPendingToolResult(handle, event)
     syncGoalStateFromSession(handle)
     events.broadcastEvent('runtime_event', {
       activeSessionId: handle.sessionId,
       event,
+      handoffId,
     })
     if (event.type === 'compaction_end') {
       queueMicrotask(() => events.broadcastActiveSession(handle))
@@ -45,6 +48,32 @@ export async function bindRuntimeHandle(handle, events) {
 
 function isResearchStateEvent(event) {
   return event?.type === 'entry_appended' && isResearchEntry(event.entry)
+}
+
+function promptHandoffId(handle, event) {
+  if (event?.type === 'message_start' && event.message?.role === 'user') {
+    const handoff = handle.pendingPromptHandoff
+    handle.pendingPromptHandoff = undefined
+    handle.activePromptHandoffId = handoff?.id
+    handoff?.resolve()
+    return handoff?.id
+  }
+  if (event?.type === 'message_end' && event.message?.role === 'user') {
+    const id = handle.activePromptHandoffId
+    handle.activePromptHandoffId = undefined
+    return id
+  }
+  if (['agent_end', 'aborted'].includes(event?.type)) {
+    settlePromptHandoff(handle)
+  }
+  return undefined
+}
+
+function settlePromptHandoff(handle) {
+  const handoff = handle.pendingPromptHandoff
+  handle.pendingPromptHandoff = undefined
+  handle.activePromptHandoffId = undefined
+  handoff?.resolve()
 }
 
 function trackPendingToolResult(handle, event) {

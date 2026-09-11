@@ -1,5 +1,8 @@
 import { basename } from 'node:path'
-import { projectTranscriptEntries } from '../../lib/transcript-projection.js'
+import {
+  projectTranscriptEntries,
+  skillPromptDisplayText,
+} from '../../lib/transcript-projection.js'
 import { SessionManager } from '@earendil-works/pi-coding-agent'
 import { emptyExtensionUiState } from './extension-ui.js'
 import { goalStateFromEntries, goalStateFromSession } from './goal-state.js'
@@ -310,7 +313,10 @@ export function toSessionDto(session) {
     parentSessionPath: session.parentSessionPath,
     isSubagentSession: session.isSubagentSession === true,
     research: compactResearchState(session.research),
-    firstMessage: truncate(session.firstMessage || '', 140),
+    firstMessage: truncate(
+      skillPromptDisplayText(session.firstMessage || ''),
+      140,
+    ),
     messageCount: session.messageCount ?? 0,
     modified: session.modified || session.created || timestampFromPath(session.path),
     timestamp: session.created || timestampFromPath(session.path),

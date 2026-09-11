@@ -12,8 +12,10 @@ import {
   imageBlocksFor,
   imageSrc,
   messageBlocksFor,
+  parseSkillPrompt,
   renderedBlock,
   renderedMessage,
+  renderedText,
   renderedToolJson,
   skillSummaries,
   toolCommandCode,
@@ -83,6 +85,14 @@ const unhelpfulThumbPaths = [
 
 function toggleThinking() {
   thinkingExpanded.value = !thinkingExpanded.value
+}
+
+function skillContent(entry) {
+  return parseSkillPrompt(entry.text)?.content || entry.text || ''
+}
+
+function skillUserMessage(entry) {
+  return parseSkillPrompt(entry.text)?.userMessage || ''
 }
 
 function copyTitle(id) {
@@ -709,11 +719,17 @@ function openMarkdownContent(event) {
         <div class="skill-expand-inner">
           <div
             class="skill-expanded entry-text markdown-body"
-            v-html="renderedMessage(entry)"
+            v-html="renderedText(skillContent(entry))"
             @click="openMarkdownContent"
           ></div>
         </div>
       </div>
+      <div
+        v-if="skillUserMessage(entry)"
+        class="entry-text markdown-body"
+        v-html="renderedText(skillUserMessage(entry))"
+        @click="openMarkdownContent"
+      ></div>
     </div>
     <div
       v-else
