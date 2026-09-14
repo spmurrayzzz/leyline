@@ -26,9 +26,28 @@ const views = computed(() => [
 const visibleSources = computed(() => {
   const sources = props.research?.sources || []
   if (view.value === 'ledger') return sources
-  return sources.filter((source) => source.status === 'cited')
+  const invalidIds = new Set(
+    (props.research?.invalidLinks || []).map((link) => link.id),
+  )
+  return sources.filter((source) => {
+    return source.status === 'cited' || invalidIds.has(source.id)
+  })
+})
+const unmatchedInvalidLinks = computed(() => {
+  const sourceIds = new Set(
+    (props.research?.sources || []).map((source) => source.id),
+  )
+  return (props.research?.invalidLinks || []).filter((link) => {
+    return !sourceIds.has(link.id)
+  })
 })
 const summary = computed(() => {
+  const invalidCount = props.research?.invalidLinkCount
+    || props.research?.invalidLinks?.length
+    || 0
+  if (invalidCount) {
+    return `${invalidCount} citation ${invalidCount === 1 ? 'needs' : 'need'} repair`
+  }
   if (view.value === 'cited') {
     return `${props.research?.citedSourceCount || 0} cited in this report`
   }
@@ -86,6 +105,12 @@ function sourceSummary(source) {
   }
   return source.claim || source.evidence || ''
 }
+
+function invalidCitationTarget(source) {
+  return props.research?.invalidLinks?.find((link) => {
+    return link.id === source.id
+  })?.href || ''
+}
 </script>
 
 <template>
@@ -122,7 +147,10 @@ function sourceSummary(source) {
         v-for="source in visibleSources"
         :key="source.id"
         class="research-source-card"
-        :class="{ excluded: source.status === 'excluded' }"
+        :class="{
+          excluded: source.status === 'excluded',
+          'invalid-citation': !!invalidCitationTarget(source),
+        }"
       >
         <component
           :is="source.url ? 'a' : 'div'"
@@ -147,14 +175,37 @@ function sourceSummary(source) {
             <span>{{ source.kind }}</span>
             <span>{{ sourceStatus(source) }}</span>
           </span>
+          <span
+            v-if="invalidCitationTarget(source)"
+            class="research-source-validation-error"
+          >Report target does not match: {{ invalidCitationTarget(source) }}</span>
           <span v-if="sourceSummary(source)" class="research-source-summary">
             {{ sourceSummary(source) }}
           </span>
         </component>
       </article>
-      <div v-if="!visibleSources.length" class="research-source-empty">
-        No sources in this view.
-      </div>
+      <article
+        v-for="link in unmatchedInvalidLinks"
+        :key="`invalid-${link.id}-${link.href}`"
+        class="research-source-card invalid-citation"
+      >
+        <div class="research-source-select">
+          <span class="research-source-card-head">
+            <b>{{ link.id }}</b>
+            <span>
+              <strong>Unknown citation {{ link.id }}</strong>
+              <small>Not in the source ledger</small>
+            </span>
+          </span>
+          <span class="research-source-validation-error">
+            Report target does not match: {{ link.href }}
+          </span>
+        </div>
+      </article>
+      <div
+        v-if="!visibleSources.length && !unmatchedInvalidLinks.length"
+        class="research-source-empty"
+      >No sources in this view.</div>
     </div>
   </aside>
 </template>

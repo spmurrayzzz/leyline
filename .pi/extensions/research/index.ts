@@ -54,6 +54,8 @@ const RESEARCH_FOLLOWUP_PROMPT = `The current Leyline deep research cycle has en
 
 Treat the user's message as a normal follow-up. Use any available report, source ledger, partial findings, and transcript as context. Tools and subagents do not start another research cycle.
 
+If the current state has an error in the report phase and the user asks you to fix, repair, revise, or complete the report, repair that report without starting a new plan. Update a source only when its ledger record is wrong. Then call research_update with action "phase" and phase "report", the report title, and the source IDs you will cite. Write the complete corrected report as the next response. Use each source's canonical URL or path from the tool response. This checkpoint revalidates the replacement report.
+
 Start another research cycle only when the user explicitly asks for additional research. For a new cycle:
 1. Call research_update with action "plan" before you delegate.
 2. Delegate parallel threads with the "researcher" agent and register their useful sources.
@@ -126,6 +128,9 @@ function stateForModel(state: NonNullable<ResearchState>): string {
     phase: state.phase,
     status: state.status,
     error: state.status === "error" ? state.error : "",
+    errorCode: state.status === "error" ? state.errorCode : "",
+    invalidLinks: state.status === "error" ? state.invalidLinks : [],
+    invalidLinkCount: state.status === "error" ? state.invalidLinkCount : 0,
     threads,
     sources,
   }, null, 2);
@@ -206,6 +211,7 @@ export default function researchExtension(pi: ExtensionAPI) {
     sources: unknown,
     ctx?: ExtensionContext,
     sourceCwd = ctx?.cwd || "",
+    allowIdReplacement = false,
   ): number[] {
     if (!state || !Array.isArray(sources)) return [];
     const ids: number[] = [];
@@ -226,7 +232,10 @@ export default function researchExtension(pi: ExtensionAPI) {
           return registeredSourceCwds(candidate, ctx?.cwd || "").some((candidateCwd) => {
             return canonicalResearchSourceKey(candidate, candidateCwd) === key;
           });
-        });
+        })
+        || (allowIdReplacement
+          ? state.sources.find((candidate) => candidate.id === Number(source.id))
+          : undefined);
       if (!existing && state.sources.length >= 60) continue;
       const id = existing?.id || state.sources.reduce((max, candidate) => {
         return Math.max(max, candidate.id);
@@ -335,8 +344,14 @@ export default function researchExtension(pi: ExtensionAPI) {
     }),
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       if (!active || !state) throw new Error("research_update requires a research session");
-      if (state.status !== "running" && params.action !== "plan") {
-        throw new Error("Start a new research plan before you update a finished research cycle");
+      const repairsReport = state.status === "error"
+        && state.phase === "report"
+        && (params.action === "sources"
+          || (params.action === "phase" && params.phase === "report"));
+      if (state.status !== "running" && params.action !== "plan" && !repairsReport) {
+        throw new Error(state.phase === "report"
+          ? "Repair this report with a report phase checkpoint, or start a new research plan"
+          : "Start a new research plan before you update a finished research cycle");
       }
 
       if (params.action === "plan") {
@@ -359,7 +374,13 @@ export default function researchExtension(pi: ExtensionAPI) {
 
       if (params.action === "sources") {
         if (!params.sources?.length) throw new Error("sources action requires sources");
-        registerSources(params.threadId || "", params.sources, ctx);
+        registerSources(
+          params.threadId || "",
+          params.sources,
+          ctx,
+          ctx.cwd,
+          repairsReport,
+        );
       }
 
       if (params.action === "exclude") {
@@ -443,10 +464,12 @@ export default function researchExtension(pi: ExtensionAPI) {
     if (citationAudit.invalid || (usableSources.length && !citationAudit.ids.length)) {
       persist({
         kind: "error",
+        code: "citation_validation",
         message: citationAudit.invalid
           ? `The report contained ${citationAudit.invalid} citation link${citationAudit.invalid === 1 ? "" : "s"} that did not match the source ledger. Cite each claim with the ledger source's stored URL or path verbatim.${invalidLinkExamples(citationAudit.invalidLinks)}`
           : "The report did not contain any citations that matched the source ledger.",
         invalidLinks: citationAudit.invalidLinks,
+        invalidCount: citationAudit.invalid,
         matchedCount: citationAudit.ids.length,
       }, ctx);
       return;

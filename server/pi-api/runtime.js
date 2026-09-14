@@ -949,6 +949,7 @@ function restoreTrailingResearchReport(manager) {
         kind: 'error',
         message: 'The restored report citations did not match the source ledger.',
         invalidLinks: citationAudit.invalidLinks,
+        invalidCount: citationAudit.invalid,
       }
   manager.appendCustomEntry(RESEARCH_CUSTOM_TYPE, {
     version: RESEARCH_VERSION,
@@ -1018,6 +1019,7 @@ function rebaseResearchSession(manager) {
         kind: 'error',
         message: 'Forked report citations did not match the source ledger.',
         invalidLinks: citationAudit.invalidLinks,
+        invalidCount: citationAudit.invalid,
       })
     }
   } else if (research.status === 'error') {

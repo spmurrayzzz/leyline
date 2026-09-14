@@ -438,6 +438,10 @@ const selectedResearch = computed(() => {
     || null
 })
 const isResearchSession = computed(() => Boolean(selectedResearch.value))
+const researchReportNeedsRepair = computed(() => {
+  return selectedResearch.value?.status === 'error'
+    && selectedResearch.value?.phase === 'report'
+})
 const researchPhaseSteps = ['plan', 'gather', 'synthesize', 'report']
 const researchPhaseIndex = computed(() => {
   return Math.max(0, researchPhaseSteps.indexOf(selectedResearch.value?.phase))
@@ -446,6 +450,7 @@ const researchPhaseTitle = computed(() => {
   const research = selectedResearch.value
   if (!research) return ''
   if (research.status === 'complete') return 'Research complete'
+  if (researchReportNeedsRepair.value) return 'Report needs repair'
   if (research.status === 'error') return 'Research interrupted'
   if (research.phase === 'gather') return 'Gathering evidence'
   if (research.phase === 'synthesize') return 'Synthesizing findings'
@@ -455,6 +460,14 @@ const researchPhaseTitle = computed(() => {
 const researchPhaseSummary = computed(() => {
   const research = selectedResearch.value
   if (!research) return ''
+  if (researchReportNeedsRepair.value) {
+    const count = research.invalidLinkCount || research.invalidLinks?.length || 0
+    if (count) return `${count} citation ${count === 1 ? 'target does' : 'targets do'} not match the source ledger`
+    if (research.errorCode === 'citation_validation') {
+      return 'The report has no citations that match the source ledger'
+    }
+    return 'The report stopped before validation completed'
+  }
   if (research.phase === 'gather' && research.threadCount) {
     return `${research.completedThreadCount} of ${research.threadCount} threads complete · ${research.sourceCount} sources`
   }
@@ -799,6 +812,9 @@ const composerPlaceholder = computed(() => {
   }
   if (agentRunning.value) {
     return 'Type to steer the current run; Option+Enter queues follow-up'
+  }
+  if (researchReportNeedsRepair.value) {
+    return 'Ask Leyline to repair and revalidate the report'
   }
   if (selectedResearch.value?.status === 'complete') {
     return 'Ask a follow-up or request a report revision'
@@ -2173,6 +2189,23 @@ async function refocusComposer() {
   retryComposerFocus()
 }
 
+async function requestResearchReportRepair() {
+  if (!researchReportNeedsRepair.value
+    || promptSubmitting.value
+    || agentRunning.value
+    || reloadingSession.value
+    || sessionLoading.value
+    || sessionSwitching.value
+    || sessionActivating.value
+    || compactingContext.value
+    || editingEntry.value
+    || draft.value.trim()
+    || attachedImages.value.length) return
+  draft.value = 'Repair the existing report against the source ledger and write the complete corrected report. Revalidate it without starting a new research cycle.'
+  await nextTick()
+  await submitDraft()
+}
+
 function beginInProjectNewSessionRun() {
   clearTimeout(inProjectDockTimer)
   clearTimeout(inProjectSettlingTimer)
@@ -3320,7 +3353,9 @@ function closePickerMenus() {
             class="research-session-chip"
           >{{ selectedResearch.status === 'complete'
             ? 'report ready'
-            : selectedResearch.phase }}</span>
+            : researchReportNeedsRepair
+              ? 'repair'
+              : selectedResearch.phase }}</span>
         </div>
         <div v-if="selectedSession" class="topbar-meta">
           <button
@@ -3518,8 +3553,30 @@ function closePickerMenus() {
           class="research-phase-bar"
         >
           <div class="research-phase-summary">
-            <strong>{{ researchPhaseTitle }}</strong>
-            <span>{{ researchPhaseSummary }}</span>
+            <div>
+              <strong>{{ researchPhaseTitle }}</strong>
+              <span>{{ researchPhaseSummary }}</span>
+            </div>
+            <button
+              v-if="researchReportNeedsRepair"
+              type="button"
+              :disabled="promptSubmitting
+                || agentRunning
+                || reloadingSession
+                || sessionLoading
+                || sessionSwitching
+                || sessionActivating
+                || compactingContext
+                || !!editingEntry
+                || !!draft.trim()
+                || !!attachedImages.length"
+              :title="editingEntry
+                ? 'Finish or cancel the current edit before repairing the report'
+                : draft.trim() || attachedImages.length
+                  ? 'Send or clear the current draft before repairing the report'
+                  : 'Repair and revalidate this report'"
+              @click="requestResearchReportRepair"
+            >Repair report</button>
           </div>
           <div class="research-phase-steps" aria-label="Research progress">
             <span

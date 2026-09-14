@@ -632,6 +632,9 @@ export function useSessionWorkspace({
   }
 
   function runtimeStatus(state, research, showCompleted = false) {
+    if (research?.status === 'error' && research.phase === 'report') {
+      return { label: 'repair', tone: 'error' }
+    }
     if (state.error || research?.status === 'error') {
       return { label: 'error', tone: 'error' }
     }
