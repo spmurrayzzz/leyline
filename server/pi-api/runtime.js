@@ -80,6 +80,15 @@ import {
 import { auditResearchReportCitations } from '../../lib/research-citations.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
+const BUNDLED_COMPACTION_GUARD_EXTENSION = resolve(
+  __dirname,
+  '..',
+  '..',
+  '.pi',
+  'extensions',
+  'compaction-guard',
+  'index.ts',
+)
 const BUNDLED_GOAL_EXTENSION = resolve(
   __dirname,
   '..',
@@ -200,6 +209,7 @@ function extensionNames(extension) {
 
 function preferBundledExtensions(result) {
   const specifications = [
+    { path: BUNDLED_COMPACTION_GUARD_EXTENSION, name: 'compaction-guard' },
     { path: BUNDLED_GOAL_EXTENSION, name: 'goal', command: 'goal' },
     { path: BUNDLED_MEMORY_EXTENSION, name: 'memory', command: 'memory' },
     { path: BUNDLED_SUBAGENT_EXTENSION, name: 'subagent', tool: 'subagent' },
@@ -247,6 +257,7 @@ async function createRuntimeResult(
     cwd,
     resourceLoaderOptions: {
       additionalExtensionPaths: [
+        BUNDLED_COMPACTION_GUARD_EXTENSION,
         BUNDLED_GOAL_EXTENSION,
         BUNDLED_MEMORY_EXTENSION,
         BUNDLED_SUBAGENT_EXTENSION,

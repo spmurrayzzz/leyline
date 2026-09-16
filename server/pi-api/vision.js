@@ -271,7 +271,10 @@ function applyVisionDelegations(messages, records) {
     return {
       ...message,
       content: [
-        ...message.content.filter((item) => item.type !== 'image'),
+        ...message.content.filter((item) => {
+          return item.type !== 'image'
+            && (item.type !== 'text' || item.text?.trim())
+        }),
         { type: 'text', text: alreadyInspected
           ? record.settledText || record.text
           : record.text },
