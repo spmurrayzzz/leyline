@@ -617,6 +617,7 @@ const {
   eventStreamError,
   openEventStream,
   runtimeEvents,
+  setEventSessionId,
 } = useRuntimeEvents({
   onActiveSession(activeSession) {
     if (activeSession.id && activeSession.cwd) {
@@ -646,6 +647,14 @@ const {
   onExtensionError(data) {
     if (data.activeSessionId !== selectedSessionId.value) return
     promptError.value = data.error?.message || data.error || 'Extension error'
+  },
+  onReconnect() {
+    if (!selectedSessionId.value
+      || sessionLoading.value
+      || sessionSwitching.value) return
+    scheduleSessionRefresh(selectedSessionId.value, {
+      type: 'stream_reconnected',
+    })
   },
 })
 const currentMobileModelLabel = computed(() => {
@@ -934,7 +943,8 @@ watch(settingsCwd, (cwd, previousCwd) => {
   reviewOpenRequested.value = reopen && !!cwd
 })
 
-watch(selectedSessionId, () => {
+watch(selectedSessionId, (sessionId) => {
+  setEventSessionId(sessionId)
   emptySessionKind.value = 'session'
   if (!selectedSessionId.value) {
     reviewReady.value = false

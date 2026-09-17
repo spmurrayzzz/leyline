@@ -540,7 +540,7 @@ export function useSessionWorkspace({
   }
 
   function sessionRefreshDelay(activeSessionId, event) {
-    if (event?.type === 'agent_settled') return 0
+    if (['agent_settled', 'stream_reconnected'].includes(event?.type)) return 0
     if (event?.type === 'compaction_end') {
       return event.reason === 'manual' ? 0 : undefined
     }
@@ -582,16 +582,23 @@ export function useSessionWorkspace({
       isCompacting: state.isCompacting === true,
       queuedCount: queuedCount(state.queuedMessages),
       pendingTools,
-      pendingToolCount: pendingTools.length || (
-        Array.isArray(state.pendingToolCalls)
-          ? state.pendingToolCalls.length
-          : 0
-      ),
+      pendingToolCount: Number.isFinite(state.pendingToolCount)
+        ? state.pendingToolCount
+        : pendingTools.length || (
+            Array.isArray(state.pendingToolCalls)
+              ? state.pendingToolCalls.length
+              : 0
+          ),
       research: state.research || null,
     }
+    const previous = runtimeSessionsById.value[runtimeSession.id] || {}
+    const wasBusy = previous.isStreaming || previous.isCompacting
+    const isBusy = patch.isStreaming || patch.isCompacting
     patchRuntimeSessionState(runtimeSession.id, patch, {
-      preserveUnread: true,
-      touchActivity: runtimeProjectActive(patch),
+      unread: runtimeSession.id !== selectedSessionId.value
+        && wasBusy
+        && !isBusy,
+      touchActivity: runtimeProjectActive(patch) || (wasBusy && !isBusy),
     })
   }
 
@@ -814,8 +821,12 @@ export function useSessionWorkspace({
   }
 
   function queuedCount(queue) {
-    const steering = Array.isArray(queue?.steering) ? queue.steering.length : 0
-    const followUp = Array.isArray(queue?.followUp) ? queue.followUp.length : 0
+    const steering = Number.isFinite(queue?.steeringCount)
+      ? queue.steeringCount
+      : Array.isArray(queue?.steering) ? queue.steering.length : 0
+    const followUp = Number.isFinite(queue?.followUpCount)
+      ? queue.followUpCount
+      : Array.isArray(queue?.followUp) ? queue.followUp.length : 0
     return steering + followUp
   }
 
