@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, Menu, shell } from 'electron'
 
 app.commandLine.appendSwitch(
   'ignore-connections-limit',
@@ -443,6 +443,7 @@ async function loadLoginShellEnvironment() {
 if (gotSingleInstanceLock) {
   app.whenReady().then(async () => {
     await loadLoginShellEnvironment()
+    if (process.platform === 'linux') Menu.setApplicationMenu(null)
     await createWindow(nativeCommandFromArgv(process.argv))
   })
 }
