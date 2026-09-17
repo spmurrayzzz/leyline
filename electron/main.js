@@ -61,8 +61,8 @@ async function createWindow(initialCommand, initialUrl = '') {
 
   const window = new BrowserWindow({
     ...windowState.bounds,
-    minWidth: 900,
-    minHeight: 640,
+    minWidth: 360,
+    minHeight: 420,
     backgroundColor: '#0b0b10',
     webPreferences: {
       contextIsolation: true,
