@@ -1,8 +1,16 @@
 import { execFile } from 'node:child_process'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
-import { app, BrowserWindow, Menu, shell } from 'electron'
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  Menu,
+  shell,
+  utilityProcess,
+} from 'electron'
 
 app.commandLine.appendSwitch(
   'ignore-connections-limit',
@@ -10,11 +18,20 @@ app.commandLine.appendSwitch(
 )
 
 const execFileAsync = promisify(execFile)
+const PACKAGED_SERVER_START_TIMEOUT_MS = 15000
+const PACKAGED_SERVER_STOP_TIMEOUT_MS = 2000
+const packagedServerProcessPath = fileURLToPath(
+  new URL('./leyline-server-process.js', import.meta.url),
+)
 
-let leylineServer
+let leylineServerProcess
 let leylineServerUrl
 let leylineServerStarting
+let leylineServerStopping
 let mainWindow
+let quitAfterServerStops = false
+let serverStoppedForQuit = false
+let unexpectedServerExitHandled = false
 
 const gotSingleInstanceLock = app.requestSingleInstanceLock()
 if (!gotSingleInstanceLock) app.quit()
@@ -393,14 +410,165 @@ async function packagedAppUrl() {
 }
 
 async function startPackagedAppServer() {
+  const child = utilityProcess.fork(packagedServerProcessPath, [], {
+    cwd: process.cwd(),
+    serviceName: 'Leyline Backend',
+  })
+  let serverReady = false
+  leylineServerProcess = child
+
+  child.on('error', (type, location) => {
+    console.error(`Leyline backend process error (${type}) at ${location}`)
+  })
+  child.on('exit', (code) => {
+    if (leylineServerProcess !== child) return
+    leylineServerProcess = undefined
+    leylineServerUrl = undefined
+    if (quitAfterServerStops) return
+    if (serverReady) {
+      handleUnexpectedServerExit(code)
+    } else if (code !== 0) {
+      console.error(`Leyline backend process exited with code ${code}`)
+    }
+  })
+
   try {
-    const { startLeylineServer } = await import('../server/leyline-server.js')
-    leylineServer = await startLeylineServer()
-    leylineServerUrl = leylineServer.url
-    return leylineServerUrl
+    const url = await waitForPackagedServer(child)
+    if (leylineServerProcess !== child) {
+      throw new Error('Leyline backend stopped during startup')
+    }
+    serverReady = true
+    leylineServerUrl = url
+    return url
+  } catch (error) {
+    if (leylineServerProcess === child) leylineServerProcess = undefined
+    child.kill()
+    throw error
   } finally {
     leylineServerStarting = null
   }
+}
+
+function waitForPackagedServer(child) {
+  return new Promise((resolveServer, rejectServer) => {
+    let settled = false
+    const timeout = setTimeout(() => {
+      finish(
+        rejectServer,
+        new Error('Timed out while starting the Leyline backend'),
+      )
+    }, PACKAGED_SERVER_START_TIMEOUT_MS)
+
+    const onMessage = (message) => {
+      if (message?.type === 'ready') {
+        if (!validPackagedServerUrl(message.url)) {
+          finish(rejectServer, new Error('Leyline backend returned an invalid URL'))
+          return
+        }
+        finish(resolveServer, message.url)
+      }
+      if (message?.type === 'startup-error') {
+        finish(
+          rejectServer,
+          new Error(message.message || 'Could not start the Leyline backend'),
+        )
+      }
+    }
+    const onExit = (code) => {
+      finish(
+        rejectServer,
+        new Error(`Leyline backend exited during startup with code ${code}`),
+      )
+    }
+    const finish = (settle, value) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      child.off('message', onMessage)
+      child.off('exit', onExit)
+      settle(value)
+    }
+
+    child.on('message', onMessage)
+    child.on('exit', onExit)
+  })
+}
+
+function validPackagedServerUrl(value) {
+  try {
+    const url = new URL(value)
+    const configuredHost = process.env.LEYLINE_SERVER_HOST || '127.0.0.1'
+    const expectedHost = configuredHost.includes(':')
+      && !configuredHost.startsWith('[')
+      ? `[${configuredHost}]`
+      : configuredHost
+    const expectedHostname = new URL(`http://${expectedHost}`).hostname
+    return url.protocol === 'http:' && url.hostname === expectedHostname
+  } catch {
+    return false
+  }
+}
+
+function handleUnexpectedServerExit(code) {
+  if (unexpectedServerExitHandled) return
+  unexpectedServerExitHandled = true
+
+  const message = `Leyline backend process exited with code ${code}`
+  console.error(message)
+  const options = {
+    type: 'error',
+    title: 'Leyline backend stopped',
+    message: 'The Leyline backend stopped unexpectedly.',
+    detail: `${message}. Leyline must close; reopen it to continue.`,
+    buttons: ['Close Leyline'],
+    defaultId: 0,
+    noLink: true,
+  }
+  const window = activeWindow()
+  const prompt = window
+    ? dialog.showMessageBox(window, options)
+    : dialog.showMessageBox(options)
+
+  void prompt
+    .catch((error) => {
+      console.error('Could not show the backend failure dialog', error)
+    })
+    .finally(() => app.quit())
+}
+
+function stopPackagedAppServer() {
+  if (leylineServerStopping) return leylineServerStopping
+  const child = leylineServerProcess
+  if (!child) return Promise.resolve()
+
+  leylineServerStopping = new Promise((resolveStop) => {
+    let settled = false
+    const finish = () => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      child.off('exit', finish)
+      if (leylineServerProcess === child) leylineServerProcess = undefined
+      leylineServerUrl = undefined
+      resolveStop()
+    }
+    const timeout = setTimeout(() => {
+      child.kill()
+      finish()
+    }, PACKAGED_SERVER_STOP_TIMEOUT_MS)
+
+    child.once('exit', finish)
+    try {
+      child.postMessage({ type: 'close' })
+    } catch {
+      child.kill()
+      finish()
+    }
+  }).finally(() => {
+    leylineServerStopping = undefined
+  })
+
+  return leylineServerStopping
 }
 
 function urlWithInitialCommand(url, command) {
@@ -456,6 +624,14 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
 
-app.on('before-quit', async () => {
-  await leylineServer?.close()
+app.on('before-quit', (event) => {
+  if (serverStoppedForQuit || !leylineServerProcess) return
+  event.preventDefault()
+  if (quitAfterServerStops) return
+
+  quitAfterServerStops = true
+  void stopPackagedAppServer().finally(() => {
+    serverStoppedForQuit = true
+    app.quit()
+  })
 })
