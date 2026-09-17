@@ -159,6 +159,7 @@ const events = createEventHub({
 process.env.PI_CODING_AGENT ??= 'true'
 
 const ONE_AT_A_TIME = 'one-at-a-time'
+const SUBAGENT_DELEGATION_TOOL = 'subagent'
 const SUBAGENT_THINKING_LEVELS = new Set([
   'off',
   'minimal',
@@ -1423,13 +1424,20 @@ async function runSubagent({ task, cwd, parentSessionPath, model, thinkingLevel,
     abortSubagent = () => session?.abort?.()
     signal?.addEventListener?.('abort', abortSubagent, { once: true })
 
+    if (tools?.includes(SUBAGENT_DELEGATION_TOOL)) {
+      throw new Error('Nested subagent delegation is disabled')
+    }
+
     if (excludeTools !== undefined) {
       if (typeof session.setActiveToolsByName !== 'function'
         || typeof session.getAllTools !== 'function') {
         throw new Error('Subagent runtime does not support tool exclusions')
       }
 
-      const excludedTools = new Set(excludeTools)
+      const excludedTools = new Set([
+        ...excludeTools,
+        SUBAGENT_DELEGATION_TOOL,
+      ])
       session.setActiveToolsByName(
         session.getAllTools()
           .map((tool) => tool.name)
@@ -1447,6 +1455,17 @@ async function runSubagent({ task, cwd, parentSessionPath, model, thinkingLevel,
       if (missingTools.length) {
         throw new Error(`Unknown subagent tools: ${missingTools.join(', ')}`)
       }
+    } else {
+      if (typeof session.setActiveToolsByName !== 'function'
+        || typeof session.getActiveToolNames !== 'function') {
+        throw new Error('Subagent runtime does not support tool restrictions')
+      }
+
+      session.setActiveToolsByName(
+        session.getActiveToolNames().filter((tool) => {
+          return tool !== SUBAGENT_DELEGATION_TOOL
+        }),
+      )
     }
 
     if (onStart) {

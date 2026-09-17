@@ -73,7 +73,7 @@ const BUNDLED_RESEARCHER: AgentDef = {
   model: "inherit",
   thinking: "inherit",
   tools: [],
-  excludeTools: ["write", "edit"],
+  excludeTools: ["write", "edit", "subagent"],
   systemPrompt: `You are a research worker for one bounded thread in a larger investigation.
 
 Search broadly, then read the strongest sources in depth. Prefer primary sources, official documentation, direct datasets, and reproducible benchmarks. Check dates, methods, and conflicts. Do not make the final cross-thread recommendation.
