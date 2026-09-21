@@ -86,8 +86,12 @@ export function useSessionWorkspace({
   })
   const sidebarActivitySessions = computed(() => {
     const sharedWorkingTreeCounts = new Map()
-    for (const state of Object.values(runtimeSessionsById.value)) {
-      if (!state.cwd || !runtimeWorkActive(state)) continue
+    for (const [id, state] of Object.entries(runtimeSessionsById.value)) {
+      const session = sessionsById.value.get(id)
+        || (selectedSession.value?.id === id ? selectedSession.value : null)
+      if (session?.isSubagentSession
+        || !state.cwd
+        || !runtimeWorkActive(state)) continue
       const count = sharedWorkingTreeCounts.get(state.cwd) || 0
       sharedWorkingTreeCounts.set(state.cwd, count + 1)
     }
@@ -96,7 +100,7 @@ export function useSessionWorkspace({
       const session = sessionsById.value.get(id)
         || (selectedSession.value?.id === id ? selectedSession.value : null)
       const status = runtimeStatus(state, state.research || session?.research)
-      if (!status.label || !session?.cwd) return []
+      if (!status.label || !session?.cwd || session.isSubagentSession) return []
       return [{
         activityAt: state.activityAt || 0,
         canStop: state.isStreaming && !state.isCompacting,
@@ -569,7 +573,11 @@ export function useSessionWorkspace({
 
   function updateRuntimeSessionSnapshot(runtimeSession) {
     if (!runtimeSession?.id) return
+    upsertRuntimeSessionSummary(runtimeSession.session)
     const state = runtimeSession.state || {}
+    const activity = state.activity && typeof state.activity === 'object'
+      ? state.activity
+      : null
     const pendingTools = Array.isArray(state.pendingTools)
       ? state.pendingTools
       : []
@@ -590,16 +598,57 @@ export function useSessionWorkspace({
               : 0
           ),
       research: state.research || null,
+      ...(activity ? {
+          activityAt: finiteRuntimeNumber(activity.activityAt),
+          error: typeof activity.error === 'string' ? activity.error : '',
+          settledAt: finiteRuntimeNumber(activity.settledAt),
+          settledRevision: finiteRuntimeNumber(activity.settledRevision),
+        } : {}),
     }
-    const previous = runtimeSessionsById.value[runtimeSession.id] || {}
-    const wasBusy = previous.isStreaming || previous.isCompacting
+    const previous = runtimeSessionsById.value[runtimeSession.id]
+    const wasBusy = previous?.isStreaming || previous?.isCompacting
     const isBusy = patch.isStreaming || patch.isCompacting
+    const newlySettled = previous
+      && patch.settledRevision > (previous.settledRevision || 0)
     patchRuntimeSessionState(runtimeSession.id, patch, {
       unread: runtimeSession.id !== selectedSessionId.value
-        && wasBusy
-        && !isBusy,
-      touchActivity: runtimeProjectActive(patch) || (wasBusy && !isBusy),
+        && ((wasBusy && !isBusy) || newlySettled),
+      touchActivity: !activity
+        && (runtimeProjectActive(patch) || (wasBusy && !isBusy)),
     })
+  }
+
+  function upsertRuntimeSessionSummary(session) {
+    if (!session?.id) return
+    const index = sessions.value.findIndex((item) => item.id === session.id)
+    if (index === -1) {
+      sessions.value = [session, ...sessions.value]
+      return
+    }
+    const next = [...sessions.value]
+    next[index] = {
+      ...next[index],
+      ...session,
+      isSubagentSession: next[index].isSubagentSession === true
+        || session.isSubagentSession === true,
+    }
+    sessions.value = next
+  }
+
+  function reconcileRuntimeSessionRoster(sessionIds) {
+    const roster = new Set(
+      Array.isArray(sessionIds) ? sessionIds.filter(Boolean) : [],
+    )
+    runtimeSessionsById.value = Object.fromEntries(
+      Object.entries(runtimeSessionsById.value).filter(([id]) => roster.has(id)),
+    )
+  }
+
+  function removeRuntimeSession(id) {
+    if (!id || !runtimeSessionsById.value[id]) return
+    const next = { ...runtimeSessionsById.value }
+    delete next[id]
+    runtimeSessionsById.value = next
   }
 
   function updateRuntimeEventState(data) {
@@ -676,9 +725,11 @@ export function useSessionWorkspace({
         unread: options.preserveUnread
           ? previous.unread === true
           : options.unread === true || previous.unread === true,
-        activityAt: options.touchActivity
-          ? Date.now()
-          : previous.activityAt || 0,
+        activityAt: Number.isFinite(patch.activityAt)
+          ? patch.activityAt
+          : options.touchActivity
+            ? Date.now()
+            : previous.activityAt || 0,
         updatedAt: Date.now(),
       },
     }
@@ -722,8 +773,8 @@ export function useSessionWorkspace({
     }
     if (event.type === 'agent_end') {
       return {
-        isStreaming: false,
-        error: previous.error || '',
+        isStreaming: previous.isStreaming === true,
+        error: event.willRetry ? '' : previous.error || '',
         pendingTools: [],
         pendingToolCount: 0,
       }
@@ -732,7 +783,7 @@ export function useSessionWorkspace({
       && event.message?.role === 'assistant'
       && event.message?.stopReason === 'error') {
       return {
-        isStreaming: false,
+        isStreaming: previous.isStreaming === true,
         isCompacting: false,
         error: runtimeErrorMessage(event, 'Model request failed'),
         pendingTools: [],
@@ -741,7 +792,7 @@ export function useSessionWorkspace({
     }
     if (event.type === 'error') {
       return {
-        isStreaming: false,
+        isStreaming: previous.isStreaming === true,
         isCompacting: false,
         error: runtimeErrorMessage(event, 'Runtime error'),
         pendingTools: [],
@@ -750,7 +801,7 @@ export function useSessionWorkspace({
     }
     if (event.type === 'aborted') {
       return {
-        isStreaming: false,
+        isStreaming: previous.isStreaming === true,
         isCompacting: false,
         error: '',
         pendingTools: [],
@@ -768,7 +819,7 @@ export function useSessionWorkspace({
     if (event.type === 'compaction_end') {
       return {
         isCompacting: false,
-        error: event.errorMessage || '',
+        error: event.willRetry ? '' : event.errorMessage || '',
       }
     }
     if (event.type === 'queue_update') {
@@ -815,6 +866,7 @@ export function useSessionWorkspace({
     if (typeof event.error === 'string') return event.error
     return event.error?.message
       || event.message?.errorMessage
+      || event.message?.message
       || (typeof event.message === 'string' ? event.message : '')
       || event.errorMessage
       || fallback
@@ -828,6 +880,10 @@ export function useSessionWorkspace({
       ? queue.followUpCount
       : Array.isArray(queue?.followUp) ? queue.followUp.length : 0
     return steering + followUp
+  }
+
+  function finiteRuntimeNumber(value) {
+    return Number.isFinite(value) ? Math.max(0, Number(value)) : 0
   }
 
   function patchRuntimeExtensionUi(extensionUi, goal) {
@@ -1677,6 +1733,7 @@ export function useSessionWorkspace({
     navigateHome,
     newSessionCwd,
     patchRuntimeExtensionUi,
+    reconcileRuntimeSessionRoster,
     reloadSession,
     reloadingSession,
     renameDraft,
@@ -1685,6 +1742,7 @@ export function useSessionWorkspace({
     renamingSessionSource,
     requestDeleteSession,
     requestDeleteProject,
+    removeRuntimeSession,
     resettingEntryId,
     resetSessionToEntry,
     runStartupPhase,

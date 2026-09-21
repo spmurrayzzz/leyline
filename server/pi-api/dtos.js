@@ -49,8 +49,40 @@ export function runtimeSessionDto(handle) {
     path: handle.runtime.session.sessionFile,
     cwd: handle.runtime.cwd,
     diagnostics: handle.runtime.diagnostics,
-    state: activeSessionStateDto(handle),
+    session: runtimeSessionSummaryDto(handle),
+    state: {
+      ...activeSessionStateDto(handle),
+      activity: runtimeActivityDto(handle),
+    },
   }
+}
+
+function runtimeSessionSummaryDto(handle) {
+  const manager = handle.runtime.session.sessionManager
+  const key = JSON.stringify([
+    manager.getSessionId(),
+    manager.getLeafId(),
+    manager.getSessionName?.(),
+  ])
+  if (handle.sessionSummaryKey !== key) {
+    handle.sessionSummary = toSessionDto(sessionInfo(handle))
+    handle.sessionSummaryKey = key
+  }
+  return handle.sessionSummary
+}
+
+function runtimeActivityDto(handle) {
+  const activity = handle.activityState || {}
+  return {
+    activityAt: finiteNumber(activity.activityAt),
+    error: typeof activity.error === 'string' ? activity.error : '',
+    settledAt: finiteNumber(activity.settledAt),
+    settledRevision: finiteNumber(activity.settledRevision),
+  }
+}
+
+function finiteNumber(value) {
+  return Number.isFinite(value) ? Number(value) : 0
 }
 
 export function activeSessionStateDto(handle) {

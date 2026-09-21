@@ -911,8 +911,9 @@ async function forkActiveSession(entryId) {
   if (result.cancelled) throw new Error('Fork cancelled')
   rebaseResearchSession(activeRuntime.session.sessionManager)
   forceOneAtATime(activeRuntime.session)
-  runtimeHandles.delete(previousId)
+  removeRuntimeHandle(previousId)
   activeHandle.sessionId = activeRuntime.session.sessionManager.getSessionId()
+  activeHandle.activityState = undefined
   runtimeHandles.set(activeHandle.sessionId, activeHandle)
   setActiveHandle(activeHandle)
   copySessionSubagentOverrides({
@@ -1178,8 +1179,13 @@ function discardRuntimeHandle(handle) {
   }
   handle.unsubscribe?.()
   handle.runtime.session.dispose()
-  runtimeHandles.delete(handle.sessionId)
+  removeRuntimeHandle(handle.sessionId)
   if (activeHandle === handle) setActiveHandle(undefined)
+}
+
+function removeRuntimeHandle(id) {
+  if (!runtimeHandles.delete(id)) return
+  events.broadcastRuntimeRemoved(id)
 }
 
 function trashSessionPath(session, stamp = trashStamp()) {
@@ -1232,7 +1238,10 @@ async function reloadSession(handle) {
     applied = true
     handle.sessionId = handle.runtime.session.sessionManager.getSessionId()
     handle.extensionUiState = emptyExtensionUiState()
-    if (previousId !== handle.sessionId) runtimeHandles.delete(previousId)
+    if (previousId !== handle.sessionId) {
+      removeRuntimeHandle(previousId)
+      handle.activityState = undefined
+    }
     runtimeHandles.set(handle.sessionId, handle)
     forceOneAtATime(handle.runtime.session)
     if (activeHandle === handle) setActiveHandle(handle)
@@ -1551,7 +1560,7 @@ async function runSubagent({ task, cwd, parentSessionPath, model, thinkingLevel,
     signal?.removeEventListener?.('abort', abortSubagent)
     if (!childStarted) {
       handle?.unsubscribe?.()
-      runtimeHandles.delete(childId)
+      removeRuntimeHandle(childId)
       try { session?.dispose() } catch {}
     } else if (activeHandle !== handle) {
       discardRuntimeHandle(handle)

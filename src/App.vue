@@ -387,6 +387,7 @@ const {
   navigateHome: workspaceNavigateHome,
   newSessionCwd,
   patchRuntimeExtensionUi,
+  reconcileRuntimeSessionRoster,
   reloadSession,
   reloadingSession,
   renameDraft,
@@ -395,6 +396,7 @@ const {
   renamingSessionSource,
   requestDeleteProject,
   requestDeleteSession,
+  removeRuntimeSession,
   resetSessionToEntry,
   runStartupPhase,
   scheduleSessionRefresh,
@@ -638,6 +640,13 @@ const {
       invalidateReview(runtimeCwd(data.activeSessionId))
     }
     liveTurn.handle({ kind: 'runtime', ...data })
+  },
+  onRuntimeRoster(data) {
+    reconcileRuntimeSessionRoster(data.sessionIds)
+  },
+  onRuntimeRemoved(data) {
+    removeRuntimeSession(data.id)
+    runtimeCwdBySessionId.delete(data.id)
   },
   onExtensionUi(data) {
     if (data.activeSessionId !== selectedSessionId.value) return

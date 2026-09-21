@@ -29,18 +29,32 @@ export function createEventHub(options) {
     res.on('error', () => closeClient(client))
 
     writeClientChunk(client, ': connected\n\n')
-    for (const handle of options.getRuntimeHandles()) {
+    const handles = [...options.getRuntimeHandles()]
+    for (const handle of handles) {
       sendClientEvent(
         client,
         'active_session',
         options.activeSessionDto(handle),
       )
     }
+    sendClientEvent(client, 'runtime_roster', {
+      sessionIds: handles.map((handle) => handle.sessionId),
+    })
   }
 
   function broadcastActiveSession(handle) {
     if (!handle) return
     broadcastEvent('active_session', options.activeSessionDto(handle))
+  }
+
+  function broadcastRuntimeRemoved(sessionId) {
+    if (!sessionId) return
+    const pending = pendingMessageUpdates.get(sessionId)
+    if (pending) {
+      clearTimeout(pending.timer)
+      pendingMessageUpdates.delete(sessionId)
+    }
+    broadcastEvent('runtime_removed', { id: sessionId })
   }
 
   function broadcastEvent(type, data) {
@@ -185,6 +199,7 @@ export function createEventHub(options) {
   return {
     broadcastActiveSession,
     broadcastEvent,
+    broadcastRuntimeRemoved,
     openEventStream,
   }
 }
@@ -229,6 +244,7 @@ function compactActiveSession(session) {
     path: session?.path,
     cwd: session?.cwd,
     diagnostics: compactDiagnostics(session?.diagnostics),
+    session: compactSessionSummary(session?.session),
     state: {
       isStreaming: state.isStreaming === true,
       isCompacting: state.isCompacting === true,
@@ -237,7 +253,6 @@ function compactActiveSession(session) {
       pendingToolCount: Math.max(
         pendingToolCalls.length,
         pendingTools.length,
-        finiteCount(state.activeToolCount),
       ),
       activeToolCount: finiteCount(state.activeToolCount),
       activeToolNames: Array.isArray(state.activeToolNames)
@@ -245,6 +260,7 @@ function compactActiveSession(session) {
         : [],
       queuedMessages: compactQueue(state.queuedMessages),
       research: compactResearch(state.research),
+      activity: compactActivity(state.activity),
     },
   }
 }
@@ -296,13 +312,19 @@ function compactRuntimeEvent(event) {
   if (event.type === 'error') {
     if (event.error !== undefined) compact.error = compactError(event.error)
     if (event.message !== undefined) {
-      compact.message = cleanText(event.message, COMPACT_TEXT_LIMIT)
+      compact.message = compactMessage(event.message)
     }
     return compact
   }
 
+  if (event.type === 'agent_end') {
+    compact.willRetry = event.willRetry === true
+  }
+
   if (event.type === 'compaction_end') {
     copyTextFields(compact, event, ['reason', 'errorMessage'])
+    compact.aborted = event.aborted === true
+    compact.willRetry = event.willRetry === true
   }
 
   return compact
@@ -318,6 +340,7 @@ function compactMessage(message) {
     'role',
     'stopReason',
     'errorMessage',
+    'message',
     'id',
     'entryId',
     'toolCallId',
@@ -326,6 +349,32 @@ function compactMessage(message) {
   if (message.isError !== undefined) compact.isError = message.isError === true
   if (message.timestamp !== undefined) compact.timestamp = message.timestamp
   return compact
+}
+
+function compactSessionSummary(session) {
+  if (!session || typeof session !== 'object') return null
+  return {
+    id: cleanText(session.id, 200),
+    path: cleanText(session.path, 4000),
+    cwd: cleanText(session.cwd, 4000),
+    name: cleanText(session.name, COMPACT_TEXT_LIMIT),
+    parentSessionPath: cleanText(session.parentSessionPath, 4000),
+    isSubagentSession: session.isSubagentSession === true,
+    research: compactResearch(session.research),
+    firstMessage: cleanText(session.firstMessage, COMPACT_TEXT_LIMIT),
+    messageCount: finiteCount(session.messageCount),
+    modified: cleanText(session.modified, 100),
+    timestamp: cleanText(session.timestamp, 100),
+  }
+}
+
+function compactActivity(activity) {
+  return {
+    activityAt: finiteCount(activity?.activityAt),
+    error: cleanText(activity?.error, 1000),
+    settledAt: finiteCount(activity?.settledAt),
+    settledRevision: finiteCount(activity?.settledRevision),
+  }
 }
 
 function compactPendingTool(tool) {

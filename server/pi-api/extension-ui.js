@@ -27,17 +27,24 @@ export async function bindRuntimeHandle(handle, events) {
   handle.unsubscribe = handle.runtime.session.subscribe((event) => {
     const handoffId = promptHandoffId(handle, event)
     trackPendingToolResult(handle, event)
+    trackRuntimeActivity(handle, event)
     syncGoalStateFromSession(handle)
     events.broadcastEvent('runtime_event', {
       activeSessionId: handle.sessionId,
       event,
       handoffId,
     })
+    if (event.type === 'message_end'
+      && event.message?.role === 'user'
+      && (!handle.sessionSummary || handle.sessionSummary.messageCount === 0)) {
+      queueMicrotask(() => events.broadcastActiveSession(handle))
+    }
     if (event.type === 'compaction_end') {
       queueMicrotask(() => events.broadcastActiveSession(handle))
     } else if (event.type === 'queue_update'
       || event.type === 'turn_end'
       || event.type === 'agent_settled'
+      || event.type === 'session_info_changed'
       || isGoalStateEvent(event)
       || isResearchStateEvent(event)) {
       events.broadcastActiveSession(handle)
@@ -97,6 +104,80 @@ function trackPendingToolResult(handle, event) {
     return
   }
   if (event.type === 'tool_execution_end') results.delete(id)
+}
+
+function trackRuntimeActivity(handle, event) {
+  if (!event?.type) return
+  const previous = handle.activityState || {
+    active: false,
+    activityAt: 0,
+    error: '',
+    settledAt: 0,
+    settledRevision: 0,
+  }
+  const next = { ...previous }
+  const now = Date.now()
+
+  if (!['message_update', 'tool_execution_update'].includes(event.type)) {
+    next.activityAt = now
+  }
+
+  if (runtimeActivityStarted(event)) {
+    next.active = true
+    next.error = ''
+  }
+
+  const error = runtimeActivityError(event)
+  if (error) next.error = error
+  else if (event.type === 'aborted') next.error = ''
+
+  if (event.type === 'agent_settled'
+    || (event.type === 'compaction_end' && event.reason === 'manual')) {
+    settleRuntimeActivity(next, previous, now)
+  }
+
+  handle.activityState = next
+}
+
+function runtimeActivityStarted(event) {
+  return [
+    'agent_start',
+    'turn_start',
+    'compaction_start',
+    'auto_retry_start',
+    'summarization_retry_scheduled',
+    'summarization_retry_attempt_start',
+  ].includes(event.type)
+    || (event.type === 'agent_end' && event.willRetry)
+    || (event.type === 'message_start' && event.message?.role !== 'custom')
+    || ['tool_call', 'tool_execution_start'].includes(event.type)
+}
+
+function runtimeActivityError(event) {
+  if (event.willRetry) return ''
+  if (event.type === 'compaction_end' && event.errorMessage) {
+    return String(event.errorMessage)
+  }
+  if (event.type === 'message_end'
+    && event.message?.role === 'assistant'
+    && event.message?.stopReason === 'error') {
+    return event.message.errorMessage || 'Model request failed'
+  }
+  if (event.type !== 'error') return ''
+  if (typeof event.error === 'string') return event.error
+  return event.error?.message
+    || event.message?.errorMessage
+    || event.message?.message
+    || (typeof event.message === 'string' ? event.message : '')
+    || event.errorMessage
+    || 'Runtime error'
+}
+
+function settleRuntimeActivity(next, previous, now) {
+  next.active = false
+  if (!previous.active) return
+  next.settledAt = now
+  next.settledRevision = (previous.settledRevision || 0) + 1
 }
 
 function createExtensionUiContext(handle, events) {
