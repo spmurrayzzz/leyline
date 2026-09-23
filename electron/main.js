@@ -624,7 +624,7 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
 
-app.on('before-quit', (event) => {
+app.on('will-quit', (event) => {
   if (serverStoppedForQuit || !leylineServerProcess) return
   event.preventDefault()
   if (quitAfterServerStops) return
