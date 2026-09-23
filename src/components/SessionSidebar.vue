@@ -172,8 +172,12 @@ let navigatorOpener = null
 let sessionResizeObserver
 
 const sessionSkeletonItems = computed(() => {
+  const lastSessionItem = sessionListItems.value.at(-1)
+  const listedHeight = lastSessionItem
+    ? lastSessionItem.top + lastSessionItem.height
+    : 0
   const targetHeight = Math.max(
-    sessionViewportHeight.value,
+    sessionViewportHeight.value - listedHeight,
     SESSION_GROUP_HEIGHT,
   )
   const items = [{
@@ -523,7 +527,9 @@ const activitySummary = computed(() => {
 
 const projectSessionCount = computed(() => {
   const count = currentProjectSessions.value.length
-  if (!props.sessionsHydrated && !count) return '…'
+  if (!props.sessionsHydrated
+    && !props.sessionsHydrationError
+    && !props.sessionsError) return '…'
   return count
 })
 
@@ -838,7 +844,8 @@ const vFocusSelect = {
 
 <template>
   <aside class="sidebar project-sidebar">
-    <template v-if="sessionsLoading && visibleProjects.length === 0">
+    <template v-if="visibleProjects.length === 0
+      && (sessionsLoading || sessionsHydrating)">
       <div
         class="sidebar-project-header sidebar-project-header-skeleton"
         aria-hidden="true"
@@ -977,42 +984,7 @@ const vFocusSelect = {
           class="project-session-scroll"
           @scroll.passive="updateSessionScroll"
         >
-          <div
-            v-if="!sessionsHydrated
-              && !sessionsHydrationError
-              && currentProjectSessions.length === 0"
-            class="project-session-skeleton"
-            aria-hidden="true"
-          >
-            <template
-              v-for="item in sessionSkeletonItems"
-              :key="item.key"
-            >
-              <div
-                v-if="item.type === 'group'"
-                class="session-skeleton-group"
-                :class="[
-                  `variant-${item.variant}`,
-                  { 'has-separator': item.separator },
-                ]"
-              >
-                <span class="skeleton-line"></span>
-              </div>
-              <div
-                v-else
-                class="session-skeleton-row"
-                :class="`variant-${item.variant}`"
-              >
-                <span
-                  class="skeleton-line session-skeleton-title"
-                ></span>
-                <span
-                  class="skeleton-line session-skeleton-meta"
-                ></span>
-              </div>
-            </template>
-          </div>
-          <div v-else-if="sessionsError" class="sidebar-note error-note">
+          <div v-if="sessionsError" class="sidebar-note error-note">
             {{ sessionsError }}
             <button type="button" @click="emit('retry-sessions')">Retry</button>
           </div>
@@ -1025,18 +997,18 @@ const vFocusSelect = {
             <button type="button" @click="emit('retry-sessions')">Retry</button>
           </div>
           <div
-            v-else-if="currentProjectSessions.length === 0"
+            v-else-if="sessionsHydrated && currentProjectSessions.length === 0"
             class="sidebar-note project-session-empty"
           >
             No sessions in this project
           </div>
           <div
-            v-else-if="matchingProjectSessions.length === 0"
+            v-else-if="sessionsHydrated && matchingProjectSessions.length === 0"
             class="sidebar-note project-session-empty"
           >
             No matching sessions
           </div>
-          <template v-else>
+          <template v-else-if="matchingProjectSessions.length > 0">
             <div
               v-if="virtualSessionWindow.top"
               class="project-session-virtual-spacer"
@@ -1181,6 +1153,33 @@ const vFocusSelect = {
               aria-hidden="true"
             ></div>
           </template>
+          <div
+            v-if="!sessionsHydrated && !sessionsHydrationError && !sessionsError"
+            class="project-session-skeleton"
+            :class="{ 'has-session-rows': matchingProjectSessions.length > 0 }"
+            aria-hidden="true"
+          >
+            <template v-for="item in sessionSkeletonItems" :key="item.key">
+              <div
+                v-if="item.type === 'group'"
+                class="session-skeleton-group"
+                :class="[
+                  `variant-${item.variant}`,
+                  { 'has-separator': item.separator },
+                ]"
+              >
+                <span class="skeleton-line"></span>
+              </div>
+              <div
+                v-else
+                class="session-skeleton-row"
+                :class="`variant-${item.variant}`"
+              >
+                <span class="skeleton-line session-skeleton-title"></span>
+                <span class="skeleton-line session-skeleton-meta"></span>
+              </div>
+            </template>
+          </div>
           <div
             v-if="currentProjectSessions.length > 0
               && sessionsHydrationError"

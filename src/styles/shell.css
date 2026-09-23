@@ -441,6 +441,10 @@
   overflow: hidden;
 }
 
+.project-session-skeleton.has-session-rows {
+  height: auto;
+}
+
 .project-session-skeleton .session-skeleton-row {
   --session-skeleton-meta-width: 24px;
   --session-skeleton-title-width: 76%;
