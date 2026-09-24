@@ -7,7 +7,7 @@ an optional desktop shell around the same Vue app and API.
 | --- | --- | --- |
 | App files | Vite dev server | Vite dev server or packaged `dist/` files |
 | Native backend | `server/pi-api/index.js` as Vite middleware | Vite middleware or `server/leyline-server.js` in a packaged app |
-| Environment | Inherits the environment that starts Vite | Loads the macOS login-shell environment |
+| Environment | Inherits the environment that starts Vite | Loads the login-shell environment |
 | Terminal | WebSocket connection to the selected backend | WebSocket connection to the selected backend |
 | Windows | Browser-managed tabs and windows | Foreground native windows with saved state |
 | Dictation | Available when the browser supports the Web Speech API | Not supported |

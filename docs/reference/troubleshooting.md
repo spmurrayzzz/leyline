@@ -60,8 +60,8 @@ During an active run, use these keys:
 ## Model or provider authentication fails
 
 Set the provider credentials in the environment that starts Leyline. Browser
-development inherits the terminal environment. Electron loads the macOS
-login-shell environment.
+development inherits the terminal environment. Electron loads the login-shell
+environment on macOS and Linux.
 
 Select a model that has configured credentials. The backend rejects a child
 model when its provider has no API key.
@@ -107,8 +107,11 @@ subagent overrides, and vision overrides use `~/.local/share/leyline/memory.sqli
 
 ## Electron does not have shell environment variables
 
-Confirm that your macOS login shell exports the required variables. Electron
-runs the shell as an interactive login shell and waits up to five seconds.
+Confirm that your login shell exports the required variables. Electron runs the
+shell as an interactive login shell on macOS and Linux and waits up to five
+seconds. On Linux, this runs the startup files a desktop entry does not. For
+Bash, confirm that `~/.bash_profile`, `~/.bash_login`, or `~/.profile` sources
+`~/.bashrc` when your exports live there.
 
 Electron keeps existing process variables, except `PATH`. It replaces `PATH`
 with the login-shell value.

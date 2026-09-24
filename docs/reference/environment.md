@@ -15,7 +15,7 @@ variables come from the user's pi setup.
 | `PI_CODING_AGENT_SESSION_DIR` | Session directory for discovery and new sessions. Leyline expands `~` and searches subdirectories for JSONL files. |
 | `PI_ENABLE_CREATE_GOAL` | Set to `1` to expose the goal extension's `create_goal` model tool. |
 | `LEYLINE_MEMORY_DIR` | Directory for shared app metadata and pasted-image attachments. Backend connections, UI settings, memory, rollout feedback, subagent overrides, and vision overrides use `memory.sqlite` in this directory. Vision delegation uses its `attachments` subdirectory. |
-| `SHELL` | Login shell used by Electron environment loading and the terminal backend. Electron defaults to `/bin/zsh`; the terminal has additional shell fallbacks. |
+| `SHELL` | Login shell used by Electron environment loading and the terminal backend. Electron falls back to the account shell; the terminal has additional shell fallbacks. |
 
 Without `PI_CODING_AGENT_SESSION_DIR`, Leyline uses the session directory from
 pi settings for the selected project.
@@ -95,6 +95,9 @@ Do not set these variables as user configuration.
 
 ## Shell environment
 
-The browser workflow inherits the environment that starts Vite. On macOS,
-Electron loads the login-shell environment before it creates the first window.
-Electron uses that shell's `PATH` and adds missing provider and tool variables.
+The browser workflow inherits the environment that starts Vite. Electron loads
+the login-shell environment before it creates the first window on macOS and
+Linux. Electron uses that shell's `PATH` and adds missing provider and tool
+variables. On Linux, this runs the interactive login startup files that a
+desktop entry does not. For Bash, `~/.bashrc` applies when the login profile
+sources it.

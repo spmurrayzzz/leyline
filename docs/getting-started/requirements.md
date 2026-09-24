@@ -20,4 +20,4 @@ It must also include the environment variables required by your tools and
 extensions.
 
 Electron is optional. Use Electron to test the desktop package, desktop
-shortcuts, macOS login-shell environment loading, and window state.
+shortcuts, login-shell environment loading, and window state.

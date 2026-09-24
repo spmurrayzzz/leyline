@@ -8,7 +8,7 @@ Electron adds these functions:
 - Foreground native windows for modified internal targets
 - Desktop shortcuts
 - A packaged native backend available to all app windows
-- macOS login-shell environment loading
+- Login-shell environment loading on macOS and Linux
 - Saved window size, position, maximized state, and full-screen state
 - Independent backend selection in each window
 - The `leyline` command after local publication

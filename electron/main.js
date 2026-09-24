@@ -1,5 +1,7 @@
 import { execFile } from 'node:child_process'
+import { existsSync } from 'node:fs'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { userInfo } from 'node:os'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
@@ -18,6 +20,9 @@ app.commandLine.appendSwitch(
 )
 
 const execFileAsync = promisify(execFile)
+const ENV_DUMP_COMMAND = existsSync('/usr/bin/env')
+  ? '/usr/bin/env -0'
+  : 'env -0'
 const PACKAGED_SERVER_START_TIMEOUT_MS = 15000
 const PACKAGED_SERVER_STOP_TIMEOUT_MS = 2000
 const packagedServerProcessPath = fileURLToPath(
@@ -35,6 +40,10 @@ let unexpectedServerExitHandled = false
 
 const gotSingleInstanceLock = app.requestSingleInstanceLock()
 if (!gotSingleInstanceLock) app.quit()
+
+const environmentReady = gotSingleInstanceLock
+  ? loadLoginShellEnvironment()
+  : Promise.resolve()
 
 app.on('second-instance', (_event, argv) => {
   const command = nativeCommandFromArgv(argv)
@@ -54,6 +63,7 @@ app.on('second-instance', (_event, argv) => {
 })
 
 async function createWindow(initialCommand, initialUrl = '') {
+  await environmentReady
   const url = initialUrl
     ? urlWithInitialCommand(initialUrl, initialCommand)
     : await appUrl(initialCommand)
@@ -584,15 +594,24 @@ function urlWithInitialCommand(url, command) {
   return next.toString()
 }
 
-async function loadLoginShellEnvironment() {
-  if (process.platform !== 'darwin') return
+function accountShell() {
+  try {
+    return userInfo().shell || ''
+  } catch {
+    return ''
+  }
+}
 
-  const shell = process.env.SHELL || '/bin/zsh'
+async function loadLoginShellEnvironment() {
+  if (process.platform !== 'darwin' && process.platform !== 'linux') return
+
+  const shell = process.env.SHELL || accountShell()
+  if (!shell) return
 
   try {
     const { stdout } = await execFileAsync(
       shell,
-      ['-ilc', '/usr/bin/env -0'],
+      ['-ilc', ENV_DUMP_COMMAND],
       { encoding: 'buffer', maxBuffer: 1024 * 1024, timeout: 5000 },
     )
 
@@ -602,7 +621,9 @@ async function loadLoginShellEnvironment() {
 
       const key = entry.slice(0, index)
       const value = entry.slice(index + 1)
-      if (key === 'PATH' || !process.env[key]) process.env[key] = value
+      if (key === 'PATH' || process.env[key] === undefined) {
+        process.env[key] = value
+      }
     }
   } catch {
   }
@@ -610,7 +631,7 @@ async function loadLoginShellEnvironment() {
 
 if (gotSingleInstanceLock) {
   app.whenReady().then(async () => {
-    await loadLoginShellEnvironment()
+    await environmentReady
     if (process.platform === 'linux') Menu.setApplicationMenu(null)
     await createWindow(nativeCommandFromArgv(process.argv))
   })
