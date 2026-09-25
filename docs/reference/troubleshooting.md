@@ -128,13 +128,41 @@ Use a compatible browser, such as Chrome, for dictation.
 Rebuild with `npm run electron:build`. The packaging script must unpack the
 `node-pty` native files and `spawn-helper` from the Electron archive.
 
+## The Linux Electron app does not start
+
+Run the installed executable directly from an external terminal to see startup
+errors; the CLI launcher discards that output:
+
+```bash
+"$HOME/.local/opt/leyline/Leyline"
+```
+
+Check for missing shared libraries with:
+
+```bash
+ldd "$HOME/.local/opt/leyline/Leyline"
+```
+
+Install your distribution's runtime packages for any library marked
+`not found`. Confirm that you copied the complete `release/Leyline-linux-x64/`
+package, not just its executable, and that you are running as your normal user
+in a graphical session. The tested setup and build steps are in
+[Linux installation](../getting-started/linux-installation).
+
 ## The `leyline` command cannot find the app
 
-Run `npm run local-publish`. Confirm that `/Applications/Leyline.app` exists and
-that `~/.local/bin` is on `PATH`.
+Confirm that `~/.local/bin` is on `PATH` and check `command -v leyline`.
 
-The CLI also checks `release/Leyline-darwin-arm64/Leyline.app`. Use
-`LEYLINE_APP` only when the package is in a different location.
+On Linux, confirm that `~/.local/opt/leyline/Leyline` is executable and install
+the [Linux launcher](../getting-started/linux-installation#_3-add-the-cli-launcher).
+Do not use `npm run local-publish` or link the macOS-only `bin/leyline`.
+
+On Apple silicon macOS, run `npm run local-publish` and confirm that
+`/Applications/Leyline.app` exists. That CLI also checks
+`release/Leyline-darwin-arm64/Leyline.app`.
+
+Use `LEYLINE_APP` only when the app is in a different location: a Linux
+executable path or a macOS `.app` bundle path.
 
 ## The screenshot command cannot connect
 

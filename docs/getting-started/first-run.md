@@ -2,6 +2,10 @@
 
 ## Start Leyline
 
+If you followed [Linux installation](./linux-installation), open **Leyline**
+from your application menu and continue at step 3. The packaged app does not
+need a development server.
+
 1. Run the development server:
 
    ```bash

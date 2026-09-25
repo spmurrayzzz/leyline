@@ -10,7 +10,8 @@ npm run electron:build
 
 The script runs `npm run build` first. This creates the app in `dist/` and the
 VitePress site in `dist/docs/`. Electron Packager then writes the desktop
-package to `release/`.
+package to `release/` for the host platform and architecture. The x86-64 Linux
+output is `release/Leyline-linux-x64/`.
 
 The package uses icon files under `assets/icon`. The build unpacks native
 `node-pty` files and `spawn-helper`. The packaged terminal can fail with
@@ -23,7 +24,16 @@ The packaging flow uses these files:
 - `server/leyline-server.js`
 - `server/pi-api/`
 
-## Install the local package
+## Install on Linux
+
+Follow [Linux installation](../getting-started/linux-installation) to copy the
+complete package to `~/.local/opt/leyline`, create a Linux CLI launcher, and add
+an application-menu entry. That guide also covers verification and updates.
+
+Do not use `npm run local-publish` or the repository's `bin/leyline` on Linux;
+both currently assume a macOS app bundle.
+
+## Install on Apple silicon macOS
 
 Run:
 

@@ -4,6 +4,10 @@ Leyline is a local interface for a configured pi coding-agent environment. It
 reads pi sessions and uses pi runtime operations to run work from a browser or
 Electron window.
 
+For a packaged Linux desktop app, follow
+[Linux installation](./linux-installation). You do not need to run a Vite
+server for the installed app.
+
 ## Start the browser app
 
 1. Install Node.js 22.19.0 and npm.
@@ -19,6 +23,7 @@ Continue with these pages:
 
 - [Requirements](./requirements)
 - [Installation](./installation)
+- [Linux installation](./linux-installation)
 - [First run](./first-run)
 - [Browser vs Electron](./browser-vs-electron)
 - [Composer](../user-guide/composer)

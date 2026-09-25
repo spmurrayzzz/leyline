@@ -1,5 +1,9 @@
 # Installation
 
+For a user-local Linux desktop app, CLI launcher, and application-menu entry,
+follow [Linux installation](./linux-installation). The steps below set up the
+source checkout for browser or Electron development on macOS or Linux.
+
 Open the Leyline repository. Then install the dependencies:
 
 ```bash

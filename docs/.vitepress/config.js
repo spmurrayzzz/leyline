@@ -27,6 +27,7 @@ export default defineConfig({
           { text: 'Motivations', link: '/motivations' },
           { text: 'Requirements', link: '/getting-started/requirements' },
           { text: 'Installation', link: '/getting-started/installation' },
+          { text: 'Linux installation', link: '/getting-started/linux-installation' },
           { text: 'First run', link: '/getting-started/first-run' },
           {
             text: 'Browser vs Electron',

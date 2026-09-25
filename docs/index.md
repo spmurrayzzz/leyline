@@ -49,11 +49,12 @@ features:
 
 ## Browser first, Electron optional
 
-The browser and Vite workflow is the primary path. Electron is an optional desktop shell around the same app. It adds packaged use, desktop shortcuts, macOS shell environment loading, multiple windows, and saved window state.
+The browser and Vite workflow is the primary path. Electron is an optional desktop shell around the same app. It adds packaged use, desktop shortcuts, login-shell environment loading on macOS and Linux, multiple windows, and saved window state.
 
 ## Quick links
 
 - [Install and run Leyline](/getting-started/)
+- [Install the Linux desktop app](/getting-started/linux-installation)
 - [Learn the UI](/user-guide/)
 - [Read the motivations](/motivations)
 - [Understand the architecture](/developer-guide/)

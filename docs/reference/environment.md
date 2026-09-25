@@ -48,10 +48,12 @@ prevent direct network clients from sending requests.
 | Variable | Purpose |
 | --- | --- |
 | `LEYLINE_CWD` | Directory used by plain `leyline` instead of the current shell directory. It does not affect `leyline -n`. |
-| `LEYLINE_APP` | App package used by `leyline` instead of `/Applications/Leyline.app`. |
+| `LEYLINE_APP` | macOS: app bundle instead of `/Applications/Leyline.app`. With the documented Linux launcher: executable instead of `~/.local/opt/leyline/Leyline`. |
 
-If `LEYLINE_APP` does not exist, the CLI checks the repository path
-`release/Leyline-darwin-arm64/Leyline.app`.
+On macOS, if the app bundle does not exist, the CLI checks the repository path
+`release/Leyline-darwin-arm64/Leyline.app`. The
+[Linux launcher](../getting-started/linux-installation#_3-add-the-cli-launcher)
+requires an executable path and has no repository fallback.
 
 ## Documentation variable
 

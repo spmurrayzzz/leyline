@@ -1,12 +1,16 @@
 # Requirements
 
-## Supported system
+## Supported systems
 
-Leyline is developed and tested on macOS only. Linux and Windows are not
-supported.
+Leyline is used on macOS and Linux. The Linux reference setup is x86-64
+Omarchy (Arch-based), running Hyprland on Wayland. Other Linux distributions
+and architectures have not been validated. Windows is not supported.
 
-The local Electron publish script expects an Apple silicon package named
-`Leyline-darwin-arm64`. The browser workflow is the primary development path.
+The browser workflow is the primary development path. For a Linux desktop app,
+follow [Linux installation](./linux-installation), including its build tools
+and runtime-library requirements. The local Electron publish script and the
+repository's CLI launcher remain Apple silicon macOS-specific; do not use
+`npm run local-publish` on Linux.
 
 ## Required software
 

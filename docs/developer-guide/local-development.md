@@ -1,6 +1,9 @@
 # Local development
 
-Leyline requires macOS, npm, and Node.js 22.19.0. The repository records the Node.js version in `.nvmrc`.
+Leyline development runs on macOS and Linux with npm and Node.js 22.19.0.
+The repository records the Node.js version in `.nvmrc`. See
+[Requirements](../getting-started/requirements) for the tested Linux setup and
+[Linux installation](../getting-started/linux-installation) for desktop packaging.
 
 ## Install dependencies
 

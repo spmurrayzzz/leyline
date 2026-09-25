@@ -48,14 +48,17 @@ For the reasoning behind the project, see [Motivations](docs/motivations.md).
 
 ## Requirements
 
-- macOS
+- macOS or Linux (see the tested setup below)
 - Node.js 22.19.0, as specified in `.nvmrc`
 - npm
 - A configured pi coding-agent environment
 
-Leyline is developed and tested on macOS only. Linux and Windows are not
-supported. The local Electron publish script currently expects an Apple silicon
-build named `Leyline-darwin-arm64`.
+Leyline is used on macOS and Linux. The Linux reference setup is x86-64
+Omarchy (Arch-based), running Hyprland on Wayland. Other Linux distributions
+and architectures have not been validated. Windows is not supported.
+
+For a user-local Linux desktop app and CLI, follow the
+[Linux installation guide](docs/getting-started/linux-installation.md).
 
 ## Setup
 
@@ -122,7 +125,11 @@ The packaged app is written to `release/`. The build creates the Vite `dist/`
 output and then packages Electron. It unpacks the native terminal files that
 `node-pty` needs.
 
-To install the packaged app locally and expose the `leyline` command:
+On Linux, follow the [Linux installation guide](docs/getting-started/linux-installation.md)
+to install `release/Leyline-linux-x64/`, a launcher, and an application-menu entry.
+The repository's `bin/leyline` and `local-publish` script are still macOS-only.
+
+On Apple silicon macOS, install the packaged app and expose `leyline` with:
 
 ```sh
 npm run local-publish
@@ -137,9 +144,10 @@ leyline
 ```
 
 The CLI opens or focuses Leyline and creates a session for the current shell
-directory. Use `leyline -n` to create the session in a new Leyline window.
+directory. Use `leyline -n` to open a new window at the home workspace without
+creating a session.
 
-## Electron shortcuts
+## Electron shortcuts (macOS)
 
 - `Command+N`: create a session in the current window
 - `Command+Shift+N`: create a session in a new window
@@ -153,6 +161,7 @@ directory. Use `leyline -n` to create the session in a new Leyline window.
 ## Documentation
 
 - [Getting started](docs/getting-started/index.md)
+- [Linux installation](docs/getting-started/linux-installation.md)
 - [Sessions](docs/user-guide/sessions.md)
 - [Composer](docs/user-guide/composer.md)
 - [Deep research](docs/user-guide/deep-research.md)
@@ -176,7 +185,7 @@ npm run docs:build
 npm run docs:screenshots
 npm run electron:dev
 npm run electron:build
-npm run local-publish
+npm run local-publish # Apple silicon macOS only
 npm run screenshot
 npm run video
 ```

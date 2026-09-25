@@ -28,7 +28,11 @@ The repository does not include a package lock.
 | --- | --- |
 | `npm run electron:dev` | Open Electron at `http://localhost:5173`. Start Vite first. |
 | `npm run electron:build` | Build the app and documentation, then package Electron in `release/`. |
-| `npm run local-publish` | Build the Apple silicon app, copy it to `/Applications/`, and link the CLI. |
+| `npm run local-publish` | macOS only: build the Apple silicon app, copy it to `/Applications/`, and link the CLI. |
+
+For Linux installation and launchers, follow
+[Linux installation](../getting-started/linux-installation). The repository's
+publish script and `bin/leyline` do not install or launch Linux packages.
 
 ## Capture screenshots and video
 
@@ -45,7 +49,9 @@ for URL, path, and video size overrides.
 
 ## Use the packaged CLI
 
-Run `npm run local-publish` before you use the global command.
+On Apple silicon macOS, run `npm run local-publish` first. On Linux, install
+the [Linux launcher](../getting-started/linux-installation#_3-add-the-cli-launcher).
+Ensure `~/.local/bin` is on your `PATH`.
 
 ```bash
 leyline
@@ -63,5 +69,6 @@ create a pi session. It is the only supported CLI option, and the CLI does not
 accept a directory argument.
 
 Set `LEYLINE_CWD` to change the directory for plain `leyline`. It does not affect
-`leyline -n`. Set `LEYLINE_APP` to select a different app package. See
+`leyline -n`. Set `LEYLINE_APP` to select a different macOS app bundle or, with
+the documented Linux launcher, an executable path. See
 [Environment variables](./environment#cli-variables).
