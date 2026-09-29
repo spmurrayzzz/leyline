@@ -254,6 +254,7 @@ function compactActiveSession(session) {
         pendingToolCalls.length,
         pendingTools.length,
       ),
+      pendingConfirmationCount: finiteCount(state.pendingConfirmationCount),
       activeToolCount: finiteCount(state.activeToolCount),
       activeToolNames: Array.isArray(state.activeToolNames)
         ? state.activeToolNames.slice(0, 32)
@@ -277,6 +278,7 @@ function compactRuntimeEnvelope(data) {
 
 function compactRuntimeEvent(event) {
   if (!event?.type
+    || event.parentToolCallId
     || event.type === 'message_update'
     || event.type === 'tool_execution_update') return null
   const compact = { type: event.type }

@@ -180,7 +180,7 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     for (const pendingTool of state.pendingTools) {
       const toolCallId = pendingTool?.toolCallId
       const toolName = pendingTool?.toolName
-      if (!toolCallId || !toolName) continue
+      if (!toolCallId || !toolName || pendingTool.parentToolCallId) continue
       pendingIds.add(toolCallId)
       const existing = liveTools.value.find((tool) => {
         return tool.toolCallId === toolCallId
@@ -191,6 +191,8 @@ export function useLiveTurnProjection({ onIntent } = {}) {
           state.research,
           true,
         )
+      if (existing?.finalResultReceived || existing?.persistedEntry
+        || existing?.terminalLiveResultReceived) continue
       if (existing?.liveResultReceived) continue
       if (existing
         && !existing.restoredFromRuntime
@@ -388,6 +390,7 @@ export function useLiveTurnProjection({ onIntent } = {}) {
   }
 
   function updateLiveTool(event) {
+    if (event?.parentToolCallId) return
     const type = event?.type || ''
 
     if (type === 'tool_call') {
@@ -406,9 +409,9 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     }
 
     if (type === 'tool_execution_end') {
-      const failed = Boolean(event.error || event.isError)
+      const failed = Boolean(event.error || event.isError || event.result?.isError)
       const tool = upsertLiveTool(event, failed ? 'error' : 'reading')
-      if (!failed) scheduleLiveToolSettle(tool.id)
+      if (!failed && tool) scheduleLiveToolSettle(tool.id)
       return
     }
 
@@ -423,8 +426,10 @@ export function useLiveTurnProjection({ onIntent } = {}) {
   }
 
   function upsertLiveTool(event, status) {
+    if (event.parentToolCallId) return
     const key = liveToolKey(event)
     const existing = findLiveTool(event, key)
+    if (existing?.finalResultReceived || existing?.persistedEntry) return existing
     const id = existing?.id || key || `live-tool-${++liveToolSeq}`
     const now = Date.now()
     const liveResultReceived = existing?.liveResultReceived === true
@@ -530,11 +535,8 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     })
     if (!tool) return
 
-    let status = tool.status
-    if (message.isError === true) status = 'error'
-    if (message.isError === false && status === 'error') {
-      status = liveToolFloorElapsed(tool) ? 'completed' : 'reading'
-    }
+    const status = message.isError ? 'error'
+      : liveToolFloorElapsed(tool) ? 'completed' : 'reading'
 
     const next = {
       ...tool,
@@ -542,6 +544,7 @@ export function useLiveTurnProjection({ onIntent } = {}) {
       restoredFromRuntime: false,
       liveResultReceived: true,
       terminalLiveResultReceived: true,
+      finalResultReceived: true,
       resultEntry: projectLiveToolEntry(
         tool,
         message,
@@ -568,7 +571,9 @@ export function useLiveTurnProjection({ onIntent } = {}) {
         toolCallId,
         toolName: message.toolName || tool.toolName,
       },
-    }, new Map([[toolCallId, { arguments: tool.args }]]))
+    }, new Map([[toolCallId, {
+      arguments: tool.args || {},
+    }]]))
     return entry ? { ...entry, persisted: false } : null
   }
 

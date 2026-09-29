@@ -20,6 +20,7 @@ const MemoryInspector = defineAsyncComponent(() => import('./components/MemoryIn
 const SessionComposer = defineAsyncComponent(() => import('./components/SessionComposer.vue'))
 const SubagentConfigDrawer = defineAsyncComponent(() => import('./components/SubagentConfigDrawer.vue'))
 const VisionConfigDrawer = defineAsyncComponent(() => import('./components/VisionConfigDrawer.vue'))
+import ExtensionConfirmations from './components/ExtensionConfirmations.vue'
 import StartComposer from './components/StartComposer.vue'
 import SessionSidebar from './components/SessionSidebar.vue'
 import { useBackendConnections } from './composables/useBackendConnections'
@@ -130,6 +131,7 @@ let activeComposerDraftKey = startComposerDraftKey
 const seenEntryIds = ref(new Set())
 const animatingEntryIds = ref(new Set())
 const composerRef = ref(null)
+const confirmationPanelHeight = ref(0)
 const startComposerRef = ref(null)
 const startupComposerDockLeft = ref('50%')
 const startupComposerDockX = ref('0px')
@@ -730,6 +732,11 @@ const contextUsageLevel = computed(() => {
   if (percent >= 80) return 'warning'
   return 'normal'
 })
+const extensionConfirmations = computed(() => {
+  const runtime = activeRuntimeSession.value
+  if (!selectedSessionId.value || runtime?.id !== selectedSessionId.value) return []
+  return runtime.state?.extensionUi?.confirmations || []
+})
 const goalWidgetLines = computed(() => {
   const ui = activeRuntimeSession.value?.state?.extensionUi
   return ui?.widgets?.goal?.lines || []
@@ -871,7 +878,8 @@ const inProjectTransitionActive = computed(() => {
   )
 })
 const emptySessionShellVisible = computed(() => {
-  return Boolean(isEmptySelectedSession.value || inProjectNewSessionRun.value)
+  return !extensionConfirmations.value.length
+    && Boolean(isEmptySelectedSession.value || inProjectNewSessionRun.value)
 })
 const runtimeChromeVisible = computed(() => {
   return initializing.value || selectedSession.value
@@ -962,6 +970,7 @@ watch(selectedSessionId, (sessionId) => {
   }
   expandedTools.value = new Set()
   expandedSkills.value = new Set()
+  closeToolFullscreen()
   promptError.value = ''
   seenEntryIds.value = new Set()
   animatingEntryIds.value = new Set()
@@ -3264,7 +3273,9 @@ function closePickerMenus() {
     }"
     :style="{
       '--composer-height': `${composerHeight}px`,
-      '--composer-reserved-height': composerReservedHeight,
+      '--composer-reserved-height': confirmationPanelHeight
+        ? `calc(${composerReservedHeight} + ${confirmationPanelHeight + 12}px)`
+        : composerReservedHeight,
       '--startup-composer-dock-left': startupComposerDockLeft,
       '--startup-composer-dock-x': startupComposerDockX,
       '--startup-composer-dock-y': startupComposerDockY,
@@ -4027,10 +4038,19 @@ function closePickerMenus() {
         :class="{ 'is-switching': sessionLoading || sessionSwitching }"
       ></div>
 
+      <ExtensionConfirmations
+        v-if="selectedSession && extensionConfirmations.length"
+        :key="`${activeBackendConnectionId}:${selectedSessionId}`"
+        :session-id="selectedSessionId"
+        :requests="extensionConfirmations"
+        :disabled="!eventStreamConnected"
+        @resize="confirmationPanelHeight = $event"
+      />
+
       <SessionComposer
         v-if="selectedSession
           && !initializing
-          && !startupRun"
+          && (!startupRun || extensionConfirmations.length)"
         ref="composerRef"
         v-model:draft="draft"
         :agent-running="agentRunning"

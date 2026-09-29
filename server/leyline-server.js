@@ -7,6 +7,7 @@ import { backendConnectionsHandler } from './backend-connections.js'
 import {
   configurePiWebSocketServer,
   piApiHandler,
+  shutdownPiRuntime,
 } from './pi-api/index.js'
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
@@ -51,7 +52,13 @@ export async function startLeylineServer(options = {}) {
   return {
     server,
     url,
-    close: () => new Promise((resolveClose) => server.close(resolveClose)),
+    close: async () => {
+      try {
+        await shutdownPiRuntime()
+      } finally {
+        await new Promise((resolveClose) => server.close(resolveClose))
+      }
+    },
   }
 }
 

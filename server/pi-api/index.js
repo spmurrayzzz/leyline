@@ -10,6 +10,7 @@ const runtime = createPiRuntimeApi()
 export function piApi() {
   return {
     name: 'pi-api',
+    closeBundle: () => runtime.shutdownRuntime(),
     configureServer(server) {
       configurePiWebSocketServer(server.httpServer)
       server.middlewares.use('/api/leyline', backendConnectionsHandler)
@@ -33,3 +34,4 @@ export function configurePiWebSocketServer(httpServer) {
 }
 
 export const piApiHandler = createPiApiHandler(runtime)
+export const shutdownPiRuntime = () => runtime.shutdownRuntime()

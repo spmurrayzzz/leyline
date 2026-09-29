@@ -261,6 +261,14 @@ export function editPrompt(
   )
 }
 
+export function replyPiExtensionConfirmation(sessionId, requestId, confirmed) {
+  return apiRequest(
+    `/api/pi/sessions/${encodeURIComponent(sessionId)}/extension-confirmations/${encodeURIComponent(requestId)}`,
+    'Failed to reply to confirmation',
+    { method: 'POST', body: { confirmed } },
+  )
+}
+
 export function interruptPiSession(sessionId) {
   return apiRequest(
     sessionActionUrl(sessionId, 'interrupt'),

@@ -125,6 +125,7 @@ export function sessionStateDto(
       followUp: [...session.getFollowUpMessages()],
     },
     extensionUi: extensionUiState,
+    pendingConfirmationCount: extensionUiState.confirmations?.length || 0,
     goal: goalStateFromSession(session),
     research: researchStateFromSession(session),
   }

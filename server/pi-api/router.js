@@ -1,5 +1,6 @@
 import { setCorsHeaders } from './cors.js'
 import { compactSessionDetailDto } from './dtos.js'
+import { replyExtensionConfirmation } from './extension-ui.js'
 
 export function createPiApiHandler(api) {
   const {
@@ -583,6 +584,25 @@ async function piApiHandler(req, res) {
         } catch (error) {
           return json(res, { error: error.message }, 500)
         }
+      }
+
+      const confirmationMatch = url.pathname.match(
+        /^\/sessions\/([^/]+)\/extension-confirmations\/([^/]+)$/,
+      )
+      if (confirmationMatch) {
+        if (req.method !== 'POST') {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+        const body = await readJson(req)
+        if (typeof body?.confirmed !== 'boolean') {
+          return json(res, { error: 'confirmed must be a boolean' }, 400)
+        }
+        const handle = await runtimeHandleForId(decodeURIComponent(confirmationMatch[1]))
+        if (!handle) return json(res, { error: 'Session not found' }, 404)
+        if (!replyExtensionConfirmation(handle, decodeURIComponent(confirmationMatch[2]), body.confirmed)) {
+          return json(res, { error: 'Confirmation is no longer pending' }, 409)
+        }
+        return json(res, { ok: true })
       }
 
       const scopedActions = [

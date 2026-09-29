@@ -589,6 +589,7 @@ export function useSessionWorkspace({
       isStreaming: state.isStreaming === true,
       isCompacting: state.isCompacting === true,
       queuedCount: queuedCount(state.queuedMessages),
+      pendingConfirmationCount: finiteRuntimeNumber(state.pendingConfirmationCount),
       pendingTools,
       pendingToolCount: Number.isFinite(state.pendingToolCount)
         ? state.pendingToolCount
@@ -654,7 +655,7 @@ export function useSessionWorkspace({
   function updateRuntimeEventState(data) {
     const id = data?.activeSessionId
     const event = data?.event
-    if (!id || !event?.type) return
+    if (!id || !event?.type || event.parentToolCallId) return
 
     const previous = runtimeSessionsById.value[id] || {}
     const patch = runtimePatchFromEvent(event, previous)
@@ -688,6 +689,7 @@ export function useSessionWorkspace({
   }
 
   function runtimeStatus(state, research, showCompleted = false) {
+    if (state.pendingConfirmationCount) return { label: 'confirm', tone: 'unread' }
     if (research?.status === 'error' && research.phase === 'report') {
       return { label: 'repair', tone: 'error' }
     }
@@ -1533,6 +1535,7 @@ export function useSessionWorkspace({
       || state.isCompacting
       || state.queuedCount > 0
       || state.pendingToolCount > 0
+      || state.pendingConfirmationCount > 0
       || state.unread
       || state.error
   }
@@ -1542,9 +1545,11 @@ export function useSessionWorkspace({
       || state.isCompacting
       || state.queuedCount > 0
       || state.pendingToolCount > 0
+      || state.pendingConfirmationCount > 0
   }
 
   function runtimeActivityDetail(state) {
+    if (state.pendingConfirmationCount) return 'Waiting for confirmation'
     if (state.error) {
       if (state.error !== 'error') return state.error
       const diagnostic = [...(state.diagnostics || [])].reverse().find((item) => {

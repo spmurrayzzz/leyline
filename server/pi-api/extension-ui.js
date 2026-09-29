@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { goalStateFromSession, isGoalStateEvent } from './goal-state.js'
 import { isResearchEntry } from '../../lib/research-state.js'
 
@@ -6,23 +7,38 @@ export function emptyExtensionUiState() {
     statuses: {},
     widgets: {},
     notifications: [],
+    confirmations: [],
   }
 }
 
 export async function bindRuntimeHandle(handle, events) {
+  const session = handle.runtime.session
+  const alreadyBound = handle.boundSession === session
+  cleanupExtensionConfirmations(handle, { invalidate: !alreadyBound })
   settlePromptHandoff(handle)
   handle.unsubscribe?.()
   handle.extensionUiState = emptyExtensionUiState()
   handle.pendingToolResults = new Map()
-  await handle.runtime.session.bindExtensions({
-    uiContext: createExtensionUiContext(handle, events),
-    onError: (error) => {
-      events.broadcastEvent('extension_error', {
-        activeSessionId: handle.sessionId,
-        error: { message: error?.message || String(error) },
+  try {
+    if (alreadyBound) {
+      await session.reload()
+    } else {
+      await session.bindExtensions({
+        mode: 'rpc',
+        uiContext: createExtensionUiContext(handle, events),
+        onError: (error) => {
+          events.broadcastEvent('extension_error', {
+            activeSessionId: handle.sessionId,
+            error: { message: error?.message || String(error) },
+          })
+        },
       })
-    },
-  })
+    }
+    handle.boundSession = session
+  } catch (error) {
+    cleanupExtensionConfirmations(handle)
+    throw error
+  }
   syncGoalStateFromSession(handle)
   handle.unsubscribe = handle.runtime.session.subscribe((event) => {
     const handoffId = promptHandoffId(handle, event)
@@ -85,7 +101,7 @@ function settlePromptHandoff(handle) {
 
 function trackPendingToolResult(handle, event) {
   const results = handle.pendingToolResults
-  if (!results) return
+  if (!results || event.parentToolCallId) return
   if (['agent_end', 'error', 'aborted'].includes(event.type)) {
     results.clear()
     return
@@ -107,7 +123,7 @@ function trackPendingToolResult(handle, event) {
 }
 
 function trackRuntimeActivity(handle, event) {
-  if (!event?.type) return
+  if (!event?.type || event.parentToolCallId) return
   const previous = handle.activityState || {
     active: false,
     activityAt: 0,
@@ -180,10 +196,93 @@ function settleRuntimeActivity(next, previous, now) {
   next.settledRevision = (previous.settledRevision || 0) + 1
 }
 
+export function cleanupExtensionConfirmations(handle, { invalidate = true } = {}) {
+  const binding = handle?.extensionConfirmations
+  if (!binding) return
+  binding.invalidated ||= invalidate
+  binding.controller.abort()
+  if (!binding.invalidated) binding.controller = new AbortController()
+}
+
+export function replyExtensionConfirmation(handle, requestId, confirmed) {
+  if (typeof requestId !== 'string' || typeof confirmed !== 'boolean') return false
+  const pending = handle?.extensionConfirmations?.pending.get(requestId)
+  return pending ? pending(confirmed) : false
+}
+
+function requestExtensionConfirmation(handle, events, binding, title, message, options = {}) {
+  const isCurrent = () => handle.extensionConfirmations === binding
+    && handle.runtime.session === binding.session
+    && handle.sessionId === binding.sessionId
+  const timeout = options.timeout
+  if (!isCurrent() || binding.invalidated || binding.controller.signal.aborted
+    || (timeout !== undefined && (!Number.isFinite(timeout) || timeout <= 0))) {
+    return Promise.resolve(false)
+  }
+  const signal = AbortSignal.any([
+    binding.controller.signal,
+    options.signal,
+    binding.session.agent?.signal,
+    handle.subagentSignal,
+  ].filter(Boolean))
+  if (signal.aborted) return Promise.resolve(false)
+
+  const request = {
+    id: randomUUID(),
+    title,
+    message,
+    createdAt: Date.now(),
+    expiresAt: timeout === undefined ? null : Date.now() + timeout,
+  }
+  return new Promise((resolve) => {
+    let timer
+    const finish = (confirmed) => {
+      if (!binding.pending.has(request.id)) return false
+      const valid = isCurrent() && !signal.aborted
+        && (request.expiresAt === null || Date.now() < request.expiresAt)
+      binding.pending.delete(request.id)
+      clearTimeout(timer)
+      signal.removeEventListener('abort', cancel)
+      handle.extensionUiState = {
+        ...handle.extensionUiState,
+        confirmations: (handle.extensionUiState.confirmations || [])
+          .filter((item) => item.id !== request.id),
+      }
+      resolve(valid && confirmed === true)
+      if (isCurrent()) broadcastExtensionUi(handle, events)
+      return valid
+    }
+    const cancel = () => finish(false)
+    const scheduleTimeout = () => {
+      const remaining = request.expiresAt - Date.now()
+      if (remaining <= 0) cancel()
+      else timer = setTimeout(scheduleTimeout, Math.min(remaining, 2147483647))
+    }
+    binding.pending.set(request.id, finish)
+    signal.addEventListener('abort', cancel, { once: true })
+    handle.extensionUiState = {
+      ...handle.extensionUiState,
+      confirmations: [...handle.extensionUiState.confirmations, request],
+    }
+    if (request.expiresAt !== null) scheduleTimeout()
+    broadcastExtensionUi(handle, events)
+  })
+}
+
 function createExtensionUiContext(handle, events) {
+  const binding = {
+    session: handle.runtime.session,
+    sessionId: handle.sessionId,
+    controller: new AbortController(),
+    invalidated: false,
+    pending: new Map(),
+  }
+  handle.extensionConfirmations = binding
   return {
     select: async () => undefined,
-    confirm: async () => true,
+    confirm: (title, message, options) => {
+      return requestExtensionConfirmation(handle, events, binding, title, message, options)
+    },
     input: async () => undefined,
     notify(message, type = 'info') {
       const notification = {
