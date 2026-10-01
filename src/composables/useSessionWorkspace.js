@@ -781,9 +781,8 @@ export function useSessionWorkspace({
         pendingToolCount: 0,
       }
     }
-    if (event.type === 'message_end'
-      && event.message?.role === 'assistant'
-      && event.message?.stopReason === 'error') {
+    if (event.type === 'message_end' && event.message?.role === 'assistant') {
+      if (event.message.stopReason !== 'error') return { error: '' }
       return {
         isStreaming: previous.isStreaming === true,
         isCompacting: false,
@@ -821,7 +820,7 @@ export function useSessionWorkspace({
     if (event.type === 'compaction_end') {
       return {
         isCompacting: false,
-        error: event.willRetry ? '' : event.errorMessage || '',
+        error: event.willRetry ? '' : runtimeErrorMessage(event, ''),
       }
     }
     if (event.type === 'queue_update') {
@@ -865,13 +864,15 @@ export function useSessionWorkspace({
   }
 
   function runtimeErrorMessage(event, fallback) {
-    if (typeof event.error === 'string') return event.error
-    return event.error?.message
+    const error = (typeof event.error === 'string' ? event.error : event.error?.message)
       || event.message?.errorMessage
       || event.message?.message
       || (typeof event.message === 'string' ? event.message : '')
       || event.errorMessage
       || fallback
+    if (event.error?.name === 'AbortError') return ''
+    if (event.error?.name || event.error?.code) return error
+    return error === 'This operation was aborted' ? '' : error
   }
 
   function queuedCount(queue) {

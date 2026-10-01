@@ -143,9 +143,14 @@ function trackRuntimeActivity(handle, event) {
     next.error = ''
   }
 
-  const error = runtimeActivityError(event)
-  if (error) next.error = error
-  else if (event.type === 'aborted') next.error = ''
+  const assistantEnded = event.type === 'message_end' && event.message?.role === 'assistant'
+  const outcomeEvent = ['error', 'aborted', 'compaction_end'].includes(event.type)
+  if (assistantEnded || outcomeEvent) {
+    next.error = runtimeActivityError(event)
+    const untypedError = !event.error?.name && !event.error?.code
+    if (untypedError && next.error === 'This operation was aborted') next.error = ''
+    if (event.error?.name === 'AbortError') next.error = ''
+  }
 
   if (event.type === 'agent_settled'
     || (event.type === 'compaction_end' && event.reason === 'manual')) {
