@@ -75,6 +75,7 @@ async function createWindow(initialCommand, initialUrl = '') {
     minHeight: 420,
     backgroundColor: '#0b0b10',
     webPreferences: {
+      backgroundThrottling: false,
       contextIsolation: true,
       nodeIntegration: false,
     },
