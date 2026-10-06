@@ -277,11 +277,12 @@ export function interruptPiSession(sessionId) {
   )
 }
 
-export function forkPiSession(entryId) {
-  return apiRequest('/api/pi/fork', 'Failed to fork session', {
-    method: 'POST',
-    body: { entryId },
-  })
+export function forkPiSession(sessionId, entryId) {
+  return apiRequest(
+    sessionActionUrl(sessionId, 'fork'),
+    'Failed to fork session',
+    { method: 'POST', body: { entryId } },
+  )
 }
 
 export function resetPiSession(entryId) {

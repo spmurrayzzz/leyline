@@ -960,55 +960,67 @@ function updateSessionContext(session) {
   session.refreshContext()
 }
 
-const forkActiveSession = trackRuntimeCreation(async (entryId) => {
-  const handle = requireActiveHandle()
+const forkSession = trackRuntimeCreation(async (handle, entryId) => {
   requireInitializedSession(handle)
-  const runtime = handle.runtime
-  const session = runtime.session
+  const session = handle.runtime.session
   if (!entryId) throw new Error('entryId is required')
-  if (session.isStreaming) {
-    throw new Error('Wait for the current response to finish before forking.')
-  }
+  if (!session.sessionManager.getEntry(entryId)) throw new Error('Entry not found')
   if (session.isCompacting) {
     throw new Error('Wait for compaction to finish before forking.')
   }
 
-  const previousId = handle.sessionId
-  const previousSessionPath = session.sessionManager.getSessionFile()
-  cleanupExtensionConfirmations(handle, { invalidate: false })
-  const result = await runtime.fork(entryId, { position: 'at' })
+  const result = await session.extensionRunner.emit({
+    type: 'session_before_fork',
+    entryId,
+    position: 'at',
+  })
+  if (result?.cancel) throw new Error('Fork cancelled')
   if (runtimeShuttingDown || handle.disposalPromise) {
-    if (handle.disposalPromise) {
-      try {
-        await handle.disposalPromise
-      } finally {
-        if (runtime.session !== session) await disposeRuntime(runtime)
-      }
-    } else {
-      await discardRuntimeHandle(handle)
-    }
     throw new Error('Runtime is shutting down')
   }
-  if (result.cancelled) throw new Error('Fork cancelled')
-  rebaseResearchSession(runtime.session.sessionManager)
-  forceOneAtATime(runtime.session)
-  removeRuntimeHandle(previousId)
-  handle.sessionId = runtime.session.sessionManager.getSessionId()
-  handle.activityState = undefined
-  runtimeHandles.set(handle.sessionId, handle)
-  setActiveHandle(handle)
+  if (handle.runtime.session !== session) throw new Error('Session changed before forking')
+
+  const previousSessionFile = session.sessionManager.getSessionFile()
+  if (!previousSessionFile || !existsSync(previousSessionFile)) {
+    throw new Error('Wait for this session to finish saving before forking.')
+  }
+  const manager = SessionManager.open(
+    previousSessionFile,
+    session.sessionManager.getSessionDir(),
+  )
+  manager.createBranchedSession(entryId)
+  rebaseResearchSession(manager)
   copySessionSubagentOverrides({
-    cwd: runtime.session.sessionManager.getCwd(),
-    fromSessionPath: previousSessionPath,
-    toSessionPath: runtime.session.sessionManager.getSessionFile(),
+    cwd: manager.getCwd(),
+    fromSessionPath: previousSessionFile,
+    toSessionPath: manager.getSessionFile(),
   })
   copySessionVisionOverrides({
-    cwd: runtime.session.sessionManager.getCwd(),
-    fromSessionPath: previousSessionPath,
-    toSessionPath: runtime.session.sessionManager.getSessionFile(),
+    cwd: manager.getCwd(),
+    fromSessionPath: previousSessionFile,
+    toSessionPath: manager.getSessionFile(),
   })
-  await bindRuntimeHandle(handle)
-  return activeSessionDto(handle)
+  const runtime = await createAgentSessionRuntime(createRuntime, {
+    cwd: manager.getCwd(),
+    agentDir: getAgentDir(),
+    sessionManager: manager,
+    sessionStartEvent: { type: 'session_start', reason: 'fork', previousSessionFile },
+  })
+  const fork = {
+    runtime,
+    sessionId: manager.getSessionId(),
+    unsubscribe: undefined,
+    extensionUiState: emptyExtensionUiState(),
+  }
+  runtimeHandles.set(fork.sessionId, fork)
+  try {
+    await bindRuntimeHandle(fork)
+    setActiveHandle(fork)
+    return fork
+  } catch (error) {
+    await discardRuntimeHandle(fork)
+    throw error
+  }
 })
 
 function restoreTrailingResearchReport(manager) {
@@ -1766,7 +1778,7 @@ export function createPiRuntimeApi() {
   exportFilename,
   exportSessionDetail,
   exportShareMeta,
-  forkActiveSession,
+  forkSession,
   html,
   interruptSession,
   json,

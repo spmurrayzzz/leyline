@@ -1129,28 +1129,49 @@ export function useSessionWorkspace({
   }
 
   async function forkSession(entry) {
-    if (!entry?.id || !canBranchFromEntry()) return
+    if (!entry?.id || !selectedSession.value || !canBranchFromEntry()) return
 
+    const sessionId = selectedSessionId.value
+    const token = sessionSelectionToken
     forkingEntryId.value = entry.id
     sessionError.value = ''
-    liveTurn?.setActivity?.('Forking session…')
+    if (!liveTurn?.agentRunning?.value) liveTurn?.setActivity?.('Forking session…')
 
     try {
-      const data = await forkPiSession(entry.id)
-      setSelectedSessionData(data.detail, data.active)
+      let entryId = entry.id
+      if (!sessionDetail.value?.entries.some((item) => item.id === entryId)) {
+        const detail = await fetchSessionDetail(sessionId)
+        if (!isCurrentSessionSelection(token, sessionId)) return
+        sessionDetail.value = detail
+        liveTurn?.setPersistedDetail?.(detail)
+        if (!detail.entries.some((item) => item.id === entryId)) {
+          entryId = liveTurn?.liveItems?.value.find((item) => {
+            return item.id === entry.id
+          })?.persistedEntry?.id
+        }
+        if (!entryId) throw new Error('Wait for this entry to finish saving before forking.')
+      }
+      const data = await forkPiSession(sessionId, entryId)
+      if (isCurrentSessionSelection(token, sessionId)) {
+        setSelectedSessionData(data.detail, data.active)
+        await scrollToLatest?.()
+        await reconnectTerminalIfOpen()
+      }
       await loadSessions({ selectFirst: false, showLoading: false })
-      await scrollToLatest?.()
-      await reconnectTerminalIfOpen()
     } catch (error) {
-      sessionError.value = error.message
-      liveTurn?.setActivity?.('')
+      if (selectedSessionId.value === sessionId) sessionError.value = error.message
     } finally {
+      if (selectedSessionId.value === sessionId
+        && liveTurn?.liveActivity?.value === 'Forking session…') {
+        liveTurn?.setActivity?.('')
+      }
       forkingEntryId.value = ''
     }
   }
 
   async function resetSessionToEntry(entry) {
-    if (!entry?.id || !selectedSession.value || !canBranchFromEntry()) return
+    if (!entry?.id || !selectedSession.value || !canBranchFromEntry()
+      || liveTurn?.agentRunning?.value) return
 
     resettingEntryId.value = entry.id
     sessionError.value = ''
@@ -1173,7 +1194,6 @@ export function useSessionWorkspace({
   function canBranchFromEntry() {
     return !forkingEntryId.value
       && !resettingEntryId.value
-      && !liveTurn?.agentRunning?.value
       && !liveTurn?.compactingContext?.value
   }
 

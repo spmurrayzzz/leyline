@@ -15,7 +15,7 @@ export function createPiApiHandler(api) {
     exportFilename,
     exportSessionDetail,
     exportShareMeta,
-    forkActiveSession,
+    forkSession,
     html,
     interruptSession,
     json,
@@ -261,11 +261,11 @@ async function piApiHandler(req, res) {
         }
   
         const body = await readJson(req)
-        const active = await forkActiveSession(body.entryId)
+        const fork = await forkSession(requireActiveHandle(), body.entryId)
         return json(res, {
           ok: true,
-          active,
-          detail: toActiveSessionDetailDto(),
+          active: activeSessionDto(fork),
+          detail: toActiveSessionDetailDto(fork),
         })
       }
 
@@ -610,6 +610,7 @@ async function piApiHandler(req, res) {
         'bash',
         'compact',
         'edit-prompt',
+        'fork',
         'interrupt',
         'reload',
         'model',
@@ -668,6 +669,14 @@ async function piApiHandler(req, res) {
             body.handoffId,
           )
           return json(res, { ok: true, active: activeSessionDto(handle) })
+        }
+        if (action === 'fork') {
+          const fork = await forkSession(handle, body.entryId)
+          return json(res, {
+            ok: true,
+            active: activeSessionDto(fork),
+            detail: toActiveSessionDetailDto(fork),
+          })
         }
         if (action === 'interrupt') {
           await interruptSession(handle)
