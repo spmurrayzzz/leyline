@@ -608,6 +608,7 @@ async function promptSession(
         streamingBehavior,
         promptHandoffId,
         controller.signal,
+        registration,
       )
       if (controller.signal.aborted) {
         registration.cancel()
@@ -633,6 +634,7 @@ async function runSessionPrompt(
   streamingBehavior,
   handoffId,
   signal,
+  visionRegistration,
 ) {
   const release = await lockPromptSubmission(handle)
   const session = handle.runtime.session
@@ -648,7 +650,10 @@ async function runSessionPrompt(
         preflightResult: (result) => {
           if (signal?.aborted) throw new Error('Prompt cancelled')
           disposition = result
-          if (result === 'started') handoff = createPromptHandoff(handle, handoffId)
+          if (result === 'started') {
+            visionRegistration?.start()
+            handoff = createPromptHandoff(handle, handoffId)
+          }
           resolve()
         },
       })

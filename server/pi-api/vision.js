@@ -33,9 +33,12 @@ export function installVisionDelegationContext(session) {
     if (event.type !== 'message_end' || event.message?.role !== 'user') return
     const signature = imageSignature(event.message.content)
     const prompt = textContent(event.message.content)
-    const exactIndex = state.pending.findIndex((item) => {
-      return item.signature === signature && item.prompt === prompt
-    })
+    const startedIndex = state.pending.findIndex((item) => item.started)
+    const exactIndex = startedIndex === -1
+      ? state.pending.findIndex((item) => {
+          return item.signature === signature && item.prompt === prompt
+        })
+      : startedIndex
     const candidates = state.pending
       .map((item, index) => ({ index, item }))
       .filter(({ item }) => {
@@ -47,6 +50,8 @@ export function installVisionDelegationContext(session) {
     if (index === -1) return
 
     const [pending] = state.pending.splice(index, 1)
+    pending.bound = true
+    if (!signature) return
     const record = {
       signature,
       text: pending.text,
@@ -55,7 +60,6 @@ export function installVisionDelegationContext(session) {
       userTimestamp: event.message.timestamp,
     }
     state.records.push(record)
-    pending.bound = true
     queueMicrotask(() => {
       record.userEntryId = session.sessionManager.getLeafId()
       session.sessionManager.appendCustomEntry(
@@ -81,6 +85,9 @@ export function registerVisionDelegation(session, images, delegation, prompt) {
   }
   state.pending.push(pending)
   return {
+    start() {
+      pending.started = true
+    },
     cancel() {
       if (pending.bound) return
       state.pending = state.pending.filter((item) => item !== pending)
