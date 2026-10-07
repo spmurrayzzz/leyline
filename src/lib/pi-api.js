@@ -44,6 +44,25 @@ export function fetchFsDirectory(path, cwd = '') {
   return apiRequest(`/api/pi/fs${query}`, 'Failed to read folder')
 }
 
+export function fetchFileSettings() {
+  return apiRequest('/api/pi/files/settings', 'Failed to load file settings')
+}
+
+export function saveFileSettings(settings) {
+  return apiRequest('/api/pi/files/settings', 'Failed to save file settings', {
+    method: 'PUT',
+    body: settings,
+  })
+}
+
+export function performFileAction(sessionId, target, action = 'preview') {
+  return apiRequest(
+    `/api/pi/sessions/${encodeURIComponent(sessionId)}/file`,
+    'Failed to open file',
+    { method: 'POST', body: { ...target, action } },
+  )
+}
+
 export function fetchGitReview(cwd) {
   const params = new URLSearchParams({ cwd })
   return apiRequest(

@@ -161,6 +161,9 @@ function sourceDate() {
       rel="noreferrer"
       @click="emit('close')"
     >Open source ↗</a>
-    <code v-else-if="source.path">{{ source.path }}</code>
+    <template v-else-if="source.path">
+      <code>{{ source.path }}</code>
+      <a href="#" :data-local-file="encodeURIComponent(source.path)">Preview file</a>
+    </template>
   </section>
 </template>

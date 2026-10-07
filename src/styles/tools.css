@@ -659,6 +659,120 @@
   background: #0f1014;
 }
 
+.file-preview-backdrop {
+  z-index: 75;
+}
+
+.file-preview {
+  outline: none;
+}
+
+.file-preview-heading {
+  flex: 1;
+}
+
+.file-preview-heading > span {
+  flex-shrink: 0;
+}
+
+.file-preview-actions {
+  flex-wrap: wrap;
+}
+
+.file-preview-actions > button,
+.file-preview-heading > button {
+  min-height: 28px;
+  padding: 4px 8px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.file-preview-meta {
+  margin: 0;
+  padding: 8px 16px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.file-preview-message {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  max-width: 640px;
+  margin: 36px auto;
+  padding: 20px;
+  color: var(--muted-strong);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.file-preview-message p {
+  margin: 0;
+}
+
+.file-preview-message code {
+  overflow-wrap: anywhere;
+}
+
+.file-preview-message button {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-soft);
+  padding: 7px 12px;
+  color: var(--text);
+}
+
+.file-context-menu {
+  position: fixed;
+  z-index: 90;
+  display: grid;
+  width: min(280px, calc(100vw - 16px));
+  max-height: calc(100dvh - 16px);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  outline: none;
+  background: #18191f;
+  padding: 5px;
+  box-shadow: 0 10px 32px rgb(0 0 0 / 35%);
+}
+
+.file-context-menu > code {
+  overflow: hidden;
+  padding: 6px 8px 9px;
+  color: var(--muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-context-menu > button {
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  padding: 8px;
+  color: var(--text);
+  font-size: 12px;
+  text-align: left;
+}
+
+.file-context-menu > button:hover,
+.file-context-menu > button:focus-visible {
+  outline: none;
+  background: var(--panel-soft);
+}
+
+.file-context-menu > button:disabled {
+  color: var(--muted);
+}
+
+.file-menu-note {
+  padding: 6px 8px;
+  color: var(--muted);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
 .error-card {
   border-color: rgb(160 78 90 / 42%);
 }

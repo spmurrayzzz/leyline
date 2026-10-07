@@ -213,7 +213,8 @@
   gap: 5px;
 }
 
-.backend-connection-form input {
+.backend-connection-form input,
+.file-settings-form select {
   width: 100%;
   min-width: 0;
   border: 1px solid var(--border-soft);
@@ -226,7 +227,8 @@
   font-size: 11px;
 }
 
-.backend-connection-form input:focus {
+.backend-connection-form input:focus,
+.file-settings-form select:focus {
   border-color: var(--accent-border);
 }
 

@@ -13,6 +13,7 @@ const error = ref('')
 let instance
 let diffContainer
 let renderTimer
+let linePositioned = false
 
 const options = {
   theme: 'pierre-dark',
@@ -55,10 +56,22 @@ function handlePostRender(_node, renderedInstance) {
   if (renderedInstance !== instance) return
   clearTimeout(renderTimer)
   renderTimer = undefined
+  const line = props.preview?.line
+  if (line && !linePositioned && props.preview.kind === 'file') {
+    instance.setSelectedLines({ start: line, end: props.preview.endLine || line })
+    const target = diffContainer?.shadowRoot?.querySelector(`[data-column-number="${line}"]`)
+    const scroller = container.value?.closest('.tool-fullscreen-body')
+    if (target && scroller) {
+      scroller.scrollTop += target.getBoundingClientRect().top
+        - scroller.getBoundingClientRect().top - scroller.clientHeight / 3
+      linePositioned = true
+    }
+  }
   emit('ready')
 }
 
 function cleanup() {
+  linePositioned = false
   clearTimeout(renderTimer)
   renderTimer = undefined
   instance?.cleanUp?.()

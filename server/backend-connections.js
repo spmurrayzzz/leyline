@@ -179,6 +179,26 @@ function registryDto(db) {
   return { connections, defaultConnectionId }
 }
 
+export function readBackendSettings(keys) {
+  const db = openDb()
+  try {
+    return Object.fromEntries(keys.map((key) => [key, settingValue(db, key)]))
+  } finally {
+    db.close()
+  }
+}
+
+export function writeBackendSettings(values) {
+  const db = openDb()
+  try {
+    db.exec('BEGIN')
+    for (const [key, value] of Object.entries(values)) setSetting(db, key, value)
+    db.exec('COMMIT')
+  } finally {
+    db.close()
+  }
+}
+
 function settingValue(db, key) {
   return db.prepare('SELECT value FROM leyline_settings WHERE key = ?').get(key)?.value || ''
 }

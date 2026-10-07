@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import MarkdownIt from 'markdown-it'
+import { configureMarkdownLinks } from '../../lib/markdown-file-links.js'
 import {
   imageBlocksFor,
   messageBlocksFor,
@@ -14,6 +15,8 @@ const exportMarkdown = new MarkdownIt({
   linkify: true,
   breaks: true,
 })
+
+configureMarkdownLinks(exportMarkdown, { interactive: false })
 
 exportMarkdown.renderer.rules.table_open = () =>
   '<div class="table-wrap"><table>'
@@ -1007,6 +1010,7 @@ button, input, textarea { color: inherit; font: inherit; }
   color: #adb1bc;
 }
 .markdown-body a { color: #bfb5ff; text-decoration: none; }
+.markdown-body .markdown-relative-link { border-bottom: 1px dotted currentColor; color: #bfb5ff; }
 .tool-card {
   min-width: 0;
   width: min(var(--content-max), 100%);

@@ -134,8 +134,6 @@ async function createWindow(initialCommand, initialUrl = '') {
       && key === 'e'
       && input.meta
       && !input.shift
-    const isEscape = input.type === 'keyDown' && key === 'escape'
-
     if (
       !isNewWindow
       && !isNewSession
@@ -144,14 +142,7 @@ async function createWindow(initialCommand, initialUrl = '') {
       && !isOpenSettings
       && !isToggleMemory
       && !isToggleSidebar
-      && !isEscape
     ) return
-
-    if (isEscape) {
-      event.preventDefault()
-      sendEscapeCommand(window)
-      return
-    }
 
     event.preventDefault()
     if (isNewWindow) void createWindowFromSource(null, window)
@@ -210,10 +201,6 @@ function isWorkspaceUrl(value, appOrigin) {
   } catch {
     return false
   }
-}
-
-function sendEscapeCommand(window) {
-  sendWindowCommand(window, 'leyline:escape')
 }
 
 function sendNewSessionCommand(window) {

@@ -1,6 +1,7 @@
 import { setCorsHeaders } from './cors.js'
 import { compactSessionDetailDto } from './dtos.js'
 import { replyExtensionConfirmation } from './extension-ui.js'
+import { getFileSettings, performFileAction, setFileSettings } from './files.js'
 
 export function createPiApiHandler(api) {
   const {
@@ -87,8 +88,35 @@ async function piApiHandler(req, res) {
             review: true,
             reviewWatch: true,
             terminal: true,
+            fileLinks: true,
           },
         })
+      }
+
+      if (url.pathname === '/files/settings') {
+        if (req.method === 'GET') return json(res, await getFileSettings())
+        if (req.method === 'PUT') {
+          try {
+            return json(res, await setFileSettings(await readJson(req)))
+          } catch (error) {
+            return json(res, { ...await getFileSettings(), error: error.message }, error.statusCode || 400)
+          }
+        }
+        return json(res, { error: 'Method not allowed' }, 405)
+      }
+
+      const fileMatch = url.pathname.match(/^\/sessions\/([^/]+)\/file$/)
+      if (fileMatch) {
+        if (req.method !== 'POST') {
+          return json(res, { error: 'Method not allowed' }, 405)
+        }
+        const session = await resolveSession(decodeURIComponent(fileMatch[1]))
+        if (!session) return json(res, { error: 'Session not found' }, 404)
+        try {
+          return json(res, await performFileAction(session, await readJson(req)))
+        } catch (error) {
+          return json(res, { error: error.message }, error.statusCode || 500)
+        }
       }
 
       if (url.pathname === '/projects') {

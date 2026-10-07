@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path'
 import pty from 'node-pty'
 import { WebSocket, WebSocketServer } from 'ws'
 import { requestOriginAllowed } from './cors.js'
+import { terminalEditorOptions } from './files.js'
 
 const require = createRequire(import.meta.url)
 
@@ -33,8 +34,15 @@ export function configurePiWebSocketServer(
 }
 
 async function openTerminal(ws, req, getActiveCwd, getSessionCwd) {
-  const sessionId = new URL(req.url, 'http://localhost').searchParams.get('sessionId')
+  const params = new URL(req.url, 'http://localhost').searchParams
+  const sessionId = params.get('sessionId')
+  const editorRequested = params.has('editorPath')
   let cwd
+
+  if (editorRequested && !sessionId) {
+    closeWithError(ws, 'A sessionId is required for an editor terminal')
+    return
+  }
 
   try {
     cwd = sessionId
@@ -60,9 +68,18 @@ async function openTerminal(ws, req, getActiveCwd, getSessionCwd) {
     return
   }
 
+  let editor
   try {
+    if (editorRequested) {
+      editor = await terminalEditorOptions(cwd, {
+        editorPath: params.get('editorPath'),
+        editorLine: params.get('editorLine'),
+        allowOutsideProject: params.get('allowOutsideProject') === 'true',
+      })
+    }
+    if (ws.readyState !== WebSocket.OPEN) return
     ensureNodePtyHelperExecutable()
-    term = pty.spawn(shell, ['-l'], {
+    term = pty.spawn(editor?.executable || shell, editor?.args || ['-l'], {
       name: 'xterm-256color',
       cols: 100,
       rows: 24,
@@ -79,7 +96,8 @@ async function openTerminal(ws, req, getActiveCwd, getSessionCwd) {
   ws.send(JSON.stringify({
     type: 'ready',
     cwd,
-    shell,
+    shell: editor?.executable || shell,
+    ...(editor ? { editorPath: editor.path } : {}),
     pty: true,
   }))
 

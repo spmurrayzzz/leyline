@@ -791,6 +791,11 @@
   text-decoration: none;
 }
 
+.markdown-body .markdown-relative-link {
+  border-bottom: 1px dotted currentColor;
+  color: #bfb5ff;
+}
+
 .event-row {
   display: flex;
   align-items: center;

@@ -257,7 +257,7 @@ function openMarkdownContent(event) {
     return item.id === id
   })
   if (!source) return
-  const target = citationTarget(link.getAttribute('href') || '')
+  const target = citationTarget(link.getAttribute('data-local-file') || link.getAttribute('href') || '')
   const targetSource = /^https?:\/\//i.test(target)
     ? { url: target }
     : { path: target }

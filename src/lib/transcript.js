@@ -1,4 +1,5 @@
 import MarkdownIt from 'markdown-it'
+import { configureMarkdownLinks } from '../../lib/markdown-file-links.js'
 import highlightJsSource from '../../node_modules/@earendil-works/pi-coding-agent/dist/core/export-html/vendor/highlight.min.js?raw'
 import {
   imageBlocksFor,
@@ -16,10 +17,9 @@ import {
 
 const hljs = loadHighlightJs()
 const markdown = createMarkdown()
-const previewMarkdown = createMarkdown()
+const previewMarkdown = createMarkdown(true)
 previewMarkdown.renderer.rules.image = renderPreviewImage
-previewMarkdown.renderer.rules.link_open = renderPreviewLinkOpen
-previewMarkdown.renderer.rules.link_close = renderPreviewLinkClose
+previewMarkdown.renderer.rules.heading_open = renderPreviewHeading
 
 export function entryClass(entry) {
   return {
@@ -65,33 +65,29 @@ export function renderedToolJson(entry) {
   }
 }
 
-function createMarkdown() {
-  return new MarkdownIt({
+function createMarkdown(preview = false) {
+  const markdown = new MarkdownIt({
     html: false,
     linkify: true,
     breaks: true,
     highlight: highlightCode,
   })
+  configureMarkdownLinks(markdown, { preview })
+  return markdown
 }
 
 function renderPreviewImage(tokens, index) {
   return `<span class="markdown-image-reference">Image: ${escapeHtml(tokens[index].content || 'Untitled')}</span>`
 }
 
-function renderPreviewLinkOpen(tokens, index, options, env, renderer) {
-  const token = tokens[index]
-  const external = /^(?:https?:|mailto:)/i.test(token.attrGet('href') || '')
-  const stack = env.previewLinkStack || (env.previewLinkStack = [])
-  stack.push(external)
-  if (!external) return '<span class="markdown-relative-link">'
-
-  token.attrSet('target', '_blank')
-  token.attrSet('rel', 'noopener noreferrer')
+function renderPreviewHeading(tokens, index, options, env, renderer) {
+  const text = tokens[index + 1]?.content || ''
+  const slug = text.toLowerCase().replace(/[^\p{L}\p{N}\s_-]/gu, '').replace(/\s/g, '-')
+  const counts = env.headingCounts || (env.headingCounts = new Map())
+  const count = counts.get(slug) || 0
+  counts.set(slug, count + 1)
+  tokens[index].attrSet('id', count ? `${slug}-${count}` : slug)
   return renderer.renderToken(tokens, index, options)
-}
-
-function renderPreviewLinkClose(_tokens, _index, _options, env) {
-  return env.previewLinkStack?.pop() ? '</a>' : '</span>'
 }
 
 function highlightCode(source, language) {

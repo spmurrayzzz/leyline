@@ -26,6 +26,14 @@ export function useTerminal() {
     await connectTerminal(sessionId)
   }
 
+  async function openEditorTerminal(sessionId, file, allowOutsideProject = false) {
+    if (terminalOpen.value && ['connected', 'connecting'].includes(terminalStatus.value)
+      && !window.confirm('Opening this editor will replace the current terminal and stop its process. Continue?')) return false
+    terminalOpen.value = true
+    await connectTerminal(sessionId, { ...file, allowOutsideProject })
+    return true
+  }
+
   function disposeTerminalConnection() {
     terminalInputDisposable?.dispose()
     terminalInputDisposable = undefined
@@ -45,7 +53,7 @@ export function useTerminal() {
     disposeTerminalConnection()
   }
 
-  async function connectTerminal(sessionId = '') {
+  async function connectTerminal(sessionId = '', editor = null) {
     const runId = terminalRunId + 1
     terminalRunId = runId
     terminalStatus.value = 'connecting'
@@ -81,9 +89,14 @@ export function useTerminal() {
     resizeTerminal()
     focusTerminal()
 
-    const terminalPath = sessionId
-      ? `/api/pi/terminal?sessionId=${encodeURIComponent(sessionId)}`
-      : '/api/pi/terminal'
+    const params = new URLSearchParams()
+    if (sessionId) params.set('sessionId', sessionId)
+    if (editor) {
+      params.set('editorPath', editor.path)
+      if (editor.line) params.set('editorLine', editor.line)
+      if (editor.allowOutsideProject) params.set('allowOutsideProject', 'true')
+    }
+    const terminalPath = `/api/pi/terminal${params.size ? `?${params}` : ''}`
     const socket = new WebSocket(backendWebSocketUrl(terminalPath))
     const pendingInput = []
     let terminalReady = false
@@ -199,6 +212,7 @@ export function useTerminal() {
   return {
     closeTerminalPanel,
     connectTerminal,
+    openEditorTerminal,
     terminalCwd,
     terminalEl,
     terminalOpen,

@@ -11,6 +11,9 @@ import {
 const TranscriptEntry = defineAsyncComponent(() => import('./components/TranscriptEntry.vue'))
 const LiveAssistantMessage = defineAsyncComponent(() => import('./components/LiveAssistantMessage.vue'))
 const PierrePreview = defineAsyncComponent(() => import('./components/PierrePreview.vue'))
+const FilePreview = defineAsyncComponent(() => import('./components/FilePreview.vue'))
+const FileContextMenu = defineAsyncComponent(() => import('./components/FileContextMenu.vue'))
+const FileLinkSettings = defineAsyncComponent(() => import('./components/FileLinkSettings.vue'))
 const ProjectBrowser = defineAsyncComponent(() => import('./components/ProjectBrowser.vue'))
 const ProjectDetailDrawer = defineAsyncComponent(() => import('./components/ProjectDetailDrawer.vue'))
 const ReviewPane = defineAsyncComponent(() => import('./components/ReviewPane.vue'))
@@ -24,6 +27,7 @@ import ExtensionConfirmations from './components/ExtensionConfirmations.vue'
 import StartComposer from './components/StartComposer.vue'
 import SessionSidebar from './components/SessionSidebar.vue'
 import { useBackendConnections } from './composables/useBackendConnections'
+import { useFileLinks } from './composables/useFileLinks'
 import { useLiveTurnProjection } from './composables/useLiveTurnProjection'
 import { useMemoryInspector } from './composables/useMemoryInspector'
 import { useProjectBrowser } from './composables/useProjectBrowser'
@@ -181,6 +185,9 @@ const {
   testResult: backendConnectionTestResult,
   updateConnection: updateSavedBackendConnection,
 } = useBackendConnections()
+const fileLinksAvailable = computed(() => {
+  return activeBackendConnectionInfo.value?.capabilities?.fileLinks === true
+})
 const reviewEnabled = computed(() => {
   return activeBackendConnectionInfo.value?.capabilities?.review === true
 })
@@ -251,6 +258,7 @@ const reviewToggleDescription = computed(() => {
 const {
   closeTerminalPanel,
   connectTerminal,
+  openEditorTerminal,
   terminalCwd,
   terminalEl,
   terminalOpen,
@@ -577,6 +585,31 @@ const {
   copyTitle,
   copyGlyph,
 } = toolExpansion
+const {
+  filePreview,
+  fileMenu,
+  handleFileClick,
+  handleFileContextMenu,
+  closeFileMenu,
+  closeFilePreview,
+  approveFile,
+  goBackFile,
+  previewFileMenu,
+  fileMenuAction,
+} = useFileLinks({
+  sessionId: computed(() => sessionDetail.value?.session?.id || selectedSessionId.value),
+  available: fileLinksAvailable,
+  copyText: copyTranscriptItem,
+  openEditorTerminal: async (...args) => {
+    const opened = await openEditorTerminal(...args)
+    if (opened) closeToolFullscreen()
+    return opened
+  },
+  openSettings: () => {
+    closeToolFullscreen()
+    openSettingsDrawer()
+  },
+})
 const transcriptPreferences = useTranscriptPreferences()
 const {
   error: transcriptPreferencesError,
@@ -971,6 +1004,8 @@ watch(selectedSessionId, (sessionId) => {
   expandedTools.value = new Set()
   expandedSkills.value = new Set()
   closeToolFullscreen()
+  closeFileMenu(false)
+  closeFilePreview(false)
   promptError.value = ''
   seenEntryIds.value = new Set()
   animatingEntryIds.value = new Set()
@@ -1017,7 +1052,6 @@ onMounted(async () => {
   window.addEventListener('leyline:open-settings', handleNativeOpenSettings)
   window.addEventListener('leyline:toggle-memory', handleNativeToggleMemory)
   window.addEventListener('leyline:toggle-sidebar', handleNativeToggleSidebar)
-  window.addEventListener('leyline:escape', handleNativeEscape)
   const backendInitialization = await initializeBackendConnections()
   requiredInitialBackendConnectionId.value = backendInitialization.requestedId
   await loadTranscriptPreferences()
@@ -1042,7 +1076,6 @@ onUnmounted(() => {
   window.removeEventListener('leyline:open-settings', handleNativeOpenSettings)
   window.removeEventListener('leyline:toggle-memory', handleNativeToggleMemory)
   window.removeEventListener('leyline:toggle-sidebar', handleNativeToggleSidebar)
-  window.removeEventListener('leyline:escape', handleNativeEscape)
   closeResearchCitationPreview()
   delete window.__leylineBackendConnectionId
   disposeTerminalResize()
@@ -1358,30 +1391,30 @@ function confirmPendingDelete() {
 }
 
 async function handleNativeToggleTerminal() {
+  if (filePreview.value || fileMenu.value) return
   if (!selectedSession.value || initializing.value) return
 
   await toggleTerminal(selectedSessionId.value)
 }
 
 function handleNativeOpenSettings() {
+  if (filePreview.value || fileMenu.value) return
   toggleSettingsDrawer()
 }
 
 function handleNativeToggleMemory() {
+  if (filePreview.value || fileMenu.value) return
   toggleMemoryPanel()
 }
 
 function handleNativeToggleSidebar() {
+  if (filePreview.value || fileMenu.value) return
   if (window.matchMedia('(max-width: 760px)').matches) {
     sidebarOpen.value = !sidebarOpen.value
     return
   }
 
   desktopSidebarHidden.value = !desktopSidebarHidden.value
-}
-
-function handleNativeEscape() {
-  handleEscape()
 }
 
 function wait(ms) {
@@ -3136,10 +3169,12 @@ async function submitStartDraft() {
 }
 
 function handleGlobalKeydown(event) {
+  if (terminalEl.value?.contains(event.target) && !anyEscapeTargetOpen()) return
   if ((event.metaKey || event.ctrlKey)
     && event.key.toLowerCase() === 'k') {
     event.preventDefault()
-    if (deleteConfirmActive.value || editingEntry.value || renamingSessionId.value) {
+    if (filePreview.value || fileMenu.value
+      || deleteConfirmActive.value || editingEntry.value || renamingSessionId.value) {
       return
     }
     closePickerMenus()
@@ -3155,6 +3190,8 @@ function anyEscapeTargetOpen() {
   return Boolean(
     fullscreenImage.value
     || fullscreenTool.value
+    || filePreview.value
+    || fileMenu.value
     || projectBrowserOpen.value
     || sidebarNavigator.value
     || settingsOpen.value
@@ -3178,6 +3215,13 @@ function anyEscapeTargetOpen() {
 }
 
 function handleEscape(event) {
+  if (fileMenu.value || filePreview.value) {
+    event?.preventDefault?.()
+    event?.stopPropagation?.()
+    if (fileMenu.value) closeFileMenu()
+    else closeFilePreview()
+    return
+  }
   if (!anyEscapeTargetOpen() && agentRunning.value) {
     event?.preventDefault?.()
     void interruptAgent()
@@ -3246,6 +3290,11 @@ function closePickerMenus() {
 <template>
   <main
     class="leyline-app"
+    @click.capture="handleFileClick"
+    @click="handleFileClick"
+    @auxclick.capture="handleFileClick"
+    @auxclick="handleFileClick"
+    @contextmenu.capture="handleFileContextMenu"
     :class="{
       'sidebar-open': sidebarOpen,
       'sidebar-hidden': desktopSidebarHidden,
@@ -4425,6 +4474,11 @@ function closePickerMenus() {
             </dl>
           </section>
 
+          <FileLinkSettings
+            v-if="fileLinksAvailable"
+            :backend-name="activeBackendConnection.name"
+          />
+
           <section class="settings-group">
             <h2>Display</h2>
             <div class="settings-choice-group">
@@ -4702,6 +4756,7 @@ function closePickerMenus() {
             <div
               v-else-if="fullscreenToolSupportsMarkdown && fullscreenToolView === 'rendered'"
               class="tool-fullscreen-markdown markdown-body"
+              :data-file-base="fullscreenTool.preview.path"
               v-html="fullscreenToolMarkdown"
             ></div>
             <PierrePreview
@@ -4721,5 +4776,23 @@ function closePickerMenus() {
         </section>
       </div>
     </Transition>
+    <Transition name="tool-fullscreen">
+      <FilePreview
+        v-if="filePreview"
+        :file="filePreview"
+        :copied-id="copiedEntryId"
+        @close="closeFilePreview"
+        @back="goBackFile"
+        @approve="approveFile"
+        @copy="copyTranscriptItem"
+        @menu="previewFileMenu"
+      />
+    </Transition>
+    <FileContextMenu
+      v-if="fileMenu"
+      :menu="fileMenu"
+      @close="closeFileMenu"
+      @action="fileMenuAction"
+    />
   </main>
 </template>
