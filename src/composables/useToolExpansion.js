@@ -12,7 +12,13 @@ export function useToolExpansion({ liveAssistantBlocks }) {
   )
   const fullscreenToolMarkdown = computed(() => {
     if (!fullscreenToolSupportsMarkdown.value) return ''
-    return renderedMarkdownPreview(fullscreenTool.value.preview)
+    const { toolName, preview } = fullscreenTool.value
+    const skill = toolName === 'read-skill'
+      || /(?:^|\/)SKILL\.md$/.test(preview.path || '')
+    const content = skill
+      ? (preview.content || '').replace(/^\uFEFF?---[ \t]*\r?\n(?:[^\r\n]*\r?\n)*?(?:---|\.\.\.)[ \t]*(?:\r?\n|$)/, '')
+      : preview.content
+    return renderedMarkdownPreview({ ...preview, content })
   })
   let copiedTimer
 
@@ -138,7 +144,7 @@ export function useToolExpansion({ liveAssistantBlocks }) {
 
 function isMarkdownRead(entry) {
   const preview = entry?.preview
-  return entry?.toolName === 'read'
+  return (entry?.toolName === 'read' || entry?.toolName === 'read-skill')
     && preview?.kind === 'file'
     && (preview.language === 'markdown' || /\.(?:md|markdown)$/i.test(preview.path || ''))
 }
