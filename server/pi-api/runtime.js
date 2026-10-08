@@ -16,6 +16,7 @@ import {
   renderSessionExportHtml,
 } from './export-renderer.js'
 import { createEventHub } from './events.js'
+import { createPromptQueue } from './prompt-queue.js'
 import {
   bindRuntimeHandle as bindRuntimeHandleExtensions,
   cleanupExtensionConfirmations,
@@ -441,7 +442,7 @@ function requireActiveHandle() {
 }
 
 function requireInitializedSession(handle) {
-  if (handle.initializing || handle.bindingExtensions) {
+  if (handle.initializing || handle.bindingExtensions || handle.reloading) {
     throw new Error('Wait for session initialization to finish.')
   }
 }
@@ -531,6 +532,7 @@ async function promptSession(
   signal,
   kind,
   handoffId,
+  onAccepted,
 ) {
   requireInitializedSession(handle)
   const session = handle.runtime.session
@@ -558,6 +560,15 @@ async function promptSession(
       throw new Error('invalid streaming behavior')
     }
     await initializeSessionKind(handle, kind)
+    if (controller.signal.aborted) throw new Error('Prompt cancelled')
+    const queue = ensurePromptQueue(handle)
+    const pending = queue.snapshot()
+    if (!onAccepted && !isExtensionCommand(session, promptText)
+      && (pending.held || (streamingBehavior !== 'steer'
+        && (streamingBehavior === 'followUp' || !session.isIdle || pending.items.length)))) {
+      queue.add({ text: promptText, images: promptImages, kind, handoffId: promptHandoffId })
+      return 'queued'
+    }
 
     const model = session.state?.model || session.model
     const modelSupportsImages = Boolean(model?.input?.includes('image'))
@@ -574,24 +585,21 @@ async function promptSession(
     if (controller.signal.aborted) throw new Error('Prompt cancelled')
 
     if (!delegation) {
-      try {
-        await runSessionPrompt(
-          handle,
-          promptText,
-          promptImages,
-          streamingBehavior,
-          promptHandoffId,
-          controller.signal,
-        )
-      } catch (error) {
-        if (controller.signal.aborted) throw new Error('Prompt cancelled')
-        throw error
-      }
-      if (controller.signal.aborted) {
+      const disposition = await runSessionPrompt(
+        handle,
+        promptText,
+        promptImages,
+        streamingBehavior,
+        promptHandoffId,
+        controller.signal,
+        undefined,
+        onAccepted,
+      )
+      if (controller.signal.aborted && disposition === 'started') {
         await session.abort()
         throw new Error('Prompt cancelled')
       }
-      return
+      return disposition
     }
 
     const registration = registerVisionDelegation(
@@ -601,7 +609,7 @@ async function promptSession(
       promptText,
     )
     try {
-      const accepted = await runSessionPrompt(
+      const disposition = await runSessionPrompt(
         handle,
         promptText,
         promptImages,
@@ -609,13 +617,15 @@ async function promptSession(
         promptHandoffId,
         controller.signal,
         registration,
+        onAccepted,
       )
-      if (controller.signal.aborted) {
+      if (controller.signal.aborted && disposition === 'started') {
         registration.cancel()
         await session.abort()
         throw new Error('Prompt cancelled')
       }
-      if (!accepted) registration.cancel()
+      if (disposition === 'handled') registration.cancel()
+      return disposition
     } catch (error) {
       registration.cancel()
       if (controller.signal.aborted) throw new Error('Prompt cancelled')
@@ -624,7 +634,41 @@ async function promptSession(
   } finally {
     signal?.removeEventListener?.('abort', abortPrompt)
     handle.pendingPromptControllers.delete(controller)
+    handle.promptQueue?.schedule()
   }
+}
+
+function ensurePromptQueue(handle) {
+  handle.promptQueue ||= createPromptQueue({
+    isIdle: () => handle.runtime.session.isIdle
+      && !handle.pendingPromptControllers?.size
+      && !handle.bindingExtensions
+      && !handle.reloading
+      && !handle.interruptPromise
+      && !handle.initializing
+      && !handle.disposalPromise
+      && !runtimeShuttingDown,
+    submit: (item, streamingBehavior, signal, onAccepted) => promptSession(
+      handle,
+      item.text,
+      item.images,
+      streamingBehavior,
+      signal,
+      item.kind,
+      item.handoffId,
+      onAccepted,
+    ),
+    onChange: () => events.broadcastActiveSession(handle),
+  })
+  return handle.promptQueue
+}
+
+async function updatePromptQueue(handle, request) {
+  requireInitializedSession(handle)
+  if (request.action === 'resume' && handle.interruptPromise) {
+    throw new Error('Wait for the current run to stop before resuming.')
+  }
+  await ensurePromptQueue(handle).update(request)
 }
 
 async function runSessionPrompt(
@@ -635,6 +679,7 @@ async function runSessionPrompt(
   handoffId,
   signal,
   visionRegistration,
+  onAccepted,
 ) {
   const release = await lockPromptSubmission(handle)
   const session = handle.runtime.session
@@ -648,12 +693,13 @@ async function runSessionPrompt(
         streamingBehavior,
         source: 'api',
         preflightResult: (result) => {
-          if (signal?.aborted) throw new Error('Prompt cancelled')
+          if (result === 'started' && signal?.aborted) throw new Error('Prompt cancelled')
           disposition = result
           if (result === 'started') {
             visionRegistration?.start()
             handoff = createPromptHandoff(handle, handoffId)
           }
+          onAccepted?.(result)
           resolve()
         },
       })
@@ -669,7 +715,7 @@ async function runSessionPrompt(
     if (disposition === 'started' && !session.isStreaming) {
       await new Promise((resolve) => setImmediate(resolve))
     }
-    return disposition === 'queued' || disposition === 'started'
+    return disposition
   } finally {
     settlePromptHandoff(handle, handoff)
     release()
@@ -709,7 +755,8 @@ function settlePromptHandoff(handle, handoff) {
 
 function isExtensionCommand(session, text) {
   if (!text.startsWith('/')) return false
-  const name = text.slice(1).split(/\s/, 1)[0]
+  const spaceIndex = text.indexOf(' ')
+  const name = spaceIndex === -1 ? text.slice(1) : text.slice(1, spaceIndex)
   return Boolean(session.extensionRunner.getCommand(name))
 }
 
@@ -869,12 +916,19 @@ function validateImages(images) {
 }
 
 async function interruptSession(handle) {
+  if (handle.interruptPromise) return handle.interruptPromise
+  ensurePromptQueue(handle).hold()
   handle.subagentController?.abort()
   cleanupExtensionConfirmations(handle, { invalidate: false })
   for (const controller of handle.pendingPromptControllers || []) {
     controller.abort()
   }
-  await handle.runtime.session.abort()
+  handle.interruptPromise = handle.runtime.session.abort()
+  try {
+    await handle.interruptPromise
+  } finally {
+    handle.interruptPromise = undefined
+  }
 }
 
 async function editSessionPrompt(
@@ -895,33 +949,42 @@ async function editSessionPrompt(
     throw new Error('Wait for compaction to finish before editing.')
   }
 
+  if (handle.pendingPromptControllers?.size) {
+    throw new Error('Wait for the pending message to finish sending before editing.')
+  }
   const entry = session.sessionManager.getEntry(entryId)
   if (entry?.type !== 'message' || entry.message?.role !== 'user') {
     throw new Error('Only user messages can be edited')
   }
 
+  if (handle.promptQueue?.snapshot().items.length) handle.promptQueue.hold()
   const oldLeafId = session.sessionManager.getLeafId()
-  if (oldLeafId === entryId) moveSessionLeaf(session, entry.parentId || null)
-  else {
-    const result = await session.navigateTree(entryId)
-    if (result.cancelled) throw new Error('Edit cancelled')
-  }
-  await bindRuntimeHandle(handle)
-
   try {
-    await promptSession(
-      handle,
-      text,
-      images,
-      undefined,
-      signal,
-      undefined,
-      handoffId,
-    )
-  } catch (error) {
-    moveSessionLeaf(session, oldLeafId)
+    if (oldLeafId === entryId) moveSessionLeaf(session, entry.parentId || null)
+    else {
+      const result = await session.navigateTree(entryId)
+      if (result.cancelled) throw new Error('Edit cancelled')
+    }
     await bindRuntimeHandle(handle)
-    throw error
+
+    try {
+      await promptSession(
+        handle,
+        text,
+        images,
+        undefined,
+        signal,
+        undefined,
+        handoffId,
+        () => {},
+      )
+    } catch (error) {
+      moveSessionLeaf(session, oldLeafId)
+      await bindRuntimeHandle(handle)
+      throw error
+    }
+  } finally {
+    handle.promptQueue?.schedule()
   }
 }
 
@@ -942,6 +1005,10 @@ async function resetSessionToEntry(handle, entryId) {
     throw new Error('Wait for compaction to finish before resetting.')
   }
 
+  if (handle.pendingPromptControllers?.size) {
+    throw new Error('Wait for the pending message to finish sending before resetting.')
+  }
+  if (handle.promptQueue?.snapshot().items.length) handle.promptQueue.hold()
   const manager = session.sessionManager
   const entry = manager.getEntry(entryId)
   if (!entry) throw new Error('Entry not found')
@@ -1281,6 +1348,7 @@ async function disposeRuntime(runtime) {
 
 function discardRuntimeHandle(handle) {
   if (handle.disposalPromise) return handle.disposalPromise
+  handle.promptQueue?.dispose()
   cleanupExtensionConfirmations(handle)
   for (const controller of handle.pendingPromptControllers || []) {
     controller.abort()
@@ -1356,6 +1424,10 @@ const reloadSession = trackRuntimeCreation(async (handle) => {
     throw new Error('Wait for compaction to finish before reloading.')
   }
 
+  if (handle.pendingPromptControllers?.size) {
+    throw new Error('Wait for the pending message to finish sending before reloading.')
+  }
+  if (handle.promptQueue?.snapshot().items.length) handle.promptQueue.hold()
   const previousSessionFile = session.sessionFile
   const previousLeafId = session.sessionManager.getLeafId()
   const sessionManager = previousSessionFile && existsSync(previousSessionFile)
@@ -1364,19 +1436,20 @@ const reloadSession = trackRuntimeCreation(async (handle) => {
   if (previousLeafId) sessionManager.branch(previousLeafId)
   else sessionManager.resetLeaf()
 
-  const replacement = await createAgentSessionRuntime(createRuntime, {
-    cwd: sessionManager.getCwd(),
-    agentDir: handle.runtime.services.agentDir,
-    sessionManager,
-    sessionStartEvent: {
-      type: 'session_start',
-      reason: 'reload',
-      previousSessionFile,
-    },
-  })
-
+  handle.reloading = true
+  let replacement
   let applied = false
   try {
+    replacement = await createAgentSessionRuntime(createRuntime, {
+      cwd: sessionManager.getCwd(),
+      agentDir: handle.runtime.services.agentDir,
+      sessionManager,
+      sessionStartEvent: {
+        type: 'session_start',
+        reason: 'reload',
+        previousSessionFile,
+      },
+    })
     if (runtimeShuttingDown || handle.disposalPromise) throw new Error('Runtime is shutting down')
     cleanupExtensionConfirmations(handle)
     for (const controller of handle.pendingPromptControllers || []) {
@@ -1392,12 +1465,16 @@ const reloadSession = trackRuntimeCreation(async (handle) => {
     if (activeHandle === handle) setActiveHandle(handle)
     await bindRuntimeHandle(handle)
   } catch (error) {
-    try {
-      await discardRuntimeHandle(handle)
-    } finally {
-      if (!applied) await disposeRuntime(replacement)
+    if (replacement) {
+      try {
+        await discardRuntimeHandle(handle)
+      } finally {
+        if (!applied) await disposeRuntime(replacement)
+      }
     }
     throw error
+  } finally {
+    handle.reloading = false
   }
 })
 
@@ -1498,6 +1575,7 @@ async function bindRuntimeHandle(handle) {
   if (runtimeShuttingDown) throw new Error('Runtime is shutting down')
   if (handle.bindingExtensions) throw new Error('Wait for session initialization to finish.')
   handle.bindingExtensions = true
+  ensurePromptQueue(handle)
   try {
     await bindRuntimeHandleExtensions(handle, events)
     if (runtimeShuttingDown) throw new Error('Runtime is shutting down')
@@ -1826,6 +1904,7 @@ export function createPiRuntimeApi() {
   trashProject,
   trashSession,
   updateMemory,
+  updatePromptQueue,
   runSubagent,
   runVision,
   }

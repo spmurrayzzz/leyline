@@ -5,7 +5,7 @@ Leyline serves the runtime API under `/api/pi`. The native backend also serves t
 These APIs have no authentication or cross-user access control.
 
 Successful runtime requests usually return `200`. A connection create request
-returns `201`. An accepted preflight request returns `204`.
+returns `201`. A CORS preflight request (`OPTIONS`) returns `204`.
 
 ## Conventions and status behavior
 
@@ -19,10 +19,11 @@ Most errors have this envelope:
 
 Status behavior is:
 
-- `400` is used for connection or setting validation and for missing required query values on session lookup or Git review routes.
+- `400` is used for connection, setting, or queue validation and for missing required query values on session lookup or Git review routes.
 - `403` rejects a browser origin that the server does not allow.
 - `404` is used for an unknown runtime, native app route, setting key, or session.
 - `405` is used when a known route receives an unsupported method.
+- `409` rejects a queue mutation with an outdated `revision`.
 - `500` is used for thrown runtime errors. This includes malformed JSON, SDK errors, missing memories, and some missing sessions.
 
 The current status codes do not distinguish all client errors from server
@@ -147,6 +148,7 @@ Message entries include role, text, and text, image, or thinking blocks. A compl
 ```text
 Active = {
   id: string,
+  snapshotRevision?: number,
   path: string,
   cwd: string,
   diagnostics: object[],
@@ -157,14 +159,15 @@ Active = {
     availableThinkingLevels: string[],
     isStreaming: boolean,
     isCompacting: boolean,
-    pendingToolCalls: object[],
+    pendingToolCalls: string[],
     steeringMode: string,
     followUpMode: string,
     activeToolCount: number,
     activeToolNames: string[],
     contextUsage?: object,
     slashCommands: SlashCommand[],
-    queuedMessages: { steering: object[], followUp: object[] },
+    promptQueue?: PromptQueue,
+    queuedMessages: { steering: string[], followUp: string[] },
     extensionUi: {
       statuses: object,
       widgets: object,
@@ -173,6 +176,18 @@ Active = {
     goal: Goal | null,
     research: ResearchState | null
   }
+}
+
+PromptQueue = {
+  revision: number,
+  held: boolean,
+  error: string,
+  items: Array<{
+    id: string,
+    text: string,
+    imageCount: number,
+    status: "pending" | "sending"
+  }>
 }
 
 Model = {
@@ -203,6 +218,12 @@ Goal = {
 ```
 
 The extension UI objects contain status strings, widget line arrays, and notification records from bundled extensions.
+
+Open-runtime snapshots carry `snapshotRevision`. Clients reject older snapshots for the same session, whether they arrive through HTTP or SSE. Start-screen previews can omit this field and `promptQueue`.
+
+`promptQueue` contains editable, unsent tasks. Full images stay on the backend; each item exposes only `imageCount`. Use `promptQueue.revision` for queue mutations, not `snapshotRevision`.
+
+`queuedMessages` contains read-only display text for inputs already accepted by pi. It is separate from the editable queue.
 
 ## Backend information
 
@@ -624,7 +645,7 @@ Missing query values return `400`. A missing repository, stale file path, invali
 
 ## Runtime action routes
 
-The scoped routes act on `:id`. They do not change the selected active session. If the runtime is not open, Leyline loads it. An unknown `:id` returns `404`.
+Scoped routes resolve their source from `:id`. If the runtime is not open, Leyline loads it. An unknown `:id` returns `404`. Fork selects a new runtime; other scoped actions leave the active-session selection unchanged.
 
 The matching top-level routes act on the selected active session. They are legacy routes. If no session is active, they return `500` with `No active session`.
 
@@ -641,7 +662,49 @@ Request:
 {
   text: string,
   images?: Array<{ type: "image", data: string, mimeType: string }>,
-  streamingBehavior?: "steer" | "followUp"
+  streamingBehavior?: "steer" | "followUp",
+  kind?: "session" | "research",
+  handoffId?: string
+}
+```
+
+Response (`200`):
+
+```text
+{ ok: true, queued: boolean, active: Active }
+```
+
+The response confirms queue acceptance, successful pi preflight, or input handling by an extension. It does not wait for the model run to finish.
+
+- `followUp` adds a task to Leyline's editable **Up next** queue. An idle, unheld queue can dispatch it immediately.
+- `steer` passes input to pi for the current run. An idle session can start a new run instead.
+- Without `streamingBehavior`, an idle session with no pending tasks starts normally. A busy session or a nonempty queue retains the task for later dispatch.
+- A held queue retains ordinary new prompts until Resume, including requests with `steer`. The browser disables steering while held.
+- Recognized extension commands execute through pi directly rather than entering the editable queue.
+
+`queued: true` can mean either an editable task or a native pi input. Inspect `promptQueue` and `queuedMessages` to distinguish them. `queued: false` does not guarantee a model run: an extension can consume the input.
+
+Empty text is valid only with at least one image. Supported MIME types are PNG, JPEG, GIF, and WebP.
+
+Image preparation runs when the task is submitted to pi. An image-capable model receives the images directly. Otherwise, Leyline validates the vision model and saves the attachments. The original images remain in the transcript. Parent-model context receives paths and instructions to call `vision_agent`.
+
+A missing or invalid vision model returns `500` for immediate submission. For a queued task, failed preparation retains the item, holds the queue, and sets `promptQueue.error`.
+
+The prompt response does not wait for `vision_agent` execution.
+
+### Editable prompt queue
+
+`POST /api/pi/sessions/:id/queue` changes pending tasks on that runtime handle. There is no legacy active-session equivalent.
+
+Request:
+
+```text
+{
+  action: "hold" | "resume" | "edit" | "remove" | "move" | "steer",
+  revision: number,
+  id?: string,
+  text?: string,
+  direction?: "up" | "down"
 }
 ```
 
@@ -651,11 +714,24 @@ Response:
 { ok: true, active: Active }
 ```
 
-The response means prompt preflight succeeded. The model response can continue through SSE. Empty text is valid only when at least one valid image is present. Supported MIME types are PNG, JPEG, GIF, and WebP.
+Send the current `active.state.promptQueue.revision` with every mutation. A stale or missing revision returns `409`.
 
-A model with image support receives the images directly. For other models, Leyline checks the configured vision model and saves each attachment in local app data. It persists the original user message. Parent-model context receives saved file paths and instructions to call `vision_agent`. The tool call and result appear in the transcript. A missing or invalid vision model returns `500`.
+| Action | Required fields beyond `revision` | Behavior |
+| --- | --- | --- |
+| `hold` | None | Hold remaining tasks and cancel unaccepted queue submission. An empty queue stays unheld. |
+| `resume` | None | Release the hold, clear the queue error, and schedule the next task when pi is idle. |
+| `edit` | `id`, `text` | Replace pending text, retain attachments, and hold the queue. Cancel any unaccepted queue submission. |
+| `remove` | `id` | Remove the pending task. Removing the last task clears the hold and queue error. |
+| `move` | `id`, `direction` | Move the pending task one position up or down. |
+| `steer` | `id` | Submit the pending task through pi's steering path. Requires an unheld queue. |
 
-The prompt response does not wait for `vision_agent` execution.
+Item mutations require `status: "pending"`. The UI calls `hold` before opening an editor, then `edit` on Save. Empty replacement text is valid only if the item has images.
+
+Invalid actions, missing items, changes to a sending item, or blocked lifecycle operations return `400`. Dispatch failures remain in `promptQueue.error`; inspect the returned snapshot after Resume or Steer.
+
+Pi acceptance removes the task from the editable queue. These routes do not edit, clear, or replay native pi queues.
+
+Pending tasks survive browser refresh and session switching. Runtime reload retains them in a held state. Backend restart discards them.
 
 ### Shell command
 
@@ -739,7 +815,9 @@ Response:
 { ok: true, active: Active }
 ```
 
-Interrupt aborts pending prompt setup and the active parent run. It does not wait for a separate vision preflight.
+Interrupt holds remaining unsent tasks, aborts pending prompt setup, and stops the active parent run. With no pending tasks, the queue remains unheld. It does not clear native pi queues.
+
+The response includes the resulting runtime snapshot. Resume is rejected while Stop is still in progress.
 
 ### Reload resources
 
@@ -756,7 +834,7 @@ Response:
 { ok: true, active: Active }
 ```
 
-Reload recreates the runtime at the current leaf. Streaming or compaction returns `500`.
+Reload recreates the runtime at the current leaf. Streaming, compaction, or pending prompt setup returns `500`. Unsent tasks remain on the handle in a held state.
 
 ### Select model
 
@@ -802,11 +880,11 @@ The level must occur in `active.state.availableThinkingLevels`.
 
 ## Active-session history routes
 
-These actions currently have no scoped equivalent.
+Fork has both scoped and legacy endpoints. Reset to here remains active-session-only.
 
 ### `POST /api/pi/fork`
 
-**Designation:** Active-session browser route.
+**Designation:** Legacy active-session route. The browser uses `POST /api/pi/sessions/:id/fork` to identify the source session.
 
 Request:
 
@@ -820,9 +898,9 @@ Response:
 { ok: true, active: Active, detail: SessionDetail }
 ```
 
-The route forks at the specified entry, changes the runtime session ID, and selects the fork. It also copies session-level subagent model overrides and vision overrides.
+The route creates and selects a separate runtime at the specified entry. The source runtime, pending tasks, and native inputs remain intact. The new fork has an empty editable queue. Session-level subagent and vision overrides copy to the fork.
 
-For a research session, the route rebinds retained research state to the new session ID. It revalidates a retained report before it marks the fork complete. Streaming or compaction returns `500`.
+For a research session, the route rebinds retained research state to the new session ID. It revalidates a retained report before marking the fork complete. Forking is allowed during streaming. Compaction, an unsaved source session, or extension cancellation returns `500`.
 
 ### `POST /api/pi/reset-to-entry`
 
@@ -1372,7 +1450,11 @@ The stream starts with:
 : connected
 ```
 
-It then sends one `active_session` event for each open runtime. Event frames use this format:
+It then sends one `active_session` event for each open runtime, followed by `runtime_roster`.
+
+The browser supplies `?sessionId=<id>`. That session receives full snapshots; other sessions receive compact snapshots. Compact `promptQueue` state contains `count`, `held`, and `error`, without item content.
+
+Event frames use this format:
 
 ```text
 event: <event name>
@@ -1384,9 +1466,14 @@ Implemented event names and data are:
 ```text
 active_session: Active
 
+runtime_roster: { sessionIds: string[] }
+
+runtime_removed: { id: string }
+
 runtime_event: {
   activeSessionId: string,
-  event: object
+  event: object,
+  handoffId?: string
 }
 
 extension_ui: {

@@ -28,10 +28,15 @@ output, and composer. Thought, skill, and tool rows can expand.
 
 The composer stays available during an active run:
 
-- Press Enter to send steering to the current run.
-- Press Option+Enter to queue a follow-up.
+- Press Enter to add an editable task to **Up next**.
+- Press Option+Enter to steer the current run.
 - Press Shift+Enter to add a line break.
-- Select the stop button to interrupt the run.
+- Select the stop button to interrupt the run and hold remaining unsent tasks.
+
+Select the attached **Up next** tab to manage pending tasks. Use **Send options**
+beside the send arrow to queue or steer without keyboard shortcuts. If the
+queue is held, select **Resume** to continue queued work. See
+[Composer](../user-guide/composer) for editing and queue controls.
 
 Use **Memory**, **Events**, and **Export transcript** in the workbench header.
 Use **Reload runtime** at the bottom of the sidebar when pi resources must

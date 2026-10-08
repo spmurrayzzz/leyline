@@ -16,7 +16,7 @@ Vite and the packaged server route `/api/leyline/*` to `server/backend-connectio
 Successful JSON responses use explicit envelopes such as `{ sessions }`,
 `{ active }`, or `{ ok: true }`.
 
-The router returns JSON for HTTP errors. It uses explicit 400, 404, and 405 responses in some branches, and its outer handler maps other errors to 500.
+The router returns JSON for HTTP errors. It uses explicit 400, 404, 405, and 409 responses in some branches. Its outer handler maps other errors to 500.
 
 The terminal does not use the HTTP router. It uses a WebSocket upgrade at `/api/pi/terminal`.
 
@@ -32,6 +32,7 @@ The terminal does not use the HTTP router. It uses a WebSocket upgrade at `/api/
 | `server/pi-api/router.js` | HTTP method and path dispatch |
 | `server/pi-api/cors.js` | Shared HTTP and WebSocket origin policy |
 | `server/pi-api/runtime.js` | `AgentSessionRuntime` lifecycle, runtime handles, session operations, bundled resources, subagent execution, and vision execution |
+| `server/pi-api/prompt-queue.js` | Editable unsent tasks, queue revisions, hold/resume, and submission when pi is idle |
 | `server/pi-api/sessions.js` | Session discovery, configured session directories, list metadata, and subagent markers |
 | `server/pi-api/dtos.js` | Runtime, session state, session detail, model, command, and transcript DTOs |
 | `server/pi-api/events.js` | SSE clients and event serialization |
@@ -54,7 +55,7 @@ The router has these main route groups:
 
 - session list, normal or research creation, detail, lookup by path, rename, delete, and export
 - runtime state and active-session selection
-- prompt, shell, compaction, edit, fork, Reset to here, reload, model, thinking, mode, and interrupt
+- prompt, queue mutation, shell, compaction, edit, fork, Reset to here, reload, model, thinking, mode, and interrupt
 - filesystem browsing
 - read-only Git review and review-change SSE
 - Memory Inspector operations
@@ -71,7 +72,7 @@ The frontend uses `/sessions/:id/<action>` for most runtime operations. The serv
 
 Legacy routes such as `/prompt`, `/bash`, and `/compact` use `requireActiveHandle()`. Keep them for compatibility, but do not use them for new frontend work.
 
-Fork and Reset to here currently use active-session routes. Leyline terminal connections include a session ID and resolve the requested runtime handle. Unscoped terminal requests use the active runtime CWD for compatibility.
+Fork uses a session-scoped route and creates a separate runtime. Reset to here still uses an active-session route. Leyline terminal connections resolve the requested session ID. Unscoped terminal requests use the active runtime CWD for compatibility.
 
 This distinction matters when windows use the same backend. Scoped operations and Leyline terminal connections select the requested handle. Active operations depend on the latest selection in that backend process.
 
@@ -99,7 +100,27 @@ Research creation writes a `leyline-research` marker before extension binding. T
 
 Runtime creation installs a vision context transform on the session agent. The transform replaces matched images with saved file paths and `vision_agent` instructions. After matching tool calls exist, it uses neutral text instead of another instruction.
 
-Leyline forces steering and follow-up modes to `one-at-a-time`. Prompt requests can still select `steer` or `followUp` as their streaming behavior.
+Leyline retains `one-at-a-time` delivery for native pi steering and follow-up inputs.
+
+## Pending prompts
+
+Each runtime handle owns an editable **Up next** queue from `prompt-queue.js`. Items retain stable IDs, text, images, and submission metadata until pi accepts them.
+
+Ordinary input during a run enters this queue. A `followUp` request also enters the queue when idle. Registered extension commands still execute through pi directly.
+
+The queue submits one task when `session.isIdle` and no prompt setup, Stop, reload, or initialization blocks dispatch. Settlement, compaction, and completed or cancelled edit navigation schedule another dispatch check.
+
+Submission uses the existing prompt lock, vision preparation, and `session.prompt()` path. Queued items retain the original prompt handoff ID for transformed-input reconciliation.
+
+At final settlement, the recorded runtime outcome determines whether failed work holds the queue. Do not infer success from the last projected assistant message: recovery can omit failed responses from model context.
+
+`preflightResult` marks acceptance. `started` checks cancellation before a new run begins. `queued` and `handled` are irreversible acceptance, even if cancellation arrived during an input hook. Accepted items leave the editable queue.
+
+Steer hands an item to pi's native delivery path. Leyline does not clear or replay native queues to implement edits or reordering.
+
+Stop holds unsent tasks. Editing also holds the queue and cancels any unaccepted queue submission; saving does not resume it. An empty queue clears its hold and error. Runtime reload retains pending tasks held, but backend restart discards them.
+
+Queue mutations use `promptQueue.revision` and reject stale requests with `409`. Runtime snapshots have a separate `snapshotRevision` for HTTP/SSE ordering. Snapshot DTOs expose pending text and image counts, not image bytes.
 
 ## Session writes
 
@@ -109,7 +130,7 @@ Use pi runtime and session methods for normal writes:
 - `session.executeBash()` for shell commands after extension hooks
 - `session.compact()` for compaction
 - `session.navigateTree()` for edits
-- `runtime.fork()` for forks
+- `SessionManager.createBranchedSession()` and a new runtime for forks, without replacing the source runtime
 - `session.setModel()` and `session.setThinkingLevel()` for runtime controls
 
 Rename appends a `session_info` record. Delete moves the JSONL file to Leyline trash.

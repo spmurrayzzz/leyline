@@ -6,11 +6,12 @@
 
 | Owner | State and behavior |
 | --- | --- |
-| `App.vue` | Drawer and sidebar navigator visibility, Git review and research-source state, composer draft, attachments, edit state, prompt submission, session kind, goal commands, agent settings, project detail selection, and startup motion phases |
+| `App.vue` | Drawer and sidebar navigator visibility, Git review and research-source state, composer draft, queue-edit draft cache, attachments, edit state, prompt submission, session kind, goal commands, agent settings, project detail selection, and startup motion phases |
 | `useSessionWorkspace.js` | Session list, project grouping, routes, selected detail, activation, runtime snapshots, sidebar activity rows, model and thinking controls, rename, delete, fork, reset, and reload |
 | `useBackendConnections.js` | App-wide connection records, window-specific selection, connection tests, and default selection |
 | `useTranscriptPreferences.js` | App-wide transcript display settings, loading state, and save errors |
 | `useLiveTurnProjection.js` | Optimistic user entries, live assistant blocks, live tools, compaction activity, and live-to-persisted reconciliation |
+| `PromptQueue.vue` | Queue expansion, active edit, action menus, queue mutations, and tray width measurement |
 | `useRuntimeEvents.js` | EventSource lifecycle, connection state, and the local event log |
 | `useMemoryInspector.js` | Visible Memory data, loading, optimistic mutations, dirty-state guards, and drawer state |
 | `useProjectBrowser.js` | Project picker state, folder expansion, and project-browser visibility |
@@ -27,6 +28,8 @@
 `SessionSidebar.vue` renders the current project and its virtualized session list. It owns session search, navigator search, stable project order, and cross-project activity groups.
 
 `SessionComposer.vue` and `StartComposer.vue` own local input mechanics and dictation adapters.
+
+`PromptQueue.vue` displays backend queue state. It does not schedule model work. Its attached tab opens a bounded corner tray, with a measured full-width layout when the composer is narrow. Opening it leaves the input and footer fixed.
 
 `TranscriptEntry.vue` renders persisted entries and emits transcript actions. `LiveAssistantMessage.vue` renders live assistant output.
 
@@ -65,17 +68,37 @@ The selected session route is `/sessions/:id`. Browser history changes call the 
 
 `activeRuntimeSession` contains the selected session's runtime DTO. It includes model, thinking, tools, context, queues, extension UI, goal state, and research state.
 
-SSE can send snapshots for all server handles. `App.vue` updates the selected runtime only when the IDs match.
+SSE can send snapshots for all server handles. `App.vue` updates the selected runtime only when the IDs match. Both selected and background state reject older `snapshotRevision` values. This prevents a late HTTP response from restoring stale queue state.
 
 Background event summaries remain in `runtimeSessionsById`. They supply current-project row status and the **Activity** navigator for all nonselected live sessions.
 
-Activity derives shared-CWD warnings from active or queued runtime snapshots. Its **Stop** action uses the session-scoped interrupt route and stays unavailable during compaction.
+Activity derives shared-CWD warnings from active or unheld queued work. Its **Stop** action uses the session-scoped interrupt route and stays unavailable during compaction.
+
+## Composer queue
+
+During a run, Enter adds an editable **Up next** task. Option+Enter or the send-options menu selects native steering. When idle with no pending queue, Enter sends normally.
+
+`activeRuntimeSession.state.promptQueue` supplies pending items, held state, errors, and the mutation revision. Compact background snapshots supply counts instead of items. The renderer takes queue state from snapshots, not raw `queue_update` arrays.
+
+`PromptQueue.vue` calls the session-scoped queue route with an item ID and the current queue revision. It emits the returned runtime snapshot through `SessionComposer.vue` to `App.vue`.
+
+Opening an editor first holds the queue. Saving changes only text and retains attachments. Closing the tray retains the local edit. Resume remains explicit. The separate **Sent to agent** section is read-only native input.
+
+`App.vue` owns the queue-edit draft cache. Session changes and composer unmount save the active edit there. Returning from Home restores it. Deleting a session removes its cached draft. Browser reload discards local edits, while the backend retains accepted queue tasks.
+
+The tray height limit includes the terminal drawer height. Its list scrolls within the space above the composer, keeping the attached tab accessible.
+
+The global Escape handler dismisses queue surfaces before it can interrupt a run. Outside-click handling uses `composedPath()` because an action can remove its clicked node before the window listener runs.
+
+Stop applies its returned snapshot through the revision guard. Expected cancellations do not create composer error banners. Genuine failures and raw runtime events remain available.
 
 ## Persisted and live transcript state
 
 `sessionDetail.entries` is the persisted projected branch from the backend. `useLiveTurnProjection.js` keeps live state separate.
 
-A submitted prompt first creates an optimistic user entry. Runtime events then add live user, assistant, and tool items.
+An immediate prompt creates an optimistic user entry. An **Up next** task stays outside the transcript until pi emits its user-message events. Runtime events add live user, assistant, and tool items.
+
+A queued request retains its original handoff ID through dispatch. If user events arrive before the queued HTTP response, retiring the optimistic entry keeps the confirmed live row. This also supports input transformations.
 
 The composable matches live items to refreshed persisted entries. It keeps matched live rows until visual timing and persistence conditions settle.
 
@@ -83,7 +106,7 @@ An anchor length prevents duplicate or reordered transcript rows during a live t
 
 `message_update` events update live assistant output. They do not trigger a detail refresh.
 
-Other runtime events schedule a detail refresh. The normal debounce is 250 ms, while `compaction_end` refreshes immediately.
+Settlement, reconnect, and manual compaction schedule immediate detail refreshes. Idle session-info and custom-message changes use a 250 ms debounce. Streaming tool and message events use live projection instead of per-event detail fetches.
 
 ## Project browser and Project Details
 

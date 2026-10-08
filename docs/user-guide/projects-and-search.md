@@ -49,17 +49,18 @@ The navigator excludes the selected session. It includes activity from every pro
 
 - **Needs attention** contains unread sessions and errors.
 - **Running** contains running and compacting sessions.
-- **Queued** contains sessions with queued messages.
+- **Queued** contains sessions with queued tasks or accepted inputs, including held queues.
 
 A row shows the project and the current tool target, exact runtime error, or queue state when available.
 
 Select **Open** to open the session. Use a modified click on **Open** to open it
 in a new tab or window. Select **Stop** to interrupt a streaming agent run
-without opening it.
+without opening it. Stop also holds that session's remaining unsent tasks.
+Open the session and select **Resume** to release its held queue.
 
 Compaction does not show **Stop** because the interrupt action cannot cancel compaction.
 
-Activity warns when multiple active or queued sessions share one CWD. The warning identifies collision risk. It does not attribute working-tree changes to a session.
+Activity warns when multiple sessions share one CWD and have active work or queues that are not held. A held queue alone does not trigger this warning. The warning identifies collision risk. It does not attribute working-tree changes to a session.
 
 Use **Search active sessions** to match a session title, project, CWD, tool target, or error detail.
 

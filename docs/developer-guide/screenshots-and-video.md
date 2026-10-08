@@ -46,6 +46,12 @@ Set a different app URL with:
 DOCS_SCREENSHOT_URL=http://localhost:5173/ npm run docs:screenshots
 ```
 
+Refresh selected assets by filename with a comma-separated filter:
+
+```bash
+DOCS_SCREENSHOT_FILTER=composer-queue.png,composer-queue-held.png,activity.png,activity-mobile.png npm run docs:screenshots
+```
+
 The documentation workflow uses these fixed settings:
 
 - Desktop viewport: 1440 by 900 CSS pixels
@@ -59,10 +65,11 @@ The documentation workflow uses these fixed settings:
 - Thought display default: **Collapsed**
 - Project captures: `harbor`, `field-notes`, and three sanitized matching folders
 - Git review captures: `release-safety` with four sanitized changed files
-- Activity captures: one selected run, one same-project run, one runtime error, one queued session, and a shared-CWD warning
+- Queue captures: the open **Up next** corner tray and the closed **Held** tab with **Resume**
+- Activity captures: one selected run, one same-project run, one runtime error, one session with an editable queued task, and a shared-CWD warning
 - Deep research captures: three completed threads, six ledger sources, four citations, one excluded source, and a mobile citation preview
 
-Each state uses a new browser context. The script freezes time, replaces SSE and terminal transports, waits for a state selector, and disables remaining motion.
+Each state uses a new browser context. The script uses a fixed date with increasing millisecond ticks, replaces SSE and terminal transports, and waits for a state selector. The tick prevents Vue's event timestamp guard from dropping interactions. The capture disables remaining motion.
 
 The script rejects unrecognized API calls and visible private text. It checks home paths, usernames, repository paths, email addresses, and common credential prefixes.
 

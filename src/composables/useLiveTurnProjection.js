@@ -93,7 +93,6 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     updateLiveUser(event, handoffId)
     updateLiveAssistant(event)
     releaseLiveAnchorIfSettled()
-    emit({ type: 'runtime-queue', event })
     surfaceRuntimeError(event)
     if (hasLiveOutput()) emit({ type: 'scroll-live', activeSessionId })
   }
@@ -131,12 +130,12 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     return entry
   }
 
-  function removeOptimisticEntry(entry) {
+  function removeOptimisticEntry(entry, keepDelivered = false) {
     optimisticEntries.value = optimisticEntries.value.filter((item) => {
       return item.id !== entry?.id
     })
     liveUserMessages.value = liveUserMessages.value.filter((item) => {
-      return item.id !== entry?.id
+      return item.id !== entry?.id || (keepDelivered && item.runtimeReceived)
     })
   }
 
@@ -366,27 +365,23 @@ export function useLiveTurnProjection({ onIntent } = {}) {
   }
 
   function surfaceRuntimeError(event) {
-    if (event?.type === 'compaction_end' && event.errorMessage) {
-      emit({ type: 'surface-error', message: event.errorMessage })
-      return
-    }
-
     const modelError = event?.type === 'message_end'
       && event.message?.role === 'assistant'
       && event.message?.stopReason === 'error'
-    if (modelError) {
-      emit({
-        type: 'surface-error',
-        message: event.message.errorMessage || 'Model request failed',
-      })
+    let message
+    if (event?.type === 'compaction_end' && event.errorMessage) {
+      message = event.errorMessage
+    } else if (modelError) {
+      message = event.message.errorMessage || 'Model request failed'
+    } else if (event?.type === 'error') {
+      message = event.error?.message || event.message || 'Runtime error'
+    } else {
       return
     }
-
-    if (event?.type !== 'error') return
-    emit({
-      type: 'surface-error',
-      message: event.error?.message || event.message || 'Runtime error',
-    })
+    if (event.error?.name === 'AbortError' || event.error?.code === 'ABORT_ERR') return
+    if (!event.error?.name && !event.error?.code
+      && ['This operation was aborted', 'Prompt cancelled'].includes(message)) return
+    emit({ type: 'surface-error', message })
   }
 
   function updateLiveTool(event) {
@@ -763,6 +758,7 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     return {
       id: messageEventId(event),
       handoffId,
+      runtimeReceived: true,
       createdAt: Date.now(),
       type: 'message',
       role: 'user',

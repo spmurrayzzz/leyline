@@ -53,9 +53,30 @@ compacts.
 
 During an active run, use these keys:
 
-- Enter sends steering to the active run.
-- Option+Enter queues a follow-up.
+- Enter adds an editable task to **Up next**.
+- Option+Enter steers the active run.
 - Shift+Enter adds a line break.
+
+If the queue is held, select **Resume** before you steer.
+
+## Queued tasks do not start
+
+Check the attached queue tab for **Held** or **Needs attention**. Stop and queue
+edits hold remaining unsent tasks. Save or cancel an open edit, then select
+**Resume**. Closing the tray does not cancel the edit or resume the queue.
+
+If the tray shows an error, correct the reported problem before you resume.
+Leyline sends pending tasks one at a time when the agent becomes idle.
+
+Inputs under **Sent to agent** have already reached pi. You cannot edit,
+reorder, or remove them from the tray. The queue hold does not apply to them.
+
+## Queued tasks disappear after a restart
+
+Pending **Up next** tasks survive a browser refresh, session switch, and runtime
+reload. A runtime reload leaves them held until you select **Resume**. A backend
+restart clears pending tasks. They are not saved in the session transcript
+before the agent accepts them.
 
 ## Model or provider authentication fails
 
@@ -72,7 +93,8 @@ Select **Reload runtime** at the bottom of the sidebar. Reload recreates the
 selected runtime and reloads pi resources.
 
 Wait for streaming or compaction to finish before you reload. You can also stop
-an active run and then reload.
+an active run and then reload. Pending **Up next** tasks remain held after
+reload. Select **Resume** when you are ready to continue them.
 
 ## A subagent fails to start
 

@@ -129,6 +129,7 @@ const activityActionError = ref('')
 const goalCommandSubmitting = ref('')
 const editingEntry = ref(null)
 const composerDrafts = new Map()
+const queueEditDrafts = new Map()
 const pendingComposerPastes = new Set()
 const startComposerDraftKey = 'start'
 let activeComposerDraftKey = startComposerDraftKey
@@ -439,7 +440,6 @@ const {
   switchingModel,
   switchingThinking,
   updateRuntimeEventState,
-  updateRuntimeQueue,
   updateRuntimeSessionSnapshot,
   visibleProjects,
 } = sessionWorkspace
@@ -690,7 +690,11 @@ const {
   },
   onExtensionError(data) {
     if (data.activeSessionId !== selectedSessionId.value) return
-    promptError.value = data.error?.message || data.error || 'Extension error'
+    const error = data.error
+    const message = error?.message || error || 'Extension error'
+    if (error?.name === 'AbortError' || error?.code === 'ABORT_ERR') return
+    if (!error?.name && !error?.code && message === 'This operation was aborted') return
+    promptError.value = message
   },
   onReconnect() {
     if (!selectedSessionId.value
@@ -737,6 +741,11 @@ const queuedMessages = computed(() => {
     steering: queue.steering || [],
     followUp: queue.followUp || [],
   }
+})
+const promptQueue = computed(() => {
+  const session = activeRuntimeSession.value
+  return session?.id === selectedSessionId.value && session.state?.promptQueue
+    || { revision: 0, held: false, error: '', items: [] }
 })
 const contextUsageLabel = computed(() => {
   const usage = contextUsage.value
@@ -865,12 +874,8 @@ const sendButtonLabel = computed(() => {
 const composerPlaceholder = computed(() => {
   if (compactingContext.value) return 'Compacting context before continuing…'
   if (sessionActivating.value) return 'Activating pi runtime…'
-  if (agentRunning.value && isResearchSession.value) {
-    return 'Steer this research; your message reaches the lead at the next checkpoint'
-  }
-  if (agentRunning.value) {
-    return 'Type to steer the current run; Option+Enter queues follow-up'
-  }
+  if (promptQueue.value.held) return 'Add a task to the held queue…'
+  if (agentRunning.value) return 'Add the next task…'
   if (researchReportNeedsRepair.value) {
     return 'Ask Leyline to repair and revalidate the report'
   }
@@ -1133,11 +1138,16 @@ function patchEntryFeedback(entryId, label, feedbackText = '') {
   }
 }
 
+function applyQueueSnapshot(session) {
+  if (!session) return
+  updateRuntimeSessionSnapshot(session)
+  if (session.id === selectedSessionId.value) activeRuntimeSession.value = session
+}
+
 function handleLiveTurnIntent(intent) {
   if (intent.type === 'refresh-session') {
     scheduleSessionRefresh(intent.activeSessionId, intent.event)
   }
-  if (intent.type === 'runtime-queue') updateRuntimeQueue(intent.event)
   if (intent.type === 'surface-error') promptError.value = intent.message
   if (intent.type === 'scroll-live') scheduleLiveScroll(intent.activeSessionId)
 }
@@ -1851,6 +1861,8 @@ function confirmBackendDisconnect(targetName) {
     || attachedImages.value.length
     || editingEntry.value
     || composerDrafts.size
+    || queueEditDrafts.size
+    || composerRef.value?.hasQueueDrafts?.()
     || [...pendingComposerPastes].some((paste) => paste.valid)) {
     notices.push('Unsent composer drafts will be cleared.')
   }
@@ -2418,6 +2430,7 @@ function discardComposerDraft(sessionId) {
     activateComposerDraft(composerDraftKey(selectedSessionId.value))
   }
   composerDrafts.delete(key)
+  queueEditDrafts.delete(sessionId)
 }
 
 function completeComposerEdit(key, entry) {
@@ -2472,7 +2485,18 @@ async function submitDraft(streamingBehavior) {
     return
   }
 
-  if (agentRunning.value && !editingEntry.value) {
+  if (editingEntry.value && agentRunning.value) {
+    promptError.value = 'Wait for the current response to finish before editing.'
+    return
+  }
+
+  if (streamingBehavior === 'steer' && promptQueue.value.held && !editingEntry.value) {
+    promptError.value = 'Resume the queue before steering.'
+    return
+  }
+
+  if (!editingEntry.value && (agentRunning.value
+    || promptQueue.value.held || promptQueue.value.items.length)) {
     const sessionId = selectedSessionId.value
     const submittedDraft = draft.value
     promptSubmitting.value = true
@@ -2484,7 +2508,7 @@ async function submitDraft(streamingBehavior) {
         sessionId,
         text,
         images,
-        streamingBehavior || 'steer',
+        streamingBehavior || 'followUp',
       )
       if (data.active && selectedSessionId.value === sessionId) {
         activeRuntimeSession.value = data.active
@@ -2495,7 +2519,10 @@ async function submitDraft(streamingBehavior) {
           draft.value = submittedDraft
           attachedImages.value = submittedAttachments
         }
-        promptError.value = error.message
+        if (error.name !== 'AbortError'
+          && !['Prompt cancelled', 'This operation was aborted'].includes(error.message)) {
+          promptError.value = error.message
+        }
       }
     } finally {
       promptSubmitting.value = false
@@ -2564,9 +2591,14 @@ async function submitDraft(streamingBehavior) {
     if (selectedSessionId.value === sessionId) {
       if (data.active) activeRuntimeSession.value = data.active
       if (initializesResearchSession) emptySessionKind.value = 'session'
-      if (isHandledSlashCommand(text)) removeOptimisticEntry(localEntry)
+      if (isHandledSlashCommand(text) || data.queued) {
+        removeOptimisticEntry(localEntry, data.queued === true)
+      }
       editingEntry.value = null
-      if (startsTurn) setAgentRunning(true, 'Thinking…')
+      if (startsTurn && !data.queued
+        && activeRuntimeSession.value?.state?.isStreaming) {
+        setAgentRunning(true, 'Thinking…')
+      }
       promptAccepted = true
     }
   } catch (error) {
@@ -2588,7 +2620,10 @@ async function submitDraft(streamingBehavior) {
         draft.value = submittedDraft
         attachedImages.value = submittedAttachments
       }
-      promptError.value = error.message
+      if (error.name !== 'AbortError'
+        && !['Prompt cancelled', 'This operation was aborted'].includes(error.message)) {
+        promptError.value = error.message
+      }
     }
   } finally {
     if (startsEmptySession) {
@@ -2885,8 +2920,11 @@ async function interruptAgent() {
 
   const sessionId = selectedSessionId.value
   try {
-    await interruptPiSession(sessionId)
-    if (selectedSessionId.value === sessionId) setAgentRunning(false)
+    const data = await interruptPiSession(sessionId)
+    if (selectedSessionId.value === sessionId) {
+      if (data.active) activeRuntimeSession.value = data.active
+      setAgentRunning(activeRuntimeSession.value?.state?.isStreaming === true)
+    }
   } catch (error) {
     if (selectedSessionId.value === sessionId) {
       promptError.value = error.message
@@ -3012,7 +3050,7 @@ function handleComposerKeydown(event) {
   if (handleSlashPickerKeydown(event)) return
   if (event.key !== 'Enter' || event.shiftKey) return
   event.preventDefault()
-  submitDraft(event.altKey ? 'followUp' : 'steer')
+  submitDraft(event.altKey ? 'steer' : 'followUp')
 }
 
 async function handleComposerPaste(event) {
@@ -3186,9 +3224,10 @@ function handleGlobalKeydown(event) {
   if (event.key === 'Escape') handleEscape(event)
 }
 
-function anyEscapeTargetOpen() {
+function anyEscapeTargetOpen(ignoreQueue = false) {
   return Boolean(
-    fullscreenImage.value
+    (!ignoreQueue && composerRef.value?.queueUiOpen)
+    || fullscreenImage.value
     || fullscreenTool.value
     || filePreview.value
     || fileMenu.value
@@ -3220,6 +3259,11 @@ function handleEscape(event) {
     event?.stopPropagation?.()
     if (fileMenu.value) closeFileMenu()
     else closeFilePreview()
+    return
+  }
+  if (!anyEscapeTargetOpen(true) && composerRef.value?.dismissQueue?.()) {
+    event?.preventDefault?.()
+    event?.stopPropagation?.()
     return
   }
   if (!anyEscapeTargetOpen() && agentRunning.value) {
@@ -3272,6 +3316,7 @@ function clearPendingWorkspaceTargets() {
 }
 
 function closeMenusOnOutsideClick(event) {
+  composerRef.value?.closePopovers?.(event)
   if (event.target.closest('.project-browser-modal')) return
   if (event.target.closest('.model-picker')) return
   if (event.target.closest('.start-project-button, .start-project-menu')) return
@@ -4137,6 +4182,9 @@ function closePickerMenus() {
         :research="composerResearchMode"
         :research-toggle-enabled="canToggleEmptySessionResearch"
         :queued-messages="queuedMessages"
+        :session-id="selectedSessionId"
+        :prompt-queue="promptQueue"
+        :queue-edit-drafts="queueEditDrafts"
         :selected-model-key="selectedModelKey"
         :send-button-label="sendButtonLabel"
         :slash-active-index="slashActiveIndex"
@@ -4157,6 +4205,7 @@ function closePickerMenus() {
         @keydown="handleComposerKeydown"
         @open-image="openImageFullscreen"
         @paste="handleComposerPaste"
+        @queue-snapshot="applyQueueSnapshot"
         @remove-image="removeAttachedImage"
         @select-model="selectModel"
         @select-slash-command="selectSlashCommand"

@@ -43,9 +43,13 @@ const HIDDEN_SLASH_COMMANDS = new Set([
 ])
 const THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']
 
+let snapshotRevision = 0
+
 export function runtimeSessionDto(handle) {
+  snapshotRevision = Math.max(Date.now(), snapshotRevision + 1)
   return {
     id: handle.sessionId,
+    snapshotRevision,
     path: handle.runtime.session.sessionFile,
     cwd: handle.runtime.cwd,
     diagnostics: handle.runtime.diagnostics,
@@ -86,11 +90,15 @@ function finiteNumber(value) {
 }
 
 export function activeSessionStateDto(handle) {
-  return sessionStateDto(
-    handle.runtime.session,
-    handle.extensionUiState,
-    handle.pendingToolResults,
-  )
+  return {
+    ...sessionStateDto(
+      handle.runtime.session,
+      handle.extensionUiState,
+      handle.pendingToolResults,
+    ),
+    promptQueue: handle.promptQueue?.snapshot()
+      || { revision: 0, held: false, error: '', items: [] },
+  }
 }
 
 export function sessionStateDto(
@@ -100,6 +108,7 @@ export function sessionStateDto(
 ) {
   const activeToolNames = session.getActiveToolNames()
   const pendingToolCalls = [...(session.agent?.state?.pendingToolCalls || [])]
+  const hasQueuedMessages = session.agent.hasQueuedMessages()
 
   return {
     model: modelDto(session.model),
@@ -121,8 +130,8 @@ export function sessionStateDto(
     contextUsage: session.getContextUsage?.(),
     slashCommands: slashCommandDtos(session),
     queuedMessages: {
-      steering: [...session.getSteeringMessages()],
-      followUp: [...session.getFollowUpMessages()],
+      steering: hasQueuedMessages ? [...session.getSteeringMessages()] : [],
+      followUp: hasQueuedMessages ? [...session.getFollowUpMessages()] : [],
     },
     extensionUi: extensionUiState,
     pendingConfirmationCount: extensionUiState.confirmations?.length || 0,

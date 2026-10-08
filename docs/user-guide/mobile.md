@@ -41,7 +41,7 @@ The sidebar can use up to 86 percent of the viewport width, with a maximum width
 2. Select **Activity**.
 3. Select **Open** or **Stop** for a session.
 
-The mobile view uses the same attention, running, queued, and shared-working-tree states as the desktop view.
+The mobile view uses the same attention, running, queued, held, and shared-working-tree states as the desktop view. Open a session to resume its held queue.
 
 ## Use transcript actions
 
@@ -52,6 +52,12 @@ Tool targets can shorten to fit the row. User messages and tool cards use the fu
 ## Use the mobile composer
 
 The composer stays above the bottom edge. Model, thinking, dictation, and send controls use one row.
+
+During an active run, the send arrow adds the draft to **Up next**. Select **Send options** beside the arrow for **Queue next task** or **Steer current run**.
+
+Select the attached **Up next** tab to open the tray across the composer width. The tab moves above the list. The input and footer stay fixed while the list scrolls. Each task has one actions menu for edits, order changes, steering, and removal.
+
+**Stop** holds remaining unsent tasks. The closed **Held** tab shows the count and **Resume**. Text edits keep images, and closing the tray keeps an unsaved edit. Save or cancel the edit before you select **Resume**. See [Composer](./composer#queue-the-next-task) for queue details.
 
 The context row contains runtime status, shell mode, tool count, context text, and the terminal control. Some secondary status chips are hidden to keep the row compact.
 

@@ -58,6 +58,7 @@ export function createPiApiHandler(api) {
     trashProject,
     trashSession,
     updateMemory,
+    updatePromptQueue,
     renderSessionExportHtml,
   } = api
 
@@ -223,7 +224,7 @@ async function piApiHandler(req, res) {
   
         const body = await readJson(req)
         const handle = requireActiveHandle()
-        await promptSession(
+        const disposition = await promptSession(
           handle,
           body.text,
           body.images,
@@ -232,7 +233,7 @@ async function piApiHandler(req, res) {
           body.kind,
           body.handoffId,
         )
-        return json(res, { ok: true, active: activeSessionDto(handle) })
+        return json(res, { ok: true, queued: disposition === 'queued', active: activeSessionDto(handle) })
       }
   
       if (url.pathname === '/bash') {
@@ -635,6 +636,7 @@ async function piApiHandler(req, res) {
 
       const scopedActions = [
         'prompt',
+        'queue',
         'bash',
         'compact',
         'edit-prompt',
@@ -659,8 +661,16 @@ async function piApiHandler(req, res) {
   
         const body = await readJson(req)
         const action = scopedActionMatch[2]
+        if (action === 'queue') {
+          try {
+            await updatePromptQueue(handle, body)
+            return json(res, { ok: true, active: activeSessionDto(handle) })
+          } catch (error) {
+            return json(res, { error: error.message }, error.statusCode || 400)
+          }
+        }
         if (action === 'prompt') {
-          await promptSession(
+          const disposition = await promptSession(
             handle,
             body.text,
             body.images,
@@ -669,7 +679,7 @@ async function piApiHandler(req, res) {
             body.kind,
             body.handoffId,
           )
-          return json(res, { ok: true, active: activeSessionDto(handle) })
+          return json(res, { ok: true, queued: disposition === 'queued', active: activeSessionDto(handle) })
         }
         if (action === 'bash') {
           await bashSession(handle, body.command, body.excludeFromContext)

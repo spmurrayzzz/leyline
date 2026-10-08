@@ -38,11 +38,13 @@ The sidebar marks each research session with a flask. During a run, the row can 
 
 ## Direct an active run
 
-Enter a message and press **Enter** to steer the lead. The lead receives steering at its next accepted checkpoint.
+Enter a message and press **Option+Enter** to steer the lead. The lead receives steering at its next accepted checkpoint.
 
-Press **Option+Enter** to queue a follow-up after the active run. Select **Stop generation** to interrupt the parent run.
+Press **Enter** to add an editable task to **Up next**. Leyline sends the task after the active run. Select **Send options** beside the send arrow for **Queue next task** or **Steer current run**.
 
-A stopped or failed run keeps its persisted plan, threads, and sources. Send another prompt when you want the lead to continue.
+Select **Stop generation** to interrupt the parent run and hold remaining unsent tasks. Select **Resume** to release a held queue before you steer or continue queued work.
+
+A stopped or failed run keeps its persisted plan, threads, and sources. With no pending tasks, send another prompt when you want the lead to continue. See [Composer](./composer#queue-the-next-task) for queue controls.
 
 ## Verify sources and inspect the research ledger
 

@@ -34,7 +34,8 @@ A session row can show these states:
 - **running**: the agent is producing a response.
 - **compacting**: pi is compacting the session context.
 - **unread**: a background run finished or reported an error.
-- **+N queued**: steering or follow-up messages are waiting.
+- **N queued**: tasks or accepted inputs are waiting.
+- **N held**: the queue is held until you select **Resume**.
 - **error**: the background runtime reported an error.
 - **plan**, **gather**, **synthesize**, or **report**: a research run is in that phase.
 - **gather N/N**: that many research threads have finished.
@@ -42,7 +43,9 @@ A session row can show these states:
 
 Select **Activity** to supervise other live sessions, including sessions in the current project. It shows current work and provides **Open** and session-scoped **Stop** actions.
 
-Background sessions continue when you open another session. Activity warns when multiple active or queued sessions share one CWD.
+Background sessions continue when you open another session. Activity warns when multiple sessions share one CWD and have active work or queues that are not held.
+
+Pending **Up next** tasks stay with their session when you switch sessions or refresh the browser. **Reload runtime** keeps those tasks held until you select **Resume**. A backend restart clears pending tasks. See [Composer](./composer#queue-the-next-task) for queue controls.
 
 ## Create a session in a project
 

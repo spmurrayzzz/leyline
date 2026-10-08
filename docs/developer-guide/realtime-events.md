@@ -6,14 +6,18 @@ Leyline uses server-sent events (SSE) for pi runtime and extension updates. It u
 
 `GET /api/pi/events` opens the SSE stream. `server/pi-api/events.js` owns the connected response set.
 
-A new connection receives one `active_session` event for each existing runtime handle. The server does not provide replay IDs or persisted event history.
+The browser supplies the selected `sessionId` in the query string. That runtime receives full snapshots; other runtimes receive compact snapshots.
+
+A new connection receives one `active_session` event per runtime, followed by `runtime_roster`. The server does not provide replay IDs or persisted event history.
 
 The server sends these event types:
 
 | SSE type | Payload |
 | --- | --- |
 | `active_session` | A runtime session DTO for one handle |
-| `runtime_event` | `{ activeSessionId, event }` from the pi session subscription |
+| `runtime_roster` | `{ sessionIds }` for the backend's open runtimes |
+| `runtime_removed` | `{ id }` when a runtime is removed |
+| `runtime_event` | `{ activeSessionId, event, handoffId? }` from the pi session subscription |
 | `extension_ui` | `{ activeSessionId, state, goal }` after an extension UI change |
 | `extension_error` | `{ activeSessionId, error }` after an extension binding error |
 
@@ -21,27 +25,31 @@ The server sends these event types:
 
 Queue changes and goal-state messages also trigger a new `active_session` snapshot. Extension UI changes trigger both `extension_ui` and `active_session`.
 
+Editable queue mutations broadcast snapshots through the runtime handle. Native `queue_update` snapshots run in a microtask because pi emits the event before inserting the input into its low-level queue. DTOs ignore stale native display arrays when pi has no queued inputs.
+
+Snapshots include `snapshotRevision` for ordering. Full `promptQueue` state contains the mutation revision and pending items. Compact snapshots contain its count, held state, and error.
+
 Research updates change the extension status after they append state. The resulting snapshot includes the latest branch research state.
 
 ## Frontend adapter
 
 `useRuntimeEvents.js` creates one `EventSource` for `/api/pi/events` on the
-active backend. It handles `active_session`, `runtime_event`, and
-`extension_ui`.
+active backend. It handles `active_session`, `runtime_roster`, `runtime_removed`,
+`runtime_event`, `extension_ui`, and `extension_error`. Session changes close the old stream before opening its replacement.
 
 Connection open and error callbacks update the visible stream status. EventSource performs its standard reconnect behavior after a disconnection.
 
 The adapter keeps the latest 100 local log items. The Runtime Events drawer displays the newest 20.
 
-The current frontend does not register an `extension_error` listener. Those server events do not appear in the Runtime Events drawer.
+The adapter logs extension errors. Composer error handling filters expected cancellations without removing their raw event records.
 
 ## Runtime state updates
 
 `App.vue` sends each `active_session` snapshot to `useSessionWorkspace.js`. The composable updates background status for that session ID.
 
-If the snapshot belongs to the selected session, `App.vue` also replaces `activeRuntimeSession`.
+If the snapshot belongs to the selected session, `App.vue` also updates `activeRuntimeSession`. Revision guards reject older snapshots from either HTTP or SSE.
 
-`runtime_event` payloads update background running, compacting, queue, unread, and error state. `active_session` snapshots update branch research progress. Runtime events also enter `useLiveTurnProjection.js`.
+`runtime_event` payloads update background running, compacting, unread, and error state. Queue state and branch research progress come from `active_session` snapshots. Runtime events also enter `useLiveTurnProjection.js`.
 
 ## Live transcript projection
 
@@ -51,12 +59,11 @@ If the snapshot belongs to the selected session, `App.vue` also replaces `active
 - message start, update, and end
 - tool call, execution start, and execution end
 - compaction start and end
-- queue updates
 - errors and aborts
 
 `message_update` drives live assistant blocks through one animation-frame batch. It does not fetch persisted detail.
 
-Other runtime events schedule a session-detail refresh. Normal refreshes use a 250 ms debounce, and compaction completion refreshes immediately.
+Settlement, reconnect, and manual compaction schedule immediate session-detail refreshes. Idle session-info and custom-message changes use a 250 ms debounce. Streaming message and tool events do not fetch detail individually.
 
 Live user, assistant, and tool rows reconcile with projected persisted entries after refresh. This prevents duplicate rows during the handoff.
 

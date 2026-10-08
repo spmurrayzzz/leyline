@@ -237,6 +237,13 @@ export function submitPrompt(
   )
 }
 
+export function updatePromptQueue(sessionId, request) {
+  return apiRequest(sessionActionUrl(sessionId, 'queue'), 'Failed to update queue', {
+    method: 'POST',
+    body: request,
+  })
+}
+
 export function runShellCommand(
   sessionId,
   command,

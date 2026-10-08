@@ -32,8 +32,9 @@
   - Thought, skill, and tool rows can expand. Tool rows start collapsed.
   - The composer submits prompts, images, shell commands, slash commands,
     steering messages, and follow-up messages to pi.
-  - The composer stays available during active runs. Enter sends steering,
-    Option+Enter sends a follow-up, and Shift+Enter adds a line break.
+  - The composer stays available during active runs. Enter queues the next task,
+    Option+Enter sends steering, and Shift+Enter adds a line break. Stop holds
+    remaining unsent tasks until Resume; an empty queue returns to normal Send.
   - Memory, Project Details, Settings, Runtime events, previews, and the terminal
     use focused drawers or overlays.
 - Screenshot workflows assume the dev server is running at `http://localhost:5173/`:

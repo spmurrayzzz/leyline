@@ -1,7 +1,8 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useDictation } from '../composables/useDictation'
 import ModelPicker from './ModelPicker.vue'
+import PromptQueue from './PromptQueue.vue'
 import { formatMode } from '../lib/format'
 
 const props = defineProps({
@@ -79,6 +80,15 @@ const props = defineProps({
   },
   modelPickerOpen: Boolean,
   promptSubmitting: Boolean,
+  sessionId: {
+    type: String,
+    default: '',
+  },
+  queueEditDrafts: { type: Map, default: () => new Map() },
+  promptQueue: {
+    type: Object,
+    default: () => ({ revision: 0, held: false, error: '', items: [] }),
+  },
   queuedMessages: {
     type: Object,
     default: () => ({ steering: [], followUp: [] }),
@@ -140,6 +150,7 @@ const emit = defineEmits([
   'keydown',
   'open-image',
   'paste',
+  'queue-snapshot',
   'remove-image',
   'select-model',
   'select-slash-command',
@@ -154,8 +165,19 @@ const emit = defineEmits([
 
 const form = ref(null)
 const textarea = ref(null)
+const queue = ref(null)
+const sendActions = ref(null)
+const sendMenu = ref(null)
+const sendMenuOpen = ref(false)
+const queueUiOpen = computed(() => sendMenuOpen.value || Boolean(queue.value?.surfaceOpen))
 const shellMode = computed(() => props.draft.trimStart().startsWith('!'))
 const hiddenShellMode = computed(() => props.draft.trimStart().startsWith('!!'))
+const queueMode = computed(() => !shellMode.value && !props.editingLabel
+  && (props.agentRunning || props.promptQueue?.held || props.promptQueue?.items?.length > 0))
+const stopMode = computed(() => props.agentRunning && shellMode.value)
+const submitDisabled = computed(() => props.compacting || props.promptSubmitting
+  || props.reloadingSession || !props.canSubmitDraft
+  || (props.agentRunning && Boolean(props.editingLabel)))
 const shellModeLabel = computed(() => {
   return hiddenShellMode.value ? 'shell · hidden' : 'shell · context'
 })
@@ -187,13 +209,49 @@ const dictationTitle = computed(() => {
 watch(inputDisabled, (disabled) => {
   if (disabled) stopDictation()
 })
+watch(() => props.sessionId, () => { sendMenuOpen.value = false })
+watch([queueMode, () => props.promptSubmitting], ([queueing, submitting]) => {
+  if (!queueing || submitting) sendMenuOpen.value = false
+})
 
 function focus() {
   if (inputDisabled.value) return
   textarea.value?.focus()
 }
 
-defineExpose({ focus, form })
+function dismissQueue() {
+  if (sendMenuOpen.value) {
+    sendMenuOpen.value = false
+    sendActions.value?.querySelector('.composer-send-menu-toggle')?.focus()
+    return true
+  }
+  return queue.value?.dismiss() || false
+}
+
+function closePopovers(event) {
+  if (!event.composedPath().includes(sendActions.value)) sendMenuOpen.value = false
+  queue.value?.closeOutside(event)
+}
+
+async function toggleSendMenu() {
+  sendMenuOpen.value = !sendMenuOpen.value
+  if (sendMenuOpen.value) {
+    await nextTick()
+    sendMenu.value?.focus({ preventScroll: true })
+  }
+}
+
+function submitFromMenu(behavior) {
+  sendMenuOpen.value = false
+  emit('submit', behavior)
+  focus()
+}
+
+function hasQueueDrafts() {
+  return queue.value?.hasDrafts() || false
+}
+
+defineExpose({ focus, form, dismissQueue, closePopovers, hasQueueDrafts, queueUiOpen })
 
 function updateDraft(event) {
   emit('update:draft', event.target.value)
@@ -218,32 +276,14 @@ function updateDraft(event) {
         <button type="button" @click="emit('cancel-edit')">Cancel</button>
       </div>
     </Transition>
-    <Transition name="composer-popover">
-      <div
-        v-if="queuedMessages.steering.length || queuedMessages.followUp.length"
-        class="queued-message-drawer"
-      >
-      <div
-        v-for="(message, index) in queuedMessages.steering"
-        :key="`steering-${index}-${message}`"
-        class="queued-message-row"
-      >
-        <span>Steering</span>
-        <strong>{{ message }}</strong>
-      </div>
-      <div
-        v-for="(message, index) in queuedMessages.followUp"
-        :key="`follow-up-${index}-${message}`"
-        class="queued-message-row"
-      >
-        <span>Follow-up</span>
-        <strong>{{ message }}</strong>
-      </div>
-        <div class="queued-message-hint">
-          Enter queues steering · Option+Enter queues follow-up
-        </div>
-      </div>
-    </Transition>
+    <PromptQueue
+      ref="queue"
+      :session-id="sessionId"
+      :edit-drafts="queueEditDrafts"
+      :prompt-queue="promptQueue"
+      :queued-messages="queuedMessages"
+      @runtime="emit('queue-snapshot', $event)"
+    />
     <div class="composer-input-shell">
       <Transition name="shell-glyph">
         <span v-if="shellMode" class="shell-prompt-glyph">$</span>
@@ -392,26 +432,40 @@ function updateDraft(event) {
               ></path>
             </svg>
           </button>
-          <button
-            class="send-button"
-            :class="{
-              'stop-button': agentRunning,
-              'shell-run-button': shellMode,
-            }"
-            :type="agentRunning ? 'button' : 'submit'"
-            :disabled="agentRunning
-              ? interrupting || compacting
-              : compacting
-                || promptSubmitting
-                || reloadingSession
-                || !canSubmitDraft"
-            :title="agentRunning
-              ? 'Stop generation'
-              : shellMode ? 'Run shell command' : 'Send message'"
-            @click="agentRunning && emit('interrupt')"
-          >
-            {{ sendButtonLabel }}
-          </button>
+          <div ref="sendActions" class="composer-send-actions">
+            <button
+              class="send-button"
+              :class="{
+                'stop-button': stopMode,
+                'shell-run-button': shellMode,
+              }"
+              :type="stopMode ? 'button' : 'submit'"
+              :disabled="stopMode ? interrupting || compacting : submitDisabled"
+              :title="queueMode
+                ? 'Queue next task (Enter)'
+                : stopMode ? 'Stop generation' : shellMode ? 'Run shell command' : 'Send message'"
+              :aria-label="queueMode ? 'Queue message' : stopMode ? 'Stop generation' : shellMode ? 'Run shell command' : 'Send message'"
+              @click="stopMode && emit('interrupt')"
+            >{{ queueMode || editingLabel ? '↑' : sendButtonLabel }}</button>
+            <button
+              v-if="queueMode"
+              class="composer-send-menu-toggle"
+              type="button"
+              :aria-expanded="sendMenuOpen"
+              aria-label="Send options"
+              title="Send options"
+              @click="toggleSendMenu"
+            ><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m5 6 3 3 3-3" /></svg></button>
+            <div v-if="sendMenuOpen" ref="sendMenu" class="composer-send-menu" role="group" aria-label="Send options" tabindex="-1">
+              <button type="button" :disabled="submitDisabled" @click="submitFromMenu('followUp')"><span>Queue next task</span><kbd>Enter</kbd></button>
+              <button
+                type="button"
+                :disabled="submitDisabled || promptQueue.held"
+                :title="promptQueue.held ? 'Resume the queue before steering' : 'Deliver at the agent’s next input boundary'"
+                @click="submitFromMenu('steer')"
+              ><span>Steer current run</span><kbd>Option+Enter</kbd></button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="composer-context-row">
@@ -422,6 +476,18 @@ function updateDraft(event) {
           <i aria-hidden="true"></i>
           {{ compacting ? 'compacting' : 'running' }}
         </span>
+        <button
+          v-if="agentRunning && !shellMode"
+          class="composer-stop-control"
+          type="button"
+          :disabled="interrupting || compacting"
+          title="Stop the current run and hold queued messages"
+          aria-label="Stop generation"
+          @click="emit('interrupt')"
+        >
+          <svg viewBox="0 0 12 12" aria-hidden="true"><rect x="3" y="3" width="6" height="6" rx=".5" /></svg>
+          {{ interrupting ? 'Stopping' : 'Stop' }}
+        </button>
         <button
           v-if="researchToggleEnabled"
           class="composer-chip research-mode-chip"

@@ -6,10 +6,12 @@ Leyline provides composer, browser, rename, terminal, and Electron shortcuts.
 
 | Shortcut | Action |
 | --- | --- |
-| **Enter** | Submit a prompt. During a run, queue **Steering**. |
-| **Option+Enter** | During a run, queue **Follow-up**. |
+| **Enter** | Send a prompt when idle with an empty queue. During a run, add a task to **Up next**. |
+| **Option+Enter** | During a run, **Steer current run**. |
 | **Shift+Enter** | Add a line break. |
 | **Escape** | Close an open menu, drawer, dialog, preview, or edit mode. With no open surface, stop the active run. |
+
+When pending tasks remain, **Enter** adds to the queue. A held queue stays held until you select **Resume**. Resume the queue before you use **Option+Enter** to steer.
 
 ## Use slash command shortcuts
 

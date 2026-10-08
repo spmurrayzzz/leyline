@@ -1,8 +1,10 @@
 # Composer
 
-Use the composer to send prompts, images, shell commands, slash commands, steering messages, and follow-up messages.
+Use the composer to send prompts, images, shell commands, slash commands, and steering messages, or add tasks to **Up next**.
 
 ## Send a prompt
+
+When the agent is idle and the queue is empty:
 
 1. Enter text in the composer.
 2. Press **Enter** or select **Send message**.
@@ -11,29 +13,54 @@ Press **Shift+Enter** to add a line break.
 
 The composer remains available during an active run. Model and thinking controls stay disabled until the run ends.
 
+## Queue the next task
+
+During an active run, enter a task and press **Enter** or select the send arrow. Leyline adds the task to **Up next**. You can also select **Send options** beside the arrow, then **Queue next task**.
+
+Leyline sends queued tasks one at a time when the agent becomes idle. You can edit tasks before Leyline sends them.
+
+![Open Up next tray attached to the composer with queued tasks](../assets/screenshots/composer-queue.png)
+
+*The Up next tab opens a tray above the composer input.*
+
+The closed **Up next** tab attaches to the composer's top-left edge and shows the task count. Select the tab to open the tray. The tab moves above the list while the input and footer stay fixed. The tray fills the available width in a narrow composer, including mobile layouts.
+
+With the terminal open, the list scrolls within the remaining space above the composer.
+
+Each task has one actions menu:
+
+- **Edit** changes the task text and holds the queue.
+- **Move up** and **Move down** change the task order.
+- **Steer now** sends the task to the agent's next accepted input point.
+- **Remove** deletes the unsent task.
+
+Actions are unavailable while a task shows **Sending**.
+
+Text edits keep attached images. **Save** and **Cancel** leave the queue held. Select **Resume** after you save or cancel the edit. Closing the tray, switching sessions, or visiting Home keeps an unsaved edit. A browser reload discards these local edits.
+
+The backend keeps pending tasks when you refresh the browser or switch sessions. **Reload runtime** also keeps pending tasks, but holds them until you select **Resume**. Pending tasks do not survive a backend restart.
+
 ## Steer an active run
 
-Enter a message and press **Enter**. Leyline queues it as **Steering** for the current run.
+Enter a message and press **Option+Enter**. You can also select **Send options**, then **Steer current run**.
 
-Steering changes the active run at its next accepted input point. The queued-message drawer shows waiting steering messages.
+Steering changes the active run at its next accepted input point. If the queue is held, select **Resume** before you steer.
 
-## Queue a follow-up message
-
-![Active composer with one steering message and one follow-up message in the queue](../assets/screenshots/composer-queue.png)
-
-*The queue keeps steering and follow-up messages distinct during an active run.*
-
-Enter a message and press **Option+Enter** during an active run. Leyline queues it as **Follow-up**.
-
-A follow-up starts after the active run finishes. The queued-message drawer shows waiting follow-up messages.
-
-Leyline uses one-at-a-time queues for steering and follow-up messages. The interface does not provide a queue-mode control.
+**Sent to agent** separately shows waiting inputs that pi has already accepted, labeled **Steering** or **Follow-up**. You cannot edit, reorder, or remove these inputs from the tray.
 
 ## Stop an active run
 
-Select **Stop generation**. The stop button contains a square while the agent runs.
+Select **Stop generation**, shown as **Stop** with a square while the agent runs. Stop interrupts the run and holds the remaining unsent tasks.
 
-Pressing **Escape** also sends a stop request. It also closes open menus and drawers.
+![Closed Held queue tab with a task count and Resume attached to the composer](../assets/screenshots/composer-queue-held.png)
+
+*The closed Held tab keeps Resume available without opening the tray.*
+
+Select **Resume** to let Leyline send the remaining tasks. Until then, new tasks also enter the held queue. When the queue becomes empty, the hold clears and the idle composer returns to normal Send. Stop with no pending tasks does not hold future submissions.
+
+The hold applies only to unsent tasks, not inputs under **Sent to agent**.
+
+**Escape** closes an open menu, tray, drawer, dialog, preview, or edit mode first. With no open surface, **Escape** stops the active run.
 
 ## Run shell commands
 

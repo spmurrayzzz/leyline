@@ -10,6 +10,8 @@ import {
 import { renderSessionExportHtml } from '../server/pi-api/export-renderer.js'
 
 const baseUrl = process.env.DOCS_SCREENSHOT_URL || 'http://localhost:5173/'
+const screenshotFilter = (process.env.DOCS_SCREENSHOT_FILTER || '')
+  .split(',').map((value) => value.trim()).filter(Boolean)
 const docsOutputDir = path.resolve('docs/assets/screenshots')
 const readmeOutputDir = path.resolve('assets/readme')
 const fixedNow = Date.parse('2026-08-06T16:00:00.000Z')
@@ -813,9 +815,22 @@ try {
     browser,
     file: path.join(docsOutputDir, 'composer-queue.png'),
     route: '/sessions/demo-session',
-    ready: '.queued-message-drawer',
+    ready: '.queue-toggle',
     scenario: 'queue',
-    clipSelectors: ['.composer', '.queued-message-drawer'],
+    interact: async (page) => {
+      await page.locator('.queue-toggle').click()
+      await page.locator('.queue-popover').waitFor()
+    },
+    clipSelectors: ['.composer', '.prompt-queue'],
+    padding: 18,
+  })
+  await capture({
+    browser,
+    file: path.join(docsOutputDir, 'composer-queue-held.png'),
+    route: '/sessions/demo-session',
+    ready: '.queue-resume',
+    scenario: 'queue-held',
+    clipSelectors: ['.composer', '.prompt-queue'],
     padding: 18,
   })
   await capture({
@@ -1073,7 +1088,7 @@ async function openActivity(page) {
   await page.locator('.sidebar-project-shortcut', { hasText: 'Activity' }).click()
   const dialog = page.getByRole('dialog', { name: 'Activity' })
   await dialog.locator('.activity-navigator-result').nth(2).waitFor()
-  await dialog.locator('.activity-working-tree-warning').waitFor()
+  await dialog.locator('.activity-working-tree-warning').filter({ hasText: 'harbor' }).waitFor()
 }
 
 function session(
@@ -1182,11 +1197,13 @@ function memory(id, scope, contentMd, tags, status = 'active') {
 
 function runtimeFor(scenario) {
   const activity = scenario === 'activity'
-  const queued = scenario === 'queue'
+  const queued = ['queue', 'queue-held'].includes(scenario)
+  const held = scenario === 'queue-held'
   const research = scenario === 'research'
   const id = research ? researchSession.id : 'demo-session'
   return {
     id,
+    snapshotRevision: fixedNow,
     path: `/workspace/harbor/sessions/${id}.jsonl`,
     cwd: '/workspace/harbor',
     diagnostics: [],
@@ -1195,7 +1212,7 @@ function runtimeFor(scenario) {
       availableModels,
       thinkingLevel: 'high',
       availableThinkingLevels: model.availableThinkingLevels,
-      isStreaming: queued || activity,
+      isStreaming: (queued && !held) || activity,
       isCompacting: false,
       pendingToolCalls: activity ? ['activity-selected-tool'] : [],
       pendingTools: activity
@@ -1217,12 +1234,16 @@ function runtimeFor(scenario) {
         { name: 'goal', description: 'Start or manage a goal', source: 'extension' },
         { name: 'skill:review', description: 'Load the review skill', source: 'skill' },
       ],
-      queuedMessages: queued
-        ? {
-            steering: ['Check the failure path before you finish.'],
-            followUp: ['Summarize the release risk after the change.'],
-          }
-        : { steering: [], followUp: [] },
+      promptQueue: {
+        revision: held ? 3 : queued ? 2 : 0,
+        held,
+        error: '',
+        items: queued ? [
+          { id: 'queue-failure-path', text: 'Check the release failure path.', imageCount: 1, status: 'pending' },
+          { id: 'queue-release-risk', text: 'Summarize the remaining release risks.', imageCount: 0, status: 'pending' },
+        ] : [],
+      },
+      queuedMessages: { steering: [], followUp: [] },
       extensionUi: {
         statuses: scenario === 'goal' ? { goal: 'goal: active' } : {},
         widgets: {},
@@ -1248,11 +1269,13 @@ function runtimeFixturesFor(scenario, runtime) {
       args: { command: 'npm run verify' },
     }],
   })
-  const failed = runtimeForSession('landing-copy', { isStreaming: true })
+  const failed = runtimeForSession('landing-copy', { isStreaming: false })
   const queued = runtimeForSession('search-state', {
-    queuedMessages: {
-      steering: [],
-      followUp: ['Run the focused navigation check next.'],
+    promptQueue: {
+      revision: 1,
+      held: false,
+      error: '',
+      items: [{ id: 'queue-navigation', text: 'Run the focused navigation check next.', imageCount: 0, status: 'pending' }],
     },
   })
 
@@ -1329,6 +1352,7 @@ async function capture({
   preserveHover = false,
   macWindow = false,
 }) {
+  if (screenshotFilter.length && !screenshotFilter.includes(path.basename(file))) return
   const runtime = runtimeFor(scenario)
   const runtimeFixtures = runtimeFixturesFor(scenario, runtime)
   const context = await browser.newContext({
@@ -1726,7 +1750,7 @@ function initBrowser({
       super(...(args.length ? args : [now + tick++]))
     }
     static now() {
-      return now
+      return now + tick++
     }
   }
   FixedDate.parse = NativeDate.parse

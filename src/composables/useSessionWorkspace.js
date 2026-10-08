@@ -53,7 +53,16 @@ export function useSessionWorkspace({
   const sessionSwitching = ref(false)
   const sessionActivating = ref(false)
   const sessionError = ref('')
-  const activeRuntimeSession = ref(null)
+  const activeRuntimeSnapshot = ref(null)
+  const activeRuntimeSession = computed({
+    get: () => activeRuntimeSnapshot.value,
+    set(value) {
+      const previous = activeRuntimeSnapshot.value
+      if (value?.id && value.id === previous?.id
+        && value.snapshotRevision < previous.snapshotRevision) return
+      activeRuntimeSnapshot.value = value
+    },
+  })
   const runtimeSessionsById = ref({})
   const projectAgeNow = ref(Date.now())
   const startupRun = ref(null)
@@ -557,22 +566,10 @@ export function useSessionWorkspace({
     return undefined
   }
 
-  function updateRuntimeQueue(event) {
-    if (event.type !== 'queue_update' || !activeRuntimeSession.value) return
-    activeRuntimeSession.value = {
-      ...activeRuntimeSession.value,
-      state: {
-        ...activeRuntimeSession.value.state,
-        queuedMessages: {
-          steering: event.steering || [],
-          followUp: event.followUp || [],
-        },
-      },
-    }
-  }
-
   function updateRuntimeSessionSnapshot(runtimeSession) {
     if (!runtimeSession?.id) return
+    const previous = runtimeSessionsById.value[runtimeSession.id]
+    if (runtimeSession.snapshotRevision < previous?.snapshotRevision) return
     upsertRuntimeSessionSummary(runtimeSession.session)
     const state = runtimeSession.state || {}
     const activity = state.activity && typeof state.activity === 'object'
@@ -588,7 +585,11 @@ export function useSessionWorkspace({
         : [],
       isStreaming: state.isStreaming === true,
       isCompacting: state.isCompacting === true,
-      queuedCount: queuedCount(state.queuedMessages),
+      snapshotRevision: runtimeSession.snapshotRevision,
+      queuedCount: queuedCount(state.queuedMessages)
+        + (state.promptQueue?.items?.length || state.promptQueue?.count || 0),
+      queueHeld: state.promptQueue?.held === true,
+      queueError: state.promptQueue?.error || '',
       pendingConfirmationCount: finiteRuntimeNumber(state.pendingConfirmationCount),
       pendingTools,
       pendingToolCount: Number.isFinite(state.pendingToolCount)
@@ -606,7 +607,6 @@ export function useSessionWorkspace({
           settledRevision: finiteRuntimeNumber(activity.settledRevision),
         } : {}),
     }
-    const previous = runtimeSessionsById.value[runtimeSession.id]
     const wasBusy = previous?.isStreaming || previous?.isCompacting
     const isBusy = patch.isStreaming || patch.isCompacting
     const newlySettled = previous
@@ -693,7 +693,7 @@ export function useSessionWorkspace({
     if (research?.status === 'error' && research.phase === 'report') {
       return { label: 'repair', tone: 'error' }
     }
-    if (state.error || research?.status === 'error') {
+    if (state.error || state.queueError || research?.status === 'error') {
       return { label: 'error', tone: 'error' }
     }
     if (state.isCompacting) return { label: 'compacting', tone: 'compacting' }
@@ -712,7 +712,7 @@ export function useSessionWorkspace({
       return { label: 'ready', tone: 'research' }
     }
     if (state.queuedCount) {
-      return { label: `+${state.queuedCount} queued`, tone: 'queued' }
+      return { label: `${state.queuedCount} ${state.queueHeld ? 'held' : 'queued'}`, tone: 'queued' }
     }
     return { label: '', tone: '' }
   }
@@ -822,9 +822,6 @@ export function useSessionWorkspace({
         isCompacting: false,
         error: event.willRetry ? '' : runtimeErrorMessage(event, ''),
       }
-    }
-    if (event.type === 'queue_update') {
-      return { queuedCount: queuedCount(event) }
     }
     return previous ? {} : null
   }
@@ -1564,13 +1561,14 @@ export function useSessionWorkspace({
   function runtimeWorkActive(state) {
     return state.isStreaming
       || state.isCompacting
-      || state.queuedCount > 0
+      || (state.queuedCount > 0 && !state.queueHeld)
       || state.pendingToolCount > 0
       || state.pendingConfirmationCount > 0
   }
 
   function runtimeActivityDetail(state) {
     if (state.pendingConfirmationCount) return 'Waiting for confirmation'
+    if (state.queueError) return state.queueError
     if (state.error) {
       if (state.error !== 'error') return state.error
       const diagnostic = [...(state.diagnostics || [])].reverse().find((item) => {
@@ -1586,7 +1584,7 @@ export function useSessionWorkspace({
     }
     if (state.isCompacting) return 'Compacting context'
     if (state.isStreaming) return 'Waiting for model'
-    if (state.queuedCount) return `${state.queuedCount} queued`
+    if (state.queuedCount) return `${state.queuedCount} ${state.queueHeld ? 'held until resumed' : 'queued'}`
     if (state.unread) return 'Run finished'
     return ''
   }
@@ -1808,7 +1806,6 @@ export function useSessionWorkspace({
     startupRun,
     switchingModel,
     switchingThinking,
-    updateRuntimeQueue,
     updateSelectedSessionSummary,
     visibleProjects,
   }

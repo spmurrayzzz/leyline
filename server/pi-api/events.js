@@ -241,6 +241,7 @@ function compactActiveSession(session) {
 
   return {
     id: session?.id,
+    snapshotRevision: session?.snapshotRevision,
     path: session?.path,
     cwd: session?.cwd,
     diagnostics: compactDiagnostics(session?.diagnostics),
@@ -260,6 +261,11 @@ function compactActiveSession(session) {
         ? state.activeToolNames.slice(0, 32)
         : [],
       queuedMessages: compactQueue(state.queuedMessages),
+      promptQueue: {
+        count: state.promptQueue?.items?.length || 0,
+        held: state.promptQueue?.held === true,
+        error: state.promptQueue?.error || '',
+      },
       research: compactResearch(state.research),
       activity: compactActivity(state.activity),
     },

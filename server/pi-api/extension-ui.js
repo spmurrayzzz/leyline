@@ -45,6 +45,16 @@ export async function bindRuntimeHandle(handle, events) {
     trackPendingToolResult(handle, event)
     trackRuntimeActivity(handle, event)
     syncGoalStateFromSession(handle)
+    if (event.type === 'agent_settled' || event.type === 'compaction_end') {
+      const last = session.messages.findLast((message) => message.role === 'assistant')
+      if (event.type === 'agent_settled'
+        && (handle.activityState?.error || last?.stopReason === 'aborted')
+        && handle.promptQueue?.snapshot().items.length) {
+        handle.promptQueue.hold()
+      } else {
+        handle.promptQueue?.schedule()
+      }
+    }
     events.broadcastEvent('runtime_event', {
       activeSessionId: handle.sessionId,
       event,
@@ -55,10 +65,9 @@ export async function bindRuntimeHandle(handle, events) {
       && (!handle.sessionSummary || handle.sessionSummary.messageCount === 0)) {
       queueMicrotask(() => events.broadcastActiveSession(handle))
     }
-    if (event.type === 'compaction_end') {
+    if (event.type === 'compaction_end' || event.type === 'queue_update') {
       queueMicrotask(() => events.broadcastActiveSession(handle))
-    } else if (event.type === 'queue_update'
-      || event.type === 'turn_end'
+    } else if (event.type === 'turn_end'
       || event.type === 'agent_settled'
       || event.type === 'session_info_changed'
       || isGoalStateEvent(event)

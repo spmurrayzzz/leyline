@@ -223,46 +223,512 @@
   transition-timing-function: var(--ease-accelerate);
 }
 
-.queued-message-drawer {
-  position: absolute;
-  right: 0;
-  bottom: calc(100% + 8px);
-  left: 0;
-  display: grid;
-  gap: 5px;
-  border: 1px solid #332b4a;
-  border-radius: 16px;
-  background: #1b1630;
-  padding: 11px 16px 10px;
-  color: #827b92;
-  font-size: 12px;
-  box-shadow: 0 10px 34px rgb(0 0 0 / 28%);
+.composer:has(> .prompt-queue) {
+  --queue-tab-background: var(--panel-soft);
+  border-color: #333;
 }
 
-.queued-message-row {
-  display: grid;
-  grid-template-columns: 74px minmax(0, 1fr);
-  align-items: baseline;
-  gap: 8px;
+.composer:has(> .prompt-queue):focus-within {
+  --queue-tab-background: #242425;
+}
+
+.composer:has(> .prompt-queue.is-open) {
+  border-top-left-radius: 0;
+}
+
+.composer:has(> .prompt-queue.is-open.fills-composer) {
+  border-top-color: transparent;
+  border-top-right-radius: 0;
+}
+
+.prompt-queue {
+  --queue-panel-width: min(560px, 100%);
+  --queue-bottom-offset: 0px;
+  position: absolute;
+  z-index: 2;
+  right: -1px;
+  bottom: calc(100% - 1px);
+  left: -1px;
+  color: var(--muted-strong);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.terminal-open .prompt-queue {
+  --queue-bottom-offset: var(--terminal-drawer-height);
+}
+
+.prompt-queue.is-open::after {
+  position: absolute;
+  bottom: 0;
+  left: 14px;
+  width: calc(var(--queue-panel-width) - 28px);
+  border-bottom: 1px solid #2b2b2b;
+  content: '';
+}
+
+.queue-heading,
+.queue-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   min-width: 0;
 }
 
-.queued-message-row span {
-  color: #8f83c9;
-  font-weight: 800;
+.queue-heading {
+  position: relative;
+  z-index: 1;
+  width: fit-content;
+  max-width: calc(100% - 40px);
+  gap: 0;
+  margin-left: 24px;
+  border: 1px solid #333;
+  border-bottom: 0;
+  border-radius: 10px 10px 0 0;
+  background: var(--queue-tab-background);
+  pointer-events: auto;
+  transition: background-color var(--motion-base) var(--ease-standard);
 }
 
-.queued-message-row strong {
+.prompt-queue.is-open .queue-heading {
+  margin-bottom: -1px;
+}
+
+.queue-toggle {
+  min-height: 30px;
+  gap: 8px;
+  border: 0;
+  border-radius: 9px 9px 0 0;
+  background: transparent;
+  padding: 0 12px;
+  color: var(--muted-strong);
+  font-size: 12px;
+  text-align: left;
+}
+
+.queue-summary-label {
   overflow: hidden;
-  color: #aaa4b7;
-  font-weight: 650;
+  min-width: 0;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.queued-message-hint {
-  color: #6f687d;
-  font-weight: 700;
+.queue-count {
+  margin-left: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.queue-toggle .queue-count {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  min-width: 19px;
+  height: 18px;
+  margin-left: 0;
+  border-radius: 4px;
+  background: #2c2c2c;
+  padding: 0 4px;
+  color: #c5c5c5;
+  font-size: 10px;
+}
+
+.queue-held,
+.queue-attention {
+  color: #c8a15f;
+}
+
+.queue-attention {
+  margin-left: 6px;
+  font-size: 11px;
+}
+
+.prompt-queue svg,
+.composer-send-menu-toggle svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.queue-toggle .queue-stack-icon {
+  width: 15px;
+  height: 15px;
+  color: #999;
+}
+
+.queue-heading.is-held .queue-stack-icon {
+  color: #b19a6f;
+}
+
+.queue-toggle .queue-chevron {
+  width: 12px;
+  height: 12px;
+  margin-left: 3px;
+  color: #868686;
+}
+
+.queue-expanded {
+  transform: rotate(180deg);
+}
+
+.queue-popover {
+  position: relative;
+  overflow-y: auto;
+  width: var(--queue-panel-width);
+  max-height: min(360px, calc(100dvh - var(--composer-height, 180px) - var(--queue-bottom-offset) - 120px));
+  border: 1px solid #333;
+  border-bottom: 0;
+  border-radius: 16px 16px 0 0;
+  background: var(--queue-tab-background);
+  padding: 9px 12px 10px;
+  overscroll-behavior: contain;
+  outline: none;
+  pointer-events: auto;
+  transition: background-color var(--motion-base) var(--ease-standard);
+}
+
+.queue-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.queue-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 36px;
+  border-radius: 7px;
+  padding: 3px 4px 3px 8px;
+}
+
+.queue-editing > .queue-item {
+  background: #252525;
+}
+
+.queue-number {
+  flex: 0 0 21px;
+  color: #777;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.queue-text {
+  overflow: hidden;
+  min-width: 0;
+  flex: 1;
+  color: #cecece;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queue-images,
+.queue-sending {
+  flex: none;
+  padding: 0 5px;
+  color: #989898;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.queue-icon {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  padding: 0;
+  color: #9b9b9b;
+}
+
+.queue-resume,
+.queue-more-actions button,
+.queue-editor-actions button {
+  flex: none;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  padding: 5px 7px;
+  color: var(--muted-strong);
+  font-size: 11px;
+}
+
+.queue-heading .queue-resume {
+  margin-right: 12px;
+  border: 0;
+  border-left: 1px solid #393939;
+  border-radius: 0;
+  padding: 0 0 0 10px;
+  color: #c2b8d9;
+  white-space: nowrap;
+}
+
+.queue-editor-actions button {
+  border-color: var(--border);
+}
+
+.prompt-queue button:hover:not(:disabled) {
+  background: var(--panel-strong);
+  color: var(--text);
+}
+
+.queue-heading button:hover:not(:disabled) {
+  background: transparent;
+}
+
+.prompt-queue button:disabled,
+.composer-send-menu button:disabled,
+.composer-stop-control:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.prompt-queue button:focus-visible,
+.queue-sent summary:focus-visible,
+.composer-send-menu-toggle:focus-visible,
+.composer-send-menu button:focus-visible,
+.composer-stop-control:focus-visible {
+  outline: 2px solid var(--accent-border);
+  outline-offset: 2px;
+}
+
+.queue-more-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  border-radius: 7px;
+  background: #252525;
+  padding: 4px;
+}
+
+.queue-editor {
+  margin: 5px 8px;
+}
+
+.queue-editor label > span {
+  display: block;
+  margin: 8px 0;
+  color: var(--muted-strong);
+  font-size: 11px;
+}
+
+.composer .queue-editor textarea {
+  min-height: 82px;
+  max-height: 180px;
+  resize: vertical;
+  border: 1px solid #49414f;
+  border-radius: 8px;
+  background: #222;
+  padding: 9px 10px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.composer .queue-editor textarea:focus {
+  border-color: var(--accent-border);
+}
+
+.queue-edit-hint,
+.queue-edit-warning,
+.queue-empty,
+.queue-error {
+  margin: 7px 0;
+  color: #989898;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.queue-edit-warning {
+  color: #c8a15f;
+}
+
+.queue-empty,
+.queue-error {
+  margin-right: 8px;
+  margin-left: 8px;
+}
+
+.queue-error {
+  color: #f87171;
+  overflow-wrap: anywhere;
+}
+
+.queue-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.queue-editor-actions .queue-save {
+  border-color: #66588c;
+  color: #d8d0ff;
+}
+
+.queue-sent {
+  margin: 8px;
+  border-top: 1px solid var(--border-soft);
+  padding-top: 10px;
+}
+
+.queue-sent summary {
+  color: var(--muted-strong);
+  cursor: pointer;
+}
+
+.queue-sent-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.composer-send-actions {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: 2px;
+}
+
+.composer-bar .composer-send-menu-toggle {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 32px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  padding: 0;
+  color: var(--muted);
+}
+
+.composer-bar .composer-send-menu-toggle:hover {
+  background: var(--panel-strong);
+  color: var(--text);
+}
+
+.composer-send-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 1;
+  width: 270px;
+  max-width: calc(100vw - 48px);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  padding: 4px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 24%);
+  outline: none;
+}
+
+.composer-bar .composer-send-menu button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  padding: 9px 10px;
+  color: var(--muted-strong);
+  font-size: 12px;
+  font-weight: 400;
+  text-align: left;
+}
+
+.composer-bar .composer-send-menu button:hover:not(:disabled) {
+  background: var(--panel-strong);
+  color: var(--text);
+}
+
+.composer-send-menu kbd {
+  color: var(--muted);
+  font: inherit;
+  font-size: 10px;
+}
+
+.composer-bar .composer-stop-control {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: 4px;
+  border: 0;
+  border-right: 1px solid #333;
+  border-radius: 0;
+  background: transparent;
+  padding: 4px 10px 4px 0;
+  color: #aaa;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.composer-stop-control svg {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+}
+
+.composer-bar .composer-stop-control:hover:not(:disabled) {
+  color: #eee;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .queue-heading,
+  .queue-popover {
+    transition: none;
+  }
+}
+
+@media (max-width: 640px), (pointer: coarse) {
+  .prompt-queue .queue-icon {
+    flex-basis: 36px;
+    width: 36px;
+    height: 36px;
+  }
+
+  .prompt-queue .queue-toggle,
+  .prompt-queue .queue-resume,
+  .prompt-queue .queue-more-actions button,
+  .prompt-queue .queue-editor-actions button,
+  .composer-bar .composer-send-menu button {
+    min-height: 36px;
+  }
+}
+
+@media (max-width: 640px) {
+  .queue-heading {
+    max-width: calc(100% - 32px);
+    margin-left: 20px;
+  }
+
+  .queue-item {
+    min-height: 39px;
+  }
+
+  .queue-text {
+    overflow-wrap: anywhere;
+    white-space: normal;
+    line-height: 1.45;
+  }
+
+  .composer .queue-editor textarea {
+    font-size: 16px;
+  }
 }
 
 textarea {
