@@ -64,7 +64,7 @@ function scheduleRender() {
 function renderMarkdown() {
   renderTimer = 0
   if (!pendingBlock) return
-  renderedHtml.value = renderedBlock(pendingBlock)
+  renderedHtml.value = renderedBlock(pendingBlock, { streaming: props.streaming })
   pendingBlock = undefined
   lastRenderedAt = performance.now()
 }

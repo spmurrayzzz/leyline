@@ -17,7 +17,8 @@ import {
 
 const hljs = loadHighlightJs()
 const markdown = createMarkdown()
-const previewMarkdown = createMarkdown(true)
+const streamingMarkdown = createMarkdown({ autoDetect: false })
+const previewMarkdown = createMarkdown({ preview: true })
 previewMarkdown.renderer.rules.image = renderPreviewImage
 previewMarkdown.renderer.rules.heading_open = renderPreviewHeading
 
@@ -39,8 +40,9 @@ export function renderedText(text) {
   return markdown.render(text || '')
 }
 
-export function renderedBlock(block) {
-  return markdown.render(block.text || '')
+export function renderedBlock(block, { streaming = false } = {}) {
+  const renderer = streaming ? streamingMarkdown : markdown
+  return renderer.render(block.text || '')
 }
 
 export function renderedMarkdownPreview(preview) {
@@ -65,12 +67,12 @@ export function renderedToolJson(entry) {
   }
 }
 
-function createMarkdown(preview = false) {
+function createMarkdown({ preview = false, autoDetect = true } = {}) {
   const markdown = new MarkdownIt({
     html: false,
     linkify: true,
     breaks: true,
-    highlight: highlightCode,
+    highlight: (source, language) => highlightCode(source, language, autoDetect),
   })
   configureMarkdownLinks(markdown, { preview })
   return markdown
@@ -90,7 +92,7 @@ function renderPreviewHeading(tokens, index, options, env, renderer) {
   return renderer.renderToken(tokens, index, options)
 }
 
-function highlightCode(source, language) {
+function highlightCode(source, language, autoDetect) {
   const lang = normalizeLanguage(language)
   if (hljs && lang && hljs.getLanguage(lang)) {
     try {
@@ -101,7 +103,7 @@ function highlightCode(source, language) {
     } catch {}
   }
 
-  if (hljs && !lang) {
+  if (hljs && !lang && autoDetect) {
     try {
       return hljs.highlightAuto(source).value
     } catch {}
