@@ -356,8 +356,9 @@ export function useSessionWorkspace({
 
   async function createSessionForCwd(cwd, options = {}) {
     const targetCwd = cwd?.trim() || ''
-    if (!targetCwd) return
+    if (!targetCwd || creatingSessionCwd.value) return
 
+    const selectionToken = sessionSelectionToken
     creatingSessionCwd.value = targetCwd
     sessionError.value = ''
 
@@ -378,6 +379,7 @@ export function useSessionWorkspace({
         data.detail.session,
         ...sessions.value.filter((session) => session.id !== data.detail.session.id),
       ]
+      if (selectionToken !== sessionSelectionToken) return
       setSelectedSessionData(data.detail, data.active, {
         replaceRoute: options.replaceRoute,
       })
@@ -385,8 +387,9 @@ export function useSessionWorkspace({
       await scrollToLatest?.()
       if (handoff) await finishSessionHandoffFloor(handoff)
       await reconnectTerminalIfOpen()
+      return data.detail.session
     } catch (error) {
-      sessionError.value = error.message
+      if (selectionToken === sessionSelectionToken) sessionError.value = error.message
     } finally {
       creatingSessionCwd.value = ''
       if (handoff) finishSessionHandoff(handoff)
@@ -1409,14 +1412,9 @@ export function useSessionWorkspace({
     startupRun.value = { ...startupRun.value, phase }
   }
 
-  async function runStartupPhase(phase, task) {
+  function runStartupPhase(phase, task) {
     setStartupPhase(phase)
-    const started = Date.now()
-    const result = await task()
-    const elapsed = Date.now() - started
-    const remaining = Math.max(0, 650 - elapsed)
-    if (remaining) await wait(remaining)
-    return result
+    return task()
   }
 
   function finishStartupRun() {

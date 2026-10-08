@@ -34,7 +34,7 @@
   --ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
   --ease-accelerate: cubic-bezier(0.4, 0, 1, 1);
-  --ease-dock: cubic-bezier(0.12, 0.82, 0.16, 1);
+  --ease-dock: cubic-bezier(0.22, 1, 0.36, 1);
   --sk-base: #1c1c1e;
   --sk-highlight: rgb(255 255 255 / 0.06);
   --sk-duration: 1.3s;

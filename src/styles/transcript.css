@@ -326,12 +326,12 @@
 .in-project-new-session-transition .workbench > .message,
 .in-project-new-session-transition .workbench > .tool-card,
 .in-project-new-session-transition .workbench > .live-stack {
-  animation: session-content-enter 560ms var(--ease-emphasized) both;
+  animation: session-content-enter 640ms var(--ease-dock) both;
 }
 
 .new-session-transition:not(.start-state)
   .workbench > .empty-session-panel {
-  animation: session-centered-content-enter 560ms var(--ease-emphasized) both;
+  animation: session-centered-content-enter 640ms var(--ease-dock) both;
 }
 
 .session-handoff-workbench > .message,
@@ -921,7 +921,7 @@
 }
 
 .in-project-init-panel.is-settling {
-  animation: loading-panel-exit 240ms var(--ease-accelerate) both;
+  animation: loading-panel-exit 420ms var(--ease-standard) both;
 }
 
 .activity-scanning-composer {

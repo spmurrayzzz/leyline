@@ -2,6 +2,8 @@
   bottom: var(--terminal-drawer-height);
 }
 
+.terminal-open .composer-frame:not(.is-home):not(.is-empty),
+.terminal-open .composer-dock-anchor,
 .terminal-open .composer {
   bottom: calc(var(--terminal-drawer-height) + 22px);
 }

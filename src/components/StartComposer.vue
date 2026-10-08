@@ -192,7 +192,11 @@ function updateDraft(event) {
   emit('show-slash-picker')
 }
 
-defineExpose({ form })
+function focus() {
+  if (!inputDisabled.value) textarea.value?.focus()
+}
+
+defineExpose({ form, focus })
 </script>
 
 <template>

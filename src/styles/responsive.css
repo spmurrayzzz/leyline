@@ -83,6 +83,8 @@
   .tool-fullscreen-header button,
   .start-composer,
   .composer,
+  .composer-frame,
+  .composer-layer,
   .jump-latest-button,
   .shell-prompt-glyph,
   .shell-glyph-enter-active,
@@ -124,6 +126,11 @@
   .tool-expand-inner,
   .review-pane:not(.open) {
     transition-delay: 0s;
+  }
+
+  .composer-frame.from-home > .start-composer-layer:not(.is-active),
+  .composer-frame.from-home > .session-composer-layer.is-active {
+    transition: none;
   }
 
   .message-enter,
@@ -600,23 +607,24 @@
     top: 86px;
   }
 
-  .startup-composer-docking .start-composer {
+  .composer-frame,
+  .composer-dock-anchor {
     bottom: 10px;
-    width: calc(100vw - 20px);
+    left: 50%;
+    width: calc(100% - 20px);
   }
 
-  .in-project-composer-docking .composer.empty-session-composer {
-    top: calc(100% - var(--composer-height) - 10px);
-    bottom: auto;
-    width: calc(100vw - 20px);
-    max-width: none;
+  .composer-frame {
+    border-radius: 18px;
   }
 
-  .terminal-open.in-project-composer-docking
-    .composer.empty-session-composer {
-    top: calc(
-      100% - var(--terminal-drawer-height) - var(--composer-height) - 10px
-    );
+  .composer-frame.is-empty {
+    max-width: calc(100% - 24px);
+  }
+
+  .terminal-open .composer-frame:not(.is-home):not(.is-empty),
+  .terminal-open .composer-dock-anchor {
+    bottom: calc(var(--terminal-drawer-height) + 10px);
   }
 
   .composer {
@@ -857,22 +865,23 @@
     width: min(var(--content-max), calc(100vw - 64px));
   }
 
-  .startup-composer-docking .start-composer {
+  .composer-frame,
+  .composer-dock-anchor {
     bottom: 22px;
-    width: var(--docked-composer-width);
+    width: calc(100% - 64px);
   }
 
-  .in-project-composer-docking .composer.empty-session-composer {
-    top: calc(100% - var(--composer-height) - 22px);
-    width: var(--docked-composer-width);
-    max-width: calc(100% - 48px);
+  .composer-frame {
+    border-radius: 24px;
   }
 
-  .terminal-open.in-project-composer-docking
-    .composer.empty-session-composer {
-    top: calc(
-      100% - var(--terminal-drawer-height) - var(--composer-height) - 22px
-    );
+  .composer-frame.is-empty {
+    max-width: calc(100% - 64px);
+  }
+
+  .terminal-open .composer-frame:not(.is-home):not(.is-empty),
+  .terminal-open .composer-dock-anchor {
+    bottom: calc(var(--terminal-drawer-height) + 22px);
   }
 
   .composer {

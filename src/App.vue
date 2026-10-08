@@ -20,13 +20,14 @@ const ReviewPane = defineAsyncComponent(() => import('./components/ReviewPane.vu
 const ResearchCitationPreview = defineAsyncComponent(() => import('./components/ResearchCitationPreview.vue'))
 const ResearchSourcesPane = defineAsyncComponent(() => import('./components/ResearchSourcesPane.vue'))
 const MemoryInspector = defineAsyncComponent(() => import('./components/MemoryInspector.vue'))
-const SessionComposer = defineAsyncComponent(() => import('./components/SessionComposer.vue'))
 const SubagentConfigDrawer = defineAsyncComponent(() => import('./components/SubagentConfigDrawer.vue'))
 const VisionConfigDrawer = defineAsyncComponent(() => import('./components/VisionConfigDrawer.vue'))
 import ExtensionConfirmations from './components/ExtensionConfirmations.vue'
 import StartComposer from './components/StartComposer.vue'
+import SessionComposer from './components/SessionComposer.vue'
 import SessionSidebar from './components/SessionSidebar.vue'
 import { useBackendConnections } from './composables/useBackendConnections'
+import { useComposerMotion } from './composables/useComposerMotion'
 import { useFileLinks } from './composables/useFileLinks'
 import { useLiveTurnProjection } from './composables/useLiveTurnProjection'
 import { useMemoryInspector } from './composables/useMemoryInspector'
@@ -138,9 +139,10 @@ const animatingEntryIds = ref(new Set())
 const composerRef = ref(null)
 const confirmationPanelHeight = ref(0)
 const startComposerRef = ref(null)
-const startupComposerDockLeft = ref('50%')
-const startupComposerDockX = ref('0px')
-const startupComposerDockY = ref('0px')
+const composerFrameRef = ref(null)
+const startComposerAnchor = ref(null)
+const composerDockAnchor = ref(null)
+const startupDraftSnapshot = ref(null)
 const modelPickerOpen = ref(false)
 const thinkingPickerOpen = ref(false)
 const toolsPickerOpen = ref(false)
@@ -149,14 +151,6 @@ const slashPickerDismissed = ref(false)
 const promptError = ref('')
 const composerScannerSettling = ref(false)
 const composerCommitPulse = ref(false)
-const newSessionSettling = ref(false)
-const startupComposerDocking = ref(false)
-const startupRevealHold = ref(false)
-const startupRevealSettling = ref(false)
-const startupRevealCwd = ref('')
-const inProjectNewSessionRun = ref(false)
-const inProjectComposerDocking = ref(false)
-const inProjectNewSessionSettling = ref(false)
 const vFocusSelect = {
   mounted(el) {
     requestAnimationFrame(() => {
@@ -273,8 +267,6 @@ const {
   terminalDrawerHeight,
   disposeTerminalResize,
 } = useTerminal()
-const startupAcceptedFloorMs = 420
-const inProjectNewSessionFloorMs = 1240
 const initPhaseFloorMs = 340
 
 const selectedSessionExportUrl = computed(() => {
@@ -298,12 +290,6 @@ const pendingInitialSessionPath = ref('')
 const requiredInitialBackendConnectionId = ref('')
 let composerScannerSettlingTimer = null
 let composerCommitTimer = null
-let startupDockTimer = null
-let startupRevealTimer = null
-let newSessionSettlingTimer = null
-let inProjectDockTimer = null
-let inProjectSettlingTimer = null
-let inProjectNewSessionStartedAt = 0
 const workbenchScroll = useWorkbenchScroll({ workbench, composerRef })
 const {
   composerHeight,
@@ -444,6 +430,50 @@ const {
   visibleProjects,
 } = sessionWorkspace
 workbenchScroll.bind({ selectedSessionId, liveItems })
+const homeComposerVisible = computed(() => !initializing.value && Boolean(
+  startupRun.value || (!selectedSession.value && !sessionLoading.value && !sessionSwitching.value),
+))
+const composerMotion = useComposerMotion({
+  frame: composerFrameRef,
+  homeAnchor: startComposerAnchor,
+  dockAnchor: composerDockAnchor,
+  startComposer: startComposerRef,
+  sessionComposer: composerRef,
+  workbench,
+  homeVisible: homeComposerVisible,
+  isSessionVisible: () => !homeComposerVisible.value || extensionConfirmations.value.length > 0,
+  onReveal(kind) {
+    if (kind !== 'home') return
+    finishStartupRun()
+    const activeElement = document.activeElement
+    if (activeElement === document.body || startComposerRef.value?.form?.contains(activeElement)) {
+      refocusComposer()
+    }
+  },
+  onFinish() {
+    startupDraftSnapshot.value = null
+  },
+})
+const {
+  state: composerMotionState,
+  style: composerFrameStyle,
+  homeHeight: homeComposerHeight,
+  coverVisible: composerCoverVisible,
+} = composerMotion
+const startComposerDraft = computed({
+  get: () => startupDraftSnapshot.value?.text ?? draft.value,
+  set: (value) => { if (!startupDraftSnapshot.value) draft.value = value },
+})
+const startupComposerDocking = computed(() => composerMotionState.value?.kind === 'home'
+  && composerMotionState.value.phase !== 'lead')
+const startupRevealHold = computed(() => composerMotionState.value?.kind === 'home'
+  && composerMotionState.value.phase === 'revealing' && composerCoverVisible.value)
+const startupRevealSettling = computed(() => composerMotionState.value?.kind === 'home'
+  && composerMotionState.value.phase === 'revealing')
+const inProjectNewSessionRun = computed(() => composerMotionState.value?.kind === 'session'
+  && composerMotionState.value.phase !== 'revealing')
+const inProjectNewSessionSettling = computed(() => composerMotionState.value?.kind === 'session'
+  && composerMotionState.value.phase === 'revealing')
 const selectedResearch = computed(() => {
   return activeRuntimeSession.value?.state?.research
     || selectedSession.value?.research
@@ -907,7 +937,7 @@ const backendUnavailable = computed(() => {
 })
 const newSessionTransitionActive = computed(() => {
   return Boolean(
-    startupShellVisible.value || newSessionSettling.value,
+    startupShellVisible.value || startupRevealSettling.value,
   )
 })
 const inProjectTransitionActive = computed(() => {
@@ -963,6 +993,15 @@ const slashCommandItems = computed(() => {
     .slice(0, 8)
 })
 
+watch(startupRun, (run) => {
+  if (!run && composerMotionState.value?.kind === 'home'
+    && composerMotionState.value.phase !== 'revealing') cancelComposerMotion()
+})
+
+watch(sessionLoading, (loading) => {
+  if (loading) cancelComposerMotion()
+})
+
 watch(newSessionCwd, (cwd) => {
   loadStartRuntimeState(cwd)
 })
@@ -998,7 +1037,11 @@ watch(settingsCwd, (cwd, previousCwd) => {
   reviewOpenRequested.value = reopen && !!cwd
 })
 
-watch(selectedSessionId, (sessionId) => {
+watch(selectedSessionId, (sessionId, previousSessionId) => {
+  if (sessionId !== previousSessionId && composerMotionState.value
+    && (composerMotionState.value.kind === 'session' || previousSessionId)) {
+    cancelComposerMotion()
+  }
   setEventSessionId(sessionId)
   emptySessionKind.value = 'session'
   if (!selectedSessionId.value) {
@@ -1094,11 +1137,6 @@ onUnmounted(() => {
   cancelAnimationFrame(sessionHydrationFrame)
   clearTimeout(composerScannerSettlingTimer)
   clearTimeout(composerCommitTimer)
-  clearTimeout(startupDockTimer)
-  clearTimeout(startupRevealTimer)
-  clearTimeout(newSessionSettlingTimer)
-  clearTimeout(inProjectDockTimer)
-  clearTimeout(inProjectSettlingTimer)
   clearTimeout(reviewCloseTimer)
   clearTimeout(reviewExpansionTimer)
 })
@@ -1267,10 +1305,11 @@ async function createSession(project, options = {}) {
 }
 
 async function createSessionForCwd(cwd, options = {}) {
-  await workspaceCreateSessionForCwd(cwd, options)
+  const session = await workspaceCreateSessionForCwd(cwd, options)
   projectBrowserOpen.value = false
   projectDetailCwd.value = ''
   sidebarOpen.value = false
+  return session
 }
 
 async function selectSession(session, options) {
@@ -2247,8 +2286,9 @@ function trimNumber(value) {
 }
 
 function retryComposerFocus(attempt = 0) {
-  if (composerRef.value) {
-    composerRef.value.focus()
+  const composer = homeComposerVisible.value ? startComposerRef.value : composerRef.value
+  if (composer) {
+    composer.focus()
     return
   }
   if (attempt < 40) setTimeout(() => retryComposerFocus(attempt + 1), 50)
@@ -2276,43 +2316,11 @@ async function requestResearchReportRepair() {
   await submitDraft()
 }
 
-function beginInProjectNewSessionRun() {
-  clearTimeout(inProjectDockTimer)
-  clearTimeout(inProjectSettlingTimer)
-  inProjectNewSessionSettling.value = false
-  inProjectNewSessionStartedAt = Date.now()
-  inProjectNewSessionRun.value = true
-  inProjectComposerDocking.value = false
-  inProjectDockTimer = window.setTimeout(() => {
-    inProjectComposerDocking.value = true
-  }, 320)
-}
-
-async function finishInProjectNewSessionRun() {
-  if (!inProjectNewSessionRun.value) return
-
-  clearTimeout(inProjectDockTimer)
-  inProjectComposerDocking.value = true
-
-  const elapsed = Date.now() - inProjectNewSessionStartedAt
-  const remaining = Math.max(0, inProjectNewSessionFloorMs - elapsed)
-  if (remaining) await wait(remaining)
-
-  inProjectNewSessionSettling.value = true
-  inProjectNewSessionRun.value = false
-  inProjectComposerDocking.value = false
-  clearTimeout(inProjectSettlingTimer)
-  inProjectSettlingTimer = window.setTimeout(() => {
-    inProjectNewSessionSettling.value = false
-  }, 720)
-}
-
-function cancelInProjectNewSessionRun() {
-  clearTimeout(inProjectDockTimer)
-  clearTimeout(inProjectSettlingTimer)
-  inProjectNewSessionRun.value = false
-  inProjectComposerDocking.value = false
-  inProjectNewSessionSettling.value = false
+function cancelComposerMotion() {
+  const fromHome = composerMotionState.value?.kind === 'home'
+  composerMotion.cancel()
+  startupDraftSnapshot.value = null
+  if (fromHome) finishStartupRun()
 }
 
 function pulseComposerCommit() {
@@ -2555,8 +2563,8 @@ async function submitDraft(streamingBehavior) {
   } else {
     reconcileCurrentDetail()
   }
-  if (startsEmptySession) beginInProjectNewSessionRun()
-  pulseComposerCommit()
+  const motionToken = startsEmptySession ? composerMotion.begin('session') : null
+  if (!startsEmptySession && !startupRun.value) pulseComposerCommit()
   const localEntry = beginUserTurn(text, images)
   const submittedDraft = draft.value
   promptSubmitting.value = true
@@ -2623,9 +2631,9 @@ async function submitDraft(streamingBehavior) {
       }
     }
   } finally {
-    if (startsEmptySession) {
-      if (promptAccepted) await finishInProjectNewSessionRun()
-      else cancelInProjectNewSessionRun()
+    if (composerMotion.isCurrent(motionToken)) {
+      if (promptAccepted) composerMotion.ready(motionToken)
+      else cancelComposerMotion()
     }
     promptSubmitting.value = false
     refocusComposer()
@@ -3117,22 +3125,6 @@ function handleStartComposerKeydown(event) {
   submitStartDraft()
 }
 
-function measureStartupComposerDock() {
-  const form = startComposerRef.value?.form
-  const pane = form?.closest('.main-pane')
-  if (!form || !pane) return
-
-  const formRect = form.getBoundingClientRect()
-  const paneRect = pane.getBoundingClientRect()
-  const bottom = window.matchMedia('(max-width: 760px)').matches ? 10 : 22
-  const dockLeft = paneRect.left + paneRect.width / 2
-  const dockTop = paneRect.bottom - bottom - formRect.height
-  startupComposerDockLeft.value = `${dockLeft}px`
-  startupComposerDockX.value = `${formRect.left
-    - (dockLeft - formRect.width / 2)}px`
-  startupComposerDockY.value = `${formRect.top - dockTop}px`
-}
-
 async function submitStartDraft() {
   const text = draft.value.trim()
   const model = startSelectedModel.value
@@ -3145,61 +3137,48 @@ async function submitStartDraft() {
       || hasPendingComposerPastes(sourceDraftKey),
   )
   const kind = text.startsWith('!') ? 'session' : startSessionKind.value
-  if (!targetCwd || creatingSessionCwd.value) return
+  if (!targetCwd || creatingSessionCwd.value || startupRun.value) return
 
-  clearTimeout(startupDockTimer)
-  startupComposerDocking.value = false
-  if (hasPrompt) measureStartupComposerDock()
+  closePickerMenus()
+  const animatePrompt = hasPrompt && (!isHandledSlashCommand(text) || slashCommandStartsTurn(text))
+  startupDraftSnapshot.value = animatePrompt ? {
+    ...currentComposerDraft(),
+    cwd: targetCwd,
+    modelLabel: currentModelLabel.value,
+    thinkingLabel: currentThinkingLabel.value,
+  } : null
+  const motionToken = animatePrompt ? composerMotion.begin('home') : null
   beginStartupRun(targetCwd, { hasPrompt, model, thinkingLevel })
-  if (hasPrompt) {
-    startupDockTimer = window.setTimeout(() => {
-      startupComposerDocking.value = true
-    }, 320)
-  }
+  let session
 
   try {
-    await wait(startupAcceptedFloorMs)
-    await runStartupPhase('creating', () => {
-      return createSessionForCwd(targetCwd, { kind })
-    })
-    if (selectedSession.value && hasPrompt) {
-      const targetDraftKey = moveComposerDraft(
-        sourceDraftKey,
-        selectedSession.value.id,
-      )
+    session = await runStartupPhase('creating', () => createSessionForCwd(targetCwd, { kind }))
+    const isCurrent = () => session?.id === selectedSessionId.value
+      && (!motionToken || composerMotion.isCurrent(motionToken))
+    if (!session || !isCurrent()) return
+    if (hasPrompt) {
+      const targetDraftKey = moveComposerDraft(sourceDraftKey, session.id)
       await settleComposerPastes(targetDraftKey)
+      if (!isCurrent()) return
     }
-    if (selectedSession.value) startSessionKind.value = 'session'
-    if (model && selectedSession.value) {
+    startSessionKind.value = 'session'
+    if (model) {
       await runStartupPhase('model', () => selectWorkspaceModel(model))
+      if (!isCurrent() || sessionError.value) return
     }
-    if (thinkingLevel && selectedSession.value) {
-      await runStartupPhase('thinking', () => {
-        return selectWorkspaceThinkingLevel(thinkingLevel)
-      })
+    if (thinkingLevel) {
+      await runStartupPhase('thinking', () => selectWorkspaceThinkingLevel(thinkingLevel))
+      if (!isCurrent() || sessionError.value) return
     }
     if (hasPrompt) await runStartupPhase('submitting', submitDraft)
   } finally {
-    await wait(260)
-    clearTimeout(startupDockTimer)
-    clearTimeout(startupRevealTimer)
-    const shouldRevealSession = Boolean(selectedSession.value)
-    startupRevealHold.value = shouldRevealSession && hasPrompt
-    startupRevealSettling.value = shouldRevealSession && hasPrompt
-    startupRevealCwd.value = targetCwd
-    newSessionSettling.value = true
-    finishStartupRun()
-    startupComposerDocking.value = shouldRevealSession && hasPrompt
-    startupRevealTimer = window.setTimeout(() => {
-      startupRevealHold.value = false
-      startupRevealCwd.value = ''
-      startupComposerDocking.value = false
-    }, 180)
-    clearTimeout(newSessionSettlingTimer)
-    newSessionSettlingTimer = window.setTimeout(() => {
-      newSessionSettling.value = false
-      startupRevealSettling.value = false
-    }, 720)
+    if (!motionToken) finishStartupRun()
+    else if (composerMotion.isCurrent(motionToken)) {
+      if (session?.id === selectedSessionId.value && !isEmptySelectedSession.value
+        && !sessionError.value && !promptError.value) {
+        composerMotion.ready(motionToken)
+      } else cancelComposerMotion()
+    }
   }
 }
 
@@ -3347,7 +3326,6 @@ function closePickerMenus() {
       'startup-reveal-hold': startupRevealHold,
       'startup-reveal-settling': startupRevealSettling,
       'in-project-new-session-transition': inProjectTransitionActive,
-      'in-project-composer-docking': inProjectComposerDocking,
       'session-handoff': sessionHandoff,
       'terminal-open': terminalOpen,
       'event-log-open': eventLogOpen,
@@ -3367,9 +3345,6 @@ function closePickerMenus() {
       '--composer-reserved-height': confirmationPanelHeight
         ? `calc(${composerReservedHeight} + ${confirmationPanelHeight + 12}px)`
         : composerReservedHeight,
-      '--startup-composer-dock-left': startupComposerDockLeft,
-      '--startup-composer-dock-x': startupComposerDockX,
-      '--startup-composer-dock-y': startupComposerDockY,
       '--terminal-drawer-height': `${terminalDrawerHeight}px`,
       '--review-pane-width': `${reviewPaneWidth}px`,
       '--research-pane-width': '340px',
@@ -3856,58 +3831,11 @@ function closePickerMenus() {
               <div class="skeleton-line short"></div>
             </div>
           </div>
-          <StartComposer
-            ref="startComposerRef"
-            v-model:draft="draft"
-            :class="{ 'activity-scanning-composer': startupShellVisible }"
-            v-model:start-project-query="startProjectQuery"
-            :attached-images="attachedImages"
-            :available-models="availableModels"
-            :available-thinking-levels="availableThinkingLevels"
-            :chips="composerChips"
-            :creating-session-cwd="creatingSessionCwd
-              || startupRun?.cwd
-              || startupRevealCwd
-              || ''"
-            :current-model-label="currentModelLabel"
-            :current-thinking-label="currentThinkingLabel"
-            :image-support-warning="imageSupportWarning"
-            :vision-delegation-notice="visionDelegationNotice"
-            :model-key="modelKey"
-            :model-picker-open="modelPickerOpen"
-            :research-enabled="researchEnabled"
-            :session-kind="startSessionKind"
-            :new-session-cwd="newSessionCwd"
-            :selected-model-key="selectedModelKey"
-            :slash-active-index="slashActiveIndex"
-            :slash-command-items="slashCommandItems"
-            :slash-command-source-label="slashCommandSourceLabel"
-            :slash-picker-open="slashPickerOpen"
-            :start-project-label="startProjectLabel"
-            :start-project-options="startProjectOptions"
-            :start-project-picker-open="startProjectPickerOpen"
-            :switching-model="switchingModel"
-            :switching-thinking="switchingThinking"
-            :thinking-level="composerRuntime?.state?.thinkingLevel"
-            :thinking-picker-open="thinkingPickerOpen"
-            :tool-names="activeToolNames"
-            :tools-chip-label="toolsChipLabel"
-            :tools-picker-open="toolsPickerOpen"
-            @keydown="handleStartComposerKeydown"
-            @open-image="openImageFullscreen"
-            @open-project-browser="openProjectBrowser"
-            @paste="handleComposerPaste"
-            @remove-image="removeAttachedImage"
-            @select-model="selectModel"
-            @select-project="selectStartProjectTarget"
-            @select-slash-command="selectSlashCommand"
-            @select-thinking="selectThinkingLevel"
-            @show-slash-picker="showSlashPicker"
-            @submit="submitStartDraft"
-            @toggle-picker="togglePicker"
-            @toggle-session-kind="toggleStartSessionKind"
-            @toggle-project-picker="startProjectPickerOpen = !startProjectPickerOpen"
-          />
+          <div
+            ref="startComposerAnchor"
+            class="start-composer-anchor"
+            :style="{ height: `${homeComposerHeight}px` }"
+          ></div>
         </div>
         <div
           v-if="emptySessionShellVisible && !startupRun"
@@ -4138,81 +4066,165 @@ function closePickerMenus() {
         @resize="confirmationPanelHeight = $event"
       />
 
-      <SessionComposer
-        v-if="selectedSession
-          && !initializing
-          && (!startupRun || extensionConfirmations.length)"
-        ref="composerRef"
-        v-model:draft="draft"
-        :agent-running="agentRunning"
-        :attached-images="attachedImages"
-        :compacting="compactingContext"
-        :available-models="availableModels"
-        :available-thinking-levels="availableThinkingLevels"
-        :can-submit-draft="canSubmitDraft"
-        :chips="composerChips"
-        :current-mobile-model-label="currentMobileModelLabel"
-        :current-mobile-thinking-label="currentMobileThinkingLabel"
-        :current-model-label="currentModelLabel"
-        :current-thinking-label="currentThinkingLabel"
-        :context-usage-label="contextUsageLabel"
-        :context-usage-level="contextUsageLevel"
-        :context-usage-percent="contextUsagePercent"
-        :context-usage-title="contextUsageTitle"
-        :editing-label="editingLabel"
-        :error="promptError || eventStreamError || imageSupportWarning"
-        :vision-delegation-notice="visionDelegationNotice"
-        :interrupting="interrupting"
+      <div ref="composerDockAnchor" class="composer-dock-anchor" aria-hidden="true"></div>
+      <div
+        ref="composerFrameRef"
+        v-show="!initializing && (selectedSession || homeComposerVisible)
+          && (!sessionError || selectedSession)"
+        class="composer-frame"
         :class="{
-          'empty-session-composer': emptySessionShellVisible,
-          'session-handoff-composer': sessionHandoff,
-          'activity-scanning-composer': composerScannerVisible,
-          'activity-scanner-settling': composerScannerSettling,
-          'composer-committing': composerCommitPulse,
+          'is-home': homeComposerVisible,
+          'is-positioned': !homeComposerVisible || !!composerFrameStyle.left,
+          'is-empty': emptySessionShellVisible && !homeComposerVisible,
+          'is-moving': composerMotionState,
+          'from-home': composerMotionState?.kind === 'home',
           'is-switching': sessionLoading || sessionSwitching,
+          'is-handoff': sessionHandoff,
+          'composer-committing': composerCommitPulse,
+          'shell-mode-composer': shellModeDraft,
+          'hidden-shell-mode-composer': draft.trimStart().startsWith('!!'),
+          'research-mode-composer': homeComposerVisible
+            ? startSessionKind === 'research'
+            : composerResearchMode,
         }"
-        :model-key="modelKey"
-        :model-picker-open="modelPickerOpen"
-        :placeholder="composerPlaceholder"
-        :prompt-submitting="promptSubmitting"
-        :reloading-session="reloadingSession || sessionActivating"
-        :research="composerResearchMode"
-        :research-toggle-enabled="canToggleEmptySessionResearch"
-        :queued-messages="queuedMessages"
-        :session-id="selectedSessionId"
-        :prompt-queue="promptQueue"
-        :queue-edit-drafts="queueEditDrafts"
-        :selected-model-key="selectedModelKey"
-        :send-button-label="sendButtonLabel"
-        :slash-active-index="slashActiveIndex"
-        :slash-command-items="slashCommandItems"
-        :slash-command-source-label="slashCommandSourceLabel"
-        :slash-picker-open="slashPickerOpen"
-        :switching-model="switchingModel"
-        :switching-thinking="switchingThinking"
-        :terminal-open="terminalOpen"
-        :terminal-status="terminalStatus"
-        :thinking-level="composerRuntime?.state?.thinkingLevel"
-        :thinking-picker-open="thinkingPickerOpen"
-        :tool-names="activeToolNames"
-        :tools-chip-label="toolsChipLabel"
-        :tools-picker-open="toolsPickerOpen"
-        @cancel-edit="cancelEditingEntry"
-        @interrupt="interruptAgent"
-        @keydown="handleComposerKeydown"
-        @open-image="openImageFullscreen"
-        @paste="handleComposerPaste"
-        @queue-snapshot="applyQueueSnapshot"
-        @remove-image="removeAttachedImage"
-        @select-model="selectModel"
-        @select-slash-command="selectSlashCommand"
-        @select-thinking="selectThinkingLevel"
-        @show-slash-picker="showSlashPicker"
-        @submit="submitDraft"
-        @toggle-picker="togglePicker"
-        @toggle-research="toggleEmptySessionKind"
-        @toggle-terminal="toggleTerminal(selectedSessionId)"
-      />
+        :style="composerFrameStyle"
+      >
+        <div
+          class="composer-layer start-composer-layer"
+          :class="{ 'is-active': homeComposerVisible && !extensionConfirmations.length }"
+          :inert="!!composerMotionState || !homeComposerVisible || !!extensionConfirmations.length"
+        >
+          <StartComposer
+            v-if="homeComposerVisible || composerMotionState?.kind === 'home'"
+            ref="startComposerRef"
+            v-model:draft="startComposerDraft"
+            :class="{ 'activity-scanning-composer': startupShellVisible }"
+            v-model:start-project-query="startProjectQuery"
+            :attached-images="startupDraftSnapshot?.images || attachedImages"
+            :available-models="availableModels"
+            :available-thinking-levels="availableThinkingLevels"
+            :chips="composerChips"
+            :creating-session-cwd="creatingSessionCwd || startupRun?.cwd || startupDraftSnapshot?.cwd || ''"
+            :current-model-label="startupDraftSnapshot?.modelLabel || currentModelLabel"
+            :current-thinking-label="startupDraftSnapshot?.thinkingLabel || currentThinkingLabel"
+            :image-support-warning="imageSupportWarning"
+            :vision-delegation-notice="visionDelegationNotice"
+            :model-key="modelKey"
+            :model-picker-open="modelPickerOpen"
+            :research-enabled="researchEnabled"
+            :session-kind="startSessionKind"
+            :new-session-cwd="newSessionCwd"
+            :selected-model-key="selectedModelKey"
+            :slash-active-index="slashActiveIndex"
+            :slash-command-items="slashCommandItems"
+            :slash-command-source-label="slashCommandSourceLabel"
+            :slash-picker-open="slashPickerOpen"
+            :start-project-label="startupDraftSnapshot?.cwd
+              ? projectName(startupDraftSnapshot.cwd)
+              : startProjectLabel"
+            :start-project-options="startProjectOptions"
+            :start-project-picker-open="startProjectPickerOpen"
+            :switching-model="switchingModel"
+            :switching-thinking="switchingThinking"
+            :thinking-level="composerRuntime?.state?.thinkingLevel"
+            :thinking-picker-open="thinkingPickerOpen"
+            :tool-names="activeToolNames"
+            :tools-chip-label="toolsChipLabel"
+            :tools-picker-open="toolsPickerOpen"
+            @keydown="handleStartComposerKeydown"
+            @open-image="openImageFullscreen"
+            @open-project-browser="openProjectBrowser"
+            @paste="handleComposerPaste"
+            @remove-image="removeAttachedImage"
+            @select-model="selectModel"
+            @select-project="selectStartProjectTarget"
+            @select-slash-command="selectSlashCommand"
+            @select-thinking="selectThinkingLevel"
+            @show-slash-picker="showSlashPicker"
+            @submit="submitStartDraft"
+            @toggle-picker="togglePicker"
+            @toggle-session-kind="toggleStartSessionKind"
+            @toggle-project-picker="startProjectPickerOpen = !startProjectPickerOpen"
+          />
+        </div>
+        <div
+          class="composer-layer session-composer-layer"
+          :class="{ 'is-active': !homeComposerVisible || extensionConfirmations.length }"
+          :inert="homeComposerVisible && !extensionConfirmations.length"
+        >
+          <SessionComposer
+            v-if="!initializing && (selectedSession || composerMotionState?.kind === 'home')"
+            ref="composerRef"
+            v-model:draft="draft"
+            :agent-running="agentRunning"
+            :attached-images="attachedImages"
+            :compacting="compactingContext"
+            :available-models="availableModels"
+            :available-thinking-levels="availableThinkingLevels"
+            :can-submit-draft="canSubmitDraft"
+            :chips="composerChips"
+            :current-mobile-model-label="currentMobileModelLabel"
+            :current-mobile-thinking-label="currentMobileThinkingLabel"
+            :current-model-label="currentModelLabel"
+            :current-thinking-label="currentThinkingLabel"
+            :context-usage-label="contextUsageLabel"
+            :context-usage-level="contextUsageLevel"
+            :context-usage-percent="contextUsagePercent"
+            :context-usage-title="contextUsageTitle"
+            :editing-label="editingLabel"
+            :error="promptError || eventStreamError || imageSupportWarning"
+            :vision-delegation-notice="visionDelegationNotice"
+            :interrupting="interrupting"
+            :class="{
+              'empty-session-composer': emptySessionShellVisible,
+              'activity-scanning-composer': composerScannerVisible,
+              'activity-scanner-settling': composerScannerSettling,
+              'composer-committing': composerCommitPulse,
+            }"
+            :model-key="modelKey"
+            :model-picker-open="modelPickerOpen"
+            :placeholder="composerPlaceholder"
+            :prompt-submitting="promptSubmitting"
+            :reloading-session="reloadingSession || sessionActivating"
+            :research="composerResearchMode"
+            :research-toggle-enabled="canToggleEmptySessionResearch"
+            :queued-messages="queuedMessages"
+            :session-id="selectedSessionId"
+            :prompt-queue="promptQueue"
+            :queue-edit-drafts="queueEditDrafts"
+            :selected-model-key="selectedModelKey"
+            :send-button-label="sendButtonLabel"
+            :slash-active-index="slashActiveIndex"
+            :slash-command-items="slashCommandItems"
+            :slash-command-source-label="slashCommandSourceLabel"
+            :slash-picker-open="slashPickerOpen"
+            :switching-model="switchingModel"
+            :switching-thinking="switchingThinking"
+            :terminal-open="terminalOpen"
+            :terminal-status="terminalStatus"
+            :thinking-level="composerRuntime?.state?.thinkingLevel"
+            :thinking-picker-open="thinkingPickerOpen"
+            :tool-names="activeToolNames"
+            :tools-chip-label="toolsChipLabel"
+            :tools-picker-open="toolsPickerOpen"
+            @cancel-edit="cancelEditingEntry"
+            @interrupt="interruptAgent"
+            @keydown="handleComposerKeydown"
+            @open-image="openImageFullscreen"
+            @paste="handleComposerPaste"
+            @queue-snapshot="applyQueueSnapshot"
+            @remove-image="removeAttachedImage"
+            @select-model="selectModel"
+            @select-slash-command="selectSlashCommand"
+            @select-thinking="selectThinkingLevel"
+            @show-slash-picker="showSlashPicker"
+            @submit="submitDraft"
+            @toggle-picker="togglePicker"
+            @toggle-research="toggleEmptySessionKind"
+            @toggle-terminal="toggleTerminal(selectedSessionId)"
+          />
+        </div>
+      </div>
     </section>
 
     <ReviewPane

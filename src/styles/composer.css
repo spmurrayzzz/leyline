@@ -21,25 +21,102 @@
   transform: translateY(12px);
 }
 
-.composer.empty-session-composer {
+.composer-frame,
+.composer-dock-anchor {
+  position: absolute;
+  z-index: 5;
+  bottom: 22px;
+  left: 50%;
+  width: min(var(--content-max), calc(100% - 88px));
+  transform: translateX(-50%);
+}
+
+.composer-dock-anchor {
+  height: 0;
+  pointer-events: none;
+}
+
+.composer-frame {
+  border: 1px solid transparent;
+  border-radius: 24px;
+  background: var(--panel-soft);
+  transition:
+    opacity var(--motion-slow) var(--ease-standard),
+    background-color var(--motion-base) var(--ease-standard);
+}
+
+.composer-frame:focus-within {
+  background: #242425;
+}
+
+.composer-frame.is-home:not(.is-positioned) {
+  visibility: hidden;
+}
+
+.composer-frame.is-empty {
   top: calc(50% - 125px);
   bottom: auto;
   width: var(--empty-session-composer-width);
   max-width: calc(100% - 88px);
-  transform: translateX(-50%);
 }
 
-.in-project-composer-docking .composer.empty-session-composer {
-  top: calc(100% - var(--composer-height) - 22px);
-  bottom: auto;
-  width: var(--docked-composer-width);
-  max-width: calc(100% - 88px);
+.composer-frame.is-switching,
+.composer-frame.is-handoff {
+  opacity: 0;
+  pointer-events: none;
 }
 
-.terminal-open.in-project-composer-docking .composer.empty-session-composer {
-  top: calc(
-    100% - var(--terminal-drawer-height) - var(--composer-height) - 22px
-  );
+.composer-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  border-radius: inherit;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 420ms var(--ease-standard);
+}
+
+.composer-layer.is-active {
+  position: relative;
+  visibility: visible;
+  opacity: 1;
+}
+
+.composer-frame.is-moving > .composer-layer {
+  position: absolute;
+}
+
+.composer-frame.is-moving.from-home > .composer-layer {
+  visibility: visible;
+}
+
+.composer-frame.from-home > .start-composer-layer:not(.is-active) {
+  transition: opacity 180ms var(--ease-accelerate);
+}
+
+.composer-frame.from-home > .session-composer-layer.is-active {
+  transition: opacity 300ms var(--ease-decelerate) 120ms;
+}
+
+.composer-frame.is-moving > .start-composer-layer {
+  height: 100%;
+  clip-path: inset(0 round 23px);
+}
+
+.composer-frame > .composer-layer > .composer,
+.composer-frame > .composer-layer > .start-composer {
+  position: relative;
+  inset: auto;
+  width: 100%;
+  max-width: none;
+  min-height: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+  animation: none;
 }
 
 .composer.empty-session-composer .slash-picker {
@@ -104,8 +181,6 @@
   bottom: 22px;
   left: 50%;
   transition:
-    top 980ms var(--ease-dock),
-    width 980ms var(--ease-dock),
     bottom var(--motion-base) var(--ease-standard),
     border-color var(--motion-base) var(--ease-standard),
     background-color var(--motion-base) var(--ease-standard),
@@ -132,6 +207,7 @@
   background: #242425;
 }
 
+.composer-frame.composer-committing,
 .composer.composer-committing {
   border-color: #5f4b83;
   box-shadow:

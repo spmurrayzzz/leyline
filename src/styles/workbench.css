@@ -57,6 +57,10 @@
   width: var(--start-composer-width);
 }
 
+.start-composer-anchor {
+  width: 100%;
+}
+
 .backend-unavailable-panel {
   display: grid;
   justify-items: center;
@@ -123,12 +127,12 @@
 .startup-reveal-hold .start-panel {
   position: absolute;
   inset: 0;
-  z-index: 6;
+  z-index: 4;
   place-content: center;
   width: auto;
-  background: #111217;
+  background: var(--bg);
   pointer-events: none;
-  animation: startup-overlay-exit 180ms var(--ease-accelerate) both;
+  animation: startup-overlay-exit 420ms var(--ease-standard) both;
 }
 
 .start-headline-text,
@@ -214,7 +218,7 @@
   width: min(var(--content-max), calc(100vw - 364px));
   opacity: 0;
   transform: translate(var(--skeleton-x), 10px);
-  animation: startup-loading-enter 420ms var(--ease-decelerate) both;
+  animation: startup-loading-enter 640ms var(--ease-dock) 120ms both;
 }
 
 .sidebar-hidden .startup-init-panel {
@@ -231,22 +235,10 @@
   width: min(var(--content-max), calc(100% - 88px));
   opacity: 0;
   transform: translate(var(--skeleton-x), 10px);
-  animation: startup-loading-enter 420ms var(--ease-decelerate) both;
+  animation: startup-loading-enter 640ms var(--ease-dock) 120ms both;
 }
 
-.startup-composer-docking .start-composer {
-  position: fixed;
-  bottom: 22px;
-  left: var(--startup-composer-dock-left);
-  width: var(--docked-composer-width);
-  min-width: 0;
-  opacity: 0.96;
-  animation: startup-composer-dock 980ms var(--ease-dock) both;
-  box-shadow:
-    0 1px 0 rgb(255 255 255 / 3%) inset,
-    0 10px 30px -18px rgb(0 0 0 / 52%);
-}
-
+.composer-frame.shell-mode-composer,
 .start-composer.shell-mode-composer,
 .composer.shell-mode-composer {
   border-color: rgba(74, 222, 128, 0.42);
@@ -256,11 +248,13 @@
     0 14px 48px rgb(0 0 0 / 46%);
 }
 
+.composer-frame.shell-mode-composer:focus-within,
 .start-composer.shell-mode-composer:focus-within,
 .composer.shell-mode-composer:focus-within {
   border-color: rgba(134, 239, 172, 0.62);
 }
 
+.composer-frame.hidden-shell-mode-composer,
 .start-composer.hidden-shell-mode-composer,
 .composer.hidden-shell-mode-composer {
   border-color: rgba(125, 160, 202, 0.42);
@@ -270,6 +264,7 @@
     0 14px 48px rgb(0 0 0 / 46%);
 }
 
+.composer-frame.hidden-shell-mode-composer:focus-within,
 .start-composer.hidden-shell-mode-composer:focus-within,
 .composer.hidden-shell-mode-composer:focus-within {
   border-color: rgba(147, 197, 253, 0.58);
