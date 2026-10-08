@@ -8,6 +8,7 @@ const props = defineProps({
   cwd: { type: String, default: '' },
   expanded: Boolean,
   open: Boolean,
+  prepare: Boolean,
   refreshToken: { type: Number, default: 0 },
   sidebarHidden: Boolean,
   watchEnabled: Boolean,
@@ -49,6 +50,7 @@ const hasLoaded = ref(false)
 let reviewGeneration = 0
 let diffGeneration = 0
 let diffRenderGeneration = 0
+let diffDirty = false
 let pendingPreviewKeys = new Set()
 let resizeCleanup
 let reviewEventSource
@@ -56,6 +58,7 @@ let reviewEventLoadTimer
 let watchedRefreshQueued = false
 let watchedRefreshTimer
 
+const diffRequested = computed(() => props.open || props.prepare)
 const files = computed(() => review.value.files || [])
 const filesTruncated = computed(() => review.value.filesTruncated === true)
 const totalFiles = computed(() => {
@@ -116,6 +119,7 @@ watch(() => props.cwd, () => {
   pendingPreviewKeys = new Set()
   selectedPath.value = ''
   diff.value = { diffs: [], path: '' }
+  diffDirty = false
   loading.value = true
   refreshing.value = false
   diffLoading.value = false
@@ -144,6 +148,21 @@ watch(() => props.refreshToken, () => {
 })
 
 watch(() => props.sidebarHidden, constrainCurrentWidth)
+
+watch(diffRequested, (requested) => {
+  if (!requested) {
+    if (diffLoading.value) {
+      diffGeneration++
+      diffLoading.value = false
+      diffDirty = true
+      announcePrepared()
+    }
+    return
+  }
+  if (!hasLoaded.value || refreshing.value) return
+  if (selectedPath.value && diffDirty) void loadDiff(selectedPath.value)
+  else announcePrepared()
+})
 
 function openReviewEventStream(loadAfterConnect = false) {
   if (!props.watchEnabled || !props.cwd) return false
@@ -227,8 +246,10 @@ async function loadReview({ preserveSelection = false } = {}) {
       : files.value[0]?.path || ''
     selectedPath.value = nextPath
     hasLoaded.value = true
-    if (nextPath) void loadDiff(nextPath)
-    else clearDiff()
+    if (nextPath) {
+      diffDirty = true
+      if (diffRequested.value) void loadDiff(nextPath)
+    } else clearDiff()
   } catch (err) {
     if (generation !== reviewGeneration) return
     error.value = err.message
@@ -247,6 +268,7 @@ async function loadReview({ preserveSelection = false } = {}) {
 
 async function loadDiff(path) {
   const generation = ++diffGeneration
+  diffDirty = false
   emit('preparing')
   diffLoading.value = true
   diffRendering.value = false
@@ -257,6 +279,10 @@ async function loadDiff(path) {
   try {
     const data = await fetchGitReviewDiff(props.cwd, path)
     if (generation !== diffGeneration || selectedPath.value !== path) return
+    if (!diffRequested.value) {
+      diffDirty = true
+      return
+    }
     const renderGeneration = ++diffRenderGeneration
     pendingPreviewKeys = new Set(
       (data.diffs || [])
@@ -288,6 +314,7 @@ function selectFile(file) {
 
 function clearDiff() {
   diffGeneration++
+  diffDirty = false
   diffLoading.value = false
   diffRendering.value = false
   diffError.value = ''
@@ -304,7 +331,7 @@ function announcePrepared() {
     || diffRendering.value
     || pendingPreviewKeys.size
   ) return
-  emit('prepared')
+  emit('prepared', diffRequested.value && !diffDirty)
 }
 
 function announceSummary() {

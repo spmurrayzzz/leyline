@@ -1544,15 +1544,7 @@ async function openResearchSource(payload) {
 function openReview() {
   closeResearchCitationPreview()
   closeResearchSources(true)
-  if (!reviewReady.value) {
-    reviewOpenRequested.value = true
-    return
-  }
-  clearTimeout(reviewCloseTimer)
-  reviewOpenRequested.value = false
-  reviewClosing.value = false
-  if (!reviewExpanded.value) reviewPaneExpanded.value = false
-  reviewOpen.value = true
+  reviewOpenRequested.value = true
 }
 
 function closeReview(immediate = false) {
@@ -1587,9 +1579,14 @@ function handleReviewPreparing() {
   reviewReady.value = false
 }
 
-function handleReviewPrepared() {
+function handleReviewPrepared(canOpen) {
   reviewReady.value = true
-  if (reviewOpenRequested.value) openReview()
+  if (!reviewOpenRequested.value || !canOpen) return
+  clearTimeout(reviewCloseTimer)
+  reviewOpenRequested.value = false
+  reviewClosing.value = false
+  if (!reviewExpanded.value) reviewPaneExpanded.value = false
+  reviewOpen.value = true
 }
 
 function handleReviewDesktopChange(event) {
@@ -4223,6 +4220,7 @@ function closePickerMenus() {
       :cwd="selectedSession.cwd"
       :expanded="reviewPaneExpanded"
       :open="reviewOpen"
+      :prepare="reviewOpenRequested"
       :refresh-token="reviewRefreshToken"
       :sidebar-hidden="desktopSidebarHidden"
       :watch-enabled="reviewWatchEnabled"
