@@ -44,6 +44,7 @@ import {
 } from './memories.js'
 import { setRolloutFeedback } from './rollout-feedback.js'
 import {
+  closeSessionSummaryWorkers,
   configuredSessionDir,
   findPersistedSessionRecord,
   listPersistedProjects,
@@ -1373,6 +1374,7 @@ function shutdownRuntime() {
   if (runtimeShutdownPromise) return runtimeShutdownPromise
   runtimeShuttingDown = true
   runtimeShutdownPromise = Promise.resolve().then(async () => {
+    await closeSessionSummaryWorkers()
     const interruptions = [
       ...runtimeHandles.values(),
       ...hiddenRuntimeHandles,

@@ -1,27 +1,32 @@
-import { createReadStream } from 'node:fs'
 import { open, readdir, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
-import { createInterface } from 'node:readline'
 import { StringDecoder } from 'node:string_decoder'
 import {
   getAgentDir,
   SettingsManager,
 } from '@earendil-works/pi-coding-agent'
-import { goalStateFromEntries } from './goal-state.js'
+import { createSummaryPool } from './session-summary-pool.js'
 import {
-  RESEARCH_CUSTOM_TYPE,
-  researchStateFromEntries,
-} from '../../lib/research-state.js'
+  buildSessionInfo,
+  messageText,
+  SUBAGENT_SESSION_CUSTOM_TYPE,
+} from './session-summary.js'
 
 const SESSION_DIR_ENV = 'PI_CODING_AGENT_SESSION_DIR'
 const PROJECT_HEADER_SCAN_LIMIT = 1024 * 1024
 const PROJECT_SCAN_CONCURRENCY = 24
+const SESSION_SUMMARY_WORKERS = 4
 const sessionInfoCache = new Map()
 let pendingSessionList
-export const SUBAGENT_SESSION_CUSTOM_TYPE = 'leyline-subagent-session'
+let summaryPool
+let summaryShuttingDown = false
+let summaryShutdownPromise
+
+export { messageText, SUBAGENT_SESSION_CUSTOM_TYPE }
 
 export async function listPersistedSessions() {
+  if (summaryShuttingDown) throw new Error('Summary scanner is shutting down')
   if (pendingSessionList) return pendingSessionList
   const request = (async () => {
     const sessionDir = configuredSessionDir(process.cwd())
@@ -36,6 +41,25 @@ export async function listPersistedSessions() {
   } finally {
     if (pendingSessionList === request) pendingSessionList = null
   }
+}
+
+export function closeSessionSummaryWorkers() {
+  if (summaryShutdownPromise) return summaryShutdownPromise
+  summaryShuttingDown = true
+  const current = summaryPool
+  const pending = pendingSessionList
+  summaryPool = null
+  summaryShutdownPromise = Promise.resolve().then(async () => {
+    try {
+      await current?.close()
+    } finally {
+      await pending?.catch(() => {})
+    }
+  }).finally(() => {
+    summaryShuttingDown = false
+    summaryShutdownPromise = undefined
+  })
+  return summaryShutdownPromise
 }
 
 export async function listPersistedProjects() {
@@ -247,15 +271,42 @@ function sessionHeaderFromLine(line) {
 
 async function buildSessionInfos(files, goalFallback) {
   const sessions = new Array(files.length)
+  const misses = []
   let nextIndex = 0
   const workerCount = Math.min(PROJECT_SCAN_CONCURRENCY, files.length)
-  const workers = Array.from({ length: workerCount }, async () => {
+  await Promise.all(Array.from({ length: workerCount }, async () => {
     while (nextIndex < files.length) {
       const index = nextIndex++
-      sessions[index] = await buildSessionInfo(files[index], goalFallback)
+      const filePath = files[index]
+      try {
+        const stats = await stat(filePath)
+        const cached = sessionInfoCache.get(filePath)
+        if (cached?.mtimeMs === stats.mtimeMs && cached.size === stats.size) {
+          sessions[index] = cached.session
+        } else {
+          misses.push({
+            index,
+            path: filePath,
+            mtimeMs: stats.mtimeMs,
+            size: stats.size,
+          })
+        }
+      } catch {}
     }
-  })
-  await Promise.all(workers)
+  }))
+  if (misses.length) {
+    misses.sort((a, b) => a.index - b.index)
+    const results = await readSessionMisses(misses, goalFallback)
+    for (const result of results) {
+      sessions[result.index] = result.session
+      if (!result.session) continue
+      sessionInfoCache.set(result.path, {
+        mtimeMs: result.mtimeMs,
+        size: result.size,
+        session: result.session,
+      })
+    }
+  }
   const currentPaths = new Set(files)
   for (const path of sessionInfoCache.keys()) {
     if (!currentPaths.has(path)) sessionInfoCache.delete(path)
@@ -263,169 +314,42 @@ async function buildSessionInfos(files, goalFallback) {
   return sessions.filter(Boolean)
 }
 
-async function buildSessionInfo(filePath, goalFallback) {
+async function readSessionMisses(misses, goalFallback) {
+  if (summaryShuttingDown) throw new Error('Summary scanner is shutting down')
   try {
-    const stats = await stat(filePath)
-    const cached = sessionInfoCache.get(filePath)
-    if (cached?.mtimeMs === stats.mtimeMs && cached.size === stats.size) {
-      return cached.session
-    }
-    const lines = createInterface({
-      input: createReadStream(filePath, { encoding: 'utf8' }),
-      crlfDelay: Infinity,
-    })
-    let header
-    let messageCount = 0
-    let firstMessage = ''
-    let name
-    let goalObjective = ''
-    let lastActivityTime = 0
-    let isSubagentSession = false
-    const subagentChildPaths = []
-    const researchTree = new Map()
-    let researchLeafId = ''
-
-    for await (const line of lines) {
-      const prefix = line.slice(0, 192)
-      if (!header) {
-        let entry
-        try {
-          entry = JSON.parse(line)
-        } catch {
-          continue
-        }
-        if (entry.type !== 'session' || typeof entry.id !== 'string') return null
-        header = entry
-        continue
-      }
-
-      const treeLink = sessionTreeLinkFromLine(line)
-      if (treeLink) {
-        researchTree.set(treeLink.id, treeLink)
-        researchLeafId = treeLink.id
-      }
-
-      if (prefix.includes('"type":"session_info"')) {
-        try {
-          const entry = JSON.parse(line)
-          name = entry.name?.trim() || undefined
-        } catch {}
-        continue
-      }
-
-      if (prefix.includes('"type":"custom"')) {
-        if (!line.includes(`"customType":"${SUBAGENT_SESSION_CUSTOM_TYPE}"`)
-          && !line.includes(`"customType":"${RESEARCH_CUSTOM_TYPE}"`)
-          && !line.includes('"customType":"goal-state"')) continue
-        try {
-          const entry = JSON.parse(line)
-          if (entry.customType === SUBAGENT_SESSION_CUSTOM_TYPE
-            && entry.data?.sessionId === header.id) {
-            isSubagentSession = true
-          }
-          if (entry.customType === RESEARCH_CUSTOM_TYPE) {
-            const node = researchTree.get(entry.id)
-            if (node) node.researchEntry = entry
-          }
-          const goal = goalStateFromEntries([entry])
-          if (goal?.objective) goalObjective = goal.objective
-        } catch {}
-        continue
-      }
-
-      if (!prefix.includes('"type":"message"')) continue
-      messageCount++
-      const role = prefix.match(/"role":"([^"]+)"/)?.[1]
-      if (role === 'toolResult' && line.includes('"toolName":"subagent"')) {
-        try {
-          const entry = JSON.parse(line)
-          for (const result of entry.message?.details?.results || []) {
-            const path = result.childSession?.path
-            if (typeof path === 'string' && path) subagentChildPaths.push(path)
-          }
-        } catch {}
-      }
-      if (role !== 'user' && role !== 'assistant') continue
-
-      const messageTimestamp = numericTimestampFromLine(line, role)
-      if (messageTimestamp) {
-        lastActivityTime = Math.max(lastActivityTime, messageTimestamp)
-      } else {
-        const timestamp = prefix.match(/"timestamp":"([^"]+)"/)?.[1]
-        if (timestamp) {
-          const time = new Date(timestamp).getTime()
-          if (!Number.isNaN(time)) lastActivityTime = Math.max(
-            lastActivityTime,
-            time,
-          )
-        }
-      }
-
-      if (!firstMessage && role === 'user') {
-        firstMessage = firstMessageTextFromLine(line)
-      }
-    }
-
-    if (!header) return null
-    const headerTime = new Date(header.timestamp).getTime()
-    const modified = lastActivityTime > 0
-      ? new Date(lastActivityTime)
-      : Number.isNaN(headerTime) ? stats.mtime : new Date(headerTime)
-    const session = {
-      path: filePath,
-      id: header.id,
-      cwd: typeof header.cwd === 'string' ? header.cwd : '',
-      name,
-      parentSessionPath: header.parentSession,
-      isSubagentSession,
-      subagentChildPaths,
-      research: researchStateFromEntries(
-        activeResearchEntries(researchTree, researchLeafId),
-        header.id,
-      ),
-      created: new Date(header.timestamp),
-      modified,
-      messageCount,
-      firstMessage: firstMessage
-        || (goalFallback ? goalObjective : '')
-        || '(no messages)',
-    }
-    sessionInfoCache.set(filePath, {
-      mtimeMs: stats.mtimeMs,
-      size: stats.size,
-      session,
-    })
-    return session
-  } catch {
-    return null
+    if (!summaryPool) summaryPool = createSummaryPool(SESSION_SUMMARY_WORKERS)
+    return await summaryPool.scan(misses, goalFallback)
+  } catch (error) {
+    if (summaryShuttingDown || isClosedPoolError(error)) throw error
+    const failedPool = summaryPool
+    summaryPool = null
+    await failedPool?.close().catch(() => {})
+    if (summaryShuttingDown) throw new Error('Summary scanner is shutting down')
+    return readSessionMissesOnThread(misses, goalFallback)
   }
 }
 
-function sessionTreeLinkFromLine(line) {
-  const structural = line.length > 4096
-    ? `${line.slice(0, 2048)}${line.slice(-2048)}`
-    : line
-  const match = structural.match(/"id":"([^"]+)","parentId":(null|"([^"]+)")/)
-  if (!match) return null
-  return {
-    id: match[1],
-    parentId: match[2] === 'null' ? null : match[3],
-    researchEntry: null,
-  }
+async function readSessionMissesOnThread(misses, goalFallback) {
+  const results = new Array(misses.length)
+  let nextIndex = 0
+  const workerCount = Math.min(PROJECT_SCAN_CONCURRENCY, misses.length)
+  await Promise.all(Array.from({ length: workerCount }, async () => {
+    while (nextIndex < misses.length) {
+      const index = nextIndex++
+      const job = misses[index]
+      results[index] = {
+        ...job,
+        session: await buildSessionInfo(job.path, goalFallback),
+      }
+    }
+  }))
+  return results
 }
 
-function activeResearchEntries(tree, leafId) {
-  const entries = []
-  const seen = new Set()
-  let currentId = leafId
-  while (currentId && !seen.has(currentId)) {
-    seen.add(currentId)
-    const node = tree.get(currentId)
-    if (!node) break
-    if (node.researchEntry) entries.push(node.researchEntry)
-    currentId = node.parentId
-  }
-  return entries.reverse()
+function isClosedPoolError(error) {
+  const message = error?.message || ''
+  return message.includes('Summary pool closed')
+    || message.includes('Summary pool is closed')
 }
 
 export function hasSubagentSessionMarker(entries, sessionId) {
@@ -434,73 +358,6 @@ export function hasSubagentSessionMarker(entries, sessionId) {
       && entry.customType === SUBAGENT_SESSION_CUSTOM_TYPE
       && entry.data?.sessionId === sessionId
   })
-}
-
-function numericTimestampFromLine(line, role) {
-  const marker = ',"timestamp":'
-  let index
-  if (role === 'assistant') {
-    const stopReasonIndex = line.lastIndexOf(',"stopReason":')
-    index = stopReasonIndex === -1
-      ? -1
-      : line.indexOf(marker, stopReasonIndex)
-  } else {
-    index = line.lastIndexOf(marker)
-  }
-  if (index === -1) return 0
-  const start = index + marker.length
-  if (line[start] < '0' || line[start] > '9') return 0
-  let end = start + 1
-  while (line[end] >= '0' && line[end] <= '9') end++
-  return Number(line.slice(start, end)) || 0
-}
-
-function firstMessageTextFromLine(line) {
-  if (line.length < 256 * 1024) {
-    try {
-      return messageText(JSON.parse(line).message?.content)
-    } catch {
-      return ''
-    }
-  }
-
-  const textMarker = '"type":"text","text":'
-  const markerIndex = line.indexOf(textMarker)
-  if (markerIndex !== -1) {
-    return jsonStringAt(line, markerIndex + textMarker.length)
-  }
-
-  const contentMarker = '"content":'
-  const contentIndex = line.indexOf(contentMarker)
-  if (contentIndex === -1) return ''
-  return jsonStringAt(line, contentIndex + contentMarker.length)
-}
-
-function jsonStringAt(value, start) {
-  if (value[start] !== '"') return ''
-  let escaped = false
-  for (let index = start + 1; index < value.length; index++) {
-    const character = value[index]
-    if (character === '"' && !escaped) {
-      try {
-        return JSON.parse(value.slice(start, index + 1))
-      } catch {
-        return ''
-      }
-    }
-    if (character === '\\' && !escaped) escaped = true
-    else escaped = false
-  }
-  return ''
-}
-
-export function messageText(content) {
-  if (typeof content === 'string') return content
-  if (!Array.isArray(content)) return ''
-  return content
-    .filter((block) => block?.type === 'text')
-    .map((block) => block.text)
-    .join(' ')
 }
 
 export function sessionModifiedDate(entries, header, statsMtime) {
