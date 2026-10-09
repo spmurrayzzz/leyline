@@ -312,8 +312,16 @@
   border-top-left-radius: 0;
 }
 
+.composer-frame:has(.prompt-queue.is-open) {
+  border-top-left-radius: 0;
+}
+
 .composer:has(> .prompt-queue.is-open.fills-composer) {
   border-top-color: transparent;
+  border-top-right-radius: 0;
+}
+
+.composer-frame:has(.prompt-queue.is-open.fills-composer) {
   border-top-right-radius: 0;
 }
 
