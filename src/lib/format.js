@@ -22,6 +22,29 @@ export function formatDate(value) {
   }).format(new Date(value))
 }
 
+export function sourceLocation(source) {
+  if (source.publisher) return source.publisher
+  if (source.url) {
+    try {
+      return new URL(source.url).hostname.replace(/^www\./, '')
+    } catch {}
+  }
+  return source.path ? 'project file' : 'source'
+}
+
+export function sourceDate(source) {
+  if (!source.publishedAt) return ''
+  const value = /^\d{4}-\d{2}-\d{2}$/.test(source.publishedAt)
+    ? `${source.publishedAt}T00:00:00`
+    : source.publishedAt
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return source.publishedAt
+  return date.toLocaleDateString(undefined, {
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
 export function eventTime(item) {
   return new Intl.DateTimeFormat(undefined, {
     hour: 'numeric',

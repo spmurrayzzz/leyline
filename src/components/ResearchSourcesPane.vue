@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { sourceDate, sourceLocation } from '../lib/format'
 
 const props = defineProps({
   open: Boolean,
@@ -64,29 +65,6 @@ watch(() => props.research?.citedSourceCount || 0, (count, previousCount) => {
 
 function setDefaultView() {
   view.value = props.research?.citedSourceCount ? 'cited' : 'ledger'
-}
-
-function sourceLocation(source) {
-  if (source.publisher) return source.publisher
-  if (source.url) {
-    try {
-      return new URL(source.url).hostname.replace(/^www\./, '')
-    } catch {}
-  }
-  return source.path ? 'project file' : 'source'
-}
-
-function sourceDate(source) {
-  if (!source.publishedAt) return ''
-  const value = /^\d{4}-\d{2}-\d{2}$/.test(source.publishedAt)
-    ? `${source.publishedAt}T00:00:00`
-    : source.publishedAt
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return source.publishedAt
-  return date.toLocaleDateString(undefined, {
-    month: 'short',
-    year: 'numeric',
-  })
 }
 
 function sourceStatus(source) {

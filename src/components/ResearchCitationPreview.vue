@@ -1,5 +1,6 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { sourceDate, sourceLocation } from '../lib/format'
 
 const props = defineProps({
   anchorRect: {
@@ -102,29 +103,6 @@ function closeFromOutside(event) {
 function closeFromViewportChange() {
   emit('close')
 }
-
-function sourceLocation() {
-  if (props.source.publisher) return props.source.publisher
-  if (props.source.url) {
-    try {
-      return new URL(props.source.url).hostname.replace(/^www\./, '')
-    } catch {}
-  }
-  return props.source.path ? 'project file' : 'source'
-}
-
-function sourceDate() {
-  if (!props.source.publishedAt) return ''
-  const value = /^\d{4}-\d{2}-\d{2}$/.test(props.source.publishedAt)
-    ? `${props.source.publishedAt}T00:00:00`
-    : props.source.publishedAt
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return props.source.publishedAt
-  return date.toLocaleDateString(undefined, {
-    month: 'short',
-    year: 'numeric',
-  })
-}
 </script>
 
 <template>
@@ -140,8 +118,8 @@ function sourceDate() {
     <header class="research-citation-preview-head">
       <b>{{ source.id }}</b>
       <span>
-        {{ sourceLocation() }}
-        <template v-if="sourceDate()"> · {{ sourceDate() }}</template>
+        {{ sourceLocation(source) }}
+        <template v-if="sourceDate(source)"> · {{ sourceDate(source) }}</template>
       </span>
       <button type="button" aria-label="Close source preview" @click="emit('close')">
         ×
