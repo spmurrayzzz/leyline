@@ -810,10 +810,6 @@ const extensionConfirmations = computed(() => {
   if (!selectedSessionId.value || runtime?.id !== selectedSessionId.value) return []
   return runtime.state?.extensionUi?.confirmations || []
 })
-const goalWidgetLines = computed(() => {
-  const ui = activeRuntimeSession.value?.state?.extensionUi
-  return ui?.widgets?.goal?.lines || []
-})
 const goalBudgetLabel = computed(() => {
   const goal = activeGoal.value
   if (!goal) return ''
