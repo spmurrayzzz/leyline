@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, realpathSync } from 'node:fs'
+import { mkdirSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { basename, dirname, join, resolve } from 'node:path'
+import { dirname, join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
+import { overrideContext, scopeIdentity } from './override-context.js'
 
 const SCOPES = new Set(['global', 'project', 'session'])
 const VISION_THINKING_LEVELS = new Set([
@@ -98,7 +99,7 @@ export function registerVisionDelegation(session, images, delegation, prompt) {
 const SCOPE_PRIORITY = ['session', 'project', 'global']
 
 export function listVisionConfig({ cwd, sessionPath }) {
-  const context = visionContext(cwd, sessionPath)
+  const context = overrideContext(cwd, sessionPath)
   const db = openDb()
   try {
     const overrides = visibleOverrides(db, context)
@@ -129,7 +130,7 @@ export function setVisionOverride({ cwd, model, thinking, scope, sessionPath }) 
   if (thinkingValue && !VISION_THINKING_LEVELS.has(thinkingValue)) {
     throw new Error(`Invalid vision thinking level: ${thinkingValue}`)
   }
-  const context = visionContext(cwd, sessionPath)
+  const context = overrideContext(cwd, sessionPath)
   const identity = scopeIdentity(context, scope)
   const db = openDb()
   try {
@@ -167,7 +168,7 @@ export function setVisionOverride({ cwd, model, thinking, scope, sessionPath }) 
 
 export function clearVisionOverride({ cwd, scope, sessionPath }) {
   if (!SCOPES.has(scope)) throw new Error('Invalid vision override scope')
-  const context = visionContext(cwd, sessionPath)
+  const context = overrideContext(cwd, sessionPath)
   const identity = scopeIdentity(context, scope)
   const db = openDb()
   try {
@@ -182,7 +183,7 @@ export function clearVisionOverride({ cwd, scope, sessionPath }) {
 }
 
 export function resolveVisionConfig({ cwd, sessionPath, staticModel }) {
-  const context = visionContext(cwd, sessionPath)
+  const context = overrideContext(cwd, sessionPath)
   const db = openDb()
   try {
     const overrides = visibleOverrides(db, context)
@@ -203,8 +204,8 @@ export function resolveVisionConfig({ cwd, sessionPath, staticModel }) {
 
 export function copySessionVisionOverrides({ cwd, fromSessionPath, toSessionPath }) {
   if (!fromSessionPath || !toSessionPath) return
-  const source = visionContext(cwd, fromSessionPath)
-  const target = visionContext(cwd, toSessionPath)
+  const source = overrideContext(cwd, fromSessionPath)
+  const target = overrideContext(cwd, toSessionPath)
   if (!source.sessionId || !target.sessionId) return
   const db = openDb()
   try {
@@ -329,51 +330,6 @@ function effectiveOverride(overrides, field) {
     if (hit) return { value: hit[field], source: scope }
   }
   return { value: '', source: 'none' }
-}
-
-function scopeIdentity(context, scope) {
-  if (scope === 'global') return { scopeId: 'global', sessionId: null, sessionFile: null }
-  if (scope === 'project') return { scopeId: context.projectId, sessionId: null, sessionFile: null }
-  if (!context.sessionId) throw new Error('Session override is unavailable before a session is created')
-  return { scopeId: context.sessionId, sessionId: context.sessionId, sessionFile: context.sessionFile }
-}
-
-function visionContext(cwd, sessionPath) {
-  const resolvedCwd = String(cwd || '').trim()
-  if (!resolvedCwd) throw new Error('Project cwd is required')
-  const projectRoot = findProjectRoot(resolvedCwd)
-  const sessionFile = sessionPath ? safeRealpath(sessionPath) : null
-  return {
-    cwd: resolvedCwd,
-    projectId: hashId('project', projectRoot),
-    projectName: basename(projectRoot),
-    projectRoot,
-    sessionAvailable: Boolean(sessionFile),
-    sessionFile,
-    sessionId: sessionFile ? hashId('session', sessionFile) : null,
-  }
-}
-
-function findProjectRoot(cwd) {
-  let current = safeRealpath(cwd)
-  while (true) {
-    if (existsSync(join(current, '.git'))) return current
-    const parent = dirname(current)
-    if (parent === current) return safeRealpath(cwd)
-    current = parent
-  }
-}
-
-function safeRealpath(path) {
-  try {
-    return realpathSync(path)
-  } catch {
-    return resolve(path)
-  }
-}
-
-function hashId(prefix, value) {
-  return `${prefix}_${createHash('sha256').update(value).digest('hex').slice(0, 16)}`
 }
 
 function openDb() {

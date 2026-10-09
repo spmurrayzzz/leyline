@@ -1,13 +1,13 @@
-import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { basename, dirname, join, resolve } from 'node:path'
+import { dirname, join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
+import { overrideContext, safeRealpath, scopeIdentity } from './override-context.js'
 
 const SCOPES = new Set(['global', 'project', 'session'])
 
 export function listSubagentConfigs({ cwd, sessionPath }) {
-  const context = subagentContext(cwd, sessionPath)
+  const context = overrideContext(cwd, sessionPath)
   const agents = discoverAgents(context.cwd)
   const db = openDb()
   try {
@@ -31,7 +31,7 @@ export function setSubagentModelOverride({ agentKey, cwd, model, scope, sessionP
   if (!SCOPES.has(scope)) throw new Error('Invalid subagent override scope')
   const value = String(model || '').trim()
   if (!value) throw new Error('Model is required')
-  const context = subagentContext(cwd, sessionPath)
+  const context = overrideContext(cwd, sessionPath)
   const agent = discoverAgents(context.cwd).find((item) => item.key === agentKey)
   if (!agent) throw new Error('Subagent definition not found')
   const identity = scopeIdentity(context, scope)
@@ -64,7 +64,7 @@ export function setSubagentModelOverride({ agentKey, cwd, model, scope, sessionP
 
 export function deleteSubagentModelOverride({ agentKey, cwd, scope, sessionPath }) {
   if (!SCOPES.has(scope)) throw new Error('Invalid subagent override scope')
-  const context = subagentContext(cwd, sessionPath)
+  const context = overrideContext(cwd, sessionPath)
   const agent = discoverAgents(context.cwd).find((item) => item.key === agentKey)
   if (!agent) throw new Error('Subagent definition not found')
   const identity = scopeIdentity(context, scope)
@@ -82,7 +82,7 @@ export function deleteSubagentModelOverride({ agentKey, cwd, scope, sessionPath 
 }
 
 export function resolveSubagentConfig({ agentKey, cwd, sessionPath, staticModel, staticThinking }) {
-  const context = subagentContext(cwd, sessionPath)
+  const context = overrideContext(cwd, sessionPath)
   const agent = discoverAgents(context.cwd).find((item) => item.key === agentKey)
   const db = openDb()
   try {
@@ -107,8 +107,8 @@ export function resolveSubagentConfig({ agentKey, cwd, sessionPath, staticModel,
 
 export function copySessionSubagentOverrides({ cwd, fromSessionPath, toSessionPath }) {
   if (!fromSessionPath || !toSessionPath) return
-  const source = subagentContext(cwd, fromSessionPath)
-  const target = subagentContext(cwd, toSessionPath)
+  const source = overrideContext(cwd, fromSessionPath)
+  const target = overrideContext(cwd, toSessionPath)
   if (!source.sessionId || !target.sessionId) return
   const db = openDb()
   try {
@@ -229,51 +229,6 @@ function visibleOverrides(db, context) {
     agentKey: row.agent_key,
     model: row.model,
   }))
-}
-
-function subagentContext(cwd, sessionPath) {
-  const resolvedCwd = String(cwd || '').trim()
-  if (!resolvedCwd) throw new Error('Project cwd is required')
-  const projectRoot = findProjectRoot(resolvedCwd)
-  const sessionFile = sessionPath ? safeRealpath(sessionPath) : null
-  return {
-    cwd: resolvedCwd,
-    projectId: hashId('project', projectRoot),
-    projectName: basename(projectRoot),
-    projectRoot,
-    sessionAvailable: Boolean(sessionFile),
-    sessionFile,
-    sessionId: sessionFile ? hashId('session', sessionFile) : null,
-  }
-}
-
-function scopeIdentity(context, scope) {
-  if (scope === 'global') return { scopeId: 'global', sessionId: null, sessionFile: null }
-  if (scope === 'project') return { scopeId: context.projectId, sessionId: null, sessionFile: null }
-  if (!context.sessionId) throw new Error('Session override is unavailable before a session is created')
-  return { scopeId: context.sessionId, sessionId: context.sessionId, sessionFile: context.sessionFile }
-}
-
-function findProjectRoot(cwd) {
-  let current = safeRealpath(cwd)
-  while (true) {
-    if (existsSync(join(current, '.git'))) return current
-    const parent = dirname(current)
-    if (parent === current) return safeRealpath(cwd)
-    current = parent
-  }
-}
-
-function safeRealpath(path) {
-  try {
-    return realpathSync(path)
-  } catch {
-    return resolve(path)
-  }
-}
-
-function hashId(prefix, value) {
-  return `${prefix}_${createHash('sha256').update(value).digest('hex').slice(0, 16)}`
 }
 
 function openDb() {
