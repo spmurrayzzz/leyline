@@ -268,7 +268,6 @@ export function useWorkbenchScroll({ workbench, composerRef }) {
   return {
     composerHeight,
     stickToBottom,
-    userScrollActive,
     hasNewOutput,
     composerReservedHeight,
     scrollToLatest,

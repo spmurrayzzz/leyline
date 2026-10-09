@@ -294,7 +294,6 @@ const workbenchScroll = useWorkbenchScroll({ workbench, composerRef })
 const {
   composerHeight,
   stickToBottom,
-  userScrollActive,
   hasNewOutput,
   composerReservedHeight,
   scrollToLatest,
