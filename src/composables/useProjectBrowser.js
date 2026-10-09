@@ -11,7 +11,6 @@ export function useProjectBrowser({
   const projectBrowserInitialPath = ref('')
   const startProjectPickerOpen = ref(false)
   const startProjectQuery = ref('')
-  const expandedProjects = ref(new Set())
 
   const startProjectOptions = computed(() => {
     const query = startProjectQuery.value.trim().toLowerCase()
@@ -23,22 +22,6 @@ export function useProjectBrowser({
   const startProjectLabel = computed(() => {
     return newSessionCwd.value ? projectName(newSessionCwd.value) : 'Choose project'
   })
-
-  function isProjectExpanded(project) {
-    return expandedProjects.value.has(project.cwd)
-  }
-
-  function expandProject(cwd) {
-    if (!cwd) return
-    expandedProjects.value = new Set([...expandedProjects.value, cwd])
-  }
-
-  function toggleProject(project) {
-    const next = new Set(expandedProjects.value)
-    if (next.has(project.cwd)) next.delete(project.cwd)
-    else next.add(project.cwd)
-    expandedProjects.value = next
-  }
 
   function selectStartProject(cwd) {
     newSessionCwd.value = cwd
@@ -62,12 +45,8 @@ export function useProjectBrowser({
     projectBrowserInitialPath,
     startProjectPickerOpen,
     startProjectQuery,
-    expandedProjects,
     startProjectOptions,
     startProjectLabel,
-    isProjectExpanded,
-    expandProject,
-    toggleProject,
     selectStartProject,
     openProjectBrowser,
     closeProjectBrowser,
