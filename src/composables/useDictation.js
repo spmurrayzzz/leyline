@@ -1,4 +1,4 @@
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 
 function isElectron() {
   if (typeof navigator === 'undefined') return false
@@ -29,6 +29,12 @@ export function useDictation(options) {
   const listening = ref(false)
   const error = ref('')
   const supported = computed(() => Boolean(recognitionConstructor()))
+  const buttonDisabled = computed(() => options.inputDisabled.value && !listening.value)
+  const title = computed(() => {
+    if (!supported.value) return unsupportedMessage()
+    if (listening.value) return 'Stop dictation'
+    return error.value || 'Start dictation'
+  })
   let recognition = null
   let stopping = false
 
@@ -122,14 +128,17 @@ export function useDictation(options) {
     startDictation()
   }
 
+  watch(options.inputDisabled, (disabled) => {
+    if (disabled) stopDictation()
+  })
+
   onBeforeUnmount(stopDictation)
 
   return {
-    dictationError: error,
+    dictationButtonDisabled: buttonDisabled,
     dictationListening: listening,
     dictationSupported: supported,
-    dictationUnsupportedMessage: unsupportedMessage,
-    stopDictation,
+    dictationTitle: title,
     toggleDictation,
   }
 }

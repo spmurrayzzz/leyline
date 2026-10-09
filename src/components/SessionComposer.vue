@@ -190,30 +190,19 @@ const inputDisabled = computed(() => {
   return !props.agentRunning && (props.reloadingSession || props.compacting)
 })
 const {
-  dictationError,
+  dictationButtonDisabled,
   dictationListening,
   dictationSupported,
-  dictationUnsupportedMessage,
-  stopDictation,
+  dictationTitle,
   toggleDictation,
 } = useDictation({
   focus: () => textarea.value?.focus(),
   getDraft: () => props.draft,
+  inputDisabled,
   onDraftChange: () => emit('show-slash-picker'),
   setDraft: (value) => emit('update:draft', value),
 })
-const dictationButtonDisabled = computed(() => {
-  return inputDisabled.value && !dictationListening.value
-})
-const dictationTitle = computed(() => {
-  if (!dictationSupported.value) return dictationUnsupportedMessage()
-  if (dictationListening.value) return 'Stop dictation'
-  return dictationError.value || 'Start dictation'
-})
 
-watch(inputDisabled, (disabled) => {
-  if (disabled) stopDictation()
-})
 watch(() => props.sessionId, () => { sendMenuOpen.value = false })
 watch([queueMode, () => props.promptSubmitting], ([queueing, submitting]) => {
   if (!queueing || submitting) sendMenuOpen.value = false
