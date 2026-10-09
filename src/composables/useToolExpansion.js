@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { messageBlocksFor, renderedMarkdownPreview } from '../lib/transcript'
 
-export function useToolExpansion({ liveAssistantBlocks }) {
+export function useToolExpansion() {
   const expandedTools = ref(new Set())
   const expandedSkills = ref(new Set())
   const copiedEntryId = ref('')
@@ -71,12 +71,8 @@ export function useToolExpansion({ liveAssistantBlocks }) {
     return item?.blocks || []
   }
 
-  function liveAssistantCopyText(blocks = liveAssistantBlocks.value) {
-    return blocks.map((block) => block.text).join('\n\n')
-  }
-
   function liveAssistantDisplayCopyText(item) {
-    return liveAssistantCopyText(liveAssistantDisplayBlocks(item))
+    return liveAssistantDisplayBlocks(item).map((block) => block.text).join('\n\n')
   }
 
   async function copyEntry(entry) {
@@ -135,7 +131,6 @@ export function useToolExpansion({ liveAssistantBlocks }) {
     toggleSkill,
     entryCopyText,
     liveAssistantDisplayBlocks,
-    liveAssistantCopyText,
     liveAssistantDisplayCopyText,
     copyEntry,
     copyTranscriptItem,

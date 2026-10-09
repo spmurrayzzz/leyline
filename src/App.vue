@@ -319,7 +319,6 @@ const {
   entries,
   finishTools: finishLiveTools,
   liveActivity,
-  liveAssistantBlocks,
   liveItems,
   liveTurnActive,
   reconcileCurrentDetail,
@@ -595,7 +594,7 @@ const projectDetailProject = computed(() => {
   if (!projectSessions.length) return null
   return { cwd, name: projectName(cwd), sessions: projectSessions }
 })
-const toolExpansion = useToolExpansion({ liveAssistantBlocks })
+const toolExpansion = useToolExpansion()
 const {
   expandedTools,
   expandedSkills,
@@ -612,7 +611,6 @@ const {
   toggleSkill,
   entryCopyText,
   liveAssistantDisplayBlocks,
-  liveAssistantCopyText,
   liveAssistantDisplayCopyText,
   copyEntry,
   copyTranscriptItem,

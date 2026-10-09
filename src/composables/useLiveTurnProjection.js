@@ -16,8 +16,6 @@ export function useLiveTurnProjection({ onIntent } = {}) {
   const agentRunning = ref(false)
   const compactingContext = ref(false)
   const liveActivity = ref('')
-  const liveAssistantText = ref('')
-  const liveAssistantBlocks = ref([])
   const liveAssistantMessages = ref([])
   const liveUserMessages = ref([])
   const liveSystemMessages = ref([])
@@ -336,8 +334,6 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     liveTurnAnchorLength.value = null
     compactingContext.value = false
     liveActivity.value = ''
-    liveAssistantText.value = ''
-    liveAssistantBlocks.value = []
     liveAssistantMessages.value = []
     liveUserMessages.value = []
     liveSystemMessages.value = []
@@ -1025,9 +1021,6 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     } else {
       liveAssistantMessages.value = [...liveAssistantMessages.value, next]
     }
-
-    liveAssistantBlocks.value = blocks
-    liveAssistantText.value = text
   }
 
   function finishLiveAssistant() {
@@ -1076,8 +1069,6 @@ export function useLiveTurnProjection({ onIntent } = {}) {
   function clearLiveAssistant() {
     pendingAssistantEvent = undefined
     cancelAnimationFrame(liveAssistantFrame)
-    liveAssistantText.value = ''
-    liveAssistantBlocks.value = []
     liveAssistantMessages.value = liveAssistantMessages.value.filter((item) => {
       if (activeLiveAssistantId && item.id === activeLiveAssistantId) {
         return false
@@ -1159,7 +1150,6 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     finishTools,
     handle,
     liveActivity,
-    liveAssistantBlocks,
     liveFirstUserText,
     liveItems,
     liveTurnActive,
