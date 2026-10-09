@@ -3944,7 +3944,18 @@ function closePickerMenus() {
             :class="liveItemClass(item)"
           >
             <TranscriptEntry
-              v-if="item.type === 'message'"
+              v-if="item.type === 'system'"
+              :copied-entry-id="copiedEntryId"
+              :entry="item.persistedEntry || item"
+              :tool-expanded="isToolExpanded(item.persistedEntry || item)"
+              @copy="copyEntry"
+              @fork="forkSession"
+              @reset="resetSessionToEntry"
+              @toggle-tool="toggleTool"
+            />
+
+            <TranscriptEntry
+              v-else-if="item.type === 'message'"
               :copied-entry-id="copiedEntryId"
               :entry="item.persistedEntry || item"
               :research-cwd="selectedSession?.cwd || ''"

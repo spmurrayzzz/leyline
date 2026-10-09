@@ -20,6 +20,7 @@ export function useLiveTurnProjection({ onIntent } = {}) {
   const liveAssistantBlocks = ref([])
   const liveAssistantMessages = ref([])
   const liveUserMessages = ref([])
+  const liveSystemMessages = ref([])
   const liveTools = ref([])
   const liveFirstUserText = computed(() => {
     const text = liveUserMessages.value.find((message) => message.text?.trim())
@@ -33,6 +34,7 @@ export function useLiveTurnProjection({ onIntent } = {}) {
   const liveItems = computed(() => [
     ...liveAssistantMessages.value,
     ...liveUserMessages.value,
+    ...liveSystemMessages.value,
     ...liveTools.value,
     compactingContext.value ? {
       id: 'live-compaction',
@@ -53,12 +55,13 @@ export function useLiveTurnProjection({ onIntent } = {}) {
       || liveTools.value.length > 0
       || liveAssistantMessages.value.length > 0
       || liveUserMessages.value.length > 0
+      || liveSystemMessages.value.length > 0
       || Boolean(liveActivity.value)
   })
   const entries = computed(() => {
     let list = rawEntries.value
-    if (liveTurnActive.value && liveTurnAnchorLength !== null) {
-      list = list.slice(0, liveTurnAnchorLength)
+    if (liveTurnActive.value && liveTurnAnchorLength.value !== null) {
+      list = list.slice(0, liveTurnAnchorLength.value)
     }
 
     return list.filter((entry) => {
@@ -66,13 +69,14 @@ export function useLiveTurnProjection({ onIntent } = {}) {
         && !isCoveredByLiveTool(entry)
         && !isCoveredByLiveAssistant(entry)
         && !isCoveredByLiveUser(entry)
+        && !isCoveredByLiveSystem(entry)
     })
   })
   const liveToolSettleTimers = new Map()
   const liveToolVisualFloorMs = 450
   let liveToolSeq = 0
   let liveItemSeq = 0
-  let liveTurnAnchorLength = null
+  const liveTurnAnchorLength = ref(null)
   let activeLiveAssistantId = ''
   let pendingAssistantEvent
   let liveAssistantFrame
@@ -90,6 +94,7 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     agentRunning.value = isRunningEvent(event)
     liveActivity.value = activityText(event)
     updateLiveTool(event)
+    updateLiveSystem(event)
     updateLiveUser(event, handoffId)
     updateLiveAssistant(event)
     releaseLiveAnchorIfSettled()
@@ -112,6 +117,7 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     persistedDetail.value = detail
     if (!detail) return
     reconcileOptimisticEntries(detail)
+    reconcileLiveSystems(detail)
     reconcileLiveUsers(detail)
     reconcileLiveAssistants(detail)
     reconcileLiveTools(detail)
@@ -120,13 +126,14 @@ export function useLiveTurnProjection({ onIntent } = {}) {
 
   function beginUserTurn(text, images = []) {
     activeLiveAssistantId = ''
+    if (liveTurnAnchorLength.value === null) clearSettledLiveItems()
     const entry = pendingUserEntry(text, images)
     optimisticEntries.value = [...optimisticEntries.value, entry]
     liveUserMessages.value = [
       ...liveUserMessages.value,
       { ...entry, seq: ++liveItemSeq },
     ]
-    liveTurnAnchorLength = rawEntries.value.length
+    liveTurnAnchorLength.value = rawEntries.value.length
     return entry
   }
 
@@ -146,6 +153,7 @@ export function useLiveTurnProjection({ onIntent } = {}) {
   function clearLiveOutput() {
     liveAssistantMessages.value = []
     liveUserMessages.value = []
+    liveSystemMessages.value = []
     liveTools.value = []
     activeLiveAssistantId = ''
     clearLiveToolSettleTimers()
@@ -309,13 +317,14 @@ export function useLiveTurnProjection({ onIntent } = {}) {
   }
 
   function reset() {
-    liveTurnAnchorLength = null
+    liveTurnAnchorLength.value = null
     compactingContext.value = false
     liveActivity.value = ''
     liveAssistantText.value = ''
     liveAssistantBlocks.value = []
     liveAssistantMessages.value = []
     liveUserMessages.value = []
+    liveSystemMessages.value = []
     liveTools.value = []
     optimisticEntries.value = []
     agentRunning.value = false
@@ -331,15 +340,23 @@ export function useLiveTurnProjection({ onIntent } = {}) {
 
   function markLiveTurnStart(event) {
     if (!startsLiveTurn(event)) return
-    if (liveTurnAnchorLength !== null) return
-    liveTurnAnchorLength = rawEntries.value.length
+    if (liveTurnAnchorLength.value !== null) return
+    clearSettledLiveItems()
+    liveTurnAnchorLength.value = rawEntries.value.length
+  }
+
+  function clearSettledLiveItems() {
+    liveUserMessages.value = liveUserMessages.value.filter((message) => !message.persistedEntry)
+    liveAssistantMessages.value = liveAssistantMessages.value.filter((message) => !message.persistedEntry)
+    liveSystemMessages.value = liveSystemMessages.value.filter((message) => !message.persistedEntry)
+    liveTools.value = liveTools.value.filter((tool) => !tool.persistedEntry)
   }
 
   function startsLiveTurn(event) {
     const type = event?.type
     if (type === 'agent_start' || type === 'turn_start') return true
     return ['message_start', 'message_update', 'message_end'].includes(type)
-      && event.message?.role === 'assistant'
+      && ['assistant', 'system'].includes(event.message?.role)
   }
 
   function updateCompactionState(event) {
@@ -672,6 +689,13 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     })
   }
 
+  function isCoveredByLiveSystem(entry) {
+    if (entry.type !== 'system') return false
+    return liveSystemMessages.value.some((message) => {
+      return liveSystemMatchesEntry(message, entry)
+    })
+  }
+
   function isCoveredByLiveUser(entry) {
     if (entry.type !== 'message' || entry.role !== 'user') return false
     return liveUserMessages.value.some((message) => {
@@ -693,7 +717,7 @@ export function useLiveTurnProjection({ onIntent } = {}) {
   }
 
   function releaseLiveAnchorIfSettled() {
-    if (liveTurnAnchorLength === null) return
+    if (liveTurnAnchorLength.value === null) return
     if (agentRunning.value || compactingContext.value || liveActivity.value) {
       return
     }
@@ -704,12 +728,69 @@ export function useLiveTurnProjection({ onIntent } = {}) {
       return message.streaming || !message.persistedEntry
     })) return
     if (liveTools.value.some((tool) => !liveToolSettled(tool))) return
-    liveTurnAnchorLength = null
+    if (liveSystemMessages.value.some((message) => !message.persistedEntry)) return
+    liveTurnAnchorLength.value = null
   }
 
   function liveToolSettled(tool) {
     if (tool.persistedEntry) return true
     return ['completed', 'error', 'aborted'].includes(tool.status)
+  }
+
+  function updateLiveSystem(event) {
+    if (!['message_start', 'message_end'].includes(event?.type)) return
+    if (event.message?.role !== 'system') return
+
+    const entry = projectEntry({
+      type: 'message',
+      id: messageEventId(event),
+      timestamp: new Date(event.message.timestamp ?? Date.now()).toISOString(),
+      message: event.message,
+    })
+    const existing = liveSystemMessages.value.find((message) => {
+      return liveSystemMatchesEntry(message, entry)
+    })
+    const pendingUser = liveItems.value.filter((item) => item.type !== 'activity').at(-1)
+    const seq = existing?.seq ?? ++liveItemSeq
+    const next = {
+      ...entry,
+      id: existing?.id || entry.id || `local-system-${seq}`,
+      seq: existing?.seq ?? (pendingUser?.role === 'user' && !pendingUser.runtimeReceived
+        ? pendingUser.seq - 0.5
+        : seq),
+      createdAt: existing?.createdAt || Date.now(),
+      persisted: false,
+      persistedEntry: existing?.persistedEntry,
+    }
+    if (existing) {
+      liveSystemMessages.value = liveSystemMessages.value.map((message) => {
+        return message.id === existing.id ? next : message
+      })
+    } else {
+      liveSystemMessages.value = [...liveSystemMessages.value, next]
+    }
+  }
+
+  function reconcileLiveSystems(detail) {
+    const persisted = (detail.entries || []).filter((entry) => entry.type === 'system')
+    const matchedIds = new Set()
+    liveSystemMessages.value = liveSystemMessages.value.map((message) => {
+      const entry = persisted.find((item) => {
+        return !matchedIds.has(item.id) && liveSystemMatchesEntry(message, item)
+      })
+      if (!entry) return message
+      matchedIds.add(entry.id)
+      return { ...message, persistedEntry: entry }
+    })
+  }
+
+  function liveSystemMatchesEntry(message, entry) {
+    if (message.persistedEntry?.id) return message.persistedEntry.id === entry.id
+    if (message.id && message.id === entry.id) return true
+    if (message.messageTimestamp !== undefined && entry.messageTimestamp !== undefined) {
+      return message.messageTimestamp === entry.messageTimestamp && message.text === entry.text
+    }
+    return entryIsNearLiveMessage(entry, message) && message.text === entry.text
   }
 
   function updateLiveUser(event, handoffId) {
@@ -997,6 +1078,7 @@ export function useLiveTurnProjection({ onIntent } = {}) {
     return liveAssistantMessages.value.length
       || liveUserMessages.value.length
       || liveActivity.value
+      || liveSystemMessages.value.length
       || liveTools.value.length
   }
 

@@ -23,6 +23,9 @@ export function useToolExpansion({ liveAssistantBlocks }) {
   let copiedTimer
 
   function toolExpansionId(entry) {
+    if (entry.type === 'system' && entry.messageTimestamp !== undefined) {
+      return `system-${entry.messageTimestamp}`
+    }
     return entry.toolCallId || entry.id
   }
 
