@@ -83,6 +83,7 @@ import {
   researchStateFromEntries,
 } from '../../lib/research-state.js'
 import { auditResearchReportCitations } from '../../lib/research-citations.js'
+import { projectModelChanges } from '../../lib/transcript-projection.js'
 import { supportsUltrafastWithAuth, ULTRAFAST_COMMAND } from '../../lib/ultrafast.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -1553,6 +1554,25 @@ async function setSessionModel(handle, provider, id) {
     const model = session.modelRuntime.getModel(provider, id)
     if (!model) throw new Error('Model not found')
     await session.setModel(model, { persist: true })
+    const branch = session.sessionManager.getBranch()
+    const lastModelChange = branch.findLast((entry) => entry.type === 'model_change')
+    const change = projectModelChanges(branch, {
+      modelName: (provider, id) => session.modelRuntime.getModel(provider, id)?.name,
+      includeUnchanged: true,
+    }).at(-1)
+    if (change && change.selectionId === lastModelChange?.id) {
+      const unchanged = change.fromModel.provider === change.toModel.provider
+        && change.fromModel.id === change.toModel.id
+      broadcastEvent('runtime_event', {
+        activeSessionId: handle.sessionId,
+        event: {
+          type: 'model_changed',
+          entryId: change.id,
+          entry: unchanged ? null : change,
+        },
+      })
+    }
+    broadcastActiveSession(handle)
   } finally {
     release()
     handle.settingModel = false

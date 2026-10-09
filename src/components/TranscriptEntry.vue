@@ -281,7 +281,22 @@ function openMarkdownContent(event) {
 </script>
 
 <template>
-  <div v-if="entry.type === 'event'" class="event-row">
+  <div v-if="entry.type === 'model-change'" class="model-change-row">
+    <span class="model-change-label">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="m12 3 9 5v8l-9 5-9-5V8l9-5Z" />
+        <path d="m3 8 9 5 9-5M12 13v8M8 5l9 5" />
+      </svg>
+      <span>
+        Model changed from
+        <strong :title="`${entry.fromModel.provider}/${entry.fromModel.id}`">{{ entry.fromModel.name }}</strong>
+        to
+        <strong :title="`${entry.toModel.provider}/${entry.toModel.id}`">{{ entry.toModel.name }}</strong>
+      </span>
+    </span>
+  </div>
+
+  <div v-else-if="entry.type === 'event'" class="event-row">
     <span>{{ entry.label }}</span>
     <strong>{{ entry.text }}</strong>
     <button

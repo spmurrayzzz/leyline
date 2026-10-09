@@ -179,7 +179,22 @@ function toExportEntry(entry) {
 function renderExportEntry(entry, index) {
   if (entry.type === 'tool') return renderExportTool(entry, index)
   if (entry.type === 'system') return renderExportSystem(entry)
+  if (entry.type === 'model-change') return renderExportModelChange(entry)
   return renderExportMessage(entry)
+}
+
+function renderExportModelChange(entry) {
+  const from = entry.fromModel
+  const to = entry.toModel
+  return `<div class="model-change-row">
+<span class="model-change-label">
+<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+<path d="m12 3 9 5v8l-9 5-9-5V8l9-5Z" />
+<path d="m3 8 9 5 9-5M12 13v8M8 5l9 5" />
+</svg>
+<span>Model changed from <strong title="${escapeHtml(`${from.provider}/${from.id}`)}">${escapeHtml(from.name)}</strong> to <strong title="${escapeHtml(`${to.provider}/${to.id}`)}">${escapeHtml(to.name)}</strong></span>
+</span>
+</div>`
 }
 
 function renderExportTool(entry, index) {
@@ -758,6 +773,63 @@ button, input, textarea { color: inherit; font: inherit; }
   line-height: 1.45;
 }
 .message p { margin: 0 0 12px; }
+.model-change-row {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  width: min(var(--content-max), 100%);
+  margin: 20px auto 0;
+  color: var(--muted-strong);
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: center;
+}
+.model-change-row::before,
+.model-change-row::after {
+  flex: 1 1 24px;
+  min-width: 16px;
+  height: 1px;
+  background: var(--border);
+  content: '';
+}
+.model-change-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: calc(100% - 58px);
+}
+.model-change-label > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+.model-change-label svg {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  color: #969699;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.model-change-label strong {
+  display: inline-block;
+  max-width: 100%;
+  color: #c6c6cb;
+  font-weight: 500;
+  vertical-align: bottom;
+}
+@media (max-width: 760px) {
+  .model-change-row {
+    gap: 8px;
+    font-size: 11px;
+  }
+  .model-change-label {
+    max-width: calc(100% - 48px);
+  }
+}
 .message-meta {
   margin-bottom: 6px;
   color: var(--muted);

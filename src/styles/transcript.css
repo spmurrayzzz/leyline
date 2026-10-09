@@ -261,6 +261,7 @@
 .workbench > .message,
 .workbench > .tool-card,
 .workbench > .event-row,
+.workbench > .model-change-row,
 .live-stack > .live-item {
   content-visibility: auto;
 }
@@ -273,7 +274,9 @@
   contain-intrinsic-block-size: auto 20px;
 }
 
-.workbench > .event-row {
+.workbench > .event-row,
+.workbench > .model-change-row,
+.live-stack > .live-model-change-item {
   contain-intrinsic-block-size: auto 24px;
 }
 
@@ -293,6 +296,7 @@
 
 .workbench > .message,
 .workbench > .tool-card,
+.workbench > .model-change-row,
 .workbench > .live-stack,
 .workbench > .empty-session-panel,
 .workbench > .session-loading-panel,
@@ -307,6 +311,7 @@
 
 .session-switching > .message,
 .session-switching > .tool-card,
+.session-switching > .model-change-row,
 .session-switching > .live-stack,
 .session-switching > .empty-session-panel,
 .session-switching > .start-panel {
@@ -322,9 +327,11 @@
 
 .new-session-transition:not(.start-state) .workbench > .message,
 .new-session-transition:not(.start-state) .workbench > .tool-card,
+.new-session-transition:not(.start-state) .workbench > .model-change-row,
 .new-session-transition:not(.start-state) .workbench > .live-stack,
 .in-project-new-session-transition .workbench > .message,
 .in-project-new-session-transition .workbench > .tool-card,
+.in-project-new-session-transition .workbench > .model-change-row,
 .in-project-new-session-transition .workbench > .live-stack {
   animation: session-content-enter 640ms var(--ease-dock) both;
 }
@@ -336,6 +343,7 @@
 
 .session-handoff-workbench > .message,
 .session-handoff-workbench > .tool-card,
+.session-handoff-workbench > .model-change-row,
 .session-handoff-workbench > .live-stack {
   opacity: 0;
   filter: blur(2px);
@@ -794,6 +802,78 @@
 .markdown-body .markdown-relative-link {
   border-bottom: 1px dotted currentColor;
   color: #bfb5ff;
+}
+
+.model-change-row {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  width: min(var(--content-max), 100%);
+  margin: 20px auto 0;
+  color: var(--muted-strong);
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.model-change-row::before,
+.model-change-row::after {
+  flex: 1 1 24px;
+  min-width: 16px;
+  height: 1px;
+  background: var(--border);
+  content: '';
+}
+
+.model-change-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: calc(100% - 58px);
+}
+
+.model-change-label > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+
+.model-change-label svg {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  color: #969699;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.model-change-label strong {
+  display: inline-block;
+  max-width: 100%;
+  color: #c6c6cb;
+  font-weight: 500;
+  vertical-align: bottom;
+}
+
+@media (max-width: 760px) {
+  .model-change-row {
+    gap: 8px;
+    font-size: 11px;
+  }
+
+  .model-change-label {
+    max-width: calc(100% - 48px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workbench > .model-change-row {
+    animation: none !important;
+    transition: none !important;
+  }
 }
 
 .event-row {

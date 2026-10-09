@@ -240,10 +240,11 @@ export function toActiveSessionDetailDto(handle) {
     handle.runtime.session.sessionManager,
     sessionInfo(handle),
     handle.runtime.session.getContextUsage?.(),
+    handle.runtime.session.modelRuntime,
   )
 }
 
-function toSessionDetailFromManager(manager, session, contextUsage) {
+function toSessionDetailFromManager(manager, session, contextUsage, modelRuntime) {
   const header = manager.getHeader()
   const entries = manager.getBranch()
   let messageCount = 0
@@ -297,7 +298,10 @@ function toSessionDetailFromManager(manager, session, contextUsage) {
       contextUsage,
     },
     entries: applyRolloutFeedback(
-      projectTranscriptEntries(entries, { research }),
+      projectTranscriptEntries(entries, {
+        research,
+        modelName: (provider, id) => modelRuntime?.getModel(provider, id)?.name,
+      }),
       info.cwd,
       info.path,
       info.id,

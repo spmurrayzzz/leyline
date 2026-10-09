@@ -576,7 +576,7 @@ export function useSessionWorkspace({
   }
 
   function sessionRefreshDelay(activeSessionId, event) {
-    if (['agent_settled', 'stream_reconnected'].includes(event?.type)) return 0
+    if (['agent_settled', 'stream_reconnected', 'model_changed'].includes(event?.type)) return 0
     if (event?.type === 'compaction_end') {
       return event.reason === 'manual' ? 0 : undefined
     }

@@ -3944,7 +3944,7 @@ function closePickerMenus() {
             :class="liveItemClass(item)"
           >
             <TranscriptEntry
-              v-if="item.type === 'system'"
+              v-if="item.type === 'system' || item.type === 'model-change'"
               :copied-entry-id="copiedEntryId"
               :entry="item.persistedEntry || item"
               :tool-expanded="isToolExpanded(item.persistedEntry || item)"
