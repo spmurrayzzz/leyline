@@ -2,6 +2,7 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { useDictation } from '../composables/useDictation'
 import ModelPicker from './ModelPicker.vue'
+import UltrafastToggle from './UltrafastToggle.vue'
 import PromptQueue from './PromptQueue.vue'
 import { formatMode } from '../lib/format'
 
@@ -123,6 +124,9 @@ const props = defineProps({
   slashPickerOpen: Boolean,
   switchingModel: Boolean,
   switchingThinking: Boolean,
+  switchingUltrafast: Boolean,
+  ultrafastAvailable: Boolean,
+  ultrafastEnabled: Boolean,
   terminalOpen: Boolean,
   terminalStatus: {
     type: String,
@@ -158,6 +162,7 @@ const emit = defineEmits([
   'show-slash-picker',
   'submit',
   'toggle-picker',
+  'toggle-ultrafast',
   'toggle-research',
   'toggle-terminal',
   'update:draft',
@@ -176,7 +181,7 @@ const queueMode = computed(() => !shellMode.value && !props.editingLabel
   && (props.agentRunning || props.promptQueue?.held || props.promptQueue?.items?.length > 0))
 const stopMode = computed(() => props.agentRunning && shellMode.value)
 const submitDisabled = computed(() => props.compacting || props.promptSubmitting
-  || props.reloadingSession || !props.canSubmitDraft
+  || props.reloadingSession || props.switchingUltrafast || !props.canSubmitDraft
   || (props.agentRunning && Boolean(props.editingLabel)))
 const shellModeLabel = computed(() => {
   return hiddenShellMode.value ? 'shell · hidden' : 'shell · context'
@@ -268,7 +273,7 @@ function updateDraft(event) {
       'hidden-shell-mode-composer': hiddenShellMode,
       'research-mode-composer': research,
     }"
-    @submit.prevent="emit('submit')"
+    @submit.prevent="!switchingUltrafast && emit('submit')"
   >
     <Transition name="composer-reveal">
       <div v-if="editingLabel" class="editing-banner">
@@ -293,7 +298,9 @@ function updateDraft(event) {
         :value="draft"
         :disabled="inputDisabled"
         :placeholder="placeholder"
-        @keydown="emit('keydown', $event)"
+        @keydown="switchingUltrafast && $event.key === 'Enter' && !$event.shiftKey
+          ? $event.preventDefault()
+          : emit('keydown', $event)"
         @input="updateDraft"
         @paste="emit('paste', $event)"
       ></textarea>
@@ -350,7 +357,7 @@ function updateDraft(event) {
     <div class="composer-bar">
       <div class="composer-primary-row">
         <div class="composer-row-spacer"></div>
-        <div class="composer-actions">
+        <div class="composer-actions" :class="{ 'has-ultrafast': ultrafastAvailable }">
           <ModelPicker
             :available-models="availableModels"
             :current-mobile-model-label="currentMobileModelLabel"
@@ -359,11 +366,12 @@ function updateDraft(event) {
               || compacting
               || promptSubmitting
               || reloadingSession
-              || switchingModel"
+              || switchingModel
+              || switchingUltrafast"
             :model-key="modelKey"
-            :open="modelPickerOpen"
+            :open="modelPickerOpen && !switchingUltrafast"
             :selected-model-key="selectedModelKey"
-            @select="emit('select-model', $event)"
+            @select="!switchingUltrafast && emit('select-model', $event)"
             @toggle="emit('toggle-picker', 'model')"
           />
           <div class="model-picker small-picker">
@@ -374,7 +382,8 @@ function updateDraft(event) {
                 || compacting
                 || promptSubmitting
                 || reloadingSession
-                || switchingThinking"
+                || switchingThinking
+                || switchingUltrafast"
               @click="emit('toggle-picker', 'thinking')"
             >
               <span class="model-label desktop-label">
@@ -386,13 +395,14 @@ function updateDraft(event) {
               <span class="model-caret">▾</span>
             </button>
             <Transition name="composer-popover">
-              <div v-if="thinkingPickerOpen" class="model-menu small-menu">
+              <div v-if="thinkingPickerOpen && !switchingUltrafast" class="model-menu small-menu">
                 <button
                   v-for="level in availableThinkingLevels"
                   :key="level"
                   type="button"
                   :class="{ active: level === thinkingLevel }"
-                  @click="emit('select-thinking', level)"
+                  :disabled="switchingUltrafast"
+                  @click="!switchingUltrafast && emit('select-thinking', level)"
                 >
                   <span>{{ formatMode(level) }}</span>
                   <span v-if="level === thinkingLevel">✓</span>
@@ -400,6 +410,18 @@ function updateDraft(event) {
               </div>
             </Transition>
           </div>
+          <UltrafastToggle
+            v-if="ultrafastAvailable"
+            :enabled="ultrafastEnabled"
+            :disabled="agentRunning
+              || compacting
+              || promptSubmitting
+              || reloadingSession
+              || switchingModel
+              || switchingThinking
+              || switchingUltrafast"
+            @toggle="emit('toggle-ultrafast')"
+          />
           <button
             class="dictation-button"
             :class="{
@@ -577,3 +599,20 @@ function updateDraft(event) {
     </div>
   </form>
 </template>
+
+<style scoped>
+@media (max-width: 380px) {
+  .composer-actions.has-ultrafast {
+    flex-wrap: wrap;
+  }
+
+  .composer-actions.has-ultrafast > .model-picker:first-child {
+    flex: 1 1 100%;
+  }
+
+  .composer-actions.has-ultrafast > .small-picker {
+    min-width: 0;
+    flex: 1 1 0;
+  }
+}
+</style>

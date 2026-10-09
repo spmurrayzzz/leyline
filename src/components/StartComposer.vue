@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useDictation } from '../composables/useDictation'
 import ModelPicker from './ModelPicker.vue'
+import UltrafastToggle from './UltrafastToggle.vue'
 import { formatMode } from '../lib/format'
 
 const props = defineProps({
@@ -91,6 +92,9 @@ const props = defineProps({
   },
   switchingModel: Boolean,
   switchingThinking: Boolean,
+  switchingUltrafast: Boolean,
+  ultrafastAvailable: Boolean,
+  ultrafastEnabled: Boolean,
   thinkingLevel: {
     type: String,
     default: '',
@@ -120,6 +124,7 @@ const emit = defineEmits([
   'show-slash-picker',
   'submit',
   'toggle-picker',
+  'toggle-ultrafast',
   'toggle-session-kind',
   'toggle-project-picker',
   'update:draft',
@@ -208,7 +213,7 @@ defineExpose({ form, focus })
       'hidden-shell-mode-composer': hiddenShellMode,
       'research-mode-composer': researchMode,
     }"
-    @submit.prevent="emit('submit')"
+    @submit.prevent="!switchingUltrafast && emit('submit')"
   >
     <div class="composer-input-shell">
       <Transition name="shell-glyph">
@@ -221,7 +226,9 @@ defineExpose({ form, focus })
           ? 'Describe the research question, constraints, and desired report'
           : 'Ask Leyline anything'"
         :disabled="inputDisabled"
-        @keydown="emit('keydown', $event)"
+        @keydown="switchingUltrafast && $event.key === 'Enter' && !$event.shiftKey
+          ? $event.preventDefault()
+          : emit('keydown', $event)"
         @input="updateDraft"
         @paste="emit('paste', $event)"
       ></textarea>
@@ -280,36 +287,37 @@ defineExpose({ form, focus })
     <div class="start-composer-bar">
       <div class="composer-primary-row">
         <div class="composer-row-spacer"></div>
-        <div class="composer-actions">
+        <div class="composer-actions" :class="{ 'has-ultrafast': ultrafastAvailable }">
           <ModelPicker
             :available-models="availableModels"
             :current-model-label="currentModelLabel"
-            :disabled="switchingModel || availableModels.length === 0"
+            :disabled="switchingModel || switchingUltrafast || availableModels.length === 0"
             :model-key="modelKey"
-            :open="modelPickerOpen"
+            :open="modelPickerOpen && !switchingUltrafast"
             :selected-model-key="selectedModelKey"
             start
-            @select="emit('select-model', $event)"
+            @select="!switchingUltrafast && emit('select-model', $event)"
             @toggle="emit('toggle-picker', 'model')"
           />
           <div class="model-picker small-picker start-picker">
             <button
               class="composer-chip model-picker-button start-composer-chip"
               type="button"
-              :disabled="switchingThinking || !availableThinkingLevels.length"
+              :disabled="switchingThinking || switchingUltrafast || !availableThinkingLevels.length"
               @click="emit('toggle-picker', 'thinking')"
             >
               <span class="model-label">{{ currentThinkingLabel }}</span>
               <span class="model-caret">▾</span>
             </button>
             <Transition name="composer-popover">
-              <div v-if="thinkingPickerOpen" class="model-menu small-menu">
+              <div v-if="thinkingPickerOpen && !switchingUltrafast" class="model-menu small-menu">
                 <button
                   v-for="level in availableThinkingLevels"
                   :key="level"
                   type="button"
                   :class="{ active: level === thinkingLevel }"
-                  @click="emit('select-thinking', level)"
+                  :disabled="switchingUltrafast"
+                  @click="!switchingUltrafast && emit('select-thinking', level)"
                 >
                   <span>{{ formatMode(level) }}</span>
                   <span v-if="level === thinkingLevel">✓</span>
@@ -317,6 +325,16 @@ defineExpose({ form, focus })
               </div>
             </Transition>
           </div>
+          <UltrafastToggle
+            v-if="ultrafastAvailable"
+            :enabled="ultrafastEnabled"
+            :disabled="!!creatingSessionCwd
+              || switchingModel
+              || switchingThinking
+              || switchingUltrafast"
+            start
+            @toggle="emit('toggle-ultrafast')"
+          />
           <button
             class="dictation-button"
             :class="{
@@ -356,6 +374,7 @@ defineExpose({ form, focus })
             :title="shellMode ? 'Run shell command' : 'Send message'"
             :disabled="!newSessionCwd.trim()
               || !!creatingSessionCwd
+              || switchingUltrafast
               || !!imageSupportWarning
               || (shellMode && (!shellCommand || attachedImages.length))"
           >{{ shellMode ? 'Run' : '↑' }}</button>
@@ -466,3 +485,20 @@ defineExpose({ form, focus })
     </Transition>
   </form>
 </template>
+
+<style scoped>
+@media (max-width: 380px) {
+  .composer-actions.has-ultrafast {
+    flex-wrap: wrap;
+  }
+
+  .composer-actions.has-ultrafast > .model-picker:first-child {
+    flex: 1 1 100%;
+  }
+
+  .composer-actions.has-ultrafast > .small-picker {
+    min-width: 0;
+    flex: 1 1 0;
+  }
+}
+</style>

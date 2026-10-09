@@ -425,6 +425,10 @@ const {
   startupRun,
   switchingModel,
   switchingThinking,
+  switchingUltrafast,
+  setUltrafast,
+  ultrafastAvailable,
+  ultrafastEnabled,
   updateRuntimeEventState,
   updateRuntimeSessionSnapshot,
   visibleProjects,
@@ -2304,6 +2308,7 @@ async function requestResearchReportRepair() {
     || promptSubmitting.value
     || agentRunning.value
     || reloadingSession.value
+    || switchingUltrafast.value
     || sessionLoading.value
     || sessionSwitching.value
     || sessionActivating.value
@@ -2472,6 +2477,7 @@ async function submitDraft(streamingBehavior) {
   const compactCommand = compactCommandFromText(text)
   if (!text && images.length === 0) return
   if (promptSubmitting.value
+    || switchingUltrafast.value
     || reloadingSession.value
     || sessionLoading.value
     || sessionSwitching.value
@@ -2960,6 +2966,12 @@ async function selectModel(model) {
   await selectWorkspaceModel(model)
 }
 
+async function toggleUltrafast() {
+  closePickerMenus()
+  promptError.value = ''
+  await setUltrafast(!ultrafastEnabled.value)
+}
+
 async function selectThinkingLevel(level) {
   thinkingPickerOpen.value = false
   promptError.value = ''
@@ -3126,8 +3138,11 @@ function handleStartComposerKeydown(event) {
 }
 
 async function submitStartDraft() {
+  if (switchingUltrafast.value) return
   const text = draft.value.trim()
+  const requestedUltrafast = ultrafastEnabled.value
   const model = startSelectedModel.value
+    || (requestedUltrafast ? composerRuntime.value?.state?.model : null)
   const thinkingLevel = startSelectedThinkingLevel.value
   const targetCwd = newSessionCwd.value.trim()
   const sourceDraftKey = activeComposerDraftKey
@@ -3169,6 +3184,10 @@ async function submitStartDraft() {
     if (thinkingLevel) {
       await runStartupPhase('thinking', () => selectWorkspaceThinkingLevel(thinkingLevel))
       if (!isCurrent() || sessionError.value) return
+    }
+    if (requestedUltrafast) {
+      const enabled = await runStartupPhase('ultrafast', () => setUltrafast(true))
+      if (!isCurrent() || !enabled || sessionError.value) return
     }
     if (hasPrompt) await runStartupPhase('submitting', submitDraft)
   } finally {
@@ -3659,6 +3678,7 @@ function closePickerMenus() {
               :disabled="promptSubmitting
                 || agentRunning
                 || reloadingSession
+                || switchingUltrafast
                 || sessionLoading
                 || sessionSwitching
                 || sessionActivating
@@ -4126,6 +4146,9 @@ function closePickerMenus() {
             :start-project-picker-open="startProjectPickerOpen"
             :switching-model="switchingModel"
             :switching-thinking="switchingThinking"
+            :switching-ultrafast="switchingUltrafast"
+            :ultrafast-available="ultrafastAvailable"
+            :ultrafast-enabled="ultrafastEnabled"
             :thinking-level="composerRuntime?.state?.thinkingLevel"
             :thinking-picker-open="thinkingPickerOpen"
             :tool-names="activeToolNames"
@@ -4144,6 +4167,7 @@ function closePickerMenus() {
             @submit="submitStartDraft"
             @toggle-picker="togglePicker"
             @toggle-session-kind="toggleStartSessionKind"
+            @toggle-ultrafast="toggleUltrafast"
             @toggle-project-picker="startProjectPickerOpen = !startProjectPickerOpen"
           />
         </div>
@@ -4207,6 +4231,9 @@ function closePickerMenus() {
             :tool-names="activeToolNames"
             :tools-chip-label="toolsChipLabel"
             :tools-picker-open="toolsPickerOpen"
+            :switching-ultrafast="switchingUltrafast"
+            :ultrafast-available="ultrafastAvailable"
+            :ultrafast-enabled="ultrafastEnabled"
             @cancel-edit="cancelEditingEntry"
             @interrupt="interruptAgent"
             @keydown="handleComposerKeydown"
@@ -4222,6 +4249,7 @@ function closePickerMenus() {
             @toggle-picker="togglePicker"
             @toggle-research="toggleEmptySessionKind"
             @toggle-terminal="toggleTerminal(selectedSessionId)"
+            @toggle-ultrafast="toggleUltrafast"
           />
         </div>
       </div>

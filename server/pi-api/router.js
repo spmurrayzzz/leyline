@@ -51,6 +51,7 @@ export function createPiApiHandler(api) {
     setSessionMode,
     setSessionModel,
     setSessionThinkingLevel,
+    setSessionUltrafast,
     sessionDetail,
     switchActiveSession,
     toActiveSessionDetailDto,
@@ -645,6 +646,7 @@ async function piApiHandler(req, res) {
         'reload',
         'model',
         'thinking',
+        'ultrafast',
       ].join('|')
       const scopedActionMatch = url.pathname.match(
         new RegExp(`^/sessions/([^/]+)/(${scopedActions})$`),
@@ -726,6 +728,10 @@ async function piApiHandler(req, res) {
         }
         if (action === 'model') {
           await setSessionModel(handle, body.provider, body.id)
+          return json(res, { ok: true, active: activeSessionDto(handle) })
+        }
+        if (action === 'ultrafast') {
+          await setSessionUltrafast(handle, body.enabled, responseAbortSignal(res))
           return json(res, { ok: true, active: activeSessionDto(handle) })
         }
   

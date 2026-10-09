@@ -356,6 +356,15 @@ export async function switchPiModel(sessionId, provider, id) {
   return data.active
 }
 
+export async function setPiUltrafast(sessionId, enabled) {
+  const data = await apiRequest(
+    sessionActionUrl(sessionId, 'ultrafast'),
+    'Failed to change Ultrafast',
+    { method: 'POST', body: { enabled } },
+  )
+  return data.active
+}
+
 export async function switchPiThinkingLevel(sessionId, level) {
   const data = await apiRequest(
     sessionActionUrl(sessionId, 'thinking'),

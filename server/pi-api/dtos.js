@@ -5,6 +5,7 @@ import {
 } from '../../lib/transcript-projection.js'
 import { SessionManager } from '@earendil-works/pi-coding-agent'
 import { emptyExtensionUiState } from './extension-ui.js'
+import { supportsUltrafastWithAuth, ULTRAFAST_COMMAND } from '../../lib/ultrafast.js'
 import { goalStateFromEntries, goalStateFromSession } from './goal-state.js'
 import { applyRolloutFeedback } from './rollout-feedback.js'
 import {
@@ -40,6 +41,7 @@ const HIDDEN_SLASH_COMMANDS = new Set([
   'settings',
   'share',
   'tree',
+  ULTRAFAST_COMMAND,
 ])
 const THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']
 
@@ -111,8 +113,10 @@ export function sessionStateDto(
   const hasQueuedMessages = session.agent.hasQueuedMessages()
 
   return {
-    model: modelDto(session.model),
-    availableModels: session.modelRuntime.getAvailableSnapshot().map(modelDto),
+    model: modelDto(session.model, session.modelRuntime),
+    availableModels: session.modelRuntime.getAvailableSnapshot().map((model) => {
+      return modelDto(model, session.modelRuntime)
+    }),
     thinkingLevel: session.thinkingLevel,
     availableThinkingLevels: session.getAvailableThinkingLevels(),
     isStreaming: session.isStreaming,
@@ -194,13 +198,17 @@ function slashCommandDtos(session) {
     .sort((a, b) => a.name.localeCompare(b.name))
 }
 
-function modelDto(model) {
+function modelDto(model, modelRuntime) {
   if (!model) return undefined
   return {
     id: model.id,
     name: model.name,
     provider: model.provider,
     supportsImages: model.input?.includes('image') === true,
+    supportsUltrafast: supportsUltrafastWithAuth(
+      model,
+      modelRuntime.isUsingSubscription(model.provider),
+    ),
     availableThinkingLevels: modelThinkingLevels(model),
   }
 }

@@ -83,6 +83,7 @@ import {
   researchStateFromEntries,
 } from '../../lib/research-state.js'
 import { auditResearchReportCitations } from '../../lib/research-citations.js'
+import { supportsUltrafastWithAuth, ULTRAFAST_COMMAND } from '../../lib/ultrafast.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const BUNDLED_OUTPUT_BUDGET_EXTENSION = resolve(
@@ -92,6 +93,15 @@ const BUNDLED_OUTPUT_BUDGET_EXTENSION = resolve(
   '.pi',
   'extensions',
   'output-budget',
+  'index.js',
+)
+const BUNDLED_ULTRAFAST_EXTENSION = resolve(
+  __dirname,
+  '..',
+  '..',
+  '.pi',
+  'extensions',
+  'ultrafast',
   'index.js',
 )
 const BUNDLED_GOAL_EXTENSION = resolve(
@@ -234,6 +244,7 @@ function extensionNames(extension) {
 function preferBundledExtensions(result) {
   const specifications = [
     { path: BUNDLED_OUTPUT_BUDGET_EXTENSION, name: 'output-budget' },
+    { path: BUNDLED_ULTRAFAST_EXTENSION, name: 'ultrafast', command: ULTRAFAST_COMMAND },
     { path: BUNDLED_GOAL_EXTENSION, name: 'goal', command: 'goal' },
     { path: BUNDLED_MEMORY_EXTENSION, name: 'memory', command: 'memory' },
     { path: BUNDLED_SUBAGENT_EXTENSION, name: 'subagent', tool: 'subagent' },
@@ -262,6 +273,9 @@ function preferBundledExtensions(result) {
             && extension.commands?.has(specification.command))
           || (specification.tool && extension.tools?.has(specification.tool))
       })
+    }).sort((a, b) => {
+      return Number(a.resolvedPath === BUNDLED_ULTRAFAST_EXTENSION)
+        - Number(b.resolvedPath === BUNDLED_ULTRAFAST_EXTENSION)
     }),
   }
 }
@@ -321,6 +335,7 @@ async function createRuntimeResult(
       ],
       additionalExtensionPaths: [
         BUNDLED_OUTPUT_BUDGET_EXTENSION,
+        BUNDLED_ULTRAFAST_EXTENSION,
         BUNDLED_GOAL_EXTENSION,
         BUNDLED_MEMORY_EXTENSION,
         BUNDLED_SUBAGENT_EXTENSION,
@@ -536,6 +551,8 @@ async function promptSession(
   onAccepted,
 ) {
   requireInitializedSession(handle)
+  if (handle.settingModel) throw new Error('Finish the model change before sending.')
+  if (handle.settingUltrafast) throw new Error('Finish the Ultrafast change before sending.')
   const session = handle.runtime.session
   const controller = new AbortController()
   const abortPrompt = () => controller.abort()
@@ -647,6 +664,8 @@ function ensurePromptQueue(handle) {
       && !handle.reloading
       && !handle.interruptPromise
       && !handle.initializing
+      && !handle.settingModel
+      && !handle.settingUltrafast
       && !handle.disposalPromise
       && !runtimeShuttingDown,
     submit: (item, streamingBehavior, signal, onAccepted) => promptSession(
@@ -1480,15 +1499,69 @@ const reloadSession = trackRuntimeCreation(async (handle) => {
   }
 })
 
+async function setSessionUltrafast(handle, enabled, signal) {
+  requireInitializedSession(handle)
+  if (typeof enabled !== 'boolean') throw new Error('enabled must be a boolean')
+  if (handle.settingModel) throw new Error('Wait for the model change to finish.')
+  if (handle.settingUltrafast) throw new Error('Wait for the Ultrafast change to finish.')
+  const session = handle.runtime.session
+  if (!session.extensionRunner.getCommand(ULTRAFAST_COMMAND)) {
+    throw new Error('Ultrafast is not available in this runtime.')
+  }
+  const model = session.model
+  if (enabled && (!model || !supportsUltrafastWithAuth(
+    model,
+    session.modelRuntime.isUsingSubscription(model.provider),
+  ))) {
+    throw new Error('Ultrafast is not available for this model and authentication method.')
+  }
+  if (!session.isIdle || handle.pendingPromptControllers?.size || handle.interruptPromise) {
+    throw new Error('Wait for the current run to finish before changing Ultrafast.')
+  }
+  if (signal?.aborted) return
+
+  handle.settingUltrafast = true
+  const release = await lockPromptSubmission(handle)
+  try {
+    requireInitializedSession(handle)
+    if (signal?.aborted || handle.runtime.session !== session) return
+    await session.prompt(`/${ULTRAFAST_COMMAND} ${enabled ? 'on' : 'off'}`, { source: 'api' })
+  } finally {
+    release()
+    handle.settingUltrafast = false
+    handle.promptQueue?.schedule()
+  }
+}
+
 async function setSessionModel(handle, provider, id) {
+  requireInitializedSession(handle)
+  if (handle.settingModel) throw new Error('Wait for the model change to finish.')
+  if (handle.settingUltrafast) throw new Error('Wait for the Ultrafast change to finish.')
   if (!provider || !id) throw new Error('provider and id are required')
 
-  const model = handle.runtime.session.modelRuntime.getModel(provider, id)
-  if (!model) throw new Error('Model not found')
-  await handle.runtime.session.setModel(model, { persist: true })
+  const session = handle.runtime.session
+  if (!session.isIdle || handle.pendingPromptControllers?.size || handle.interruptPromise) {
+    throw new Error('Wait for the current run to finish before changing models.')
+  }
+  handle.settingModel = true
+  const release = await lockPromptSubmission(handle)
+  try {
+    requireInitializedSession(handle)
+    if (handle.runtime.session !== session || !session.isIdle || handle.interruptPromise) {
+      throw new Error('Wait for the current run to finish before changing models.')
+    }
+    const model = session.modelRuntime.getModel(provider, id)
+    if (!model) throw new Error('Model not found')
+    await session.setModel(model, { persist: true })
+  } finally {
+    release()
+    handle.settingModel = false
+    handle.promptQueue?.schedule()
+  }
 }
 
 function setSessionThinkingLevel(handle, level) {
+  if (handle.settingModel) throw new Error('Wait for the model change to finish.')
   if (!level) throw new Error('level is required')
 
   const levels = handle.runtime.session.getAvailableThinkingLevels()
@@ -1898,6 +1971,7 @@ export function createPiRuntimeApi() {
   setSessionModel,
   setRolloutFeedback,
   setSessionThinkingLevel,
+  setSessionUltrafast,
   shutdownRuntime,
   sessionDetail,
   switchActiveSession,

@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue'
 import { highlightedText as highlightFuzzyText } from '../lib/fuzzy'
+import { ULTRAFAST_STATUS_KEY } from '../../lib/ultrafast.js'
 import {
   formatMode,
   modelChip,
@@ -20,6 +21,7 @@ import {
   reloadPiSession,
   renamePiSession,
   resetPiSession,
+  setPiUltrafast,
   switchPiModel,
   switchPiThinkingLevel,
 } from '../lib/pi-api'
@@ -46,6 +48,7 @@ export function useSessionWorkspace({
   const startRuntimeState = ref(null)
   const startSelectedModel = ref(null)
   const startSelectedThinkingLevel = ref(null)
+  const startUltrafastEnabled = ref(false)
   const sessionQuery = ref('')
   const selectedSessionId = ref('')
   const sessionDetail = ref(null)
@@ -70,6 +73,7 @@ export function useSessionWorkspace({
   const sessionHandoffSettling = ref(false)
   const switchingModel = ref(false)
   const switchingThinking = ref(false)
+  const switchingUltrafast = ref(false)
   const reloadingSession = ref(false)
   const renamingSessionId = ref('')
   const renamingSessionSource = ref('')
@@ -128,12 +132,25 @@ export function useSessionWorkspace({
     return sessionsLoading.value && !selectedSession.value
   })
   const composerRuntime = computed(() => {
-    return selectedSession.value
-      ? activeRuntimeSession.value
-      : startRuntimeState.value
+    if (selectedSession.value) return activeRuntimeSession.value
+    return startRuntimeState.value?.cwd === newSessionCwd.value
+      ? startRuntimeState.value
+      : null
   })
   const availableModels = computed(() => {
     return composerRuntime.value?.state?.availableModels || []
+  })
+  const ultrafastAvailable = computed(() => {
+    const state = composerRuntime.value?.state
+    return state?.model?.supportsUltrafast === true
+      && (!selectedSession.value
+        || ['on', 'off'].includes(state.extensionUi?.statuses?.[ULTRAFAST_STATUS_KEY]))
+  })
+  const ultrafastEnabled = computed(() => {
+    if (!ultrafastAvailable.value) return false
+    return selectedSession.value
+      ? composerRuntime.value?.state?.extensionUi?.statuses?.[ULTRAFAST_STATUS_KEY] === 'on'
+      : startUltrafastEnabled.value
   })
   const selectedModelKey = computed(() => {
     const model = composerRuntime.value?.state?.model
@@ -308,14 +325,16 @@ export function useSessionWorkspace({
     if (!targetCwd || selectedSession.value) return
     const pending = startRuntimeRequests.get(targetCwd)
     if (pending) return pending
+    startRuntimeState.value = null
+    startSelectedModel.value = null
+    startSelectedThinkingLevel.value = null
+    startUltrafastEnabled.value = false
 
     const request = (async () => {
       try {
         const state = await fetchPiRuntimeState(targetCwd)
         if (newSessionCwd.value !== targetCwd || selectedSession.value) return
         startRuntimeState.value = state
-        startSelectedModel.value = null
-        startSelectedThinkingLevel.value = null
         sessionError.value = ''
       } catch (error) {
         if (newSessionCwd.value === targetCwd
@@ -456,6 +475,7 @@ export function useSessionWorkspace({
     sessionHandoffSettling.value = false
     clearTimeout(sessionHandoffSettlingTimer)
     activeRuntimeSession.value = null
+    startUltrafastEnabled.value = false
     finishStartupRun()
     liveTurn?.reset?.()
   }
@@ -1228,7 +1248,7 @@ export function useSessionWorkspace({
   }
 
   async function selectModel(model) {
-    if (!model || modelKey(model) === selectedModelKey.value) return false
+    if (switchingUltrafast.value || !model || modelKey(model) === selectedModelKey.value) return false
 
     switchingModel.value = true
     sessionError.value = ''
@@ -1246,6 +1266,7 @@ export function useSessionWorkspace({
         startSelectedThinkingLevel.value = thinkingLevel
       }
       startSelectedModel.value = model
+      startUltrafastEnabled.value = false
       startRuntimeState.value = {
         ...startRuntimeState.value,
         state: {
@@ -1275,8 +1296,32 @@ export function useSessionWorkspace({
     return true
   }
 
+  async function setUltrafast(enabled) {
+    if (switchingUltrafast.value
+      || (enabled && !selectedSession.value && !ultrafastAvailable.value)) return false
+    sessionError.value = ''
+    if (!selectedSession.value) {
+      startUltrafastEnabled.value = enabled
+      return enabled
+    }
+    const sessionId = selectedSessionId.value
+    switchingUltrafast.value = true
+    try {
+      const active = await setPiUltrafast(sessionId, enabled)
+      if (selectedSessionId.value !== sessionId) return false
+      activeRuntimeSession.value = active
+      return activeRuntimeSession.value?.id === sessionId
+        && activeRuntimeSession.value.state?.extensionUi?.statuses?.[ULTRAFAST_STATUS_KEY] === 'on'
+    } catch (error) {
+      if (selectedSessionId.value === sessionId) sessionError.value = error.message
+      return false
+    } finally {
+      switchingUltrafast.value = false
+    }
+  }
+
   async function selectThinkingLevel(level) {
-    if (!level || level === composerRuntime.value?.state?.thinkingLevel) {
+    if (switchingUltrafast.value || !level || level === composerRuntime.value?.state?.thinkingLevel) {
       return false
     }
 
@@ -1801,9 +1846,14 @@ export function useSessionWorkspace({
     startRuntimeState,
     startSelectedModel,
     startSelectedThinkingLevel,
+    startUltrafastEnabled,
     startupRun,
     switchingModel,
     switchingThinking,
+    switchingUltrafast,
+    setUltrafast,
+    ultrafastAvailable,
+    ultrafastEnabled,
     updateSelectedSessionSummary,
     visibleProjects,
   }
