@@ -54,7 +54,6 @@ let diffDirty = false
 let pendingPreviewKeys = new Set()
 let resizeCleanup
 let reviewEventSource
-let reviewEventLoadTimer
 let watchedRefreshQueued = false
 let watchedRefreshTimer
 
@@ -101,7 +100,7 @@ const panelSubtitle = computed(() => {
 onMounted(() => {
   emit('resize', constrainWidth(props.width))
   window.addEventListener('resize', constrainCurrentWidth)
-  if (!openReviewEventStream(true)) void loadReview()
+  void loadReview()
 })
 
 onBeforeUnmount(() => {
@@ -128,15 +127,14 @@ watch(() => props.cwd, () => {
   diffError.value = ''
   hasLoaded.value = false
   closeReviewEventStream()
-  if (!openReviewEventStream(true)) void loadReview()
+  void loadReview()
 })
 
 watch(() => props.watchEnabled, (enabled) => {
   const initialLoadNeeded = !hasLoaded.value && !refreshing.value
   if (enabled) {
-    if (!openReviewEventStream(initialLoadNeeded) && initialLoadNeeded) {
-      void loadReview()
-    }
+    if (initialLoadNeeded) void loadReview()
+    else if (hasLoaded.value && review.value.available) openReviewEventStream()
   } else {
     closeReviewEventStream()
     if (initialLoadNeeded) void loadReview()
@@ -164,39 +162,30 @@ watch(diffRequested, (requested) => {
   else announcePrepared()
 })
 
-function openReviewEventStream(loadAfterConnect = false) {
-  if (!props.watchEnabled || !props.cwd) return false
+function openReviewEventStream() {
+  if (!props.watchEnabled || !props.cwd || !hasLoaded.value
+    || !review.value.available) return false
   closeReviewEventStream()
   const params = new URLSearchParams({ cwd: props.cwd })
   const source = new EventSource(
     backendHttpUrl(`/api/pi/review/events?${params}`),
   )
-  let connected = false
-  let initialLoadStarted = false
-  const startInitialLoad = () => {
-    if (initialLoadStarted || reviewEventSource !== source) return
-    initialLoadStarted = true
-    clearTimeout(reviewEventLoadTimer)
-    reviewEventLoadTimer = undefined
-    void loadReview()
-  }
-  if (loadAfterConnect) {
-    reviewEventLoadTimer = window.setTimeout(startInitialLoad, 500)
-  }
   reviewEventSource = source
   source.addEventListener('open', () => {
-    if (reviewEventSource !== source) return
-    if (connected || (loadAfterConnect && initialLoadStarted)) {
-      requestWatchedRefresh()
-    } else if (loadAfterConnect) {
-      startInitialLoad()
-    } else {
-      requestWatchedRefresh()
-    }
-    connected = true
+    if (reviewEventSource === source) requestWatchedRefresh()
   })
   source.addEventListener('review_change', () => {
     if (reviewEventSource === source) requestWatchedRefresh()
+  })
+  source.addEventListener('review_unavailable', () => {
+    if (reviewEventSource !== source) return
+    closeReviewEventStream()
+    void loadReview()
+  })
+  source.addEventListener('error', () => {
+    if (reviewEventSource === source && source.readyState === EventSource.CLOSED) {
+      closeReviewEventStream()
+    }
   })
   return true
 }
@@ -204,8 +193,6 @@ function openReviewEventStream(loadAfterConnect = false) {
 function closeReviewEventStream() {
   reviewEventSource?.close()
   reviewEventSource = undefined
-  clearTimeout(reviewEventLoadTimer)
-  reviewEventLoadTimer = undefined
   clearTimeout(watchedRefreshTimer)
   watchedRefreshTimer = undefined
   watchedRefreshQueued = false
@@ -246,6 +233,8 @@ async function loadReview({ preserveSelection = false } = {}) {
       : files.value[0]?.path || ''
     selectedPath.value = nextPath
     hasLoaded.value = true
+    if (!data.available) closeReviewEventStream()
+    else if (!reviewEventSource) openReviewEventStream()
     if (nextPath) {
       diffDirty = true
       if (diffRequested.value) void loadDiff(nextPath)

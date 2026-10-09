@@ -25,7 +25,12 @@ export function openGitReviewEventStream(cwd, req, res) {
 
   void subscribe(cwd, res).then((unsubscribe) => {
     if (closed) {
-      unsubscribe()
+      unsubscribe?.()
+      return
+    }
+    if (!unsubscribe) {
+      res.statusCode = 204
+      res.end()
       return
     }
     release = unsubscribe
@@ -39,6 +44,7 @@ export function openGitReviewEventStream(cwd, req, res) {
 
 async function subscribe(cwd, res) {
   const target = await resolveGitReviewWatchTarget(cwd)
+  if (!target.repositoryRoot) return null
   let entry = watchEntries.get(target.watchRoot)
   if (!entry) {
     entry = createWatchEntry(cwd, target)
@@ -213,7 +219,16 @@ async function reprobeEntry(entry) {
   entry.reprobing = true
   try {
     const target = await resolveGitReviewWatchTarget(entry.cwd)
-    if (target.repositoryRoot && target.watchRoot !== entry.watchRoot) return
+    if (!target.repositoryRoot) {
+      closeEntry(entry)
+      for (const client of entry.clients) {
+        sendEvent(client, 'review_unavailable', {})
+        client.end()
+      }
+      entry.clients.clear()
+      return
+    }
+    if (target.watchRoot !== entry.watchRoot) return
     for (const watcher of entry.gitWatchers) watcher.close()
     entry.gitWatchers = []
     entry.repositoryRoot = target.repositoryRoot
