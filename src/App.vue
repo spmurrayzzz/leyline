@@ -10,6 +10,7 @@ import {
   watch,
 } from 'vue'
 const TranscriptEntry = defineAsyncComponent(() => import('./components/TranscriptEntry.vue'))
+const SystemPromptInspector = defineAsyncComponent(() => import('./components/SystemPromptInspector.vue'))
 const LiveAssistantMessage = defineAsyncComponent(() => import('./components/LiveAssistantMessage.vue'))
 const PierrePreview = defineAsyncComponent(() => import('./components/PierrePreview.vue'))
 const FilePreview = defineAsyncComponent(() => import('./components/FilePreview.vue'))
@@ -114,6 +115,12 @@ const reviewDesktopAvailable = ref(false)
 const reviewRefreshToken = ref(0)
 const reviewSummary = ref(defaultReviewSummary())
 const researchSourcesOpen = ref(false)
+const systemPromptEntry = shallowRef(null)
+const systemPromptPane = ref(null)
+const systemPromptSelection = ref(0)
+const systemPromptViewport = window.matchMedia('(max-width: 760px)')
+const systemPromptMobile = ref(systemPromptViewport.matches)
+let systemPromptOpener = null
 const researchCitationPreview = ref(null)
 let researchCitationAnchor = null
 let researchCitationPreviewToken = 0
@@ -373,6 +380,7 @@ const {
   deletingProjectCwd,
   deletingSessionId,
   finishStartupRun,
+  forkingEntryId,
   forkSession,
   handleNativeNewSession,
   handleRouteChange,
@@ -397,6 +405,7 @@ const {
   requestDeleteProject,
   requestDeleteSession,
   removeRuntimeSession,
+  resettingEntryId,
   resetSessionToEntry,
   runStartupPhase,
   scheduleSessionRefresh,
@@ -1080,6 +1089,7 @@ watch(selectedSessionId, (sessionId, previousSessionId) => {
   }
   expandedTools.value = new Set()
   expandedSkills.value = new Set()
+  closeSystemPrompt(false)
   closeToolFullscreen()
   closeFileMenu(false)
   closeFilePreview(false)
@@ -1087,6 +1097,19 @@ watch(selectedSessionId, (sessionId, previousSessionId) => {
   seenEntryIds.value = new Set()
   animatingEntryIds.value = new Set()
   resetWorkbenchScrollState()
+})
+
+watch(activeBackendConnectionId, () => closeSystemPrompt(false))
+
+watch([sessionDetail, liveFlowItems], () => {
+  const id = systemPromptEntry.value?.id
+  if (!id) return
+  const live = liveFlowItems.value.find((item) => item.type === 'system'
+    && (item.id === id || item.persistedEntry?.id === id))
+  const entry = live?.persistedEntry || live
+    || sessionDetail.value?.entries.find((item) => item.type === 'system' && item.id === id)
+  if (entry) systemPromptEntry.value = entry
+  else closeSystemPrompt(false)
 })
 
 watch(entries, (newEntries) => {
@@ -1121,6 +1144,7 @@ onMounted(async () => {
   reviewDesktopQuery = window.matchMedia('(min-width: 1121px)')
   reviewDesktopAvailable.value = reviewDesktopQuery.matches
   reviewDesktopQuery.addEventListener('change', handleReviewDesktopChange)
+  systemPromptViewport.addEventListener('change', updateSystemPromptViewport)
   window.addEventListener('keydown', handleGlobalKeydown, true)
   window.addEventListener('click', closeMenusOnOutsideClick)
   window.addEventListener('popstate', handleRouteChange)
@@ -1145,6 +1169,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   reviewDesktopQuery?.removeEventListener('change', handleReviewDesktopChange)
+  systemPromptViewport.removeEventListener('change', updateSystemPromptViewport)
   window.removeEventListener('keydown', handleGlobalKeydown, true)
   window.removeEventListener('click', closeMenusOnOutsideClick)
   window.removeEventListener('popstate', handleRouteChange)
@@ -1547,8 +1572,47 @@ function researchPhaseLabel(phase) {
   return phase.charAt(0).toUpperCase() + phase.slice(1)
 }
 
+function updateSystemPromptViewport() {
+  systemPromptMobile.value = systemPromptViewport.matches
+}
+
+function openSystemPrompt(entry, opener) {
+  if (memoryDirty.value && !confirmDiscardMemoryChanges()) return
+  closeReview(true)
+  closeResearchSources()
+  closeResearchCitationPreview()
+  if (memoryOpen.value) closeMemoryDrawer()
+  eventLogOpen.value = false
+  sessionDetailsOpen.value = false
+  projectDetailCwd.value = ''
+  sidebarOpen.value = false
+  systemPromptOpener = opener
+  if (systemPromptEntry.value?.id === entry.id) {
+    closeSystemPrompt()
+    return
+  }
+  systemPromptSelection.value++
+  systemPromptEntry.value = entry
+}
+
+async function closeSystemPrompt(restoreFocus = true) {
+  if (!systemPromptEntry.value) return
+  const opener = systemPromptOpener
+  const selection = systemPromptSelection.value
+  const focused = systemPromptPane.value?.$el?.contains(document.activeElement)
+  systemPromptEntry.value = null
+  systemPromptOpener = null
+  await nextTick()
+  if (restoreFocus && focused && !systemPromptEntry.value
+    && systemPromptSelection.value === selection && opener?.isConnected
+    && !opener.closest('[inert]') && opener.getClientRects().length) {
+    opener.focus({ preventScroll: true })
+  }
+}
+
 function openResearchSources() {
   if (!selectedResearch.value?.sourceCount) return
+  closeSystemPrompt(false)
   closeResearchCitationPreview()
   closeReview(true)
   researchSourcesDismissedSessionId = ''
@@ -1581,6 +1645,8 @@ async function openResearchSource(payload) {
   const paneWasOpen = researchSourcesOpen.value
     || reviewOpen.value
     || reviewClosing.value
+    || !!systemPromptEntry.value
+  closeSystemPrompt(false)
   closeReview(true)
   closeResearchSources(false)
   closeResearchCitationPreview()
@@ -1609,6 +1675,7 @@ async function openResearchSource(payload) {
 }
 
 function openReview() {
+  closeSystemPrompt(false)
   closeResearchCitationPreview()
   closeResearchSources(true)
   reviewOpenRequested.value = true
@@ -1710,6 +1777,7 @@ function toggleReviewExpanded() {
 function navigateHome() {
   clearPendingWorkspaceTargets()
   workspaceNavigateHome()
+  closeSystemPrompt(false)
   closeReview(true)
   closeResearchSources(false)
   closeResearchCitationPreview()
@@ -3175,6 +3243,7 @@ function anyEscapeTargetOpen(ignoreQueue = false) {
     || startProjectPickerOpen.value
     || slashPickerOpen.value
     || researchSourcesOpen.value
+    || systemPromptEntry.value
     || researchCitationPreview.value
     || (reviewPaneExpanded.value && window.innerWidth > 1120)
   )
@@ -3186,6 +3255,11 @@ function handleEscape(event) {
     event?.stopPropagation?.()
     if (fileMenu.value) closeFileMenu()
     else closeFilePreview()
+    return
+  }
+  if (systemPromptPane.value?.dismissMenu()) {
+    event?.preventDefault?.()
+    event?.stopPropagation?.()
     return
   }
   if (!anyEscapeTargetOpen(true) && composerRef.value?.dismissQueue?.()) {
@@ -3204,6 +3278,7 @@ function handleEscape(event) {
   projectDetailCwd.value = ''
   collapseReviewExpanded()
   if (researchSourcesOpen.value) closeResearchSources()
+  closeSystemPrompt()
   closeResearchCitationPreview()
   if (memoryOpen.value) closeMemoryDrawer()
   closeImageFullscreen()
@@ -3289,6 +3364,7 @@ function closePickerMenus() {
       'research-open': researchSourcesOpen
         && isResearchSession
         && !!selectedSession,
+      'system-prompt-open': !!systemPromptEntry,
     }"
     :style="{
       '--composer-height': `${composerHeight}px`,
@@ -3581,7 +3657,7 @@ function closePickerMenus() {
       @update:navigator="setSidebarNavigator"
     />
 
-    <section class="main-pane">
+    <section class="main-pane" :inert="!!systemPromptEntry && systemPromptMobile">
       <div v-if="runtimeChromeVisible" class="runtime-chrome">
 
         <section v-if="activeGoal" class="goal-control-plane">
@@ -3858,6 +3934,7 @@ function closePickerMenus() {
             :entry="entry"
             :research-cwd="selectedSession?.cwd || ''"
             :skill-expanded="isSkillExpanded(entry)"
+            :system-prompt-selected="systemPromptEntry?.id === entry.id"
             :thinking-initially-expanded="thinkingInitiallyExpanded"
             :tool-expanded="isToolExpanded(entry)"
             @copy="copyEntry"
@@ -3867,6 +3944,7 @@ function closePickerMenus() {
             @navigate-child-session="navigateChildSession"
             @open-image="openImageFullscreen"
             @open-research-source="openResearchSource"
+            @open-system-prompt="openSystemPrompt"
             @reset="resetSessionToEntry"
             @retry="retryEntry"
             @open-tool-fullscreen="openToolFullscreen"
@@ -3892,11 +3970,8 @@ function closePickerMenus() {
               v-if="item.type === 'system' || item.type === 'model-change'"
               :copied-entry-id="copiedEntryId"
               :entry="item.persistedEntry || item"
-              :tool-expanded="isToolExpanded(item.persistedEntry || item)"
-              @copy="copyEntry"
-              @fork="forkSession"
-              @reset="resetSessionToEntry"
-              @toggle-tool="toggleTool"
+              :system-prompt-selected="systemPromptEntry?.id === (item.persistedEntry || item).id"
+              @open-system-prompt="openSystemPrompt"
             />
 
             <TranscriptEntry
@@ -4235,6 +4310,22 @@ function closePickerMenus() {
       :research="selectedResearch"
       @close="closeResearchSources"
     />
+
+    <Transition name="system-prompt">
+      <SystemPromptInspector
+        v-if="systemPromptEntry"
+        :key="systemPromptSelection"
+        ref="systemPromptPane"
+        :entry="systemPromptEntry"
+        :copied-entry-id="copiedEntryId"
+        :branch-busy="!!forkingEntryId || !!resettingEntryId || compactingContext"
+        :running="agentRunning"
+        @close="closeSystemPrompt"
+        @copy="copyEntry"
+        @fork="forkSession"
+        @reset="resetSessionToEntry"
+      />
+    </Transition>
 
     <ResearchCitationPreview
       v-if="researchCitationPreview"

@@ -3,6 +3,7 @@ import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import MarkdownIt from 'markdown-it'
 import { configureMarkdownLinks } from '../../lib/markdown-file-links.js'
+import { systemPromptInfo, systemSectionTitle } from '../../lib/system-prompt.js'
 import {
   imageBlocksFor,
   messageBlocksFor,
@@ -85,6 +86,7 @@ ${researchSources}
 </section>
 </main>
 <script id="export-data" type="application/json">${exportData}</script>
+<script>${systemInspectorJs()}</script>
 <script>${highlightJsSource()}</script>
 <script type="module">${exportJs()}</script>
 </body>
@@ -178,7 +180,7 @@ function toExportEntry(entry) {
 
 function renderExportEntry(entry, index) {
   if (entry.type === 'tool') return renderExportTool(entry, index)
-  if (entry.type === 'system') return renderExportSystem(entry)
+  if (entry.type === 'system') return renderExportSystem(entry, index)
   if (entry.type === 'model-change') return renderExportModelChange(entry)
   return renderExportMessage(entry)
 }
@@ -215,36 +217,57 @@ ${entry.contextLabel ? renderToolContext(entry) : ''}
 </details>`
 }
 
-function renderExportSystem(entry) {
-  let body = ''
-  for (const section of entry.sections || []) {
-    body += `\n<div class="tool-command-block system-block">
-<strong>${escapeHtml(section.name)}${section.removed ? ' · removed' : ''}</strong>
-${section.removed ? '' : `<pre>${escapeHtml(section.text || '')}</pre>`}\n</div>`
-  }
-  for (const tool of entry.toolsAdded || []) {
-    body += `\n<div class="tool-command-block system-block">
-<strong>${escapeHtml(tool.name)} · added</strong>
-${tool.description ? `<pre>${escapeHtml(tool.description)}</pre>` : ''}\n</div>`
-  }
-  for (const name of entry.toolsRemoved || []) {
-    body += `\n<div class="tool-command-block system-block">
-<strong>${escapeHtml(name)} · removed</strong>\n</div>`
-  }
-  if (!body && entry.text) {
-    body += `\n<div class="tool-command-block system-block">
-<pre>${escapeHtml(entry.text)}</pre>\n</div>`
-  }
+function renderExportSystem(entry, index) {
+  const info = systemPromptInfo(entry)
+  const sections = entry.sections || []
+  const tools = [
+    ...(entry.toolsAdded || []),
+    ...(entry.toolsRemoved || []).map((name) => ({ name, removed: true })),
+  ]
+  const promptSelected = Boolean(sections.length || !tools.length)
+  const id = `system-${index}`
+  const prompt = sections.map((section) => `<section class="system-prompt-section">
+<h3>${escapeHtml(systemSectionTitle(section.name))}${section.removed ? '<span> · removed</span>' : info.initial ? '' : '<span> · updated</span>'}</h3>
+${section.removed ? '' : `<div class="system-prompt-prose markdown-body">${renderMarkdown(section.text)}</div>`}
+</section>`).join('') || (tools.length
+    ? '<p class="system-prompt-empty">No prompt sections changed in this event.</p>'
+    : `<div class="system-prompt-prose markdown-body">${renderMarkdown(entry.text)}</div>`)
+  const toolContent = tools.map((tool) => `<section class="system-prompt-section">
+<h3><code>${escapeHtml(tool.name)}</code>${tool.removed ? '<span> · removed</span>' : info.initial ? '' : '<span> · added</span>'}</h3>
+${tool.removed ? '' : `<div class="system-prompt-prose markdown-body">${renderMarkdown(tool.description)}</div>`}
+</section>`).join('') || `<p class="system-prompt-empty">${info.initial ? 'No tools declared in this event.' : 'No tools changed in this event.'}</p>`
 
-  return `<details class="tool-card transcript-tool system-card">
-<summary class="tool-card-header">
-<span class="chevron tool-chevron">›</span>
-<span>${escapeHtml(entry.label)}</span>
-${entry.code ? `<code>${escapeHtml(entry.code)}</code>` : ''}
+  return `<details class="system-prompt-export" name="system-inspectors" data-system-index="${index}">
+<summary class="system-prompt-row" aria-controls="${id}-inspector" title="${escapeHtml(`${info.title} · ${info.summary}`)}">
+<span class="system-prompt-trigger">
+<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H5v18h14V8l-5-5Z" /><path d="M14 3v5h5M8 12h8M8 16h6" /></svg>
+<span class="system-prompt-label">${escapeHtml(info.title)}</span>
+<span class="system-prompt-meta">· ${escapeHtml(info.summary)}</span>
+<svg class="system-prompt-open-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M15 4v16" /></svg>
+</span>
 </summary>
-<div class="tool-expanded-body system-expanded-body" data-rendered="true">
-${body || '<div class="tool-lazy-placeholder">Open to render details</div>'}
+<aside id="${id}-inspector" class="system-prompt-inspector" tabindex="-1" aria-labelledby="${id}-title">
+<header class="system-prompt-header">
+<div><h2 id="${id}-title">${escapeHtml(info.title)}</h2><p>${info.initial ? 'Initial prompt · ' : ''}${escapeHtml(info.summary)}</p></div>
+<button class="system-prompt-icon-button" type="button" aria-label="Close prompt inspector" data-system-close><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6" /></svg></button>
+</header>
+<div class="system-prompt-tabs" role="tablist" aria-label="System content">
+<button id="${id}-prompt-tab" type="button" role="tab" aria-selected="${promptSelected}" tabindex="${promptSelected ? 0 : -1}" aria-controls="${id}-prompt-panel">${info.initial ? 'Prompt' : 'Changes'} <span>${sections.length}</span></button>
+<button id="${id}-tools-tab" type="button" role="tab" aria-selected="${!promptSelected}" tabindex="${promptSelected ? -1 : 0}" aria-controls="${id}-tools-panel">Tools <span>${tools.length}</span></button>
 </div>
+<div class="system-prompt-body" tabindex="0" aria-label="System prompt contents">
+<pre class="system-prompt-raw" hidden>${escapeHtml(entry.text)}</pre>
+<div id="${id}-prompt-panel" role="tabpanel" aria-labelledby="${id}-prompt-tab"${promptSelected ? '' : ' hidden'}>${prompt}</div>
+<div id="${id}-tools-panel" role="tabpanel" aria-labelledby="${id}-tools-tab"${promptSelected ? ' hidden' : ''}>${toolContent}</div>
+</div>
+<footer class="system-prompt-footer">
+<span>${escapeHtml(info.caption)}</span>
+<div>
+<button type="button" aria-pressed="false" data-system-raw>Raw text</button>
+<button type="button" title="Copy system event" data-system-copy><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V4H4v12h4" /></svg><span aria-live="polite">Copy</span></button>
+</div>
+</footer>
+</aside>
 </details>`
 }
 
@@ -526,6 +549,96 @@ function highlightJsSource() {
     join(dirname(mainPath), 'core/export-html/vendor/highlight.min.js'),
     'utf8',
   )
+}
+
+function systemInspectorJs() {
+  return `(() => {
+  const encoded = document.getElementById('export-data').textContent
+  const { entries } = JSON.parse(new TextDecoder().decode(
+    Uint8Array.from(atob(encoded), (char) => char.charCodeAt(0)),
+  ))
+  const inspectors = [...document.querySelectorAll('[data-system-index]')]
+  for (const item of inspectors) {
+    const pane = item.querySelector('.system-prompt-inspector')
+    const trigger = item.querySelector('summary')
+    const body = pane.querySelector('.system-prompt-body')
+    const tabs = [...pane.querySelectorAll('[role="tab"]')]
+    const panels = [...pane.querySelectorAll('[role="tabpanel"]')]
+    const raw = pane.querySelector('.system-prompt-raw')
+    const rawButton = pane.querySelector('[data-system-raw]')
+    const text = entries[Number(item.dataset.systemIndex)].text || ''
+    raw.textContent = text
+    trigger.setAttribute('aria-expanded', 'false')
+
+    function selectTab(tab) {
+      for (const current of tabs) {
+        const selected = current === tab
+        current.setAttribute('aria-selected', String(selected))
+        current.tabIndex = selected ? 0 : -1
+      }
+      for (const panel of panels) panel.hidden = panel.id !== tab.getAttribute('aria-controls')
+      body.scrollTop = 0
+    }
+
+    function close() {
+      item.open = false
+      trigger.focus({ preventScroll: true })
+    }
+
+    item.addEventListener('toggle', () => {
+      trigger.setAttribute('aria-expanded', String(item.open))
+      if (!item.open) return
+      for (const other of inspectors) if (other !== item) other.open = false
+      pane.focus({ preventScroll: true })
+    })
+    pane.querySelector('[data-system-close]').addEventListener('click', close)
+    pane.addEventListener('keydown', (event) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      close()
+    })
+    for (const tab of tabs) {
+      tab.addEventListener('click', () => selectTab(tab))
+      tab.addEventListener('keydown', (event) => {
+        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+        event.preventDefault()
+        const next = event.key === 'Home' ? tabs[0] : event.key === 'End' ? tabs[1] : tabs.find((current) => current !== tab)
+        selectTab(next)
+        next.focus()
+      })
+    }
+    rawButton.addEventListener('click', () => {
+      const showingRaw = raw.hidden
+      raw.hidden = !showingRaw
+      pane.querySelector('.system-prompt-tabs').hidden = showingRaw
+      for (const panel of panels) panel.hidden = showingRaw || panel.id !== tabs.find((tab) => tab.getAttribute('aria-selected') === 'true').getAttribute('aria-controls')
+      rawButton.setAttribute('aria-pressed', String(showingRaw))
+      rawButton.textContent = showingRaw ? 'Reading view' : 'Raw text'
+      body.scrollTop = 0
+    })
+    const copy = pane.querySelector('[data-system-copy]')
+    let copyTimer
+    copy.addEventListener('click', async () => {
+      let copied = false
+      try {
+        await navigator.clipboard.writeText(text)
+        copied = true
+      } catch {
+        const input = document.createElement('textarea')
+        input.value = text
+        input.style.cssText = 'position:fixed;opacity:0;pointer-events:none'
+        pane.appendChild(input)
+        input.select()
+        try { copied = document.execCommand('copy') } catch {}
+        input.remove()
+        copy.focus({ preventScroll: true })
+      }
+      copy.querySelector('span').textContent = copied ? 'Copied' : 'Copy failed'
+      clearTimeout(copyTimer)
+      copyTimer = setTimeout(() => { copy.querySelector('span').textContent = 'Copy' }, 2000)
+    })
+  }
+})()`
 }
 
 function exportJs() {
@@ -1243,7 +1356,183 @@ button, input, textarea { color: inherit; font: inherit; }
   padding-top: 9px;
   transition: border-top-color var(--motion-base) var(--ease-decelerate);
 }
-.system-expanded-body .system-block:last-child { margin-bottom: 0; }
+.system-prompt-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: min(var(--content-max), 100%);
+  min-height: 24px;
+  margin: 20px auto 0;
+  list-style: none;
+  cursor: pointer;
+}
+.system-prompt-row::-webkit-details-marker { display: none; }
+.system-prompt-row::before,
+.system-prompt-row::after {
+  flex: 1 1 16px;
+  min-width: 12px;
+  height: 1px;
+  background: var(--border);
+  content: '';
+}
+.system-prompt-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  max-width: calc(100% - 46px);
+  border: 0;
+  border-radius: 3px;
+  padding: 5px 2px;
+  background: transparent;
+  color: #969696;
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--motion-base) var(--ease-standard);
+}
+.system-prompt-label { flex: none; font-weight: 400; white-space: nowrap; }
+.system-prompt-meta { overflow: hidden; color: #7e7e7e; text-overflow: ellipsis; white-space: nowrap; }
+.system-prompt-row:hover .system-prompt-trigger,
+.system-prompt-export[open] .system-prompt-trigger { color: #ccc; }
+.system-prompt-trigger svg,
+.system-prompt-inspector svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.system-prompt-trigger .system-prompt-open-icon { width: 12px; height: 12px; color: #777; }
+.system-prompt-inspector {
+  position: fixed;
+  z-index: 20;
+  inset: 0 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  width: min(440px, 100%);
+  min-width: 0;
+  min-height: 0;
+  border-left: 1px solid #303030;
+  outline: none;
+  background: #171717;
+  box-shadow: -12px 0 40px rgb(0 0 0 / 16%);
+  color: var(--text);
+  text-align: left;
+}
+.system-prompt-inspector [hidden] { display: none !important; }
+.system-prompt-header {
+  display: flex;
+  flex: none;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 20px 22px 17px;
+}
+.system-prompt-header > div { min-width: 0; }
+.system-prompt-header h2 { margin: 0 0 7px; color: #d4d4d4; font-size: 16px; font-weight: 550; }
+.system-prompt-header p { margin: 0; color: #858585; font-size: 11px; line-height: 1.6; overflow-wrap: anywhere; }
+.system-prompt-icon-button {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 5px;
+  padding: 0;
+  background: transparent;
+  color: #858585;
+  cursor: pointer;
+}
+.system-prompt-icon-button:hover { background: #282828; color: #ddd; }
+.system-prompt-tabs { display: flex; flex: none; gap: 20px; border-bottom: 1px solid #2b2b2b; padding: 0 22px; }
+.system-prompt-tabs button {
+  margin-bottom: -1px;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  padding: 0 0 13px;
+  color: #838383;
+  font-size: 12px;
+  cursor: pointer;
+}
+.system-prompt-tabs button[aria-selected="true"] { border-bottom-color: #bdbdbd; color: #d4d4d4; }
+.system-prompt-tabs button span { margin-left: 4px; color: #858585; font-size: 11px; }
+.system-prompt-body { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 22px; scrollbar-width: thin; scrollbar-color: #3a3a3a transparent; }
+.system-prompt-section { margin: 0 0 18px; border-bottom: 1px solid #282828; padding: 0 0 18px; }
+.system-prompt-section:last-child { margin-bottom: 0; border-bottom: 0; padding-bottom: 0; }
+.system-prompt-section > h3 {
+  margin: 0 0 9px;
+  color: #a5a5a5;
+  font-size: 13px;
+  font-weight: 550;
+  overflow-wrap: anywhere;
+}
+.system-prompt-section > h3 span { color: #858585; font-weight: 400; }
+.system-prompt-section > h3 code { font-size: 12px; }
+.system-prompt-prose { color: #bcbcbc; font-size: 13px; line-height: 1.75; overflow-wrap: anywhere; }
+.system-prompt-prose img { max-width: 100%; }
+.system-prompt-prose code { border: 0; padding: 0; background: transparent; color: #cecad6; }
+.system-prompt-prose pre { background: #111; white-space: pre-wrap; }
+.system-prompt-prose :is(h1, h2, h3, h4) { color: #bcbcbc; font-size: 13px; }
+.system-prompt-empty { margin: 0; color: #999; font-size: 13px; line-height: 1.6; }
+.system-prompt-raw {
+  margin: 0;
+  color: #aaa;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.system-prompt-footer {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 49px;
+  border-top: 1px solid #292929;
+  padding: 8px 22px;
+  color: #858585;
+  font-size: 11px;
+}
+.system-prompt-footer > div { display: flex; align-items: center; gap: 12px; }
+.system-prompt-footer button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  background: transparent;
+  padding: 4px 0;
+  color: #999;
+  font-size: 11px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.system-prompt-inspector button:hover:not(:disabled) { color: #ddd; }
+.system-prompt-row:focus-visible { outline: none; }
+.system-prompt-row:focus-visible .system-prompt-trigger,
+.system-prompt-inspector button:focus-visible { outline: 1px solid #999; outline-offset: 3px; }
+.system-prompt-body:focus-visible { outline: 1px solid #777; outline-offset: -4px; }
+@media (min-width: 1121px) {
+  .export-shell:has(.system-prompt-export[open]) { width: calc(100% - 440px); margin-right: 440px; }
+  .export-shell:has(.system-prompt-export[open]) .export-header dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 760px) {
+  .system-prompt-row { gap: 6px; }
+  .system-prompt-trigger { gap: 5px; max-width: calc(100% - 36px); font-size: 11px; }
+  .system-prompt-inspector { width: 100%; border-left: 0; }
+  .system-prompt-header { padding: 18px 16px 16px; }
+  .system-prompt-tabs { padding: 0 16px; }
+  .system-prompt-body { padding: 20px 16px; }
+  .system-prompt-footer { gap: 8px; padding: 8px 16px; }
+}
 .tool-output {
   overflow: auto;
   max-height: 420px;

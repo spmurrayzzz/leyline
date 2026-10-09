@@ -5,8 +5,9 @@ const PierrePreview = defineAsyncComponent(() => import('./PierrePreview.vue'))
 </script>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { researchSourcesMatch } from '../../lib/research-state.js'
+import { systemPromptInfo } from '../../lib/system-prompt.js'
 import {
   entryClass,
   imageBlocksFor,
@@ -35,6 +36,7 @@ const props = defineProps({
     default: '',
   },
   skillExpanded: Boolean,
+  systemPromptSelected: Boolean,
   thinkingInitiallyExpanded: Boolean,
   toolExpanded: Boolean,
   toolStatus: {
@@ -51,6 +53,7 @@ const emit = defineEmits([
   'navigate-child-session',
   'open-image',
   'open-research-source',
+  'open-system-prompt',
   'reset',
   'retry',
   'open-tool-fullscreen',
@@ -62,6 +65,7 @@ const feedbackDraft = ref('')
 const noteOpen = ref(false)
 const thinkingExpanded = ref(props.thinkingInitiallyExpanded)
 const toolContentMounted = ref(props.toolExpanded)
+const systemInfo = computed(() => systemPromptInfo(props.entry))
 
 watch(() => props.toolExpanded, (expanded) => {
   if (expanded) toolContentMounted.value = true
@@ -309,90 +313,27 @@ function openMarkdownContent(event) {
     </button>
   </div>
 
-  <article
-    v-else-if="entry.type === 'system'"
-    class="tool-card transcript-tool system-card"
-    :class="{ 'is-expanded': toolExpanded }"
-    @click="emit('toggle-tool', entry)"
-  >
-    <div class="tool-card-header">
-      <span class="chevron">›</span>
-      <span>{{ entry.label }}</span>
-      <code v-if="entry.code" :title="entry.code">{{ entry.code }}</code>
-      <button
-        v-if="!isLocalEntry(entry)"
-        class="copy-button"
-        type="button"
-        title="Fork from here"
-        @click.stop="emit('fork', entry)"
-      >
-        ⎇
-      </button>
-      <button
-        v-if="!isLocalEntry(entry)"
-        class="copy-button reset-button"
-        type="button"
-        title="Reset to here"
-        aria-label="reset this thread to this message"
-        @click.stop="emit('reset', entry)"
-      >
-        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M12 5v14" />
-          <path d="M6 19h12" />
-        </svg>
-      </button>
-      <button
-        class="copy-button"
-        type="button"
-        :title="copyTitle(entry.id)"
-        @click.stop="emit('copy', entry)"
-      >
-        {{ copyGlyph(entry.id) }}
-      </button>
-    </div>
-    <div class="tool-expand-wrapper" :class="{ 'is-expanded': toolExpanded }">
-      <div class="tool-expand-inner">
-        <div
-          v-if="toolContentMounted"
-          class="tool-expanded-body system-expanded-body"
-          @click.stop
-        >
-          <div
-            v-for="section in entry.sections"
-            :key="`section-${section.name}`"
-            class="tool-command-block system-block"
-          >
-            <strong>{{ section.name }}{{ section.removed ? ' · removed' : '' }}</strong>
-            <pre v-if="!section.removed">{{ section.text }}</pre>
-          </div>
-          <div
-            v-for="tool in entry.toolsAdded"
-            :key="`added-${tool.name}`"
-            class="tool-command-block system-block"
-          >
-            <strong>{{ tool.name }} · added</strong>
-            <pre v-if="tool.description">{{ tool.description }}</pre>
-          </div>
-          <div
-            v-for="name in entry.toolsRemoved"
-            :key="`removed-${name}`"
-            class="tool-command-block system-block"
-          >
-            <strong>{{ name }} · removed</strong>
-          </div>
-          <div
-            v-if="!entry.sections?.length
-              && !entry.toolsAdded?.length
-              && !entry.toolsRemoved?.length
-              && entry.text"
-            class="tool-command-block system-block"
-          >
-            <pre>{{ entry.text }}</pre>
-          </div>
-        </div>
-      </div>
-    </div>
-  </article>
+  <div v-else-if="entry.type === 'system'" class="system-prompt-row">
+    <button
+      class="system-prompt-trigger"
+      type="button"
+      :aria-expanded="systemPromptSelected"
+      :aria-controls="systemPromptSelected ? 'system-prompt-inspector' : undefined"
+      :title="`${systemInfo.title} · ${systemInfo.summary}`"
+      @click="emit('open-system-prompt', entry, $event.currentTarget)"
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M14 3H5v18h14V8l-5-5Z" />
+        <path d="M14 3v5h5M8 12h8M8 16h6" />
+      </svg>
+      <span class="system-prompt-label">{{ systemInfo.title }}</span>
+      <span class="system-prompt-meta">· {{ systemInfo.summary }}</span>
+      <svg class="system-prompt-open-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="3" y="4" width="18" height="16" rx="2" />
+        <path d="M15 4v16" />
+      </svg>
+    </button>
+  </div>
 
   <article
     v-else-if="isSubagentEntry(entry)"

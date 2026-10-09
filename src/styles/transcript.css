@@ -262,6 +262,7 @@
 .workbench > .tool-card,
 .workbench > .event-row,
 .workbench > .model-change-row,
+.workbench > .system-prompt-row,
 .live-stack > .live-item {
   content-visibility: auto;
 }
@@ -276,6 +277,8 @@
 
 .workbench > .event-row,
 .workbench > .model-change-row,
+.workbench > .system-prompt-row,
+.live-stack > .live-system-item,
 .live-stack > .live-model-change-item {
   contain-intrinsic-block-size: auto 24px;
 }
@@ -297,6 +300,7 @@
 .workbench > .message,
 .workbench > .tool-card,
 .workbench > .model-change-row,
+.workbench > .system-prompt-row,
 .workbench > .live-stack,
 .workbench > .empty-session-panel,
 .workbench > .session-loading-panel,
@@ -312,6 +316,7 @@
 .session-switching > .message,
 .session-switching > .tool-card,
 .session-switching > .model-change-row,
+.session-switching > .system-prompt-row,
 .session-switching > .live-stack,
 .session-switching > .empty-session-panel,
 .session-switching > .start-panel {
@@ -328,10 +333,12 @@
 .new-session-transition:not(.start-state) .workbench > .message,
 .new-session-transition:not(.start-state) .workbench > .tool-card,
 .new-session-transition:not(.start-state) .workbench > .model-change-row,
+.new-session-transition:not(.start-state) .workbench > .system-prompt-row,
 .new-session-transition:not(.start-state) .workbench > .live-stack,
 .in-project-new-session-transition .workbench > .message,
 .in-project-new-session-transition .workbench > .tool-card,
 .in-project-new-session-transition .workbench > .model-change-row,
+.in-project-new-session-transition .workbench > .system-prompt-row,
 .in-project-new-session-transition .workbench > .live-stack {
   animation: session-content-enter 640ms var(--ease-dock) both;
 }
@@ -344,6 +351,7 @@
 .session-handoff-workbench > .message,
 .session-handoff-workbench > .tool-card,
 .session-handoff-workbench > .model-change-row,
+.session-handoff-workbench > .system-prompt-row,
 .session-handoff-workbench > .live-stack {
   opacity: 0;
   filter: blur(2px);
@@ -802,6 +810,94 @@
 .markdown-body .markdown-relative-link {
   border-bottom: 1px dotted currentColor;
   color: #bfb5ff;
+}
+
+.system-prompt-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: min(var(--content-max), 100%);
+  min-height: 24px;
+  margin: 20px auto 0;
+}
+
+.system-prompt-row::before,
+.system-prompt-row::after {
+  content: '';
+  flex: 1 1 16px;
+  min-width: 12px;
+  height: 1px;
+  background: var(--border);
+}
+
+.system-prompt-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  max-width: calc(100% - 46px);
+  border: 0;
+  border-radius: 3px;
+  padding: 5px 2px;
+  background: transparent;
+  color: #969696;
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--motion-base) var(--ease-standard);
+}
+
+.system-prompt-trigger:hover,
+.system-prompt-trigger[aria-expanded="true"] {
+  color: #ccc;
+}
+
+.system-prompt-trigger:focus-visible {
+  outline: 1px solid #999;
+  outline-offset: 3px;
+}
+
+.system-prompt-trigger svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.system-prompt-label {
+  flex: none;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.system-prompt-meta {
+  overflow: hidden;
+  color: #7e7e7e;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.system-prompt-trigger .system-prompt-open-icon {
+  width: 12px;
+  height: 12px;
+  color: #777;
+}
+
+@media (max-width: 760px) {
+  .system-prompt-row {
+    gap: 6px;
+  }
+
+  .system-prompt-trigger {
+    gap: 5px;
+    max-width: calc(100% - 36px);
+    font-size: 11px;
+  }
 }
 
 .model-change-row {

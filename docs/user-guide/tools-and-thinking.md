@@ -28,7 +28,7 @@ Shell rows also show **in context** or **not in context**. This label tells you 
 
 ## Inspect System changes
 
-![Collapsed initial System card and expanded prompt-section and tool change](../assets/screenshots/system-message.png)
+![System rows in the transcript with a recorded change open in the prompt inspector](../assets/screenshots/system-message.png)
 
 Pi records changes to the system prompt and tool loadout in collapsed **System** cards. The first card can show the full prompt and initial tools. Later cards show changed or removed prompt sections and added or removed tools.
 

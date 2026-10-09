@@ -779,14 +779,13 @@ try {
     browser,
     file: path.join(docsOutputDir, 'system-message.png'),
     route: '/sessions/demo-session',
-    ready: '.system-card',
+    ready: '.system-prompt-row',
     scenario: 'system',
     interact: async (page) => {
-      const card = page.locator('.system-card').last()
-      await card.locator('.tool-card-header').click()
-      await card.locator('.system-expanded-body').waitFor()
+      await page.locator('.system-prompt-trigger').last().click()
+      await page.locator('.system-prompt-inspector').waitFor()
     },
-    clipSelectors: ['.system-card', '.system-card.is-expanded'],
+    clipSelectors: ['.system-prompt-row', '.system-prompt-inspector'],
     padding: 18,
   })
   await capture({
@@ -1409,7 +1408,7 @@ function detailFor(scenario) {
   const research = scenario === 'research'
   const summary = research ? researchSession : sessions[0]
   const entries = {
-    system: systemEntries,
+    system: systemTranscriptEntries,
     ultrafast: systemTranscriptEntries,
     export: systemTranscriptEntries,
     research: researchEntries,

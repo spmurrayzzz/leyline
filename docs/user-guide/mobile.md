@@ -2,7 +2,7 @@
 
 Leyline uses a mobile layout when the viewport is 760 pixels wide or less.
 
-![Leyline mobile session with System cards and ultrafast enabled in the composer](../assets/screenshots/mobile-session.png)
+![Leyline mobile session with System rows and ultrafast enabled in the composer](../assets/screenshots/mobile-session.png)
 
 *The mobile workbench keeps the main session actions in one column.*
 
