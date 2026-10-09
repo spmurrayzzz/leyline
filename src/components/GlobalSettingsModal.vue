@@ -53,7 +53,7 @@ onMounted(() => {
     appRootWasInert = appRoot.inert
     appRoot.inert = true
   }
-  focusCategory()
+  modalEl.value?.focus({ preventScroll: true })
 })
 
 onBeforeUnmount(() => {
@@ -109,6 +109,7 @@ function handleKeydown(event) {
         ref="modalEl"
         class="global-settings-modal"
         role="dialog"
+        tabindex="-1"
         aria-modal="true"
         aria-labelledby="global-settings-title"
         @keydown="handleKeydown"

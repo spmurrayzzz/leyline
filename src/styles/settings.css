@@ -101,6 +101,7 @@
   min-width: 0;
   border: 1px solid #363636;
   border-radius: 15px;
+  outline: none;
   background: #171717;
   color: #ececec;
   box-shadow: 0 28px 80px rgb(0 0 0 / 60%);
@@ -924,8 +925,8 @@
 
 .global-settings-modal :is(button, input, select, summary):focus-visible,
 .context-settings-drawer :is(button, input, select, summary):focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
+  outline: 1px solid #888;
+  outline-offset: 2px;
 }
 
 @keyframes global-settings-in {
