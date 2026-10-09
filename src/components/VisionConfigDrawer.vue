@@ -65,16 +65,7 @@ function formatThinking(value) {
   return formatMode(value)
 }
 
-function sourceLabel() {
-  const source = props.config?.modelSource || 'none'
-  if (source === 'session') return 'Transcript'
-  if (source === 'project') return 'Project'
-  if (source === 'global') return 'Global default'
-  return 'None configured'
-}
-
-function thinkingSourceLabel() {
-  const source = props.config?.thinkingSource || 'none'
+function sourceLabel(source) {
   if (source === 'session') return 'Transcript'
   if (source === 'project') return 'Project'
   if (source === 'global') return 'Global default'
@@ -172,7 +163,7 @@ function updateThinking(event) {
         </label>
         <div class="subagent-effective-model">
           Effective: <strong>{{ config?.model || 'not configured' }}</strong>
-          <span>from {{ sourceLabel() }}</span>
+          <span>from {{ sourceLabel(config?.modelSource) }}</span>
         </div>
         <div v-if="!visionModels.length" class="subagent-tool-summary">
           No vision-capable models found. Add a model that supports image input in pi settings.
@@ -205,7 +196,7 @@ function updateThinking(event) {
         </label>
         <div class="subagent-effective-model">
           Effective: <strong>{{ formatThinking(config?.thinking) }}</strong>
-          <span>from {{ thinkingSourceLabel() }}</span>
+          <span>from {{ sourceLabel(config?.thinkingSource) }}</span>
         </div>
         <div class="subagent-tool-summary">
           Only shown when the effective vision model supports reasoning.
