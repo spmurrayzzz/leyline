@@ -82,7 +82,7 @@ When transcript visuals change, compare and update both implementations. Check t
 - summary cards
 - Markdown and code blocks
 - syntax colors
-- tool, skill, and subagent rows
+- collapsed System cards, tool, skill, and subagent rows
 - research reports, threads, citations, and source ledgers
 - image, file, patch, and diff previews
 - responsive and reduced-motion behavior

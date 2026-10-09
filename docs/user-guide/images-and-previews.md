@@ -1,6 +1,6 @@
 # Images and previews
 
-Leyline supports pasted prompt images, vision delegation, and transcript previews for tool output.
+Leyline supports pasted prompt images, vision delegation, tool-output previews, and local file links.
 
 ## Attach an image to a prompt
 
@@ -57,6 +57,26 @@ Agents can also use the `vision_agent` tool to inspect an image file from the pr
 
 Images sent with a user message appear below that message. Each image uses its data from the session content.
 
+## Preview a local file
+
+Select a local file link in the transcript to open **File preview**. Leyline reads the current file on the session's backend. This preview can differ from an earlier tool result.
+
+Relative paths use the session project directory. Links inside a rendered file preview use that file's directory. Line references open the source view at the requested line. Markdown without a line reference opens in **Rendered** mode. Select **Source** to inspect its text.
+
+Right-click a local file link, or select **Actions** in the preview, for file actions:
+
+- **Preview file** opens the current file.
+- **Open in editor** uses the backend's configured editor.
+- **Configure editor…** opens Settings when no editor is available.
+- **Reveal in Finder** or **Open containing folder** appears when the backend supports desktop file actions.
+- **Copy path** copies the resolved path.
+
+A file outside the project requires approval before Leyline previews or opens it. Review the path, then select **Preview file** or **Open file** to approve that action. Approval applies to this file only.
+
+Use **Back** to return to a previous file preview. Select **×**, the backdrop, or press **Escape** to close it.
+
+Text previews support UTF-8 files up to 2 MiB and 20,000 lines. Supported raster image previews allow up to 10 MiB. Binary files cannot use the text preview. See [Files settings](./settings#configure-file-actions) for editor commands and execution mode.
+
 ## Expand a tool preview
 
 Select a collapsed tool row. Leyline can show these preview types:
@@ -79,6 +99,6 @@ An inline file preview shows up to 400 lines. It reports the number of clipped l
 2. For a Markdown read, select **Rendered** or **Source**.
 3. Select **×** or the backdrop to close the preview.
 
-The **Copy** action always copies the original Markdown source. Raw HTML stays disabled in the rendered view. Remote images appear as references. Leyline leaves relative links inactive.
+The **Copy** action always copies the original Markdown source. Raw HTML stays disabled in the rendered view. Remote images appear as references. Local file links open current-file previews on supported backends.
 
 Other fullscreen previews use the available file, image, patch, diff, JSON, or plain-text data. Select **Copy** to copy the available tool output.

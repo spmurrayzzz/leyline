@@ -14,7 +14,7 @@ The desktop review pane shows uncommitted Git changes for the selected session's
 
 The control appears when the viewport is wider than 1120 pixels and the selected backend supports Git review.
 
-Leyline prepares the file list and first diff before it opens the pane. The header shows the current branch and changed-file count.
+Leyline prepares the file list and selected diff before it opens the pane. The header summary stays current while the pane is closed. It shows additions and deletions when available, or a changed-file count. Its description includes the branch and conflicts.
 
 ## Read file states
 
@@ -46,6 +46,8 @@ Press **Escape** or select **Collapse review** to restore the transcript and the
 Leyline automatically refreshes review when the selected backend detects a nonignored working-tree change or a relevant Git state change. Changes from another application normally appear without a manual refresh.
 
 Leyline also refreshes after a known agent run or composer shell command settles. Select **Refresh changes** when automatic watching is unavailable or the displayed state appears stale.
+
+With the pane closed, Leyline refreshes status and the header summary without rebuilding the selected diff. It prepares that diff when you reopen the pane. Reopening without changes reuses the prepared preview.
 
 ## Use the terminal for Git actions
 

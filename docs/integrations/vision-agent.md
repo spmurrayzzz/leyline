@@ -12,7 +12,7 @@ The tool accepts these fields:
 {
   "path": "screenshots/current.png",
   "question": "What error does this screen show?",
-  "model": "anthropic/claude-sonnet-4-6",
+  "model": "local/qwen3.6-27b",
   "cwd": "/workspace/project"
 }
 ```
@@ -72,7 +72,9 @@ At each model boundary, the wrapper reloads these records from the active branch
 
 ## Child runtime
 
-The server creates a vision child through the normal subagent runtime path when `vision_agent` runs. The child has these constraints:
+The server creates a vision child through the subagent runtime path when `vision_agent` runs. Its isolated custom system prompt loads only output-budget. It omits context files, skills, MCP, tool search, and the Leyline prompt.
+
+The child has these constraints:
 
 - Its model must support image input.
 - Its active tool allowlist is empty.

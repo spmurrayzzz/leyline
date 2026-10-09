@@ -56,7 +56,7 @@ If the snapshot belongs to the selected session, `App.vue` also updates `activeR
 `useLiveTurnProjection.js` handles these event families:
 
 - agent and turn start or end
-- message start, update, and end
+- message start, update, and end, including system-role start and end
 - tool call, execution start, and execution end
 - compaction start and end
 - errors and aborts
@@ -65,7 +65,9 @@ If the snapshot belongs to the selected session, `App.vue` also updates `activeR
 
 Settlement, reconnect, and manual compaction schedule immediate session-detail refreshes. Idle session-info and custom-message changes use a 250 ms debounce. Streaming message and tool events do not fetch detail individually.
 
-Live user, assistant, and tool rows reconcile with projected persisted entries after refresh. This prevents duplicate rows during the handoff.
+Live user, assistant, System, and tool rows reconcile with projected persisted entries after refresh. The reactive anchor waits for System persistence before release. The next turn clears matched rows from the previous turn, so branch order remains intact.
+
+See [Live reconciliation and settlement](./transcript-projection#live-reconciliation-and-settlement) for matching and expansion keys.
 
 ## Goal, research, and extension UI state
 
@@ -74,6 +76,12 @@ The backend derives the latest goal from `goal-state` custom entries. It folds r
 Runtime snapshots include both states. `App.vue` applies extension UI state only when `activeSessionId` matches the selected session.
 
 The goal controls and research surfaces use projected state. The browser does not parse this state from transcript text.
+
+## Ultrafast and confirmation state
+
+Ultrafast publishes its runtime-local mode through extension statuses. The browser receives changes through the existing extension UI and runtime snapshots.
+
+Pending browser confirmations also travel in `extensionUi.confirmations`. Compact snapshots include `pendingConfirmationCount` for background supervision. Replies use the session-scoped HTTP route, not SSE. See [Browser confirmations](./backend-api#browser-confirmations).
 
 ## Concurrent sessions
 

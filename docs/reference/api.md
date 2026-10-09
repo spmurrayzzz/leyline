@@ -19,12 +19,12 @@ Most errors have this envelope:
 
 Status behavior is:
 
-- `400` is used for connection, setting, or queue validation and for missing required query values on session lookup or Git review routes.
+- `400` is used for connection, setting, queue, file-action, or confirmation validation. Missing required query values on session lookup or Git review routes also return `400`.
 - `403` rejects a browser origin that the server does not allow.
 - `404` is used for an unknown runtime, native app route, setting key, or session.
 - `405` is used when a known route receives an unsupported method.
-- `409` rejects a queue mutation with an outdated `revision`.
-- `500` is used for thrown runtime errors. This includes malformed JSON, SDK errors, missing memories, and some missing sessions.
+- `409` rejects a queue mutation with an outdated `revision` or a confirmation reply that is no longer valid.
+- `500` is used for thrown runtime errors. This includes malformed JSON on most runtime routes, SDK errors, missing memories, and some missing sessions.
 
 The current status codes do not distinguish all client errors from server
 errors. Clients must read the `error` value.
@@ -139,9 +139,36 @@ SessionDetail = {
 }
 ```
 
-A transcript entry is a projected `message`, `tool`, `event`, or `summary` object. Each entry has `id`, `type`, `timestamp`, `copyText`, `rolloutFeedback`, and `rolloutFeedbackText` where applicable.
+A transcript entry is a projected `message`, `tool`, `system`, `event`, or `summary` object. Entries include `id`, `type`, `timestamp`, `copyText`, `rolloutFeedback`, and `rolloutFeedbackText` where applicable.
 
 Message entries include role, text, and text, image, or thinking blocks. A completed report message can include `researchReport`. Tool entries can include file, diff, patch, image, bash, subagent, and research-thread data.
+
+System messages use this projection:
+
+```text
+SystemTranscriptEntry = {
+  id: string,
+  type: "system",
+  label: "System",
+  code: string,
+  sections: Array<{ name: string, text: string, removed: boolean }>,
+  toolsAdded: Array<{ name: string, description: string }>,
+  toolsRemoved: string[],
+  text: string,
+  messageTimestamp?: number,
+  timestamp: string,
+  rolloutFeedback: "helpful" | "unhelpful" | "",
+  rolloutFeedbackText: string
+}
+```
+
+`sections` contains prompt-section changes. A removed section has `removed: true` and empty `text`. Tool changes use name-and-description records for additions and names for removals.
+
+`code` is a summary, such as `tools added: vision_agent`. A nonremoved `preamble` section produces a `full prompt` summary with section and optional tool counts.
+
+`text` joins string message content and readable descriptions of prompt and tool changes. Content arrays do not contribute to `text`. System entries have no `role`, `blocks`, or `copyText` field. The browser uses `text` for copying.
+
+`messageTimestamp` comes from the system message and uses milliseconds since the Unix epoch. `timestamp` comes from the session-log entry and is an ISO string.
 
 ### Active runtime
 
@@ -160,6 +187,7 @@ Active = {
     isStreaming: boolean,
     isCompacting: boolean,
     pendingToolCalls: string[],
+    pendingConfirmationCount: number,
     steeringMode: string,
     followUpMode: string,
     activeToolCount: number,
@@ -171,7 +199,8 @@ Active = {
     extensionUi: {
       statuses: object,
       widgets: object,
-      notifications: object[]
+      notifications: object[],
+      confirmations: ExtensionConfirmation[]
     },
     goal: Goal | null,
     research: ResearchState | null
@@ -195,6 +224,7 @@ Model = {
   name: string,
   provider: string,
   supportsImages: boolean,
+  supportsUltrafast: boolean,
   availableThinkingLevels: string[]
 }
 
@@ -217,7 +247,30 @@ Goal = {
 }
 ```
 
-The extension UI objects contain status strings, widget line arrays, and notification records from bundled extensions.
+The extension UI objects contain status strings, widgets with line arrays, notification records, and pending confirmations.
+
+```text
+ExtensionConfirmation = {
+  id: string,
+  title: string,
+  message: string,
+  createdAt: number,
+  expiresAt: number | null
+}
+```
+
+Confirmation times use milliseconds since the Unix epoch. `expiresAt: null` means no timeout. `pendingConfirmationCount` counts `extensionUi.confirmations`.
+
+`Model.supportsUltrafast` reports model and authentication eligibility, not whether Ultrafast is on. Eligible models are `gpt-6-astra` and `gpt-6.1-sol` on these transports:
+
+- `openai-codex` with `openai-codex-responses`.
+- `openai` with `openai-responses` and API-key authentication. Subscription authentication is excluded.
+
+The bundled extension publishes `extensionUi.statuses["leyline-ultrafast"]` as `"on"` or `"off"`. A missing status does not mean the extension is available. Ultrafast starts off and applies to the current runtime only. Model changes and runtime reload reset it to off. A new fork starts off.
+
+Compaction and branch summaries do not use Ultrafast.
+
+If an extension changes the model during a run, reset waits for a safe turn or provider boundary.
 
 Open-runtime snapshots carry `snapshotRevision`. Clients reject older snapshots for the same session, whether they arrive through HTTP or SSE. Start-screen previews can omit this field and `promptQueue`.
 
@@ -244,7 +297,8 @@ Response:
     research: true,
     review: true,
     reviewWatch: true,
-    terminal: true
+    terminal: true,
+    fileLinks: true
   }
 }
 ```
@@ -252,6 +306,8 @@ Response:
 The frontend rejects a backend when `name` or `apiVersion` is incompatible. It shows the research control only when `capabilities.research` is `true`.
 
 It shows the desktop review control only when `capabilities.review` is `true`. It opens the automatic review stream only when `capabilities.reviewWatch` is `true`.
+
+Local file actions and the Files settings section require `capabilities.fileLinks: true`.
 
 ## Connection registry
 
@@ -525,6 +581,97 @@ DirectoryEntry = {
 
 `entries` and `directories` contain the same directory list. The default `path` is `~/`. Paths that start with `./` or `../` require `cwd`. Other relative paths resolve from the server process directory. Invalid paths return `500`.
 
+## Local file routes
+
+These routes use files and editor settings on the selected backend. They are separate from native app settings under `/api/leyline`.
+
+### `GET /api/pi/files/settings`
+
+**Designation:** Browser Files settings route.
+
+Response:
+
+```text
+FileSettings = {
+  editor: string,
+  environmentEditor: string,
+  effectiveEditor: string,
+  editorMode: "auto" | "desktop" | "terminal",
+  terminalEditor: boolean,
+  revealLabel: string | null,
+  error?: string
+}
+```
+
+`editor` is the stored command. `environmentEditor` comes from the backend's `EDITOR` variable. `effectiveEditor` uses nonempty `editor`, then `environmentEditor`. The default mode is `auto`, which detects known terminal editors. `revealLabel` is `null` when desktop reveal is unavailable. An invalid effective command produces `error` in the `200` response.
+
+### `PUT /api/pi/files/settings`
+
+Request:
+
+```text
+{ editor?: string, editorMode?: "auto" | "desktop" | "terminal" }
+```
+
+Response: `FileSettings`.
+
+Omitted fields retain their values. `editor` accepts at most 4,096 characters. The server trims the command. An empty command uses `EDITOR`. Commands permit quoted arguments but reject shell operators, expansions, substitutions, and control characters. Desktop launch does not use a shell.
+
+Invalid input or malformed JSON returns `400` with the current `FileSettings` fields and `error`. An unavailable executable can instead produce `error` in a `200` response after the settings save.
+
+### `POST /api/pi/sessions/:id/file`
+
+**Designation:** Browser session file route. This route resolves the session without requiring an open runtime or changing active-session selection.
+
+Request:
+
+```text
+{
+  action: "resolve" | "preview" | "editor" | "reveal",
+  href: string,
+  basePath?: string,
+  allowOutsideProject?: boolean,
+  approvedPath?: string
+}
+```
+
+The server resolves relative links from the session's `cwd`. If `basePath` is nonempty, it uses that file's parent directory instead. Supported links include local paths, `file:` URLs with empty or `localhost` authority, `:line[:column]` suffixes, and `#Lline[-LendLine]` fragments.
+
+Only regular files are supported. The server resolves symlinks and checks whether the resulting path is outside the project. It rejects network paths and control characters. Windows paths require a Windows backend.
+
+File-action responses use this descriptor:
+
+```text
+FileDescriptor = {
+  path: string,
+  line?: number,
+  endLine?: number,
+  column?: number,
+  anchor?: string,
+  outsideProject: boolean,
+  needsApproval: boolean,
+  editorAvailable: boolean,
+  terminalEditor: boolean,
+  revealLabel: string | null,
+  error?: string
+}
+```
+
+| Action | Response beyond `FileDescriptor` |
+| --- | --- |
+| `resolve` | None. Resolve the path without reading content or launching an application. |
+| `preview` | Text: `{ kind: "file", content: string, language: "markdown" | "text", source: "disk", modifiedAt: string, size: number }`. Image: `{ kind: "image", mimeType: string, data: string, source: "disk", modifiedAt: string, size: number }`. |
+| `editor` | `{ terminal: true }` for a terminal editor. `{ ok: true }` after desktop launch. |
+| `reveal` | `{ ok: true }` after desktop reveal launch. |
+
+Preview `modifiedAt` is an ISO timestamp. `size` counts bytes. Image `data` is base64. Text previews require UTF-8 and permit at most 2 MiB and 20,000 lines. PNG, JPEG, GIF, WebP, and BMP previews permit at most 10 MiB.
+
+If `error` is present or `needsApproval` is `true`, the server returns the descriptor without performing the action. Check `error` before requesting approval. After user approval, repeat the action with `allowOutsideProject: true` and `approvedPath` equal to the returned canonical `path`. The server resolves the path again and returns `error` if it differs from `approvedPath`.
+
+Approval applies to that request. These fields do not provide authentication or access control.
+
+Invalid action or field types return `400` with `{ error }`. An unknown session returns `404`. Malformed JSON and unexpected thrown errors return `500`. Resolution, approval-path, preview, and application-launch errors normally return `200` with `FileDescriptor.error`, not an HTTP error status.
+
 ## Git review routes
 
 These routes read the working tree on the selected backend. They do not change Git state or require an active runtime.
@@ -567,10 +714,14 @@ Response:
 
 ```text
 {
+  additions: number,
   available: boolean,
   branch: string,
+  conflicts: number,
+  deletions: number,
   files: GitReviewFile[],
   filesTruncated: boolean,
+  lineStatsAvailable: boolean,
   root: string,
   totalFiles: number | null
 }
@@ -578,7 +729,11 @@ Response:
 
 `available` is `false` when `cwd` is not inside a Git repository. In that state, `files` is empty and `root` is the resolved project directory.
 
-The response keeps at most 500 changed paths. When more paths exist, `filesTruncated` is `true` and `totalFiles` is `null`.
+`additions` and `deletions` sum staged and working-tree line changes. Additions also include untracked text files. Binary files do not contribute line counts. `conflicts` counts conflicted paths.
+
+The response keeps at most 500 changed paths. When more paths exist, `filesTruncated` is `true`, `totalFiles` is `null`, and `lineStatsAvailable` is `false`.
+
+If line counting fails, `lineStatsAvailable` is also `false`. In either case, `additions` and `deletions` are zero placeholders. `conflicts` remains a separate count. Outside a repository, all counts are zero and `lineStatsAvailable` is `true`.
 
 A missing `cwd` returns `400`. An invalid directory or Git failure returns `500`.
 
@@ -616,7 +771,9 @@ The backend shares one recursive watcher for clients that resolve to the same re
 
 A new connection starts after watcher setup, so the frontend can use it as a catch-up boundary. A watcher setup or runtime error sends `review_watch_error` and closes the response. `EventSource` clients can reconnect automatically.
 
-A missing `cwd` returns `400` before the stream starts.
+Changes can share one `review_change` event. The event contains no status list or diff. Clients fetch current data from the review routes.
+
+A missing `cwd` returns `400` before the stream starts. Other setup failures use `review_watch_error` in the `200` SSE response.
 
 ### `GET /api/pi/review/diff`
 
@@ -691,6 +848,8 @@ Image preparation runs when the task is submitted to pi. An image-capable model 
 A missing or invalid vision model returns `500` for immediate submission. For a queued task, failed preparation retains the item, holds the queue, and sets `promptQueue.error`.
 
 The prompt response does not wait for `vision_agent` execution.
+
+Prompt preflight and model or Ultrafast changes share a per-runtime submission lock. A prompt during either change returns `500`, including while model authentication resolves. It does not enter the editable queue. Automatic queue dispatch waits until the change finishes.
 
 ### Editable prompt queue
 
@@ -855,7 +1014,31 @@ Response:
 { ok: true, active: Active }
 ```
 
-Missing fields, an unknown model, or a provider failure returns `500`.
+The runtime must be idle, with no pending prompt setup or interrupt. Initialization, extension binding, reload, or another model or Ultrafast change also blocks the request. Missing fields, an unknown model, authentication failure, or a blocked change returns `500`.
+
+The model change holds the submission lock through pi's authentication check and model selection. Prompt preflight and Ultrafast changes cannot run concurrently. Automatic queue dispatch waits until the change finishes.
+
+### Set Ultrafast
+
+`POST /api/pi/sessions/:id/ultrafast` changes the mode on that runtime. There is no legacy active-session equivalent.
+
+Request:
+
+```text
+{ enabled: boolean }
+```
+
+Response:
+
+```text
+{ ok: true, active: Active }
+```
+
+Enabling requires `active.state.model.supportsUltrafast: true` and the bundled command in the runtime. Disabling does not require an eligible model, but still requires the command.
+
+The runtime must be idle, with no pending prompt setup or interrupt. Initialization, extension binding, reload, or another model or Ultrafast change blocks the request. Invalid `enabled`, unavailable support, or a blocked change returns `500` with `{ error }`. An unknown session returns `404`.
+
+Read `active.state.extensionUi.statuses["leyline-ultrafast"]` for the resulting mode. The response has no separate `enabled` field. A cancelled setup or runtime replacement can leave the mode unchanged despite `ok: true`. If the HTTP response closes before completion, the server cancels pending Ultrafast setup when possible.
 
 ### Select thinking level
 
@@ -877,6 +1060,32 @@ Response:
 ```
 
 The level must occur in `active.state.availableThinkingLevels`.
+
+## Extension confirmations
+
+Pending extension UI confirmations appear in `active.state.extensionUi.confirmations`. The runtime publishes changes through `extension_ui` and `active_session` SSE events. Compact snapshots for other sessions retain `pendingConfirmationCount`, without confirmation records.
+
+### `POST /api/pi/sessions/:id/extension-confirmations/:requestId`
+
+**Designation:** Scoped browser response route. There is no legacy active-session equivalent.
+
+Request:
+
+```text
+{ confirmed: boolean }
+```
+
+Response:
+
+```text
+{ ok: true }
+```
+
+The route responds to the request identified by `ExtensionConfirmation.id` on the specified session. Both `true` and `false` return the same success response for a valid pending request. A reply removes the request. The response contains no runtime snapshot or confirmation result.
+
+A missing or nonboolean `confirmed` returns `400` with `confirmed must be a boolean`. An unknown session returns `404` with `Session not found`. A missing, expired, cancelled, or invalidated request returns `409` with `Confirmation is no longer pending`. Malformed JSON and thrown runtime errors return `500`. Errors use the `{ error }` envelope.
+
+Timeout, an abort signal, Interrupt, runtime replacement, or disposal resolves the confirmation as `false` and removes it. Switching the selected session does not approve or cancel the request.
 
 ## Active-session history routes
 
@@ -1504,6 +1713,17 @@ The server accepts an HTTP WebSocket upgrade at this path. Leyline supplies the 
 
 The `sessionId` parameter is optional for protocol compatibility. When present, the server resolves that runtime handle without changing the process-wide active session. Without `sessionId`, the server uses the active runtime.
 
+A file action with `terminal: true` requires an editor terminal connection:
+
+```text
+sessionId: string
+editorPath: string
+editorLine?: positive integer
+allowOutsideProject?: "true"
+```
+
+`editorPath` must be the absolute canonical file path. An editor terminal requires `sessionId` and a configured terminal editor. For an approved outside-project file, send `allowOutsideProject=true`. The server resolves the path again and checks that it still equals `editorPath`. Editor setup errors send an `error` message and close the socket.
+
 Client messages:
 
 ```json
@@ -1519,13 +1739,13 @@ Malformed JSON and unknown message types are ignored. Missing resize values use 
 Server messages:
 
 ```text
-{ type: "ready", cwd: string, shell: string, pty: true }
+{ type: "ready", cwd: string, shell: string, editorPath?: string, pty: true }
 { type: "data", data: string }
 { type: "exit", exitCode: number }
 { type: "error", message: string }
 ```
 
-The first successful message is `ready`. Terminal output uses `data`. A PTY exit sends `exit` and then closes the socket.
+The first successful message is `ready`. For an editor terminal, `shell` identifies the editor executable and `editorPath` identifies the file. Terminal output uses `data`. A PTY exit sends `exit` and then closes the socket.
 
 If the requested session does not exist, the server sends `{"type":"error","message":"Session not found"}` and closes the socket. An unscoped request with no active session sends `{"type":"error","message":"No active session"}`.
 

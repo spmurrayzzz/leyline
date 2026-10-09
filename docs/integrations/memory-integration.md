@@ -20,7 +20,9 @@ The `memories` table uses three scopes:
 
 Leyline finds the nearest parent directory that contains `.git`. If it finds no Git root, it uses the current working directory. It derives project and session IDs from SHA-256 hashes of canonical paths.
 
-The database also contains `subagent_overrides`, `vision_overrides`, and `rollout_feedback` tables. Rollout labels can be `helpful` or `unhelpful`, with an optional note. Leyline adds this feedback to transcript entries when it builds session detail.
+Other modules use the same database for `backend_connections`, `leyline_settings`, `subagent_overrides`, `vision_overrides`, and `rollout_feedback`. Tables appear when their owning modules initialize storage.
+
+Rollout labels can be `helpful` or `unhelpful`, with an optional note. Leyline adds this feedback to transcript entries when it builds session detail. See [SQLite metadata](../developer-guide/architecture#sqlite-metadata) for table ownership.
 
 ## Runtime context
 
@@ -53,4 +55,4 @@ The browser API also supports create, edit, archive, restore, and permanent dele
 
 ## Path override
 
-Set `LEYLINE_MEMORY_DIR` before Leyline starts to use a different data directory. The memory extension, Memory Inspector, subagent overrides, vision overrides, and rollout feedback then use `memory.sqlite` in that directory.
+Set `LEYLINE_MEMORY_DIR` before Leyline starts to use a different data directory. Backend connections, app settings, memory, model overrides, and rollout feedback then use `memory.sqlite` in that directory.

@@ -22,23 +22,27 @@ connections to other Leyline backends.
 
 ## Features
 
-Browse, search, create, and run pi sessions from a focused web UI. The sidebar
-keeps one project in focus, and **Go to** searches sessions across projects.
-**Activity** groups nonselected sessions that need attention, are running, or
-have queued work. It shows the current operation or runtime error. It provides
-**Open** and a session-scoped **Stop** control. Leyline also shows rendered
-transcripts, live runtime output, Git changes, model controls, memory,
-subagents, runtime events, and an embedded terminal. Each window can use the
-native backend or a saved backend connection.
+Browse and run pi sessions in a focused workspace. Keep one project in focus,
+search across projects with **Go to**, and supervise background work through
+**Activity**. Read live transcripts, direct runs with steering or **Up next**
+tasks, and inspect tools, System changes, and local files. Pi's native MCP
+integration supplies configured tools, and extension confirmation cards let you
+approve or cancel requests.
+
+Model controls include the optional `ultrafast` chip for supported OpenAI
+Responses models. It is off by default and uses premium pricing. See
+[Runtime controls](docs/user-guide/runtime-controls.md#use-ultrafast).
+Memory, subagents, HTML export, and an embedded terminal support session work.
+Each window can use the native backend or a saved backend connection.
 
 Deep research sessions divide a question into parallel, source-backed threads.
 Leyline keeps the plan and worker sessions inspectable and validates numbered
 report citations. Each citation opens a source preview. The research ledger
 keeps cited, supporting, and excluded source records.
 
-On desktop, the Git review pane prepares changed files and the selected diff
-before it opens. It separates staged and working-tree changes and can expand
-across the workspace.
+On desktop, Git Review keeps its header summary current while the pane is
+closed. It prepares the selected diff before opening, separates staged and
+working-tree changes, and can expand across the workspace.
 
 When the active model cannot receive images, Leyline can send each attachment
 to a configured vision model in a hidden child session. The parent model
@@ -149,14 +153,17 @@ creating a session.
 
 ## Electron shortcuts (macOS)
 
-- `Command+N`: create a session in the current window
-- `Command+Shift+N`: create a session in a new window
+- `Command+N`: create a session in the current session CWD
+- `Command+Shift+N`: open Home in a new window without creating a session
 - `Command+W`: close the current window
 - `Command+E`: show or hide the sidebar
 - `Command+Shift+E`: open Settings
 - `Command+Shift+M`: show or hide Memory
 - `Command+Shift+T`: show or hide the terminal
-- `Escape`: stop the active run and close open drawers, dialogs, and menus
+- `Escape`: close open surfaces first. With none open, stop the active run
+
+When focus is in the terminal, Escape stays in the shell unless another surface
+is open.
 
 ## Documentation
 

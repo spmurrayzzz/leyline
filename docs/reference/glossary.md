@@ -5,12 +5,16 @@
   sessions, runtime events, terminal traffic, and exports.
 - **Compaction**: A pi operation that replaces older context with a shorter
   summary to reduce context use.
+- **Confirmation card**: An extension request above the composer with **Confirm**
+  and **Cancel** actions.
 - **Composer**: The input area for prompts, images, shell commands, slash
   commands, steering, and **Up next** tasks.
 - **Context usage**: The current number and percentage of model context tokens.
 - **Deep research session**: A pi session whose lead agent plans parallel source work and writes a cited report.
-- **Follow-up**: An input that pi runs after the active turn finishes. Accepted
-  follow-up inputs appear under **Sent to agent**.
+- **File preview**: A view of the current local file on the session's backend,
+  separate from saved tool output.
+- **Follow-up**: An input that pi has accepted to run after the active turn.
+  It appears under **Sent to agent**, not the editable **Up next** queue.
 - **Fork**: A new pi session that starts from a selected transcript entry.
 - **Git review**: A read-only desktop pane for staged, working-tree, untracked,
   and conflicted project changes.
@@ -19,6 +23,8 @@
 - **Leyline trash**: The directory where Leyline moves a deleted session JSONL
   file. It is a timestamped `leyline-trash` directory next to the configured pi
   session directory.
+- **MCP tool**: A tool from a configured Model Context Protocol server, supplied
+  through pi's native MCP integration.
 - **Memory**: Local Markdown context in global, project, or session scope.
 - **Native backend**: The backend that supplied the current Leyline app.
 - **Memory Inspector**: The **Memory** drawer for creating, editing, archiving,
@@ -41,11 +47,16 @@
   point. Use Option+Enter during an active run.
 - **Subagent**: A child pi session that runs a delegated task with isolated
   context.
+- **System card**: A collapsed transcript card for recorded system-prompt
+  sections and tool-loadout changes. Expand it to inspect the changes.
 - **Thought**: A collapsed or expanded transcript row that contains available
   model reasoning output.
 - **Tool row**: A collapsed or expanded transcript row for a tool call and its
   result.
 - **Transcript**: The selected branch of a pi session as Leyline displays it.
+- **ultrafast**: A premium service tier for supported OpenAI Responses models.
+  Its composer chip is off by default and applies to the current runtime/session.
+  Compaction and branch summaries remain Standard.
 - **Up next**: The editable queue of tasks that Leyline sends one at a time
   when the agent becomes idle. Enter adds a task during an active run.
 - **Vision agent**: The `vision_agent` tool. It starts a hidden child session

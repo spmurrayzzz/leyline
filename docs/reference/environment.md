@@ -61,9 +61,10 @@ requires an executable path and has no repository fallback.
 | --- | --- |
 | `VITEPRESS_BASE` | Base path for the VitePress build. The default is `/docs/`. |
 
-For example:
+Check both the default and deployment base paths:
 
 ```bash
+npm run docs:build
 VITEPRESS_BASE=/leyline/ npm run docs:build
 ```
 
@@ -74,6 +75,7 @@ VITEPRESS_BASE=/leyline/ npm run docs:build
 | `SCREENSHOT_URL` | `npm run screenshot` | `http://localhost:5173/` |
 | `SCREENSHOT_PATH` | `npm run screenshot` | `screenshots/current.png` |
 | `DOCS_SCREENSHOT_URL` | `npm run docs:screenshots` | `http://localhost:5173/` |
+| `DOCS_SCREENSHOT_FILTER` | `npm run docs:screenshots` | Empty: capture all fixtures. Otherwise, use comma-separated output basenames. |
 | `VIDEO_URL` | `npm run video` | `http://localhost:5173/` |
 | `VIDEO_PATH` | `npm run video` | `screenshots/walkthrough.webm` |
 | `VIDEO_DIR` | `npm run video` | `screenshots/videos` |
@@ -84,7 +86,9 @@ VITEPRESS_BASE=/leyline/ npm run docs:build
 
 The live screenshot viewport is fixed at 1503 by 818 CSS pixels with a device
 scale factor of 2. Documentation captures use fixed desktop, mobile, and README
-viewports. See [Screenshots and video](../developer-guide/screenshots-and-video).
+viewports. A filter such as `composer-queue.png,activity.png` selects matching basenames in either output directory.
+
+See [Screenshots and video](../developer-guide/screenshots-and-video) for mocked coverage, model requirements, and focused Ultrafast and System captures.
 
 ## Internal variables
 

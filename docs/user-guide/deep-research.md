@@ -88,7 +88,7 @@ A valid final response becomes a **research artifact** in the transcript. Its he
 
 If a numeric citation is invalid, Leyline marks the research session as interrupted. The response remains in the transcript, but it does not become a completed research artifact.
 
-Use the composer to ask a follow-up question or request a report revision. The lead receives the persisted research state with the next turn.
+Use the composer to ask another question or request a report revision. The lead receives the persisted research state with the next turn.
 
 Research sessions support normal prompt edits, forks, resets, and refreshes. Forks keep branch research state and bind it to the new session. Resets rebuild state from the retained branch.
 

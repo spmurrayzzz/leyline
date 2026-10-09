@@ -27,11 +27,17 @@ The right side of the header contains these controls:
 
 ## Read the transcript
 
-The transcript shows the current session branch. User messages, assistant messages, tools, thoughts, skills, summaries, and images use different rows.
+The transcript shows the current session branch. Messages, tools, thoughts, skills, summaries, images, and System changes use different rows.
+
+Collapsed **System** cards show prompt-section and tool-loadout changes that pi recorded. Expand a card to inspect the sections and added or removed tools. See [Tools and thinking](./tools-and-thinking#inspect-system-changes).
 
 Assistant output and tool activity appear while the run is active. Saved rows replace live rows after pi records the turn. Leyline keeps one visible copy of each item.
 
 A [deep research session](./deep-research) adds a phase bar, Research threads card, cited report artifact, source pane, and citation previews. Each thread can link to its child transcript.
+
+## Reply to a confirmation
+
+Extension confirmation cards appear above the composer. Read the request, then select **Confirm** or **Cancel**. A background session that needs a reply appears in **Activity** as **Waiting for confirmation**.
 
 ## Keep your reading position
 

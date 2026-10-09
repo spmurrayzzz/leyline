@@ -1,6 +1,6 @@
 # Tools and thinking
 
-The transcript separates assistant text, reasoning, tools, skills, subagents, and feedback.
+The transcript separates assistant text, reasoning, System changes, tools, skills, subagents, and feedback.
 
 ## Expand a thought
 
@@ -25,6 +25,22 @@ Tool rows are collapsed by default. Select a row to show its output or preview.
 Each row shows a tool label, target when available, and status. Common labels include file paths for file tools and commands for shell tools.
 
 Shell rows also show **in context** or **not in context**. This label tells you whether pi received the command output as session context.
+
+## Inspect System changes
+
+![Collapsed initial System card and expanded prompt-section and tool change](../assets/screenshots/system-message.png)
+
+Pi records changes to the system prompt and tool loadout in collapsed **System** cards. The first card can show the full prompt and initial tools. Later cards show changed or removed prompt sections and added or removed tools.
+
+Select a card to expand its sections and tool descriptions. **Copy** copies the recorded change text. Older sessions can have no System cards.
+
+## Use MCP tools and confirmations
+
+Leyline uses pi's native MCP integration for configured servers. MCP tools use names such as `mcp__<server>__<tool>`. Pi's exposure settings control how the model reaches them. Calls and results appear in the transcript like other tools.
+
+When an extension requests confirmation, Leyline shows a card above the composer. Read the request, then select **Confirm** or **Cancel**. MCP tools use pi's tool pipeline, so permission extensions can request confirmation for them too. Not every tool call requires confirmation.
+
+For a background session, **Activity** shows **Waiting for confirmation** under **Needs attention**. Open that session to reply.
 
 ## Open full tool output
 

@@ -94,13 +94,56 @@ Git commands disable external diff drivers and text conversion. The browser keep
 
 `createAgentSessionRuntime()` wraps the session and services in `AgentSessionRuntime`. Runtime handles keep these objects alive for background work.
 
-Each runtime loads the bundled goal, memory, subagent, research, and vision-agent extensions. It also appends the Leyline system prompt.
+Normal runtimes load the bundled output-budget, ultrafast, goal, memory, subagent, research, and vision-agent extensions. They also append the Leyline system prompt.
+
+`preferBundledExtensions()` filters conflicts by extension name and designated command or tool names. It puts the bundled Ultrafast extension last, so later hooks cannot overwrite its enabled tier.
+
+Children with an isolated custom system prompt retain only output-budget. They omit context files, skills, native extension factories, and the Leyline prompt. Vision children use this isolated path.
+
+`services.modelRuntime` is pi's `ModelRuntime`. It supplies model lookup, available snapshots, and authentication state. Use this current SDK terminology in new integration work.
 
 Research creation writes a `leyline-research` marker before extension binding. The bound extension adds its lead protocol and exposes `research_update` only for that session.
 
 Runtime creation installs a vision context transform on the session agent. The transform replaces matched images with saved file paths and `vision_agent` instructions. After matching tool calls exist, it uses neutral text instead of another instruction.
 
 Leyline retains `one-at-a-time` delivery for native pi steering and follow-up inputs.
+
+## Native MCP and tool search
+
+Normal runtimes add `createMcpExtension()` and `createToolSearchExtension()` as replaceable built-in extensions through `extensionFactories`. Pi owns server configuration, connections, discovery, and tool execution.
+
+Leyline activates `tool_search` at session start unless `defaultTools` contains `-tool_search`. Tools that it loads produce normal system-role tool deltas.
+
+Leyline does not load Codemode and always excludes `codemode` from the active tool set. Do not reintroduce it when updating SDK integration.
+
+## Browser confirmations
+
+`extension-ui.js` adapts `ctx.ui.confirm()` to pending requests in `extensionUi.confirmations`. Each request has an ID, title, message, and optional expiry.
+
+`ExtensionConfirmations.vue` shows **Confirm** and **Cancel**. Replies use the session-scoped `/sessions/:id/extension-confirmations/:requestId` route. HTTP and SSE snapshots carry the current pending requests.
+
+Confirmation replies apply only to the current session binding. Abort, expiry, reload, or disposal resolves pending requests as false. Stale replies cannot approve replacement runtimes.
+
+## Ultrafast
+
+The bundled `.pi/extensions/ultrafast/index.js` owns the mode and provider hooks. Its `leyline-ultrafast` command is for composer controls and stays hidden from the slash picker.
+
+Eligibility requires `gpt-6-astra` or `gpt-6.1-sol` on one of these paths:
+
+- `openai-codex` with `openai-codex-responses`
+- `openai` with `openai-responses` and API-key authentication
+
+The `openai` subscription path is ineligible. Ultrafast defaults to off and belongs to the current runtime. Model changes, reload, and fork reset it.
+
+Ultrafast applies only to normal agent turns. Compaction and branch summaries stay Standard, including automatic compaction during a turn. Cache warming stops while Ultrafast is enabled.
+
+When enabled, normal agent requests use `service_tier: "ultrafast"`. Codex requests also use `x-codex-routing-hint: model=<id>;tier=ultrafast`. Direct OpenAI Astra requests add `OpenAI-Service-Tier: ultrafast`.
+
+Tier changes call pi's public `cleanupSessionResources(sessionId)` to obtain a fresh connection and routing headers. An external model change during a run defers cleanup to a safe turn or provider boundary.
+
+Cost changes require a matching response ID, provider, and model. The extension recalculates base costs and multiplies each cost field by six for confirmed Ultrafast requests. Codex confirmation also accepts an Ultrafast request when the response tier is absent or `default`. Token counts do not change.
+
+Model and Ultrafast changes require an idle session and share the prompt-submission lock. Model changes hold that lock until asynchronous authentication finishes. Prompt preflight and queue dispatch stay blocked during either change. Both paths release their flags and reschedule the queue in `finally`.
 
 ## Pending prompts
 
@@ -154,7 +197,7 @@ Subagent configuration discovers definitions in `~/.pi/agent/agents` and the nea
 
 Subagent model precedence is session, project, global, then the agent definition. Vision-model precedence is session, project, then global. Session overrides for both features copy to a new fork.
 
-The subagent and vision execution routes create child pi sessions. They write an explicit marker before they start each child runtime. Vision children use an empty tool allowlist and a session-local image setting override.
+The subagent and vision execution routes create child pi sessions. They write an explicit marker before they start each child runtime. Normal subagents retain the normal runtime resources and their tool policy. Vision children use an isolated prompt, output-budget only, an empty tool allowlist, and a session-local image setting override.
 
 ## Goal and research state projection
 

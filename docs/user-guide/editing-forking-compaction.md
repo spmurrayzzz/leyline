@@ -35,7 +35,9 @@ Retry is unavailable during a run, compaction, reload, or session activation.
 
 Leyline creates and selects a new session at that entry. The original session and its later history remain unchanged.
 
-Forking is unavailable while the selected session runs or compacts. Transcript-level subagent cards do not provide this action.
+You can fork a saved entry during an active run. The source session keeps running after Leyline selects the fork. Wait for a live entry to finish saving before forking it.
+
+Forking is unavailable during compaction. Transcript-level subagent cards do not provide this action. The fork starts with `ultrafast` off.
 
 ## Reset to here
 

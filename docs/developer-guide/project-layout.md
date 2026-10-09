@@ -9,6 +9,7 @@
 - `src/components/ResearchSourcesPane.vue`: Renders cited sources and the complete research ledger.
 - `src/components/ResearchCitationPreview.vue`: Renders the anchored citation preview and mobile bottom sheet.
 - `src/components/VisionConfigDrawer.vue`: Manages transcript, project, and global vision-model overrides.
+- `src/components/ExtensionConfirmations.vue`: Displays pending extension confirmations and sends session-scoped replies.
 - `src/composables/useSessionWorkspace.js`: Owns session, route, activation, and runtime-control state.
 - `src/composables/useBackendConnections.js`: Owns connection records, the default, and window-specific backend selection.
 - `src/composables/useTranscriptPreferences.js`: Owns app-wide transcript display settings.
@@ -33,7 +34,8 @@
 - `lib/leyline-settings.js`: Defines app setting keys for the native backend and browser.
 - `lib/research-state.js`: Folds branch-local research events and normalizes threads and sources.
 - `lib/research-citations.js`: Validates numbered report links against the research source ledger.
-- `lib/transcript-projection.js`: Projects pi branch entries into shared transcript DTOs.
+- `lib/transcript-projection.js`: Projects pi branch entries, including System cards, into shared transcript DTOs.
+- `lib/ultrafast.js`: Defines Ultrafast model and authentication eligibility and shared control identifiers.
 
 These files are outside `src/` because Node.js backend code and browser code import them.
 
@@ -89,12 +91,16 @@ These files are outside `src/` because Node.js backend code and browser code imp
 
 ## Bundled pi resources
 
-- `.pi/LEYLINE_SYSTEM.md`: Adds Leyline operating context to each runtime.
+- `.pi/LEYLINE_SYSTEM.md`: Adds Leyline operating context to normal runtimes.
+- `.pi/extensions/output-budget/`: Implements one bounded retry for explicit OpenAI-compatible completion-budget errors.
+- `.pi/extensions/ultrafast/`: Owns runtime-local tier controls, provider hooks, connection cleanup, and cost adjustment.
 - `.pi/extensions/goal/`: Implements goal commands, state, and controls.
 - `.pi/extensions/memory/`: Implements memory injection, commands, and tools.
 - `.pi/extensions/subagent/`: Implements single, parallel, and chain subagent tools, including the reserved researcher.
 - `.pi/extensions/research/`: Implements research-session binding, state updates, orchestration protocol, and report checks.
-- `.pi/extensions/vision-agent/`: Implements image-file inspection through a vision child.
+- `.pi/extensions/vision-agent/`: Implements image-file inspection through an isolated vision child.
+
+Normal runtimes load all seven bundled extensions. Isolated custom-prompt children retain only output-budget. Native MCP and tool search use SDK factories in `runtime.js`. Leyline does not load Codemode.
 
 ## Capture and documentation
 

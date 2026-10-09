@@ -2,7 +2,7 @@
 
 Leyline uses a mobile layout when the viewport is 760 pixels wide or less.
 
-![Leyline mobile session with the compact header, transcript, and composer](../assets/screenshots/mobile-session.png)
+![Leyline mobile session with System cards and ultrafast enabled in the composer](../assets/screenshots/mobile-session.png)
 
 *The mobile workbench keeps the main session actions in one column.*
 
@@ -41,7 +41,7 @@ The sidebar can use up to 86 percent of the viewport width, with a maximum width
 2. Select **Activity**.
 3. Select **Open** or **Stop** for a session.
 
-The mobile view uses the same attention, running, queued, held, and shared-working-tree states as the desktop view. Open a session to resume its held queue.
+The mobile view uses the same attention, running, queued, held, and shared-working-tree states as the desktop view. Open a session to resume its held queue or reply to a confirmation.
 
 ## Use transcript actions
 
@@ -51,7 +51,9 @@ Tool targets can shorten to fit the row. User messages and tool cards use the fu
 
 ## Use the mobile composer
 
-The composer stays above the bottom edge. Model, thinking, dictation, and send controls use one row.
+The composer stays above the bottom edge. Model, thinking, optional `ultrafast`, dictation, and send controls share the primary row. With `ultrafast` available, narrow screens move the model control to its own row.
+
+The `ultrafast` chip uses the same supported models, premium pricing, and session scope as on desktop. See [Runtime controls](./runtime-controls#use-ultrafast).
 
 During an active run, the send arrow adds the draft to **Up next**. Select **Send options** beside the arrow for **Queue next task** or **Steer current run**.
 
@@ -75,6 +77,6 @@ Select a report citation to open its source preview as a bottom sheet.
 
 Right-side drawers can use the full viewport width, with a maximum width of 420 pixels.
 
-The terminal opens from the bottom. Its default mobile height is the smaller of 46 percent of the viewport or 310 pixels.
+The terminal opens from the bottom. Its default height is 310 pixels.
 
 The transcript adds space for the composer and terminal, so the newest output remains reachable.

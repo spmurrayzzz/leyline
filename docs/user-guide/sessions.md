@@ -34,6 +34,7 @@ A session row can show these states:
 - **running**: the agent is producing a response.
 - **compacting**: pi is compacting the session context.
 - **unread**: a background run finished or reported an error.
+- **confirm**: the session waits for a reply to an extension confirmation.
 - **N queued**: tasks or accepted inputs are waiting.
 - **N held**: the queue is held until you select **Resume**.
 - **error**: the background runtime reported an error.

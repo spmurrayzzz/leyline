@@ -169,11 +169,15 @@ that directory.
 
 ## Bundled extensions and prompt
 
-Each runtime loads the bundled goal, memory, subagent, research, and vision-agent extensions from `.pi/extensions/`. It also appends `.pi/LEYLINE_SYSTEM.md` to the system prompt.
+Normal runtimes load output-budget, ultrafast, goal, memory, subagent, research, and vision-agent from `.pi/extensions/`. They also append `.pi/LEYLINE_SYSTEM.md` to the system prompt.
+
+Bundled conflict filtering removes other extensions with matching names or designated commands and tools. The bundled Ultrafast extension runs last, after other provider hooks.
+
+Normal runtimes also load pi's native MCP and tool-search extensions. Leyline excludes `codemode`. See [Runtime construction](./backend-api#runtime-construction) and [Ultrafast](./backend-api#ultrafast) for the loading and request contracts.
 
 A new research session gets its marker before extension binding. The research extension exposes `research_update` only when the active branch contains a marker for that session ID.
 
-Vision children use the normal subagent runtime path with no active tools. A session-local settings override permits image input without changing the user's persisted pi image setting.
+Children with an isolated custom system prompt load only the bundled output-budget extension. They omit context files, skills, MCP, tool search, and the Leyline prompt. Vision children use this path with no active tools. A session-local settings override permits image input without changing the user's persisted pi image setting.
 
 Reload creates replacement cwd-bound services. It then binds the new session, extensions, event subscription, and extension UI state to the existing handle.
 

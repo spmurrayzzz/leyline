@@ -3,6 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { chromium } from 'playwright'
 import { THINKING_DEFAULT_SETTING_KEY } from '../lib/leyline-settings.js'
+import { projectEntry } from '../lib/transcript-projection.js'
 import {
   canonicalResearchSourceKey,
   compactResearchState,
@@ -22,14 +23,25 @@ const visionAlertImage = {
 }
 const model = {
   provider: 'local',
-  id: 'deepseek-v4-flash',
-  name: 'DeepSeek V4 Flash',
+  id: 'minimax-m2.7',
+  name: 'MiniMax M2.7',
   supportsImages: false,
-  contextWindow: 384000,
+  supportsUltrafast: false,
+  contextWindow: 204800,
   availableThinkingLevels: ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'],
+}
+const ultrafastModel = {
+  provider: 'openai-codex',
+  id: 'gpt-6.1-sol',
+  name: 'GPT-6.1 Sol',
+  supportsImages: true,
+  supportsUltrafast: true,
+  contextWindow: 272000,
+  availableThinkingLevels: ['off', 'low', 'medium', 'high', 'xhigh'],
 }
 const availableModels = [
   model,
+  ultrafastModel,
   {
     provider: 'local',
     id: 'qwen3.6-27b',
@@ -74,8 +86,18 @@ const backendInfo = {
     exports: true,
     research: true,
     review: true,
+    reviewWatch: true,
     terminal: true,
+    fileLinks: true,
   },
+}
+const fileSettings = {
+  editor: 'code --wait',
+  environmentEditor: '',
+  effectiveEditor: 'code --wait',
+  editorMode: 'desktop',
+  terminalEditor: false,
+  revealLabel: 'Reveal in Finder',
 }
 const stagedReviewPatch = `diff --git a/scripts/release.js b/scripts/release.js
 index 03b7821..f21bb35 100644
@@ -429,6 +451,46 @@ const baseEntries = [
   }),
 ]
 
+const systemEntries = [
+  projectEntry({
+    id: 'system-initial',
+    type: 'message',
+    timestamp: '2026-08-06T15:42:59.000Z',
+    message: {
+      role: 'system',
+      timestamp: Date.parse('2026-08-06T15:42:59.000Z'),
+      sections: {
+        preamble: 'You are a coding assistant working on the harbor project.',
+        project: 'Run release verification before publication.',
+      },
+      toolsAdded: [
+        { name: 'read', description: 'Read project files.' },
+        { name: 'bash', description: 'Run shell commands in the project directory.' },
+        { name: 'edit', description: 'Make precise changes to project files.' },
+      ],
+    },
+  }),
+  projectEntry({
+    id: 'system-delta',
+    type: 'message',
+    timestamp: '2026-08-06T15:46:30.000Z',
+    message: {
+      role: 'system',
+      timestamp: Date.parse('2026-08-06T15:46:30.000Z'),
+      sections: {
+        project: 'Run release verification before publication. Keep this change limited to scripts/release.js.',
+      },
+      toolsAdded: [{ name: 'grep', description: 'Search project files for matching text.' }],
+    },
+  }),
+]
+const systemTranscriptEntries = [
+  systemEntries[0],
+  ...baseEntries.slice(0, -1),
+  systemEntries[1],
+  baseEntries.at(-1),
+]
+
 const markdownPreviewContent = `# Release checklist
 
 Complete these checks before publication.
@@ -641,8 +703,8 @@ const subagentPayload = {
       model: 'inherit',
       thinking: 'high',
       tools: ['read', 'grep'],
-      overrides: { session: 'local/deepseek-v4-flash' },
-      effectiveModel: 'local/deepseek-v4-flash',
+      overrides: { session: 'local/minimax-m2.7' },
+      effectiveModel: 'local/minimax-m2.7',
       modelSource: 'session',
     },
     {
@@ -651,11 +713,11 @@ const subagentPayload = {
       description: 'Finds source evidence before implementation begins.',
       source: 'user',
       path: '/workspace/agents/researcher.md',
-      model: 'local/deepseek-v4-flash',
+      model: 'local/minimax-m2.7',
       thinking: 'medium',
       tools: ['read', 'grep', 'bash'],
-      overrides: { project: 'local/deepseek-v4-flash' },
-      effectiveModel: 'local/deepseek-v4-flash',
+      overrides: { project: 'local/minimax-m2.7' },
+      effectiveModel: 'local/minimax-m2.7',
       modelSource: 'project',
     },
   ],
@@ -711,6 +773,21 @@ try {
     file: path.join(docsOutputDir, 'workbench.png'),
     route: '/sessions/demo-session',
     ready: '.assistant-message .thinking-trigger',
+    scenario: 'ultrafast',
+  })
+  await capture({
+    browser,
+    file: path.join(docsOutputDir, 'system-message.png'),
+    route: '/sessions/demo-session',
+    ready: '.system-card',
+    scenario: 'system',
+    interact: async (page) => {
+      const card = page.locator('.system-card').last()
+      await card.locator('.tool-card-header').click()
+      await card.locator('.system-expanded-body').waitFor()
+    },
+    clipSelectors: ['.system-card', '.system-card.is-expanded'],
+    padding: 18,
   })
   await capture({
     browser,
@@ -808,6 +885,7 @@ try {
     file: path.join(docsOutputDir, 'composer-controls.png'),
     route: '/sessions/demo-session',
     ready: '.composer .composer-context-usage',
+    scenario: 'ultrafast',
     clipSelectors: ['.composer'],
     padding: 18,
   })
@@ -936,7 +1014,7 @@ try {
       }
       const options = await modelSelect.locator('option').allTextContents()
       if (options.some((option) => {
-        return option.includes('deepseek-v4-flash') || option.includes('text-only-coder')
+        return option.includes('minimax-m2.7') || option.includes('text-only-coder')
       })) {
         throw new Error('Vision model selector includes a model without image support')
       }
@@ -1020,6 +1098,7 @@ try {
     route: '/sessions/demo-session',
     ready: '.composer .mobile-label',
     viewport: { width: 390, height: 844 },
+    scenario: 'ultrafast',
   })
   await capture({
     browser,
@@ -1059,6 +1138,7 @@ try {
     route: '/sessions/demo-session',
     ready: '.assistant-message .thinking-trigger',
     viewport: { width: 1503, height: 818 },
+    scenario: 'ultrafast',
     macWindow: true,
   })
   await capture({
@@ -1200,6 +1280,7 @@ function runtimeFor(scenario) {
   const queued = ['queue', 'queue-held'].includes(scenario)
   const held = scenario === 'queue-held'
   const research = scenario === 'research'
+  const selectedModel = ['home', 'ultrafast'].includes(scenario) ? ultrafastModel : model
   const id = research ? researchSession.id : 'demo-session'
   return {
     id,
@@ -1208,10 +1289,10 @@ function runtimeFor(scenario) {
     cwd: '/workspace/harbor',
     diagnostics: [],
     state: {
-      model,
+      model: selectedModel,
       availableModels,
       thinkingLevel: 'high',
-      availableThinkingLevels: model.availableThinkingLevels,
+      availableThinkingLevels: selectedModel.availableThinkingLevels,
       isStreaming: (queued && !held) || activity,
       isCompacting: false,
       pendingToolCalls: activity ? ['activity-selected-tool'] : [],
@@ -1228,7 +1309,11 @@ function runtimeFor(scenario) {
       activeToolNames: research
         ? ['read', 'grep', 'subagent', 'research_update', 'exa_search', 'exa_contents']
         : ['read', 'grep', 'bash', 'edit'],
-      contextUsage: { tokens: 12480, contextWindow: model.contextWindow, percent: 3.25 },
+      contextUsage: {
+        tokens: 12480,
+        contextWindow: selectedModel.contextWindow,
+        percent: 12480 / selectedModel.contextWindow * 100,
+      },
       slashCommands: [
         { name: 'compact', description: 'Compact context', source: 'command' },
         { name: 'goal', description: 'Start or manage a goal', source: 'extension' },
@@ -1245,7 +1330,10 @@ function runtimeFor(scenario) {
       },
       queuedMessages: { steering: [], followUp: [] },
       extensionUi: {
-        statuses: scenario === 'goal' ? { goal: 'goal: active' } : {},
+        statuses: {
+          'leyline-ultrafast': scenario === 'ultrafast' ? 'on' : 'off',
+          ...(scenario === 'goal' ? { goal: 'goal: active' } : {}),
+        },
         widgets: {},
         notifications: [],
       },
@@ -1309,15 +1397,15 @@ function runtimeForSession(id, state) {
 function detailFor(scenario) {
   const research = scenario === 'research'
   const summary = research ? researchSession : sessions[0]
-  const entries = research
-    ? researchEntries
-    : scenario === 'markdown'
-      ? markdownPreviewEntries
-      : scenario === 'shell'
-        ? shellEntries
-        : scenario === 'vision'
-          ? visionEntries
-          : baseEntries
+  const entries = {
+    system: systemEntries,
+    ultrafast: systemTranscriptEntries,
+    export: systemTranscriptEntries,
+    research: researchEntries,
+    markdown: markdownPreviewEntries,
+    shell: shellEntries,
+    vision: visionEntries,
+  }[scenario] || baseEntries
   return {
     session: {
       ...summary,
@@ -1331,7 +1419,7 @@ function detailFor(scenario) {
       created: research
         ? '2026-08-06T15:52:00.000Z'
         : '2026-08-06T15:42:00.000Z',
-      contextUsage: { tokens: 12480, contextWindow: model.contextWindow, percent: 3.25 },
+      contextUsage: runtimeFor(scenario).state.contextUsage,
     },
     entries,
   }
@@ -1434,6 +1522,7 @@ async function capture({
     })
 
     if (key === 'GET /api/pi/info') return json(backendInfo)
+    if (key === 'GET /api/pi/files/settings') return json(fileSettings)
     if (key === 'GET /api/pi/projects') return json({ projects })
     if (key === 'GET /api/pi/fs') return json(projectDirectory)
     if (key === 'GET /api/pi/sessions') {
@@ -1499,7 +1588,16 @@ async function capture({
     }
     await page.evaluate(() => window.scrollTo(0, 0))
     await assertPrivateDataAbsent(page)
-    if (!exportPage) await assertModelLabel(page)
+    if (!exportPage) {
+      await assertModelLabel(page, `${runtime.state.model.provider}/${runtime.state.model.id}`)
+      if (['home', 'ultrafast'].includes(scenario)) {
+        const chip = page.locator('.ultrafast-toggle:visible').first()
+        if ((await chip.innerText()).trim() !== 'ultrafast'
+          || await chip.getAttribute('aria-pressed') !== String(scenario === 'ultrafast')) {
+          throw new Error('Unexpected Ultrafast control state')
+        }
+      }
+    }
     if (unexpected.length) throw new Error(unexpected.join('\n'))
     const clip = clipSelectors
       ? await unionClip(page, clipSelectors, padding, viewport)
@@ -1699,8 +1797,7 @@ async function assertPrivateDataAbsent(page) {
   }
 }
 
-async function assertModelLabel(page) {
-  const expected = 'local/deepseek-v4-flash'
+async function assertModelLabel(page, expected) {
   const selector = '.model-picker:not(.small-picker):not(.tool-picker) > .model-picker-button'
   await page.waitForFunction(({ expected, selector }) => {
     const buttons = [...document.querySelectorAll(selector)]
@@ -1775,6 +1872,8 @@ function initBrowser({
         if (this.readyState === 2) return
         this.readyState = 1
         this.onopen?.(new Event('open'))
+        this.dispatchEvent(new Event('open'))
+        if (new URL(url, window.location.href).pathname === '/api/pi/review/events') return
         for (const activeRuntime of runtimeSessions) {
           this.dispatchEvent(new MessageEvent('active_session', {
             data: JSON.stringify(activeRuntime),
@@ -1785,7 +1884,10 @@ function initBrowser({
           { activeSessionId: runtime.id, event: { type: 'tool_execution_start', toolName: 'read' } },
           { activeSessionId: runtime.id, event: { type: 'tool_execution_end', toolName: 'read' } },
           ...(!runtime.state.isStreaming
-            ? [{ activeSessionId: runtime.id, event: { type: 'agent_end' } }]
+            ? [
+                { activeSessionId: runtime.id, event: { type: 'agent_end' } },
+                { activeSessionId: runtime.id, event: { type: 'agent_settled' } },
+              ]
             : []),
         ]
         if (emitRuntimeEvents) {
@@ -1795,6 +1897,9 @@ function initBrowser({
             }))
           }
         }
+        this.dispatchEvent(new MessageEvent('active_session', {
+          data: JSON.stringify({ ...runtime, snapshotRevision: now + 1 }),
+        }))
         if (activeGoal) {
           this.dispatchEvent(new MessageEvent('extension_ui', {
             data: JSON.stringify({

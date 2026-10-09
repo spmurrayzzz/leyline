@@ -31,6 +31,8 @@ The token value is the latest available context usage. It is not a total of all 
 
 The export includes rendered Markdown, assistant thoughts, collapsed tool rows, skill rows, subagent results, and attached images.
 
+Collapsed **System** cards preserve prompt-section and tool-loadout changes that pi recorded. Expand a card to inspect updated or removed sections and added or removed tools.
+
 A deep research export also includes the styled report, research-thread results, and every ledger source. Each source shows one evidence summary. An excluded source shows its exclusion reason instead.
 
 Tool rows render their previews when you expand them. Exported runtime event rows are omitted.

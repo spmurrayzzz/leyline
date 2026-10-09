@@ -41,6 +41,8 @@ If the typed folder does not exist, the action changes to **Create & add**. Leyl
 
 These choices are staged for the new session. A model change can also change the available thinking levels.
 
+For supported OpenAI Responses models, the lowercase `ultrafast` chip appears beside these controls. It is off by default. Click it to stage the choice without a confirmation dialog. It uses premium pricing and resets when you change the model. See [Runtime controls](./runtime-controls#use-ultrafast) for model and authentication limits.
+
 ## Inspect enabled tools
 
 Select the tool-count control, such as **12 tools**. The **Enabled tools** list shows the tools for the staged runtime.
@@ -61,7 +63,7 @@ Shell mode always creates a normal session. See [Deep research](./deep-research)
 2. Enter the first task in **Ask Leyline anything**.
 3. Press **Enter** or select the send button.
 
-Leyline creates the session first. It then applies the staged model and thinking level and submits the prompt.
+Leyline creates the session first. It then applies the staged model, thinking level, and `ultrafast` choice before the prompt.
 
 Press **Shift+Enter** to add a line break.
 

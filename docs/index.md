@@ -4,7 +4,7 @@ layout: home
 hero:
   name: Leyline
   text: UI for your pi coding agent sessions
-  tagline: Browse, run, monitor, control, and export pi sessions from a focused browser or Electron workspace.
+  tagline: Run pi sessions, supervise background work, and inspect transcripts in a focused browser or Electron workspace.
   actions:
     - theme: brand
       text: Get started
@@ -20,15 +20,15 @@ features:
   - title: Browse sessions and projects
     details: Keep one project in focus, search its sessions, use Go to across projects, and move between parent and child sessions.
   - title: Run and direct agents
-    details: Submit prompts, images, shell commands, steering messages, queued follow-ups, slash commands, and long-running goals.
+    details: Send prompts and images, steer active runs, and queue editable Up next tasks. Select models and optional ultrafast for supported OpenAI Responses models.
   - title: Run deep research
     details: Split a question into parallel research threads, follow source gathering, verify report citations, and inspect the persistent research ledger.
   - title: Use images with any model
     details: Send images directly to compatible models or configure a vision agent to describe them for models without image support.
   - title: Supervise live work
-    details: Use Activity to inspect nonselected sessions, current tool targets, runtime errors, queues, shared working trees, and scoped stop controls.
+    details: Follow background sessions in Activity and stop individual runs. Inspect native MCP tools and reply to extension confirmation cards.
   - title: Review Git changes
-    details: Inspect staged, working-tree, untracked, and conflicted files in a prepared pane that can expand across the workspace.
+    details: Keep the header summary current with the pane closed. Open a prepared diff to inspect staged and working-tree changes separately.
   - title: Connect backend hosts
     details: Save named Leyline backends, set an app-wide default, and select an active backend for each window.
   - title: Manage durable memory
@@ -36,11 +36,11 @@ features:
   - title: Delegate to subagents
     details: Run specialized child agents and set model overrides by global, project, or session scope.
   - title: Review and revise history
-    details: Edit prompts, retry turns, fork sessions, reset a thread, label rollouts, and inspect rich file or diff previews.
+    details: Edit prompts, retry turns, and fork saved history while the source keeps running. Inspect current local files through transcript links.
   - title: Use a terminal
     details: Open the PTY-backed xterm drawer in the active project through the selected backend.
   - title: Export transcripts
-    details: Save portable HTML with Markdown, tools, thinking output, images, token data, previews, and optional share metadata.
+    details: Save readable HTML with messages, tools, thinking output, collapsed System change cards, and images.
 ---
 
 ## Leyline workspace

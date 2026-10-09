@@ -1,8 +1,8 @@
 # Settings
 
-The **Settings** drawer manages backend connections, transcript display, subagent defaults, and the vision model. It also shows runtime and session information.
+The **Settings** drawer manages backend connections, file actions, transcript display, subagent defaults, and the vision model. It also shows runtime and session information.
 
-![Settings drawer with backend connections, runtime details, and thought display options](../assets/screenshots/backend-connections.png)
+![Settings drawer with backend connections, runtime details, and file editor settings](../assets/screenshots/backend-connections.png)
 
 ## Open Settings
 
@@ -53,6 +53,20 @@ to an untrusted network.
 
 For remote browser access, configure the server to allow the frontend origin.
 See [Environment variables](../reference/environment).
+
+## Configure file actions
+
+The **Files** section appears when the selected backend supports file actions.
+
+1. Enter an **Editor command**, such as `code --wait` or `nvim`.
+2. Select **Open editor in**: **Automatic**, **Desktop**, or **Leyline terminal**.
+3. Select **Save**.
+
+Leave the command blank to use `$EDITOR` on that backend. **Automatic** uses the Leyline terminal for recognized terminal editors. **Desktop** launches the editor on the backend's desktop.
+
+Leyline appends the file path to the command. Optional arguments are supported, but shell operators and substitutions are not. Commands and file actions run on the selected backend, including remote backends. A remote backend does not launch an editor on the browser's machine.
+
+See [Images and previews](./images-and-previews#preview-a-local-file) for local file links and outside-project approval.
 
 ## Inspect runtime state
 

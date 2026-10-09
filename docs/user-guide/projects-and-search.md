@@ -47,11 +47,11 @@ Select **Activity** at the bottom of the sidebar.
 
 The navigator excludes the selected session. It includes activity from every project, including other sessions in the current project:
 
-- **Needs attention** contains unread sessions and errors.
+- **Needs attention** contains unread sessions, errors, and pending confirmations.
 - **Running** contains running and compacting sessions.
 - **Queued** contains sessions with queued tasks or accepted inputs, including held queues.
 
-A row shows the project and the current tool target, exact runtime error, or queue state when available.
+A row shows the project and the current tool target, exact runtime error, or queue state when available. Pending confirmations show **Waiting for confirmation**. Open the session to select **Confirm** or **Cancel** on its confirmation card.
 
 Select **Open** to open the session. Use a modified click on **Open** to open it
 in a new tab or window. Select **Stop** to interrupt a streaming agent run

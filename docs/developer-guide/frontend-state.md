@@ -7,15 +7,15 @@
 | Owner | State and behavior |
 | --- | --- |
 | `App.vue` | Drawer and sidebar navigator visibility, Git review and research-source state, composer draft, queue-edit draft cache, attachments, edit state, prompt submission, session kind, goal commands, agent settings, project detail selection, and startup motion phases |
-| `useSessionWorkspace.js` | Session list, project grouping, routes, selected detail, activation, runtime snapshots, sidebar activity rows, model and thinking controls, rename, delete, fork, reset, and reload |
+| `useSessionWorkspace.js` | Session list, project grouping, routes, selected detail, activation, runtime snapshots, sidebar activity rows, model, thinking, and Ultrafast controls, rename, delete, fork, reset, and reload |
 | `useBackendConnections.js` | App-wide connection records, window-specific selection, connection tests, and default selection |
 | `useTranscriptPreferences.js` | App-wide transcript display settings, loading state, and save errors |
-| `useLiveTurnProjection.js` | Optimistic user entries, live assistant blocks, live tools, compaction activity, and live-to-persisted reconciliation |
+| `useLiveTurnProjection.js` | Optimistic user entries, live assistant blocks, System rows, tools, compaction activity, and live-to-persisted reconciliation |
 | `PromptQueue.vue` | Queue expansion, active edit, action menus, queue mutations, and tray width measurement |
 | `useRuntimeEvents.js` | EventSource lifecycle, connection state, and the local event log |
 | `useMemoryInspector.js` | Visible Memory data, loading, optimistic mutations, dirty-state guards, and drawer state |
 | `useProjectBrowser.js` | Project picker state, folder expansion, and project-browser visibility |
-| `useToolExpansion.js` | Tool and skill expansion, copy state, and fullscreen previews |
+| `useToolExpansion.js` | System, tool, and skill expansion, copy state, and fullscreen previews |
 | `useWorkbenchScroll.js` | Bottom following, composer space, new-output state, and Jump to latest |
 | `useTerminal.js` | xterm, WebSocket, PTY status, focus, fit, and drawer height |
 | `useDictation.js` | Browser speech-recognition state inside both composer components |
@@ -74,6 +74,16 @@ Background event summaries remain in `runtimeSessionsById`. They supply current-
 
 Activity derives shared-CWD warnings from active or unheld queued work. Its **Stop** action uses the session-scoped interrupt route and stays unavailable during compaction.
 
+## Ultrafast and confirmations
+
+Both composers show a lowercase `ultrafast` chip beside the model and thinking controls for eligible models. A click changes the mode directly, without a confirmation modal.
+
+`useSessionWorkspace.js` owns eligibility, mutation state, and the staged Home choice. Home reads only project-matched runtime previews. Model changes and preview reloads clear its staged Ultrafast choice.
+
+Selected sessions read the extension status from revision-accepted runtime snapshots. The renderer does not construct provider tier fields or calculate Ultrafast costs. See [Ultrafast](./backend-api#ultrafast) for eligibility, reset, and request rules.
+
+`ExtensionConfirmations.vue` displays pending extension confirmations from the selected runtime snapshot. It sends **Confirm** or **Cancel** replies through the session-scoped API. The panel remains outside the fading and inert composer layers during startup motion.
+
 ## Composer queue
 
 During a run, Enter adds an editable **Up next** task. Option+Enter or the send-options menu selects native steering. When idle with no pending queue, Enter sends normally.
@@ -96,13 +106,15 @@ Stop applies its returned snapshot through the revision guard. Expected cancella
 
 `sessionDetail.entries` is the persisted projected branch from the backend. `useLiveTurnProjection.js` keeps live state separate.
 
-An immediate prompt creates an optimistic user entry. An **Up next** task stays outside the transcript until pi emits its user-message events. Runtime events add live user, assistant, and tool items.
+An immediate prompt creates an optimistic user entry. An **Up next** task stays outside the transcript until pi emits its user-message events. Runtime events add live user, assistant, System, and tool items.
 
 A queued request retains its original handoff ID through dispatch. If user events arrive before the queued HTTP response, retiring the optimistic entry keeps the confirmed live row. This also supports input transformations.
 
 The composable matches live items to refreshed persisted entries. It keeps matched live rows until visual timing and persistence conditions settle.
 
-An anchor length prevents duplicate or reordered transcript rows during a live turn. The anchor releases after user, assistant, tool, and activity state settles.
+A reactive anchor length prevents duplicate or reordered transcript rows during a live turn. The anchor releases after user, assistant, System, tool, and activity state settles.
+
+At the next turn start, the composable clears the previous turn's matched live rows. They then render from the persisted list in branch order. See [Live reconciliation and settlement](./transcript-projection#live-reconciliation-and-settlement).
 
 `message_update` events update live assistant output. They do not trigger a detail refresh.
 
@@ -166,7 +178,7 @@ Expanded review hides the transcript and uses the full workspace after the sideb
 
 ## Tool expansion and previews
 
-`useToolExpansion.js` stores expanded tool IDs and skill IDs. It also owns clipboard fallback state and the selected fullscreen tool.
+`useToolExpansion.js` stores expanded System, tool, and skill IDs. System cards use `messageTimestamp` as a stable expansion key across live-to-persisted reconciliation. The composable also owns clipboard fallback state and the selected fullscreen tool.
 
 Expansion state resets when the selected session changes. Preview content remains part of the projected transcript entry.
 

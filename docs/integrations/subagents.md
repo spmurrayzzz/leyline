@@ -55,6 +55,8 @@ The server creates a pi session with `parentSession` set to the parent session f
 
 For older records without the marker, Leyline also finds child paths in parent `subagent` tool results. The transcript card links to each child session, and the child session links back to its parent.
 
-The server loads the normal Leyline runtime resources for each child. It applies the selected model, thinking level, and tool allowlist. The agent definition body is added before the task text. Provider authentication must be available to the server process.
+Normal subagents load all seven bundled extensions and native MCP and tool search. The server applies the selected model, thinking level, and tool allowlist. It excludes nested `subagent` delegation and `codemode`. The agent definition body precedes the task text. Provider authentication must be available to the server process.
+
+Children with an isolated custom system prompt retain only output-budget. They have no active tools, context files, skills, native extension factories, or Leyline prompt. Vision children use this path. See [Runtime construction](../developer-guide/backend-api#runtime-construction).
 
 The child route waits for the child run to finish. If the caller disconnects before the response finishes, the server aborts the child run. See the [API reference](../reference/api#subagent-routes).

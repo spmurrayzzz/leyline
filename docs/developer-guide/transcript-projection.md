@@ -9,6 +9,7 @@ The shared implementation is `lib/transcript-projection.js`. Browser code import
 The projection performs these operations:
 
 - Extract text, image, and thinking blocks.
+- Project system-role prompt sections and tool changes as System cards.
 - Pair each tool result with its assistant `toolCall` block.
 - Create tool labels and targets.
 - Detect skill prompt rows.
@@ -30,13 +31,40 @@ Persisted runtime event entries can exist in a detail response. The current live
 
 ## Browser rendering
 
-`src/lib/transcript.js` configures `markdown-it`. Raw HTML is disabled. The module uses a separate renderer for full-screen Markdown read previews. This renderer blocks automatic image requests and leaves relative links inactive. It opens web links in a new tab. The module also exports projection helpers for Vue components.
+`src/lib/transcript.js` configures `markdown-it` with raw HTML disabled. Fullscreen Markdown previews block automatic image requests. Web links open in a new tab. Local and relative file links open current-file previews on the selected backend. The module also exports projection helpers for Vue components.
 
-`TranscriptEntry.vue` renders persisted messages, thoughts, tools, skills, subagents, research threads, report artifacts, feedback, and previews. `useLiveTurnProjection.js` supplies separate live rows while a turn runs.
+`TranscriptEntry.vue` renders persisted messages, System cards, thoughts, tools, skills, subagents, research threads, report artifacts, feedback, and previews. `useLiveTurnProjection.js` supplies separate live rows while a turn runs.
 
 A valid report citation emits a source-open event only when its numeric label and target match the report's projected ledger source.
 
 The live controller matches new persisted entries to visible live rows. It removes duplicate persisted rows until the handoff settles.
+
+## System messages
+
+Pi persists `role: "system"` messages for prompt and tool declarations. The first request records the full prompt and initial tools. Later messages record changes.
+
+`systemMessageEntry()` projects each message as `type: 'system'` with the label **System**. It normalizes these fields:
+
+- `sections`: Entries with `name`, `text`, and `removed`. A `null` source value sets `removed` to true.
+- `toolsAdded`: Tool names and descriptions.
+- `toolsRemoved`: Removed tool names.
+- `text`: Readable copy text for the recorded changes.
+
+A `preamble` update produces a `full prompt` summary. Other summaries identify section and tool deltas. Older sessions can have no system messages.
+
+System cards start collapsed and share tool expansion controls. HTML export renders the same projected data in collapsed `<details>` cards.
+
+## Live reconciliation and settlement
+
+`useLiveTurnProjection.js` keeps live System rows beside user, assistant, and tool rows in sequence order. System `message_start` and `message_end` events use the shared projection.
+
+A reactive `liveTurnAnchorLength` limits the persisted list during a turn. Covered persisted entries stay hidden while their live counterparts remain visible.
+
+Settlement waits for System rows to match persisted entries, as well as user, assistant, tool, and activity state. It then releases the anchor.
+
+When the next turn starts, `clearSettledLiveItems()` removes the previous turn's matched rows from live state. Those rows return to the persisted list in branch order. This prevents older live rows from appearing below newer system deltas.
+
+`useToolExpansion.js` keys System expansion by `messageTimestamp`, with entry ID as the fallback. Expansion therefore survives live-to-persisted reconciliation.
 
 ## Syntax highlighting
 
@@ -66,4 +94,4 @@ The app transcript uses these files:
 
 The export renderer and export CSS live in `server/pi-api/export-renderer.js`.
 
-Compare both renderers when you change messages, thoughts, tools, skills, subagents, research artifacts, Markdown, syntax colors, or previews. The standalone export header can remain different from the app shell.
+Compare both renderers when you change messages, System cards, thoughts, tools, skills, subagents, research artifacts, Markdown, syntax colors, or previews. The standalone export header can remain different from the app shell.

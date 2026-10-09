@@ -15,10 +15,10 @@ Use these pages for the main session tasks:
 - [Sessions](./sessions): select, rename, create, and delete sessions.
 - [Workbench](./workbench): use the header, transcript, drawers, and live output.
 - [Git review](./git-review): inspect staged, working-tree, and untracked project changes.
-- [Composer](./composer): send prompts, shell commands, images, steering messages, and follow-up messages.
+- [Composer](./composer): send prompts, shell commands, images, steering messages, and editable **Up next** tasks.
 - [Deep research](./deep-research): run parallel research threads and inspect cited reports and source evidence.
-- [Runtime controls](./runtime-controls): select a model and thinking level, and inspect tools and context usage.
-- [Tools and thinking](./tools-and-thinking): inspect assistant thoughts, tools, skills, and rollout feedback.
+- [Runtime controls](./runtime-controls): select a model, thinking level, and supported `ultrafast` mode, and inspect tools and context usage.
+- [Tools and thinking](./tools-and-thinking): inspect thoughts, System changes, MCP tools, confirmation cards, skills, and rollout feedback.
 - [Editing, forking, resetting, and compaction](./editing-forking-compaction): change or branch session history.
 
 ## Use additional surfaces

@@ -18,13 +18,19 @@ need a development server.
 5. Enter the first prompt.
 6. Press Enter or select the send button.
 
-Leyline creates the session, applies the staged model settings, and sends the
+Leyline creates the session, applies the staged runtime choices, and sends the
 prompt. You do not have to create an empty session first.
+
+The optional `ultrafast` chip is off by default. On Home, clicks stage the
+choice without a confirmation dialog. It uses premium pricing for supported
+OpenAI Responses models. See [Runtime controls](../user-guide/runtime-controls#use-ultrafast)
+for model and authentication limits.
 
 ## Use the workbench
 
 The workbench shows the project and session breadcrumb, transcript, live
-output, and composer. Thought, skill, and tool rows can expand.
+output, and composer. Thought, skill, tool, and System change cards can expand.
+System cards show prompt-section changes and tools that pi added or removed.
 
 The composer stays available during an active run:
 

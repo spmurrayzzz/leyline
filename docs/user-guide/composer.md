@@ -11,7 +11,7 @@ When the agent is idle and the queue is empty:
 
 Press **Shift+Enter** to add a line break.
 
-The composer remains available during an active run. Model and thinking controls stay disabled until the run ends.
+The composer remains available during an active run. Model, thinking, and `ultrafast` controls stay disabled until the run ends.
 
 ## Queue the next task
 
@@ -47,6 +47,8 @@ Enter a message and press **Option+Enter**. You can also select **Send options**
 Steering changes the active run at its next accepted input point. If the queue is held, select **Resume** before you steer.
 
 **Sent to agent** separately shows waiting inputs that pi has already accepted, labeled **Steering** or **Follow-up**. You cannot edit, reorder, or remove these inputs from the tray.
+
+**Follow-up** refers only to accepted pi input. Unsent Leyline tasks remain under **Up next**.
 
 ## Stop an active run
 
