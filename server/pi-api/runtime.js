@@ -84,7 +84,7 @@ import {
 } from '../../lib/research-state.js'
 import { auditResearchReportCitations } from '../../lib/research-citations.js'
 import { projectModelChanges } from '../../lib/transcript-projection.js'
-import { supportsUltrafastWithAuth, ULTRAFAST_COMMAND } from '../../lib/ultrafast.js'
+import { supportsUltrafastWithAuth, ULTRAFAST_COMMAND, ULTRAFAST_STATUS_KEY } from '../../lib/ultrafast.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const BUNDLED_OUTPUT_BUDGET_EXTENSION = resolve(
@@ -963,6 +963,8 @@ async function editSessionPrompt(
   requireInitializedSession(handle)
   const session = handle.runtime.session
   if (!entryId) throw new Error('entryId is required')
+  if (handle.settingModel) throw new Error('Finish the model change before editing.')
+  if (handle.settingUltrafast) throw new Error('Finish the Ultrafast change before editing.')
   if (session.isStreaming) {
     throw new Error('Wait for the current response to finish before editing.')
   }
@@ -978,6 +980,19 @@ async function editSessionPrompt(
     throw new Error('Only user messages can be edited')
   }
 
+  const ultrafastModel = handle.extensionUiState?.statuses?.[ULTRAFAST_STATUS_KEY] === 'on'
+    ? session.model
+    : null
+  async function rebindSession() {
+    await bindRuntimeHandle(handle)
+    if (ultrafastModel
+      && handle.runtime.session === session
+      && session.model?.provider === ultrafastModel.provider
+      && session.model?.id === ultrafastModel.id) {
+      await setSessionUltrafast(handle, true)
+    }
+  }
+
   if (handle.promptQueue?.snapshot().items.length) handle.promptQueue.hold()
   const oldLeafId = session.sessionManager.getLeafId()
   try {
@@ -986,9 +1001,8 @@ async function editSessionPrompt(
       const result = await session.navigateTree(entryId)
       if (result.cancelled) throw new Error('Edit cancelled')
     }
-    await bindRuntimeHandle(handle)
-
     try {
+      await rebindSession()
       await promptSession(
         handle,
         text,
@@ -1001,7 +1015,7 @@ async function editSessionPrompt(
       )
     } catch (error) {
       moveSessionLeaf(session, oldLeafId)
-      await bindRuntimeHandle(handle)
+      await rebindSession()
       throw error
     }
   } finally {
