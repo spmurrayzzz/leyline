@@ -599,20 +599,3 @@ function updateDraft(event) {
     </div>
   </form>
 </template>
-
-<style scoped>
-@media (max-width: 380px) {
-  .composer-actions.has-ultrafast {
-    flex-wrap: wrap;
-  }
-
-  .composer-actions.has-ultrafast > .model-picker:first-child {
-    flex: 1 1 100%;
-  }
-
-  .composer-actions.has-ultrafast > .small-picker {
-    min-width: 0;
-    flex: 1 1 0;
-  }
-}
-</style>
