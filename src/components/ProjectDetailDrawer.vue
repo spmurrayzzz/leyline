@@ -60,6 +60,7 @@ const emit = defineEmits([
 
 const query = ref('')
 const sortMode = ref('recent')
+const tab = ref('settings')
 
 const visibleSessions = computed(() => {
   const needle = query.value.trim().toLowerCase()
@@ -140,126 +141,129 @@ function deleteButtonLabel(session) {
 </script>
 
 <template>
-  <aside class="project-detail-drawer" aria-label="Project details">
-    <header class="project-detail-header">
+  <aside class="context-settings-drawer" aria-label="Project settings">
+    <header class="context-settings-header">
       <div>
-        <strong>{{ project.name }}</strong>
-        <span>Project sessions</span>
+        <strong>{{ tab === 'settings' ? 'Project settings' : 'Project sessions' }}</strong>
+        <small>{{ project.name }}</small>
       </div>
       <button
-        class="project-detail-close"
+        class="settings-close"
         type="button"
-        aria-label="Close project details"
+        aria-label="Close project settings"
         @click="emit('close')"
       >×</button>
     </header>
-
-    <section class="project-detail-meta">
-      <div>
-        <span>CWD</span>
-        <strong>{{ project.cwd }}</strong>
-      </div>
-      <div>
-        <span>Sessions</span>
-        <strong>{{ project.sessions.length }}</strong>
-      </div>
-      <div>
-        <span>Current</span>
-        <strong>{{ currentLabel }}</strong>
-      </div>
-    </section>
-
-    <div class="project-detail-toolbar">
-      <label class="project-detail-search">
-        <span>Filter sessions</span>
-        <input
-          v-model="query"
-          placeholder="Name or session id"
-        />
-      </label>
-      <button
-        class="project-detail-primary"
-        type="button"
-        :disabled="creatingSessionCwd === project.cwd"
-        @click="createSession"
-        @auxclick.middle.prevent="createSession"
-      >
-        {{ creatingSessionCwd === project.cwd ? 'Creating…' : 'New session' }}
-      </button>
-    </div>
-
-    <div class="project-detail-list-head">
-      <span>{{ visibleSessions.length }} visible</span>
-      <div class="project-detail-sort">
-        <button
-          type="button"
-          :class="{ active: sortMode === 'recent' }"
-          @click="sortMode = 'recent'"
-        >Recent</button>
-        <button
-          type="button"
-          :class="{ active: sortMode === 'title' }"
-          @click="sortMode = 'title'"
-        >Title</button>
-      </div>
-    </div>
-
-    <div v-if="visibleSessions.length === 0" class="project-detail-empty">
-      No matching sessions
-    </div>
-    <div v-else class="project-detail-list">
-      <article
-        v-for="session in visibleSessions"
-        :key="session.path || session.id"
-        class="project-session-card"
-        :class="{ active: session.id === selectedSessionId }"
-      >
-        <div class="project-session-main">
-          <input
-            v-if="isRenaming(session)"
-            v-focus-select
-            class="project-session-title-input"
-            :value="renameDraft"
-            aria-label="Session name"
-            @input="emit('update:renameDraft', $event.target.value)"
-            @keydown.space.stop
-            @keydown.enter.stop.prevent="emit(
-              'commit-rename-session',
-              session,
-            )"
-            @keydown.esc.stop.prevent="emit('cancel-rename-session')"
-            @blur="isRenaming(session)
-              && emit('commit-rename-session', session)"
-          />
-          <strong v-else>{{ sessionTitle(session) }}</strong>
-          <span>
-            {{ sessionTime(session) || 'new' }}
-            <template v-if="statusFor(session).label">
-              · {{ statusFor(session).label }}
-            </template>
-          </span>
+    <nav class="context-settings-tabs" aria-label="Project details sections">
+      <button type="button" :class="{ active: tab === 'settings' }" :aria-pressed="tab === 'settings'" @click="tab = 'settings'">Settings</button>
+      <button type="button" :class="{ active: tab === 'sessions' }" :aria-pressed="tab === 'sessions'" @click="tab = 'sessions'">Sessions <span>{{ project.sessions.length }}</span></button>
+    </nav>
+    <div class="context-settings-body">
+      <template v-if="tab === 'settings'">
+        <p class="context-settings-scope">Project · {{ project.name }}</p>
+        <p class="settings-note">Overrides apply to all sessions in this project.</p>
+        <slot />
+        <h3 class="settings-section-heading">Project</h3>
+        <dl class="settings-details-list settings-metadata-list">
+          <div><dt>CWD</dt><dd>{{ project.cwd }}</dd></div>
+          <div><dt>Sessions</dt><dd>{{ project.sessions.length }}</dd></div>
+          <div><dt>Current session</dt><dd>{{ currentLabel }}</dd></div>
+        </dl>
+      </template>
+      <template v-else>
+        <div class="project-detail-toolbar">
+          <label class="project-detail-search">
+            <span>Filter sessions</span>
+            <input
+              v-model="query"
+              placeholder="Name or session id"
+            />
+          </label>
+          <button
+            class="project-detail-primary"
+            type="button"
+            :disabled="creatingSessionCwd === project.cwd"
+            @click="createSession"
+            @auxclick.middle.prevent="createSession"
+          >
+            {{ creatingSessionCwd === project.cwd ? 'Creating…' : 'New session' }}
+          </button>
         </div>
-        <div v-if="!isRenaming(session)" class="project-session-actions">
-          <button
-            type="button"
-            :aria-current="session.id === selectedSessionId
-              ? 'page'
-              : undefined"
-            @click="selectSession(session, $event)"
-            @auxclick.middle.prevent="selectSession(session, $event)"
-          >{{ session.id === selectedSessionId ? 'Selected' : 'Open' }}</button>
-          <button
-            type="button"
-            :disabled="renamingSessionSavingId === session.id"
-            @click="beginRename(session)"
-          >{{ renameButtonLabel(session) }}</button>
-          <button
-            type="button"
-            :disabled="deletingSessionId === session.id"
-            @click="emit('request-delete-session', session)"
-          >{{ deleteButtonLabel(session) }}</button>
+
+        <div class="project-detail-list-head">
+          <span>{{ visibleSessions.length }} visible</span>
+          <div class="project-detail-sort">
+            <button
+              type="button"
+              :class="{ active: sortMode === 'recent' }"
+              @click="sortMode = 'recent'"
+            >Recent</button>
+            <button
+              type="button"
+              :class="{ active: sortMode === 'title' }"
+              @click="sortMode = 'title'"
+            >Title</button>
+          </div>
         </div>
-      </article>
+
+        <div v-if="visibleSessions.length === 0" class="project-detail-empty">
+          No matching sessions
+        </div>
+        <div v-else class="project-detail-list">
+          <article
+            v-for="session in visibleSessions"
+            :key="session.path || session.id"
+            class="project-session-card"
+            :class="{ active: session.id === selectedSessionId }"
+          >
+            <div class="project-session-main">
+              <input
+                v-if="isRenaming(session)"
+                v-focus-select
+                class="project-session-title-input"
+                :value="renameDraft"
+                aria-label="Session name"
+                @input="emit('update:renameDraft', $event.target.value)"
+                @keydown.space.stop
+                @keydown.enter.stop.prevent="emit(
+                  'commit-rename-session',
+                  session,
+                )"
+                @keydown.esc.stop.prevent="emit('cancel-rename-session')"
+                @blur="isRenaming(session)
+                  && emit('commit-rename-session', session)"
+              />
+              <strong v-else>{{ sessionTitle(session) }}</strong>
+              <span>
+                {{ sessionTime(session) || 'new' }}
+                <template v-if="statusFor(session).label">
+                  · {{ statusFor(session).label }}
+                </template>
+              </span>
+            </div>
+            <div v-if="!isRenaming(session)" class="project-session-actions">
+              <button
+                type="button"
+                :aria-current="session.id === selectedSessionId
+                  ? 'page'
+                  : undefined"
+                @click="selectSession(session, $event)"
+                @auxclick.middle.prevent="selectSession(session, $event)"
+              >{{ session.id === selectedSessionId ? 'Selected' : 'Open' }}</button>
+              <button
+                type="button"
+                :disabled="renamingSessionSavingId === session.id"
+                @click="beginRename(session)"
+              >{{ renameButtonLabel(session) }}</button>
+              <button
+                type="button"
+                :disabled="deletingSessionId === session.id"
+                @click="emit('request-delete-session', session)"
+              >{{ deleteButtonLabel(session) }}</button>
+            </div>
+          </article>
+        </div>
+      </template>
     </div>
   </aside>
 </template>

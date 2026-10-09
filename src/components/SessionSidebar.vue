@@ -667,7 +667,7 @@ function selectBackend(connection, event) {
 function openBackendSettings() {
   backendMenuOpen.value = false
   closeNavigator()
-  emit('open-settings')
+  emit('open-settings', 'connections')
 }
 
 function selectProject(project, event) {
@@ -706,7 +706,7 @@ function openProjectBrowser() {
 
 function openCurrentProjectDetail() {
   const project = currentProject.value
-  if (!project?.sessions.length) return
+  if (!project) return
   closeNavigator()
   emit('open-project-detail', project)
 }
@@ -939,9 +939,8 @@ const vFocusSelect = {
           >
             <button
               type="button"
-              :disabled="currentProject.sessions.length === 0"
               @click="openCurrentProjectDetail"
-            >Project details</button>
+            >Project settings</button>
             <button
               class="destructive"
               type="button"

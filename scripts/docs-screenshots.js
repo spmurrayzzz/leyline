@@ -863,11 +863,12 @@ try {
     interact: async (page) => {
       const sidebar = page.locator('.project-sidebar')
       await sidebar.getByRole('button', { name: 'Project actions' }).click()
-      await sidebar.getByRole('button', { name: 'Project details' }).click()
-      const drawer = page.locator('aside[aria-label="Project details"]')
-      await drawer.waitFor()
-      await drawer.locator('input').fill('release')
-      await drawer.locator('.project-session-card').first().waitFor()
+      await sidebar.getByRole('button', { name: 'Project settings' }).click()
+      const drawer = page.locator('aside[aria-label="Project settings"]')
+      await drawer.getByRole('button', { name: /^Sessions/ }).click()
+      await drawer.getByLabel('Filter sessions').fill('release')
+      await drawer.locator('.project-detail-list-head > span').filter({ hasText: /^2 visible$/ }).waitFor()
+      await drawer.locator('.project-session-card').nth(1).waitFor()
     },
   })
   await capture({
@@ -877,7 +878,10 @@ try {
     ready: '.assistant-message',
     interact: async (page) => {
       await page.getByRole('button', { name: 'Open settings' }).click()
-      await page.locator('aside[aria-label="Settings"] .backend-connection-card').last().waitFor()
+      const dialog = page.getByRole('dialog', { name: 'Leyline settings' })
+      await dialog.getByRole('button', { name: 'Connections', exact: true }).click()
+      await dialog.locator('.backend-connection-card').filter({ hasText: 'Team backend' }).waitFor()
+      await dialog.locator('button:not(:disabled)').filter({ hasText: /^Add connection$/ }).waitFor()
     },
   })
   await capture({
@@ -974,9 +978,15 @@ try {
     route: '/sessions/demo-session',
     ready: '.assistant-message',
     interact: async (page) => {
-      await page.getByRole('button', { name: 'Open settings' }).click()
-      await page.locator('.settings-action-row').filter({ hasText: 'Subagents' }).click()
-      await page.locator('aside[aria-label="Subagents"] .subagent-config-card').first().waitFor()
+      await page.getByRole('button', { name: 'Session details', exact: true }).click()
+      const drawer = page.locator('aside[aria-label="Session details"]')
+      await drawer.locator('section[aria-label="Vision agent"][aria-busy="false"]').waitFor()
+      const section = drawer.locator('section[aria-label="Subagents"][aria-busy="false"]')
+      await section.waitFor()
+      await section.locator('select:not(:disabled)').nth(1).waitFor()
+      await section.locator('option[value="local/minimax-m2.7"]').nth(1).waitFor({ state: 'attached' })
+      await section.getByRole('combobox', { name: /^reviewer/ }).locator('option[value="local/minimax-m2.7"]:checked').waitFor({ state: 'attached' })
+      await section.scrollIntoViewIfNeeded()
     },
   })
   await capture({
@@ -999,15 +1009,16 @@ try {
     route: '/sessions/demo-session',
     ready: '.assistant-message',
     interact: async (page) => {
-      await page.getByRole('button', { name: 'Open settings' }).click()
-      await page.locator('.settings-action-row').filter({ hasText: 'Vision agent' }).click()
-      const drawer = page.locator('aside[aria-label="Vision agent"]')
-      await drawer.locator('.subagent-config-card').first().waitFor()
-      const modelSelect = drawer.locator('select').first()
-      await page.waitForFunction((expected) => {
-        const drawer = document.querySelector('aside[aria-label="Vision agent"]')
-        return drawer?.querySelector('select')?.value === expected
-      }, 'local/qwen3.6-27b')
+      await page.getByRole('button', { name: 'Session details', exact: true }).click()
+      const drawer = page.locator('aside[aria-label="Session details"]')
+      await drawer.locator('section[aria-label="Subagents"][aria-busy="false"]').waitFor()
+      const section = drawer.locator('section[aria-label="Vision agent"][aria-busy="false"]')
+      await section.waitFor()
+      await section.locator('select:not(:disabled)').first().waitFor()
+      const modelSelect = section.getByRole('combobox', { name: /^Vision model/ })
+      await modelSelect.locator('option[value="local/qwen3.6-27b"]:checked:not(:disabled)').waitFor({ state: 'attached' })
+      await section.getByRole('combobox', { name: /^Thinking mode/ }).locator('option[value="high"]:checked').waitFor({ state: 'attached' })
+      await section.scrollIntoViewIfNeeded()
       const selectedVisionModel = await modelSelect.inputValue()
       if (selectedVisionModel !== 'local/qwen3.6-27b') {
         throw new Error(`Vision model selector uses ${selectedVisionModel || '(empty)'}`)

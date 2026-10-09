@@ -10,6 +10,7 @@ import {
   BrowserWindow,
   dialog,
   Menu,
+  MenuItem,
   shell,
   utilityProcess,
 } from 'electron'
@@ -74,6 +75,7 @@ async function createWindow(initialCommand, initialUrl = '') {
     minWidth: 360,
     minHeight: 420,
     backgroundColor: '#0b0b10',
+    autoHideMenuBar: process.platform === 'linux',
     webPreferences: {
       backgroundThrottling: false,
       contextIsolation: true,
@@ -617,10 +619,37 @@ async function loadLoginShellEnvironment() {
   }
 }
 
+function installApplicationMenu() {
+  const isMac = process.platform === 'darwin'
+  const isLinux = process.platform === 'linux'
+  const menu = Menu.buildFromTemplate(isLinux ? [{ label: 'Leyline', submenu: [] }] : [
+    ...(isMac ? [{ role: 'appMenu' }] : []),
+    { role: 'fileMenu' },
+    { role: 'editMenu' },
+    { role: 'viewMenu' },
+    { role: 'windowMenu' },
+  ])
+  const submenu = menu.items[0].submenu
+  const index = isMac ? 2 : 0
+  submenu.insert(index, new MenuItem({
+    id: 'leyline-settings',
+    label: 'Settings…',
+    accelerator: 'CommandOrControl+,',
+    click: async (_item, window) => {
+      if (!window && !activeWindow()) await createWindow()
+      const target = window || activeWindow()
+      focusWindow(target)
+      sendOpenSettingsCommand(target)
+    },
+  }))
+  if (!isLinux) submenu.insert(index + 1, new MenuItem({ type: 'separator' }))
+  Menu.setApplicationMenu(menu)
+}
+
 if (gotSingleInstanceLock) {
   app.whenReady().then(async () => {
     await environmentReady
-    if (process.platform === 'linux') Menu.setApplicationMenu(null)
+    installApplicationMenu()
     await createWindow(nativeCommandFromArgv(process.argv))
   })
 }

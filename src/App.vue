@@ -6,6 +6,7 @@ import {
   onMounted,
   onUnmounted,
   ref,
+  shallowRef,
   watch,
 } from 'vue'
 const TranscriptEntry = defineAsyncComponent(() => import('./components/TranscriptEntry.vue'))
@@ -20,8 +21,8 @@ const ReviewPane = defineAsyncComponent(() => import('./components/ReviewPane.vu
 const ResearchCitationPreview = defineAsyncComponent(() => import('./components/ResearchCitationPreview.vue'))
 const ResearchSourcesPane = defineAsyncComponent(() => import('./components/ResearchSourcesPane.vue'))
 const MemoryInspector = defineAsyncComponent(() => import('./components/MemoryInspector.vue'))
-const SubagentConfigDrawer = defineAsyncComponent(() => import('./components/SubagentConfigDrawer.vue'))
-const VisionConfigDrawer = defineAsyncComponent(() => import('./components/VisionConfigDrawer.vue'))
+const AgentSettings = defineAsyncComponent(() => import('./components/AgentSettings.vue'))
+const GlobalSettingsModal = defineAsyncComponent(() => import('./components/GlobalSettingsModal.vue'))
 import ExtensionConfirmations from './components/ExtensionConfirmations.vue'
 import StartComposer from './components/StartComposer.vue'
 import SessionComposer from './components/SessionComposer.vue'
@@ -53,7 +54,7 @@ import {
   editPrompt,
   fetchSessionDetailByPath,
   clearSubagentModelOverride,
-  clearVisionOverride,
+  fetchPiRuntimeState,
   fetchSubagentConfigs,
   fetchVisionConfig,
   interruptPiSession,
@@ -81,21 +82,25 @@ const fullscreenImage = ref(null)
 const workbench = ref(null)
 const eventLogOpen = ref(false)
 const settingsOpen = ref(false)
+const settingsCategory = ref('display')
+const settingsOpener = shallowRef(null)
+const sessionDetailsOpen = ref(false)
 const backendConnectionFormOpen = ref(false)
 const backendConnectionEditingId = ref('')
 const backendConnectionName = ref('')
 const backendConnectionUrl = ref('')
-const subagentConfigOpen = ref(false)
 const subagentConfigLoading = ref(false)
 const subagentConfigSaving = ref(false)
 const subagentConfigError = ref('')
 const subagentConfigData = ref({ context: {}, agents: [] })
-let subagentConfigRequestToken = 0
-const visionConfigOpen = ref(false)
-const visionConfigLoading = ref(false)
+const visionSettingsLoading = ref(false)
+const visionSettingsError = ref('')
+const visionSettingsData = ref({ context: {}, overrides: {} })
+const agentSettingsLoadedTarget = ref(null)
+const agentSettingsFallbackModels = ref([])
+let agentSettingsRequestToken = 0
 const visionConfigSaving = ref(false)
-const visionConfigError = ref('')
-const visionConfigData = ref({ context: {}, overrides: {}, model: '', modelSource: 'none' })
+const visionConfigData = ref({ model: '' })
 let visionConfigRequestToken = 0
 const projectDetailCwd = ref('')
 const reviewOpen = ref(false)
@@ -562,11 +567,39 @@ watch(
 
 watch(
   () => visionSessionKey(scopedConfigTarget()),
-  () => {
-    if (subagentConfigOpen.value) void loadSubagentConfigs()
-    void loadVisionConfig()
-  },
+  () => { void loadVisionConfig() },
 )
+watch(selectedSessionId, () => { sessionDetailsOpen.value = false })
+const agentSettingsScope = computed(() => {
+  if (settingsOpen.value) return 'global'
+  return projectDetailCwd.value ? 'project' : 'session'
+})
+const agentSettingsTarget = computed(() => {
+  if (settingsOpen.value && settingsCategory.value === 'agents') {
+    return { cwd: scopedConfigTarget()?.cwd || '' }
+  }
+  if (projectDetailCwd.value) return { cwd: projectDetailCwd.value }
+  if (sessionDetailsOpen.value) return selectedSession.value || null
+  return null
+})
+const agentSettingsKey = computed(() => {
+  if (!agentSettingsTarget.value) return ''
+  return `${activeBackendConnectionId.value}:${agentSettingsScope.value}:${visionSessionKey(agentSettingsTarget.value)}`
+})
+const agentSettingsProps = computed(() => ({
+  scope: agentSettingsScope.value,
+  availableModels: agentSettingsLoadedTarget.value?.cwd === scopedConfigTarget()?.cwd
+    && availableModels.value.length ? availableModels.value : agentSettingsFallbackModels.value,
+  subagentData: subagentConfigData.value,
+  visionData: visionSettingsData.value,
+  subagentLoading: subagentConfigLoading.value,
+  visionLoading: visionSettingsLoading.value,
+  subagentSaving: subagentConfigSaving.value,
+  visionSaving: visionConfigSaving.value,
+  subagentError: subagentConfigError.value,
+  visionError: visionSettingsError.value,
+}))
+watch(agentSettingsKey, () => { void loadAgentSettings() })
 const {
   projectBrowserOpen,
   projectBrowserInitialPath,
@@ -590,7 +623,6 @@ const projectDetailProject = computed(() => {
     .filter((session) => (session.cwd || 'unknown') === cwd)
     .sort((a, b) => sessionSortTime(b) - sessionSortTime(a))
 
-  if (!projectSessions.length) return null
   return { cwd, name: projectName(cwd), sessions: projectSessions }
 })
 const toolExpansion = useToolExpansion()
@@ -638,7 +670,7 @@ const {
   },
   openSettings: () => {
     closeToolFullscreen()
-    openSettingsDrawer()
+    openGlobalSettings('files')
   },
 })
 const transcriptPreferences = useTranscriptPreferences()
@@ -846,7 +878,7 @@ const imageSupportWarning = computed(() => {
   })) return 'Extension commands cannot include image attachments.'
   if (visionConfigSaving.value) return 'Wait for the vision model setting to finish saving.'
   if (visionConfigData.value?.model) return ''
-  return `${modelChip(model)} does not support images and no vision model is configured. Open Settings → Vision to set a default vision model.`
+  return `${modelChip(model)} does not support images and no vision model is configured. Open Settings → Agent defaults to set a default vision model.`
 })
 const visionDelegationNotice = computed(() => {
   if (shellModeDraft.value || !attachedImages.value.length) return ''
@@ -1198,8 +1230,7 @@ function setSidebarNavigator(navigator) {
   if (navigator === 'activity') activityActionError.value = ''
   if (!navigator) return
   settingsOpen.value = false
-  subagentConfigOpen.value = false
-  visionConfigOpen.value = false
+  sessionDetailsOpen.value = false
   eventLogOpen.value = false
   projectDetailCwd.value = ''
   if (memoryOpen.value) closeMemoryDrawer()
@@ -1371,8 +1402,8 @@ function openProjectDetail(project) {
   sidebarNavigator.value = ''
   projectDetailCwd.value = project.cwd
   settingsOpen.value = false
-  subagentConfigOpen.value = false
-  visionConfigOpen.value = false
+  sessionDetailsOpen.value = false
+  sidebarOpen.value = false
   eventLogOpen.value = false
   if (memoryOpen.value) closeMemoryDrawer()
 }
@@ -1437,24 +1468,24 @@ function confirmPendingDelete() {
 }
 
 async function handleNativeToggleTerminal() {
-  if (filePreview.value || fileMenu.value) return
+  if (settingsOpen.value || filePreview.value || fileMenu.value) return
   if (!selectedSession.value || initializing.value) return
 
   await toggleTerminal(selectedSessionId.value)
 }
 
 function handleNativeOpenSettings() {
-  if (filePreview.value || fileMenu.value) return
-  toggleSettingsDrawer()
+  if (settingsOpen.value || filePreview.value || fileMenu.value || deleteConfirmActive.value) return
+  openGlobalSettings()
 }
 
 function handleNativeToggleMemory() {
-  if (filePreview.value || fileMenu.value) return
+  if (settingsOpen.value || filePreview.value || fileMenu.value) return
   toggleMemoryPanel()
 }
 
 function handleNativeToggleSidebar() {
-  if (filePreview.value || fileMenu.value) return
+  if (settingsOpen.value || filePreview.value || fileMenu.value) return
   if (window.matchMedia('(max-width: 760px)').matches) {
     sidebarOpen.value = !sidebarOpen.value
     return
@@ -1739,22 +1770,39 @@ function liveItemClass(item) {
 }
 
 
-function openSettingsDrawer() {
+function openGlobalSettings(category) {
   if (memoryDirty.value && !confirmDiscardMemoryChanges()) return
+  settingsOpener.value = document.activeElement
+  if (typeof category === 'string') settingsCategory.value = category
+  closeImageFullscreen()
+  closeToolFullscreen()
+  closeResearchCitationPreview()
+  closePickerMenus()
+  closeProjectBrowser()
+  sidebarNavigator.value = ''
+  sidebarOpen.value = false
   settingsOpen.value = true
-  subagentConfigOpen.value = false
-  visionConfigOpen.value = false
+  sessionDetailsOpen.value = false
   eventLogOpen.value = false
   memoryOpen.value = false
   projectDetailCwd.value = ''
 }
 
-function toggleSettingsDrawer() {
-  if (settingsOpen.value) {
-    settingsOpen.value = false
-    return
-  }
-  openSettingsDrawer()
+function toggleGlobalSettings(category) {
+  if (settingsOpen.value && !category) settingsOpen.value = false
+  else openGlobalSettings(category)
+}
+
+function toggleSessionDetails() {
+  if (!selectedSession.value) return
+  if (memoryDirty.value && !confirmDiscardMemoryChanges()) return
+  sessionDetailsOpen.value = !sessionDetailsOpen.value
+  settingsOpen.value = false
+  eventLogOpen.value = false
+  memoryOpen.value = false
+  projectDetailCwd.value = ''
+  sidebarNavigator.value = ''
+  sidebarOpen.value = false
 }
 
 async function verifyActiveBackendConnection() {
@@ -1881,7 +1929,7 @@ async function switchBackendConnection(connection) {
   try {
     await activateBackendConnection(connection.id)
   } catch {
-    openSettingsDrawer()
+    openGlobalSettings('connections')
   }
 }
 
@@ -2013,8 +2061,7 @@ function toggleEventDrawer() {
   if (memoryDirty.value && !confirmDiscardMemoryChanges()) return
   eventLogOpen.value = !eventLogOpen.value
   settingsOpen.value = false
-  subagentConfigOpen.value = false
-  visionConfigOpen.value = false
+  sessionDetailsOpen.value = false
   memoryOpen.value = false
   if (eventLogOpen.value) projectDetailCwd.value = ''
 }
@@ -2024,26 +2071,8 @@ function toggleMemoryPanel() {
   toggleMemoryDrawer()
   if (!wasOpen && memoryOpen.value) {
     projectDetailCwd.value = ''
-    subagentConfigOpen.value = false
-    visionConfigOpen.value = false
+    sessionDetailsOpen.value = false
   }
-}
-
-async function openSubagentConfig() {
-  settingsOpen.value = false
-  eventLogOpen.value = false
-  memoryOpen.value = false
-  projectDetailCwd.value = ''
-  subagentConfigOpen.value = true
-  visionConfigOpen.value = false
-  if (!scopedConfigTarget()?.cwd) {
-    subagentConfigLoading.value = false
-    subagentConfigSaving.value = false
-    subagentConfigError.value = 'No project selected yet. Open a session or choose a project to manage agents.'
-    subagentConfigData.value = { context: {}, agents: [] }
-    return
-  }
-  await loadSubagentConfigs()
 }
 
 function scopedConfigTarget() {
@@ -2053,208 +2082,109 @@ function scopedConfigTarget() {
   return cwd ? { cwd } : null
 }
 
-function subagentSessionKey(session) {
-  return `${session?.cwd || ''}:${session?.id || ''}:${session?.sessionFile || session?.path || ''}`
-}
-
-let subagentConfigActiveKey = ''
-
-function currentSubagentRequest(token, sessionKey) {
-  return token === subagentConfigRequestToken
-    && sessionKey === subagentConfigActiveKey
-}
-
-async function loadSubagentConfigs() {
-  const target = scopedConfigTarget()
-  if (!target?.cwd) return
-  const token = ++subagentConfigRequestToken
-  const sessionKey = subagentSessionKey(target)
-  subagentConfigActiveKey = sessionKey
-  subagentConfigLoading.value = true
-  subagentConfigSaving.value = false
-  subagentConfigError.value = ''
-  try {
-    const data = await fetchSubagentConfigs(target)
-    if (currentSubagentRequest(token, sessionKey)) subagentConfigData.value = data
-  } catch (error) {
-    if (currentSubagentRequest(token, sessionKey)) {
-      subagentConfigError.value = error.message || 'Failed to load subagents'
-    }
-  } finally {
-    if (currentSubagentRequest(token, sessionKey)) subagentConfigLoading.value = false
-  }
-}
-
-async function saveSubagentModel(payload) {
-  const target = scopedConfigTarget()
-  if (!target?.cwd) return
-  const token = ++subagentConfigRequestToken
-  const sessionKey = subagentSessionKey(target)
-  subagentConfigActiveKey = sessionKey
-  subagentConfigSaving.value = true
-  subagentConfigError.value = ''
-  try {
-    const data = await setSubagentModelOverride(
-      target,
-      payload.agentKey,
-      payload.scope,
-      payload.model,
-    )
-    if (currentSubagentRequest(token, sessionKey)) subagentConfigData.value = data
-  } catch (error) {
-    if (currentSubagentRequest(token, sessionKey)) {
-      subagentConfigError.value = error.message || 'Failed to update subagent'
-    }
-  } finally {
-    if (currentSubagentRequest(token, sessionKey)) subagentConfigSaving.value = false
-  }
-}
-
-async function resetSubagentModel(payload) {
-  const target = scopedConfigTarget()
-  if (!target?.cwd) return
-  const token = ++subagentConfigRequestToken
-  const sessionKey = subagentSessionKey(target)
-  subagentConfigActiveKey = sessionKey
-  subagentConfigSaving.value = true
-  subagentConfigError.value = ''
-  try {
-    const data = await clearSubagentModelOverride(
-      target,
-      payload.agentKey,
-      payload.scope,
-    )
-    if (currentSubagentRequest(token, sessionKey)) subagentConfigData.value = data
-  } catch (error) {
-    if (currentSubagentRequest(token, sessionKey)) {
-      subagentConfigError.value = error.message || 'Failed to reset subagent'
-    }
-  } finally {
-    if (currentSubagentRequest(token, sessionKey)) subagentConfigSaving.value = false
-  }
-}
-
 function visionSessionKey(session) {
   return `${session?.cwd || ''}:${session?.id || ''}:${session?.sessionFile || session?.path || ''}`
 }
 
-let visionConfigActiveKey = ''
-
-function currentVisionRequest(token, sessionKey) {
-  return token === visionConfigRequestToken
-    && sessionKey === visionConfigActiveKey
-}
-
 async function loadVisionConfig() {
   const target = scopedConfigTarget()
-  if (!target?.cwd) {
-    ++visionConfigRequestToken
-    visionConfigActiveKey = ''
-    visionConfigLoading.value = false
-    visionConfigSaving.value = false
-    visionConfigError.value = ''
-    visionConfigData.value = {
-      context: {},
-      overrides: {},
-      model: '',
-      modelSource: 'none',
-      thinking: '',
-      thinkingSource: 'none',
-    }
-    return
-  }
   const token = ++visionConfigRequestToken
-  const sessionKey = visionSessionKey(target)
-  visionConfigActiveKey = sessionKey
-  if (visionConfigOpen.value) visionConfigLoading.value = true
-  visionConfigSaving.value = false
-  visionConfigError.value = ''
-  visionConfigData.value = {
-    context: {},
-    overrides: {},
-    model: '',
-    modelSource: 'none',
-    thinking: '',
-    thinkingSource: 'none',
-  }
+  visionConfigData.value = { model: '' }
+  if (!target?.cwd) return
   try {
     const data = await fetchVisionConfig(target)
-    if (currentVisionRequest(token, sessionKey)) visionConfigData.value = data
-  } catch (error) {
-    if (currentVisionRequest(token, sessionKey)) {
-      visionConfigError.value = error.message || 'Failed to load vision config'
-    }
-  } finally {
-    if (currentVisionRequest(token, sessionKey)) visionConfigLoading.value = false
+    if (token === visionConfigRequestToken) visionConfigData.value = data
+  } catch {
   }
 }
 
-async function openVisionConfig() {
-  settingsOpen.value = false
-  eventLogOpen.value = false
-  memoryOpen.value = false
-  projectDetailCwd.value = ''
-  subagentConfigOpen.value = false
-  visionConfigOpen.value = true
-  if (!scopedConfigTarget()?.cwd) {
-    visionConfigLoading.value = false
-    visionConfigSaving.value = false
-    visionConfigError.value = 'No project selected yet. Open a session or choose a project to manage the vision model.'
-    visionConfigData.value = {
-      context: {},
-      overrides: {},
-      model: '',
-      modelSource: 'none',
-      thinking: '',
-      thinkingSource: 'none',
+async function loadAgentSettings() {
+  const token = ++agentSettingsRequestToken
+  const key = agentSettingsKey.value
+  let target = agentSettingsTarget.value
+  agentSettingsLoadedTarget.value = null
+  agentSettingsFallbackModels.value = []
+  subagentConfigData.value = { context: {}, agents: [] }
+  visionSettingsData.value = { context: {}, overrides: {} }
+  subagentConfigError.value = ''
+  visionSettingsError.value = ''
+  subagentConfigLoading.value = Boolean(target)
+  visionSettingsLoading.value = Boolean(target)
+  if (!target) return
+  const current = () => token === agentSettingsRequestToken && key === agentSettingsKey.value
+  try {
+    if (!target.cwd || target.cwd !== scopedConfigTarget()?.cwd || !availableModels.value.length) {
+      const state = await fetchPiRuntimeState(target.cwd)
+      if (!current()) return
+      agentSettingsFallbackModels.value = state?.state?.availableModels || []
+      if (!target.cwd) target = { cwd: state?.cwd || '' }
+    } else {
+      agentSettingsFallbackModels.value = availableModels.value
     }
-    return
+    if (!target.cwd) throw new Error('The backend did not provide a settings directory.')
+    agentSettingsLoadedTarget.value = { ...target }
+    await Promise.all([
+      loadVisionConfig(),
+      fetchSubagentConfigs(target).then((data) => {
+        if (current()) subagentConfigData.value = data
+      }).catch((error) => {
+        if (current()) subagentConfigError.value = error.message
+      }),
+      fetchVisionConfig(target).then((data) => {
+        if (current()) visionSettingsData.value = data
+      }).catch((error) => {
+        if (current()) visionSettingsError.value = error.message
+      }),
+    ])
+  } catch (error) {
+    if (current()) {
+      subagentConfigError.value = error.message
+      visionSettingsError.value = error.message
+    }
+  } finally {
+    if (current()) {
+      subagentConfigLoading.value = false
+      visionSettingsLoading.value = false
+    }
   }
-  await loadVisionConfig()
+}
+
+async function saveSubagentModel(payload) {
+  const target = agentSettingsLoadedTarget.value
+  if (!target || payload.scope !== agentSettingsScope.value
+    || subagentConfigLoading.value || subagentConfigSaving.value || visionConfigSaving.value) return
+  const token = agentSettingsRequestToken
+  subagentConfigSaving.value = true
+  subagentConfigError.value = ''
+  try {
+    const data = payload.model
+      ? await setSubagentModelOverride(target, payload.agentKey, payload.scope, payload.model)
+      : await clearSubagentModelOverride(target, payload.agentKey, payload.scope)
+    if (token === agentSettingsRequestToken) subagentConfigData.value = data
+    else if (agentSettingsKey.value) void loadAgentSettings()
+  } catch (error) {
+    if (token === agentSettingsRequestToken) subagentConfigError.value = error.message
+  } finally {
+    subagentConfigSaving.value = false
+  }
 }
 
 async function saveVisionModel(payload) {
-  const target = scopedConfigTarget()
-  if (!target?.cwd) return
-  const token = ++visionConfigRequestToken
-  const sessionKey = visionSessionKey(target)
-  visionConfigActiveKey = sessionKey
+  const target = agentSettingsLoadedTarget.value
+  if (!target || payload.scope !== agentSettingsScope.value
+    || visionSettingsLoading.value || subagentConfigSaving.value || visionConfigSaving.value) return
+  const token = agentSettingsRequestToken
   visionConfigSaving.value = true
-  visionConfigError.value = ''
+  visionSettingsError.value = ''
   try {
-    const data = await setVisionOverride(
-      target,
-      payload.scope,
-      payload.model,
-      payload.thinking,
-    )
-    if (currentVisionRequest(token, sessionKey)) visionConfigData.value = data
+    const data = await setVisionOverride(target, payload.scope, payload.model, payload.thinking)
+    if (token === agentSettingsRequestToken) visionSettingsData.value = data
+    else if (agentSettingsKey.value) void loadAgentSettings()
+    await loadVisionConfig()
   } catch (error) {
-    if (currentVisionRequest(token, sessionKey)) {
-      visionConfigError.value = error.message || 'Failed to update vision agent'
-    }
+    if (token === agentSettingsRequestToken) visionSettingsError.value = error.message
   } finally {
-    if (currentVisionRequest(token, sessionKey)) visionConfigSaving.value = false
-  }
-}
-
-async function resetVisionModel(payload) {
-  const target = scopedConfigTarget()
-  if (!target?.cwd) return
-  const token = ++visionConfigRequestToken
-  const sessionKey = visionSessionKey(target)
-  visionConfigActiveKey = sessionKey
-  visionConfigSaving.value = true
-  visionConfigError.value = ''
-  try {
-    const data = await clearVisionOverride(target, payload.scope)
-    if (currentVisionRequest(token, sessionKey)) visionConfigData.value = data
-  } catch (error) {
-    if (currentVisionRequest(token, sessionKey)) {
-      visionConfigError.value = error.message || 'Failed to reset vision agent'
-    }
-  } finally {
-    if (currentVisionRequest(token, sessionKey)) visionConfigSaving.value = false
+    visionConfigSaving.value = false
   }
 }
 
@@ -3195,6 +3125,16 @@ async function submitStartDraft() {
 }
 
 function handleGlobalKeydown(event) {
+  if (settingsOpen.value) {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      event.stopPropagation()
+      settingsOpen.value = false
+    } else if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+      event.preventDefault()
+    }
+    return
+  }
   if (terminalEl.value?.contains(event.target) && !anyEscapeTargetOpen()) return
   if ((event.metaKey || event.ctrlKey)
     && event.key.toLowerCase() === 'k') {
@@ -3223,8 +3163,7 @@ function anyEscapeTargetOpen(ignoreQueue = false) {
     || sidebarNavigator.value
     || settingsOpen.value
     || eventLogOpen.value
-    || subagentConfigOpen.value
-    || visionConfigOpen.value
+    || sessionDetailsOpen.value
     || projectDetailCwd.value
     || memoryOpen.value
     || deleteConfirmActive.value
@@ -3261,8 +3200,7 @@ function handleEscape(event) {
   settingsOpen.value = false
   eventLogOpen.value = false
   sidebarNavigator.value = ''
-  subagentConfigOpen.value = false
-  visionConfigOpen.value = false
+  sessionDetailsOpen.value = false
   projectDetailCwd.value = ''
   collapseReviewExpanded()
   if (researchSourcesOpen.value) closeResearchSources()
@@ -3467,6 +3405,20 @@ function closePickerMenus() {
         </div>
         <div v-if="selectedSession" class="topbar-meta">
           <button
+            class="topbar-icon-button session-details-toggle"
+            :class="{ active: sessionDetailsOpen }"
+            type="button"
+            title="Session details"
+            aria-label="Session details"
+            :aria-pressed="sessionDetailsOpen"
+            @click="toggleSessionDetails"
+          >
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <circle cx="8" cy="8" r="6"></circle>
+              <path d="M8 7v4M8 4.5v.5"></path>
+            </svg>
+          </button>
+          <button
             v-if="isResearchSession && selectedResearch.sourceCount"
             class="topbar-icon-button research-sources-toggle"
             :class="{ active: researchSourcesOpen }"
@@ -3618,7 +3570,7 @@ function closePickerMenus() {
       @interrupt-session="interruptActivitySession"
       @open-project-browser="openProjectBrowser"
       @open-project-detail="openProjectDetail"
-      @open-settings="toggleSettingsDrawer"
+      @open-settings="toggleGlobalSettings"
       @reload-session="reloadSession"
       @request-delete-project="requestDeleteProject"
       @request-delete-session="requestDeleteSession"
@@ -3799,7 +3751,7 @@ function closePickerMenus() {
               :disabled="!!backendConnectionBusyId"
               @click="retryBackendConnection"
             >{{ backendConnectionBusyId ? 'Retrying…' : 'Retry' }}</button>
-            <button type="button" @click="openSettingsDrawer">Choose backend</button>
+            <button type="button" @click="openGlobalSettings('connections')">Choose backend</button>
             <button
               v-if="!activeBackendConnection.builtIn"
               type="button"
@@ -4371,7 +4323,16 @@ function closePickerMenus() {
           @create-session="createSessionTarget"
           @request-delete-session="requestDeleteSession"
           @select-session="selectSessionTarget"
-        />
+        >
+          <AgentSettings
+            v-bind="agentSettingsProps"
+            @set-model="saveSubagentModel"
+            @reset-model="saveSubagentModel"
+            @save-vision="saveVisionModel"
+            @refresh="loadAgentSettings"
+          />
+          <button class="settings-text-link" type="button" @click="openGlobalSettings('agents')">Edit global defaults</button>
+        </ProjectDetailDrawer>
       </div>
     </Transition>
 
@@ -4397,320 +4358,246 @@ function closePickerMenus() {
       </div>
     </Transition>
 
-    <Transition name="event-drawer">
-      <div v-if="settingsOpen" class="settings-drawer-slot">
-        <aside class="settings-drawer" aria-label="Settings">
-          <header class="settings-drawer-header">
-            <div>
-              <strong>Settings</strong>
-              <span>Connections, runtime, and session state</span>
-            </div>
-            <button type="button" @click="settingsOpen = false">×</button>
-          </header>
+    <GlobalSettingsModal
+      v-if="settingsOpen"
+      v-model:category="settingsCategory"
+      :backend-name="activeBackendConnection.name"
+      :file-links-available="fileLinksAvailable"
+      :opener="settingsOpener"
+      fallback-selector=".session-details-toggle, [aria-label='Open settings'], [aria-label='Open sessions']"
+      @close="settingsOpen = false"
+    >
+      <template #connections>
+        <section class="settings-group backend-settings-group">
+          <div class="settings-group-heading">
+            <h2>Backend</h2>
+            <button
+              type="button"
+              :disabled="backendConnectionsLoading || !!backendConnectionBusyId"
+              @click="beginCreateBackendConnection"
+            >Add connection</button>
+          </div>
 
-          <section class="settings-group backend-settings-group">
-            <div class="settings-group-heading">
-              <h2>Backend</h2>
+          <p v-if="backendConnectionError" class="backend-connection-error">
+            {{ backendConnectionError }}
+          </p>
+
+          <form
+            v-if="backendConnectionFormOpen"
+            class="backend-connection-form"
+            @submit.prevent="saveBackendConnection"
+          >
+            <div class="backend-connection-form-heading">
+              <strong>
+                {{ backendConnectionEditingId ? 'Edit connection' : 'New connection' }}
+              </strong>
+              <button type="button" @click="cancelBackendConnectionForm">×</button>
+            </div>
+            <label>
+              <span>Name</span>
+              <input
+                v-model="backendConnectionName"
+                type="text"
+                maxlength="80"
+                placeholder="Build host"
+                @input="clearBackendConnectionResult"
+              />
+            </label>
+            <label>
+              <span>Backend URL</span>
+              <input
+                v-model="backendConnectionUrl"
+                type="url"
+                placeholder="http://192.168.1.42:4317"
+                spellcheck="false"
+                @input="clearBackendConnectionResult"
+              />
+            </label>
+            <small>Leyline adds the <code>/api/pi</code> path.</small>
+            <span
+              v-if="backendConnectionTestResult?.id
+                === (backendConnectionEditingId || 'draft')"
+              class="backend-connection-success"
+            >{{ backendConnectionTestResult.message }}</span>
+            <div class="backend-connection-form-actions">
               <button
                 type="button"
-                :disabled="backendConnectionsLoading || !!backendConnectionBusyId"
-                @click="beginCreateBackendConnection"
-              >Add connection</button>
+                :disabled="!!backendConnectionBusyId"
+                @click="testBackendConnectionDraft"
+              >{{ backendConnectionBusyId
+                === (backendConnectionEditingId || 'draft') ? 'Testing…' : 'Test' }}</button>
+              <button type="submit" :disabled="!!backendConnectionBusyId">
+                {{ backendConnectionBusyId ? 'Saving…' : 'Save' }}
+              </button>
             </div>
+          </form>
 
-            <div class="backend-current-card">
-              <span>Current window</span>
-              <strong>{{ activeBackendConnection.name }}</strong>
-              <code>{{ activeBackendConnectionAddress }}</code>
-            </div>
-
-            <p v-if="backendConnectionError" class="backend-connection-error">
-              {{ backendConnectionError }}
-            </p>
-
-            <form
-              v-if="backendConnectionFormOpen"
-              class="backend-connection-form"
-              @submit.prevent="saveBackendConnection"
+          <div class="backend-connection-list">
+            <article
+              v-for="connection in backendConnections"
+              :key="connection.id"
+              class="backend-connection-card"
             >
-              <div class="backend-connection-form-heading">
-                <strong>
-                  {{ backendConnectionEditingId ? 'Edit connection' : 'New connection' }}
-                </strong>
-                <button type="button" @click="cancelBackendConnectionForm">×</button>
+              <div class="backend-connection-heading">
+                <span>
+                  <strong>{{ connection.name }}</strong>
+                  <small>
+                    <template v-if="connection.id === activeBackendConnectionId">Current window</template>
+                    <template v-if="connection.id === activeBackendConnectionId
+                      && connection.id === defaultBackendConnectionId"> · </template>
+                    <template v-if="connection.id === defaultBackendConnectionId">Default</template>
+                  </small>
+                </span>
+                <code>{{ backendDisplayAddress(connection) }}</code>
               </div>
-              <label>
-                <span>Name</span>
-                <input
-                  v-model="backendConnectionName"
-                  type="text"
-                  maxlength="80"
-                  placeholder="Build host"
-                  @input="clearBackendConnectionResult"
-                />
-              </label>
-              <label>
-                <span>Backend URL</span>
-                <input
-                  v-model="backendConnectionUrl"
-                  type="url"
-                  placeholder="http://192.168.1.42:4317"
-                  spellcheck="false"
-                  @input="clearBackendConnectionResult"
-                />
-              </label>
-              <small>Leyline adds the <code>/api/pi</code> path.</small>
               <span
-                v-if="backendConnectionTestResult?.id
-                  === (backendConnectionEditingId || 'draft')"
+                v-if="backendConnectionTestResult?.id === connection.id"
                 class="backend-connection-success"
               >{{ backendConnectionTestResult.message }}</span>
-              <div class="backend-connection-form-actions">
+              <div class="backend-connection-actions">
+                <button
+                  v-if="connection.id !== activeBackendConnectionId"
+                  type="button"
+                  :disabled="!!backendConnectionBusyId"
+                  @click="selectBackendTarget(connection, $event)"
+                  @auxclick.middle.prevent="selectBackendTarget(
+                    connection,
+                    $event,
+                  )"
+                >{{ backendConnectionBusyId === connection.id ? 'Connecting…' : 'Use' }}</button>
                 <button
                   type="button"
                   :disabled="!!backendConnectionBusyId"
-                  @click="testBackendConnectionDraft"
-                >{{ backendConnectionBusyId
-                  === (backendConnectionEditingId || 'draft') ? 'Testing…' : 'Test' }}</button>
-                <button type="submit" :disabled="!!backendConnectionBusyId">
-                  {{ backendConnectionBusyId ? 'Saving…' : 'Save' }}
-                </button>
+                  @click="testSavedBackendConnection(connection)"
+                >Test</button>
+                <button
+                  v-if="connection.id !== defaultBackendConnectionId"
+                  type="button"
+                  :disabled="!!backendConnectionBusyId"
+                  @click="makeDefaultBackendConnection(connection)"
+                >Make default</button>
+                <button
+                  v-if="!connection.builtIn"
+                  type="button"
+                  :disabled="!!backendConnectionBusyId"
+                  @click="beginEditBackendConnection(connection)"
+                >Edit</button>
+                <button
+                  v-if="!connection.builtIn && connection.id !== activeBackendConnectionId"
+                  type="button"
+                  :disabled="!!backendConnectionBusyId"
+                  @click="deleteBackendConnection(connection)"
+                >Remove</button>
               </div>
-            </form>
+            </article>
+          </div>
+        </section>
 
-            <div class="backend-connection-list">
-              <article
-                v-for="connection in backendConnections"
-                :key="connection.id"
-                class="backend-connection-card"
-              >
-                <div class="backend-connection-heading">
-                  <span>
-                    <strong>{{ connection.name }}</strong>
-                    <small>
-                      <template v-if="connection.id === activeBackendConnectionId">Current window</template>
-                      <template v-if="connection.id === activeBackendConnectionId
-                        && connection.id === defaultBackendConnectionId"> · </template>
-                      <template v-if="connection.id === defaultBackendConnectionId">Default</template>
-                    </small>
-                  </span>
-                  <code>{{ backendDisplayAddress(connection) }}</code>
-                </div>
-                <span
-                  v-if="backendConnectionTestResult?.id === connection.id"
-                  class="backend-connection-success"
-                >{{ backendConnectionTestResult.message }}</span>
-                <div class="backend-connection-actions">
-                  <button
-                    v-if="connection.id !== activeBackendConnectionId"
-                    type="button"
-                    :disabled="!!backendConnectionBusyId"
-                    @click="selectBackendTarget(connection, $event)"
-                    @auxclick.middle.prevent="selectBackendTarget(
-                      connection,
-                      $event,
-                    )"
-                  >{{ backendConnectionBusyId === connection.id ? 'Connecting…' : 'Use' }}</button>
-                  <button
-                    type="button"
-                    :disabled="!!backendConnectionBusyId"
-                    @click="testSavedBackendConnection(connection)"
-                  >Test</button>
-                  <button
-                    v-if="connection.id !== defaultBackendConnectionId"
-                    type="button"
-                    :disabled="!!backendConnectionBusyId"
-                    @click="makeDefaultBackendConnection(connection)"
-                  >Make default</button>
-                  <button
-                    v-if="!connection.builtIn"
-                    type="button"
-                    :disabled="!!backendConnectionBusyId"
-                    @click="beginEditBackendConnection(connection)"
-                  >Edit</button>
-                  <button
-                    v-if="!connection.builtIn && connection.id !== activeBackendConnectionId"
-                    type="button"
-                    :disabled="!!backendConnectionBusyId"
-                    @click="deleteBackendConnection(connection)"
-                  >Remove</button>
-                </div>
-              </article>
+      </template>
+      <template #display>
+        <div class="settings-choice-group">
+          <span>
+            <strong>Thought rows</strong>
+            <small>Initial state in live and saved transcripts</small>
+          </span>
+          <div class="settings-choice-options" :data-active="thinkingDefault" role="group" aria-label="Thought display">
+            <span class="settings-choice-thumb" aria-hidden="true" />
+            <button
+              type="button"
+              :class="{ active: thinkingDefault === 'collapsed' }"
+              :aria-pressed="thinkingDefault === 'collapsed'"
+              @click="setThinkingDefault('collapsed')"
+            >Collapsed</button>
+            <button
+              type="button"
+              :class="{ active: thinkingDefault === 'expanded' }"
+              :aria-pressed="thinkingDefault === 'expanded'"
+              @click="setThinkingDefault('expanded')"
+            >Expanded</button>
+          </div>
+        </div>
+        <p v-if="transcriptPreferencesError" class="settings-error" role="alert">{{ transcriptPreferencesError }}</p>
+        <p class="settings-note">Applies to new rows. Rows already in the transcript keep their current state.</p>
+        <div class="settings-thought-preview" aria-label="Thought display preview">
+          <span>Preview</span>
+          <div>{{ thinkingDefault === 'expanded' ? '⌄' : '›' }} Thought</div>
+          <p v-if="thinkingDefault === 'expanded'">I’ll check the active branch and its runtime state before making a change.</p>
+        </div>
+        <p class="settings-note">This setting does not change the model’s thinking level.</p>
+      </template>
+      <template #files>
+        <FileLinkSettings :backend-name="activeBackendConnection.name" />
+      </template>
+      <template #agents>
+        <AgentSettings
+          v-bind="agentSettingsProps"
+          @set-model="saveSubagentModel"
+          @reset-model="saveSubagentModel"
+          @save-vision="saveVisionModel"
+          @refresh="loadAgentSettings"
+        />
+        <p class="settings-note">Project and session overrides are edited in their own details panels.</p>
+      </template>
+    </GlobalSettingsModal>
+
+    <Transition name="event-drawer">
+      <div v-if="sessionDetailsOpen && selectedSession" class="settings-drawer-slot">
+        <aside class="context-settings-drawer" aria-label="Session details">
+          <header class="context-settings-header">
+            <div>
+              <strong>Session details</strong>
+              <small>{{ sessionTitle(selectedSession) }}</small>
             </div>
-          </section>
-
-          <section class="settings-group">
-            <h2>Runtime</h2>
-            <dl>
-              <div>
-                <dt>Model</dt>
-                <dd>{{ currentModelLabel }}</dd>
-              </div>
-              <div>
-                <dt>Thinking</dt>
-                <dd>{{ currentThinkingLabel }}</dd>
-              </div>
-              <div>
-                <dt>Tools</dt>
-                <dd>{{ toolsChipLabel }}</dd>
-              </div>
-              <div>
-                <dt>Context</dt>
-                <dd>{{ contextUsageLabel || 'Unknown' }}</dd>
-              </div>
-              <div>
-                <dt>Events</dt>
-                <dd>{{ eventStreamLabel }}</dd>
-              </div>
+            <button type="button" class="settings-close" aria-label="Close session details" @click="sessionDetailsOpen = false">×</button>
+          </header>
+          <div class="context-settings-body">
+            <p class="context-settings-scope">This transcript only</p>
+            <p class="settings-note">Overrides apply to this session and copy to forks.</p>
+            <h3 class="settings-section-heading">Runtime <small>Read-only</small></h3>
+            <dl class="settings-details-list">
+              <div><dt>Model</dt><dd>{{ currentModelLabel }}</dd></div>
+              <div><dt>Thinking</dt><dd>{{ currentThinkingLabel }}</dd></div>
+              <div><dt>Tools</dt><dd>{{ toolsChipLabel }}</dd></div>
+              <div><dt>Context</dt><dd>{{ contextUsageLabel || 'Unknown' }}</dd></div>
+              <div><dt>Events</dt><dd>{{ eventStreamLabel }}</dd></div>
             </dl>
-          </section>
-
-          <FileLinkSettings
-            v-if="fileLinksAvailable"
-            :backend-name="activeBackendConnection.name"
-          />
-
-          <section class="settings-group">
-            <h2>Display</h2>
-            <div class="settings-choice-group">
-              <span>
-                <strong>Thoughts</strong>
-                <small>How thought rows start in live and saved transcripts</small>
-              </span>
-              <div class="settings-choice-options" :data-active="thinkingDefault">
-                <span class="settings-choice-thumb" aria-hidden="true" />
-                <button
-                  type="button"
-                  :class="{ active: thinkingDefault === 'collapsed' }"
-                  @click="setThinkingDefault('collapsed')"
-                >Collapsed</button>
-                <button
-                  type="button"
-                  :class="{ active: thinkingDefault === 'expanded' }"
-                  @click="setThinkingDefault('expanded')"
-                >Expanded</button>
-              </div>
-              <p v-if="transcriptPreferencesError" class="settings-choice-error">
-                {{ transcriptPreferencesError }}
-              </p>
-            </div>
-          </section>
-
-          <section class="settings-group">
-            <h2>Agents</h2>
-            <button
-              type="button"
-              class="settings-action-row"
-              @click="openSubagentConfig"
-            >
-              <span>
-                <strong>Subagents</strong>
-                <small>Model defaults by transcript, project, and global scope</small>
-              </span>
-              <span>Manage</span>
-            </button>
-            <button
-              type="button"
-              class="settings-action-row"
-              @click="openVisionConfig"
-            >
-              <span>
-                <strong>Vision agent</strong>
-                <small>Vision model for models without image support</small>
-              </span>
-              <span>Manage</span>
-            </button>
-          </section>
-
-          <section class="settings-group">
-            <h2>Session</h2>
-            <dl>
-              <div>
-                <dt>Project</dt>
-                <dd>{{ projectName(selectedSession?.cwd) }}</dd>
-              </div>
+            <AgentSettings
+              v-bind="agentSettingsProps"
+              @set-model="saveSubagentModel"
+              @reset-model="saveSubagentModel"
+              @save-vision="saveVisionModel"
+              @refresh="loadAgentSettings"
+            />
+            <button class="settings-text-link" type="button" @click="openGlobalSettings('agents')">Edit global defaults</button>
+            <h3 class="settings-section-heading">Session</h3>
+            <dl class="settings-details-list settings-metadata-list">
+              <div><dt>Project</dt><dd>{{ projectName(selectedSession.cwd) }}</dd></div>
               <div>
                 <dt>Session ID</dt>
                 <dd class="settings-copy-row">
                   <span>{{ settingsSessionId || '—' }}</span>
-                  <button
-                    v-if="settingsSessionId"
-                    type="button"
-                    class="copy-button"
-                    :title="copyTitle('settings-session-id')"
-                    aria-label="Copy session ID"
-                    @click="copyTranscriptItem('settings-session-id', settingsSessionId)"
-                  >{{ copyGlyph('settings-session-id') }}</button>
+                  <button v-if="settingsSessionId" type="button" class="copy-button" :title="copyTitle('settings-session-id')" aria-label="Copy session ID" @click="copyTranscriptItem('settings-session-id', settingsSessionId)">{{ copyGlyph('settings-session-id') }}</button>
                 </dd>
               </div>
               <div>
                 <dt>CWD</dt>
                 <dd class="settings-copy-row">
-                  <span>{{ settingsCwd || 'No session selected' }}</span>
-                  <button
-                    v-if="settingsCwd"
-                    type="button"
-                    class="copy-button"
-                    :title="copyTitle('settings-cwd')"
-                    aria-label="Copy CWD"
-                    @click="copyTranscriptItem('settings-cwd', settingsCwd)"
-                  >{{ copyGlyph('settings-cwd') }}</button>
+                  <span>{{ settingsCwd }}</span>
+                  <button type="button" class="copy-button" :title="copyTitle('settings-cwd')" aria-label="Copy CWD" @click="copyTranscriptItem('settings-cwd', settingsCwd)">{{ copyGlyph('settings-cwd') }}</button>
                 </dd>
               </div>
               <div>
                 <dt>Path</dt>
                 <dd class="settings-copy-row">
                   <span>{{ settingsPath || '—' }}</span>
-                  <button
-                    v-if="settingsPath"
-                    type="button"
-                    class="copy-button"
-                    :title="copyTitle('settings-path')"
-                    aria-label="Copy path"
-                    @click="copyTranscriptItem('settings-path', settingsPath)"
-                  >{{ copyGlyph('settings-path') }}</button>
+                  <button v-if="settingsPath" type="button" class="copy-button" :title="copyTitle('settings-path')" aria-label="Copy path" @click="copyTranscriptItem('settings-path', settingsPath)">{{ copyGlyph('settings-path') }}</button>
                 </dd>
               </div>
-              <div>
-                <dt>Messages</dt>
-                <dd>{{ selectedSession?.messageCount ?? '—' }}</dd>
-              </div>
+              <div><dt>Messages</dt><dd>{{ selectedSession.messageCount ?? '—' }}</dd></div>
             </dl>
-          </section>
+            <p class="settings-note">Change the active model and thinking level in the composer.</p>
+          </div>
         </aside>
-      </div>
-    </Transition>
-
-    <Transition name="event-drawer">
-      <div v-if="subagentConfigOpen" class="settings-drawer-slot">
-        <SubagentConfigDrawer
-          :agents="subagentConfigData.agents"
-          :available-models="availableModels"
-          :context="subagentConfigData.context"
-          :error="subagentConfigError"
-          :loading="subagentConfigLoading"
-          :saving="subagentConfigSaving"
-          @close="subagentConfigOpen = false"
-          @refresh="loadSubagentConfigs"
-          @reset-model="resetSubagentModel"
-          @set-model="saveSubagentModel"
-        />
-      </div>
-    </Transition>
-
-    <Transition name="event-drawer">
-      <div v-if="visionConfigOpen" class="settings-drawer-slot">
-        <VisionConfigDrawer
-          :available-models="availableModels"
-          :config="visionConfigData"
-          :error="visionConfigError"
-          :loading="visionConfigLoading"
-          :saving="visionConfigSaving"
-          @close="visionConfigOpen = false"
-          @refresh="loadVisionConfig"
-          @reset="resetVisionModel"
-          @save="saveVisionModel"
-        />
       </div>
     </Transition>
 
