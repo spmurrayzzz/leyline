@@ -295,6 +295,91 @@ function openMarkdownContent(event) {
   </div>
 
   <article
+    v-else-if="entry.type === 'system'"
+    class="tool-card transcript-tool system-card"
+    :class="{ 'is-expanded': toolExpanded }"
+    @click="emit('toggle-tool', entry)"
+  >
+    <div class="tool-card-header">
+      <span class="chevron">›</span>
+      <span>{{ entry.label }}</span>
+      <code v-if="entry.code" :title="entry.code">{{ entry.code }}</code>
+      <button
+        v-if="!isLocalEntry(entry)"
+        class="copy-button"
+        type="button"
+        title="Fork from here"
+        @click.stop="emit('fork', entry)"
+      >
+        ⎇
+      </button>
+      <button
+        v-if="!isLocalEntry(entry)"
+        class="copy-button reset-button"
+        type="button"
+        title="Reset to here"
+        aria-label="reset this thread to this message"
+        @click.stop="emit('reset', entry)"
+      >
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 5v14" />
+          <path d="M6 19h12" />
+        </svg>
+      </button>
+      <button
+        class="copy-button"
+        type="button"
+        :title="copyTitle(entry.id)"
+        @click.stop="emit('copy', entry)"
+      >
+        {{ copyGlyph(entry.id) }}
+      </button>
+    </div>
+    <div class="tool-expand-wrapper" :class="{ 'is-expanded': toolExpanded }">
+      <div class="tool-expand-inner">
+        <div
+          v-if="toolContentMounted"
+          class="tool-expanded-body system-expanded-body"
+          @click.stop
+        >
+          <div
+            v-for="section in entry.sections"
+            :key="`section-${section.name}`"
+            class="tool-command-block system-block"
+          >
+            <strong>{{ section.name }}{{ section.removed ? ' · removed' : '' }}</strong>
+            <pre v-if="!section.removed">{{ section.text }}</pre>
+          </div>
+          <div
+            v-for="tool in entry.toolsAdded"
+            :key="`added-${tool.name}`"
+            class="tool-command-block system-block"
+          >
+            <strong>{{ tool.name }} · added</strong>
+            <pre v-if="tool.description">{{ tool.description }}</pre>
+          </div>
+          <div
+            v-for="name in entry.toolsRemoved"
+            :key="`removed-${name}`"
+            class="tool-command-block system-block"
+          >
+            <strong>{{ name }} · removed</strong>
+          </div>
+          <div
+            v-if="!entry.sections?.length
+              && !entry.toolsAdded?.length
+              && !entry.toolsRemoved?.length
+              && entry.text"
+            class="tool-command-block system-block"
+          >
+            <pre>{{ entry.text }}</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <article
     v-else-if="isSubagentEntry(entry)"
     class="tool-card subagent-card transcript-tool"
     :class="{

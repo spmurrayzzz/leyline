@@ -178,6 +178,7 @@ function toExportEntry(entry) {
 
 function renderExportEntry(entry, index) {
   if (entry.type === 'tool') return renderExportTool(entry, index)
+  if (entry.type === 'system') return renderExportSystem(entry)
   return renderExportMessage(entry)
 }
 
@@ -195,6 +196,39 @@ ${entry.contextLabel ? renderToolContext(entry) : ''}
 </summary>
 <div class="tool-expanded-body" data-tool-index="${index}">
 <div class="tool-lazy-placeholder">Open to render preview</div>
+</div>
+</details>`
+}
+
+function renderExportSystem(entry) {
+  let body = ''
+  for (const section of entry.sections || []) {
+    body += `\n<div class="tool-command-block system-block">
+<strong>${escapeHtml(section.name)}${section.removed ? ' · removed' : ''}</strong>
+${section.removed ? '' : `<pre>${escapeHtml(section.text || '')}</pre>`}\n</div>`
+  }
+  for (const tool of entry.toolsAdded || []) {
+    body += `\n<div class="tool-command-block system-block">
+<strong>${escapeHtml(tool.name)} · added</strong>
+${tool.description ? `<pre>${escapeHtml(tool.description)}</pre>` : ''}\n</div>`
+  }
+  for (const name of entry.toolsRemoved || []) {
+    body += `\n<div class="tool-command-block system-block">
+<strong>${escapeHtml(name)} · removed</strong>\n</div>`
+  }
+  if (!body && entry.text) {
+    body += `\n<div class="tool-command-block system-block">
+<pre>${escapeHtml(entry.text)}</pre>\n</div>`
+  }
+
+  return `<details class="tool-card transcript-tool system-card">
+<summary class="tool-card-header">
+<span class="chevron tool-chevron">›</span>
+<span>${escapeHtml(entry.label)}</span>
+${entry.code ? `<code>${escapeHtml(entry.code)}</code>` : ''}
+</summary>
+<div class="tool-expanded-body system-expanded-body" data-rendered="true">
+${body || '<div class="tool-lazy-placeholder">Open to render details</div>'}
 </div>
 </details>`
 }
@@ -1137,6 +1171,7 @@ button, input, textarea { color: inherit; font: inherit; }
   padding-top: 9px;
   transition: border-top-color var(--motion-base) var(--ease-decelerate);
 }
+.system-expanded-body .system-block:last-child { margin-bottom: 0; }
 .tool-output {
   overflow: auto;
   max-height: 420px;

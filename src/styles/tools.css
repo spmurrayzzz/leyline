@@ -59,6 +59,14 @@
   text-transform: uppercase;
 }
 
+.system-card .tool-card-header > button:first-of-type {
+  margin-left: auto;
+}
+
+.system-expanded-body .system-block:last-child {
+  margin-bottom: 0;
+}
+
 .tool-context-pill {
   border: 1px solid rgb(130 214 154 / 24%);
   border-radius: 999px;
