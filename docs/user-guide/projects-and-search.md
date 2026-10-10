@@ -64,22 +64,24 @@ Activity warns when multiple sessions share one CWD and have active work or queu
 
 Use **Search active sessions** to match a session title, project, CWD, tool target, or error detail.
 
-## Open Project details
+## Open Project settings
 
-![Project Details drawer with filtered session cards and sidebar context](../assets/screenshots/project-details.png)
+![Project settings drawer with project-scoped agent overrides](../assets/screenshots/project-details.png)
 
-*Project Details provides focused session management for the current project.*
+*Project settings keeps overrides separate from global defaults and session overrides.*
 
 1. Select **Project actions** beside the current project.
-2. Select **Project details**.
+2. Select **Project settings**.
 
-The drawer shows the CWD, session count, and current-session relationship.
+The **Settings** tab contains project-level subagent and vision overrides. It also shows the CWD, session count, and current-session relationship. **Edit global defaults** opens **Agent defaults** in the global Settings modal.
+
+Select the **Sessions** tab to filter, sort, create, open, rename, or delete sessions in the project.
 
 The **Project actions** menu also contains **Trash project**. This action moves all project sessions to Leyline trash after confirmation.
 
 ## Filter and sort project sessions
 
-Enter a name or session ID in **Filter sessions**. This filter uses text containment.
+In **Project settings → Sessions**, enter a name or session ID in **Filter sessions**. This filter uses text containment.
 
 Select **Recent** to sort by time. Select **Title** to sort by session title.
 

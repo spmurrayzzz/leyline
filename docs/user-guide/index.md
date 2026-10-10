@@ -29,6 +29,6 @@ Use these pages for the main session tasks:
 - [Terminal](./terminal)
 - [Images, vision delegation, and previews](./images-and-previews)
 - [Export](./export)
-- [Settings](./settings)
+- [Settings](./settings): manage provider sign-in, custom models, MCP servers, backend connections, and scoped agent defaults.
 - [Mobile layout](./mobile)
 - [Keyboard shortcuts](./keyboard-shortcuts)

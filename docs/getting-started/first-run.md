@@ -26,11 +26,15 @@ choice without a confirmation dialog. It uses premium pricing for supported
 OpenAI Responses models. See [Runtime controls](../user-guide/runtime-controls#use-ultrafast)
 for model and authentication limits.
 
+If no usable model is available, open **Settings → Models & providers**.
+Sign in to a provider or add a custom endpoint and model. See
+[Provider settings](../user-guide/settings#manage-models-and-providers).
+
 ## Use the workbench
 
 The workbench shows the project and session breadcrumb, transcript, live
-output, and composer. Thought, skill, tool, and System change cards can expand.
-System cards show prompt-section changes and tools that pi added or removed.
+output, and composer. Thought, skill, and tool rows can expand. Select a
+**System** row to inspect recorded prompt and tool changes in the side pane.
 
 The composer stays available during an active run:
 
@@ -44,6 +48,6 @@ beside the send arrow to queue or steer without keyboard shortcuts. If the
 queue is held, select **Resume** to continue queued work. See
 [Composer](../user-guide/composer) for editing and queue controls.
 
-Use **Memory**, **Events**, and **Export transcript** in the workbench header.
-Use **Reload runtime** at the bottom of the sidebar when pi resources must
-reload.
+Use **Session details**, **Memory**, **Events**, and **Export transcript** in
+the workbench header. Use **Reload runtime** at the bottom of the sidebar when
+pi resources or saved provider/MCP configuration must reload.

@@ -20,20 +20,21 @@ Shell commands and `/compact` cannot include images. Vision delegation does not 
 ## Configure vision delegation
 
 1. Open **Settings**.
-2. Find **Agents**.
-3. Select **Manage** beside **Vision agent**.
-4. Select **Transcript**, **Project**, or **Global**.
-5. Select a model that supports image input.
+2. Select **Agent defaults**.
+3. Under **Vision agent**, select an image-capable **Vision model**.
+4. Select **Thinking mode** if needed.
+
+These values supply global defaults on the selected backend. Use **Project actions → Project settings → Settings** for project overrides. Use **Session details** in the workbench header for session overrides.
 
 Leyline chooses the first configured model in this order:
 
-1. The **Transcript** override.
-2. The **Project** override.
-3. The **Global** default.
+1. The session override.
+2. The project override.
+3. The global default.
 
-The start screen has no transcript yet, so the drawer selects **Project**. A session fork copies its **Transcript** override.
+The start screen uses project overrides or global defaults. A session fork copies its session overrides. Model and thinking values inherit independently.
 
-Select **Inherit from lower scope** to remove a transcript or project override. Select **None configured** to remove the global default.
+Select the inherited option to remove a session or project override. Select **None configured** in **Agent defaults** to remove the global model. See [Vision settings](./settings#manage-the-vision-agent) for thinking options.
 
 ## Understand delegated image context
 

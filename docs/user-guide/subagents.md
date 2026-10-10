@@ -2,42 +2,42 @@
 
 Subagents run delegated tasks in child sessions with separate context.
 
-![Subagents drawer with transcript-scoped model overrides](../assets/screenshots/subagents.png)
+![Agent defaults with global subagent model choices](../assets/screenshots/subagents.png)
 
-*The drawer shows stored overrides and each agent's effective model.*
+*Each subagent row shows the model and its source at the scope you are editing.*
 
-## Open Subagents
+## Open subagent settings
 
 1. Select **Open settings** at the bottom of the sidebar.
-2. Find **Agents**.
-3. Select **Manage** beside **Subagents**.
+2. Select **Agent defaults**.
+3. Find **Subagents**.
 
-The drawer lists available project and global agent definitions. Each card shows the definition source, configured model, description, and tool list.
+The list includes project and global agent definitions. Expand **Agent definitions and tools** for descriptions, source paths, model and thinking defaults, and tool lists.
 
-Deep research uses a reserved bundled `researcher`. It does not appear in this drawer and inherits the parent model and thinking level by default.
+Deep research uses a reserved bundled `researcher`. It does not appear in this list and inherits the parent model and thinking level by default.
 
 ## Select a model scope
 
-Use one of these scope tabs:
+The surface determines the scope:
 
-- **Transcript** changes only the current session. Leyline copies this override to forks.
-- **Project** changes sessions in the current project.
-- **Global** supplies the default across projects.
+- **Settings → Agent defaults** supplies global defaults for projects on the selected backend.
+- **Project actions → Project settings → Settings** changes defaults for that project.
+- **Session details** in the workbench header changes only the selected session. Forks copy this override.
 
-Select a model in the agent card. The option label contains the model name and `provider/model-id`.
+Select a model in the subagent row. The option label contains the model name and `provider/model-id`.
 
-Select **Inherit lower scope** to remove the override at the current scope. The next applicable scope or agent definition then applies.
+Select the inherited option to remove a project or session override. In **Agent defaults**, select **Use agent definition** to remove the global override.
 
 Select **Parent session model** to store `inherit`. The child uses the parent session model when that override applies.
 
-The **Effective** row shows the selected result and its source.
+The **Effective** or **Inherited** text shows the result from the displayed scope and its broader defaults. A global view does not include project or session overrides.
 
 ## Understand model precedence
 
 Leyline selects a child model in this order:
 
 1. A model requested for the specific subagent tool call.
-2. The **Transcript** override.
+2. The session override.
 3. The **Project** override.
 4. The **Global** override.
 5. The model in the agent definition.
@@ -47,7 +47,7 @@ An applicable `inherit` value uses the parent session model.
 
 ## Understand thinking precedence
 
-The **Subagents** drawer manages model overrides only. Thinking comes from the subagent request or agent definition.
+Subagent settings manage model overrides only. Thinking comes from the subagent request or agent definition.
 
 A thinking level requested for one child run takes priority. Otherwise, the agent definition applies. The child runtime default applies when neither value exists.
 

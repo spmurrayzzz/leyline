@@ -30,6 +30,14 @@ The terminal does not use the HTTP router. It uses a WebSocket upgrade at `/api/
 | `lib/research-citations.js` | Report citation checks against canonical ledger sources |
 | `server/pi-api/index.js` | Shared runtime instance, Vite integration, and WebSocket setup |
 | `server/pi-api/router.js` | HTTP method and path dispatch |
+| `server/pi-api/pi-settings-routes.js` | Provider, model, MCP, and private operation routes |
+| `server/pi-api/pi-config.js` | Pi configuration parsing, revisions, file locks, and atomic edits |
+| `server/pi-api/provider-settings.js` | Redacted provider inventory, model/provider edits, and native authentication |
+| `server/pi-api/provider-settings-runtime.js` | Cwd-bound settings runtime leases and resource cleanup |
+| `server/pi-api/settings-operations.js` | Private prompts, operation snapshots, cancellation, and provider serialization |
+| `server/pi-api/mcp-settings.js` | Global MCP configuration, redacted inventory, and worker ownership |
+| `server/pi-api/mcp-settings-worker.js` | Disposable native MCP management session |
+| `server/pi-api/mcp-settings-transports.js` | Owned native transports, secret resolution, and bounded cleanup |
 | `server/pi-api/cors.js` | Shared HTTP and WebSocket origin policy |
 | `server/pi-api/runtime.js` | `AgentSessionRuntime` lifecycle, runtime handles, session operations, bundled resources, subagent execution, and vision execution |
 | `server/pi-api/prompt-queue.js` | Editable unsent tasks, queue revisions, hold/resume, and submission when pi is idle |
@@ -62,6 +70,7 @@ The router has these main route groups:
 - rollout feedback
 - subagent configuration and subagent execution
 - vision configuration, resolution, and child execution
+- global pi provider/model/MCP configuration and private authentication operations
 - SSE events
 
 See the [API reference](../reference/api) for route contracts. Compare that page with `server/pi-api/router.js` when route behavior changes.
@@ -116,6 +125,50 @@ Leyline activates `tool_search` at session start unless `defaultTools` contains 
 
 Leyline does not load Codemode and always excludes `codemode` from the active tool set. Do not reintroduce it when updating SDK integration.
 
+## Pi Settings
+
+`capabilities.piSettings` enables Models & providers and MCP servers. These routes run on the selected backend. Display preferences and connection records remain on the native app backend.
+
+Pi owns the global configuration files resolved through `getAgentDir()`. Leyline edits `models.json` and `mcp.json`, while native SDK authentication owns credentials. Subagent and vision overrides remain in Leyline SQLite. A provider target selects a cwd for extension discovery, not a project configuration file.
+
+`pi-config.js` preserves unknown fields, supported comments, formatting, and symlink targets. Writes require the whole-file revision, acquire a lock, and replace the file atomically after another revision check. Invalid files block saves. Provider/model inventories omit saved secrets. MCP inventories omit arguments and header/environment values and redact sensitive URL parts.
+
+See [Pi Settings routes](../reference/api#pi-settings-routes) for exact fields, methods, revisions, operation shapes, and errors. This API is deliberately smaller than pi's configuration schema. General preferences, model-picker visibility, project MCP editing, and Codemode configuration are outside this surface.
+
+### Provider runtime ownership
+
+`provider-settings-runtime.js` caches separate settings runtimes by resolved cwd. Each request acquires a lease and releases it in `finally`. These runtimes never replace conversation handles.
+
+The pool permits four contexts, including contexts still retiring. It retires unused contexts for capacity. A leased context cannot be replaced by Refresh. Construction, authentication-status reads, and catalog refresh have 15-second bounds. Interactive authentication uses the longer operation lifetime. Disposal waits up to three seconds before session disposal. A late or failed creation remains owned until cleanup finishes.
+
+Each resource-loader extension set receives an in-memory session owner, including failed creation and cold Refresh paths. `AgentSessionRuntime.dispose()` supplies shutdown before replacement. Reusing a loader does not permit an extension set to escape shutdown. Lifetime signals block late provider publication after retirement.
+
+Ordinary provider reads refresh authentication snapshots with `allowNetwork: false`. `GET /settings/providers?refresh=1` replaces the settings runtime and reloads extension registrations. The provider `refresh` action also requests a forced network catalog refresh. Neither action refreshes live conversation catalogs.
+
+Provider mutations, authentication, and conversation construction share a process-level lock. Native login can write shared credentials immediately. Before login, `assertProviderRoutes()` compares provider model APIs and URLs across open, background, hidden, and constructing runtimes. A mismatch blocks login until affected sessions reload or the backend restarts. This prevents new credentials from reaching an old endpoint.
+
+Existing work is not silently aborted or reloaded. A save refreshes only its settings runtime. `GET /state?cwd=...&refresh=1` builds and disposes a fresh Home preview without changing conversation catalogs.
+
+Pi 0.99.1 retains cached Radius gateway URLs after reload. Leyline rejects changes that alter or remove an existing Radius base URL. A different gateway requires a different provider identity. Provider IDs cannot contain `/`, but model IDs can.
+
+### Private authentication operations
+
+`settings-operations.js` owns bounded, process-local operations. Clients poll snapshots and answer the current prompt ID, or request cancellation. The SDK supplies provider text, secret, select, manual-code, authorization-URL, and device-code interactions.
+
+Settings prompts do not use `extension-ui.js`, shared SSE, or transcript entries. The initiating component retains its backend URL throughout polling and cancellation. A credential write can finish before cancellation, so cancellation cannot promise rollback.
+
+### Native MCP management
+
+MCP listing reads global configuration without connecting or resolving secrets. Check and login use a disposable worker with an in-memory session and only `createMcpExtension()`. The worker invokes the native `/mcp` command through a private UI context. It reports temporary connections, not conversation connection status. Logout neither connects nor resolves configuration secrets.
+
+The worker owns native `StdioTransport` and `StreamableHttpTransport` adapters. It tracks adapters before connection setup, command processes, prompts, and child processes. Cancellation reaches initialization as well as established connections. Deadlines bound native OAuth work and secret commands. Normal HTTP cleanup keeps a bounded signal available for session DELETE requests.
+
+Resolve the public `@earendil-works/pi-mcp` package from the coding-agent package context. This keeps transport error classes identical to those used by native MCP authentication. A separate dependency instance can break native error checks.
+
+Only controlled native diagnostics reach operation snapshots. Tool metadata excludes resolved configuration secrets and OAuth access tokens. HTTP operation locks use normalized server URLs, so aliases share the lock used for the same native credential identity.
+
+New MCP entries default to `deferred`. The editor offers `deferred`, `direct`, and `hidden`, while preserving existing exposure values. Leyline never loads or enables Codemode.
+
 ## Browser confirmations
 
 `extension-ui.js` adapts `ctx.ui.confirm()` to pending requests in `extensionUi.confirmations`. Each request has an ID, title, message, and optional expiry.
@@ -133,7 +186,9 @@ Eligibility requires `gpt-6-astra` or `gpt-6.1-sol` on one of these paths:
 - `openai-codex` with `openai-codex-responses`
 - `openai` with `openai-responses` and API-key authentication
 
-The `openai` subscription path is ineligible. Ultrafast defaults to off and belongs to the current runtime. Model changes, reload, and fork reset it.
+The `openai` subscription path is ineligible. Ultrafast defaults to off and belongs to the current runtime. Model changes and explicit reloads reset it. New forks start with it off.
+
+Retry and prompt edits retain the choice when runtime and model identity stay unchanged. Their internal navigation can rebind extensions, so the edit path restores the tier through the extension command before generation and after rollback.
 
 Ultrafast applies only to normal agent turns. Compaction and branch summaries stay Standard, including automatic compaction during a turn. Cache warming stops while Ultrafast is enabled.
 
@@ -187,7 +242,9 @@ Reset to here is the explicit exception. It replaces the manager entries with th
 `backend-connections.js`, `memories.js`, `rollout-feedback.js`, `subagents.js`,
 and `vision.js` share `~/.local/share/leyline/memory.sqlite`.
 
-Backend connection definitions, the default connection, and UI settings are app-wide. A window stores its active connection ID in `sessionStorage`.
+Backend connection definitions, the default connection, and display preferences belong to the native app backend. A window stores its active connection ID in `sessionStorage`. File editor settings, memory, feedback, and agent overrides belong to the selected backend.
+
+Global Agent defaults, Project settings, and Session details fix the override scope in the UI. They use the existing subagent and vision routes. Pi provider/model/MCP configuration remains in pi-owned global files, not these SQLite tables.
 
 Memory operations enforce global, project, and session visibility. The Memory Inspector can create, update, archive, restore, and permanently delete visible rows.
 
@@ -215,11 +272,11 @@ The browser does not reconstruct goal state from transcript text. It uses the pr
 
 `src/lib/backend.js` supplies the active backend base URL for runtime HTTP,
 SSE, terminal WebSocket, and export requests. `src/lib/pi-api.js` owns runtime fetch
-calls and request field names.
+calls and request field names. `src/lib/pi-settings-api.js` owns selected-backend Settings requests and private operation transport.
 
 `src/lib/leyline-api.js` manages the native connection registry and app settings. It also checks `GET /api/pi/info` before a switch.
 
-The backend information response gates the research control with `research`. It gates Git review with `review` and automatic watching with `reviewWatch`.
+The backend information response gates the research control with `research`. It gates Git review with `review` and automatic watching with `reviewWatch`. Models & providers and MCP servers require `piSettings`.
 
 `ReviewPane.vue` loads review data through `src/lib/pi-api.js` and opens the review stream through `backendHttpUrl()`.
 

@@ -35,6 +35,10 @@ Responses models. It is off by default and uses premium pricing. See
 Memory, subagents, HTML export, and an embedded terminal support session work.
 Each window can use the native backend or a saved backend connection.
 
+Settings includes provider sign-in, custom endpoints, model definitions and
+overrides, and MCP server configuration. Changes use pi's files on the selected
+backend. Project and session details hold their own agent overrides.
+
 Deep research sessions divide a question into parallel, source-backed threads.
 Leyline keeps the plan and worker sessions inspectable and validates numbered
 report citations. Each citation opens a source preview. The research ledger
@@ -88,8 +92,8 @@ The Vite server also serves the documentation at
 
 ## Backend connections
 
-The sidebar footer shows the backend for the current window. Open **Settings**
-to add, test, edit, remove, or select a named connection. The **Native backend**
+The sidebar footer shows the backend for the current window. Open **Settings →
+Connections** to add, test, edit, remove, or select a named connection. The **Native backend**
 is the server that supplied the current Leyline app.
 
 Saved connections and the configured default are app-wide. Each browser or
@@ -157,7 +161,8 @@ creating a session.
 - `Command+Shift+N`: open Home in a new window without creating a session
 - `Command+W`: close the current window
 - `Command+E`: show or hide the sidebar
-- `Command+Shift+E`: open Settings
+- `Command+,`: open global Settings
+- `Command+Shift+E`: show or hide Session details
 - `Command+Shift+M`: show or hide Memory
 - `Command+Shift+T`: show or hide the terminal
 - `Escape`: close open surfaces first. With none open, stop the active run
@@ -176,6 +181,7 @@ is open.
 - [Images and vision](docs/user-guide/images-and-previews.md)
 - [Memory](docs/user-guide/memory.md)
 - [Subagents](docs/user-guide/subagents.md)
+- [Settings, providers, and MCP](docs/user-guide/settings.md)
 - [Goals and events](docs/user-guide/goals-and-events.md)
 - [Terminal](docs/user-guide/terminal.md)
 - [Electron](docs/electron/index.md)

@@ -19,6 +19,7 @@ A research session shows its phase or **report ready** beside the title. Its sou
 The right side of the header contains these controls:
 
 - **Review changes** opens the desktop [Git review pane](./git-review). It appears when the selected backend supports review.
+- **Session details** opens runtime information, session metadata, and session-level agent overrides.
 - **Memory** opens the Memory Inspector. Its count shows active visible memories.
 - **Events** opens the Runtime events drawer. Its count shows retained runtime events.
 - **Export transcript** downloads the session as HTML.
@@ -29,7 +30,7 @@ The right side of the header contains these controls:
 
 The transcript shows the current session branch. Messages, tools, thoughts, skills, summaries, images, and System changes use different rows.
 
-Collapsed **System** cards show prompt-section and tool-loadout changes that pi recorded. Expand a card to inspect the sections and added or removed tools. See [Tools and thinking](./tools-and-thinking#inspect-system-changes).
+Muted **System** rows mark prompt and tool changes that pi recorded. Select a row to open the prompt inspector. Later rows show that event's changes, not a reconstructed full prompt. See [Tools and thinking](./tools-and-thinking#inspect-system-changes).
 
 Assistant output and tool activity appear while the run is active. Saved rows replace live rows after pi records the turn. Leyline keeps one visible copy of each item.
 
@@ -59,8 +60,8 @@ The workbench expands into the available space while the sidebar is hidden.
 
 ## Open workbench drawers
 
-Only one main right-side drawer is open at a time. Opening **Memory**, **Events**, **Settings**, **Subagents**, **Vision agent**, or **Project details** closes conflicting drawers.
+**Memory**, **Events**, **Project settings**, and **Session details** use focused drawers. Opening one closes conflicting drawers. The sidebar gear opens the global **Settings** modal. Subagent and vision controls appear within their applicable settings scope.
 
-Git review and research sources share the desktop right rail. Opening one closes the other. You can resize Git review or expand it across the workspace.
+Git review, research sources, and the prompt inspector share the desktop right rail. Opening one closes the others. You can resize Git review or expand it across the workspace.
 
 The terminal is a bottom drawer. It can remain open while you use the transcript and composer.

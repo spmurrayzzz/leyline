@@ -9,7 +9,7 @@ returns `201`. A CORS preflight request (`OPTIONS`) returns `204`.
 
 ## Conventions and status behavior
 
-JSON requests use `Content-Type: application/json`. Extra request fields are ignored. A field marked `?` can be omitted. JSON serialization omits object properties whose value is `undefined`. The current JSON reader has no explicit body-size limit.
+JSON requests use `Content-Type: application/json`. Most routes ignore extra fields. Pi Settings rejects unsupported provider, model, target, and editable MCP fields. A field marked `?` can be omitted. JSON serialization omits object properties whose value is `undefined`. The current JSON reader has no explicit body-size limit.
 
 Most errors have this envelope:
 
@@ -23,7 +23,8 @@ Status behavior is:
 - `403` rejects a browser origin that the server does not allow.
 - `404` is used for an unknown runtime, native app route, setting key, or session.
 - `405` is used when a known route receives an unsupported method.
-- `409` rejects a queue mutation with an outdated `revision` or a confirmation reply that is no longer valid.
+- `409` rejects stale queue or configuration revisions, expired confirmation replies, and conflicting Settings operations.
+- Pi Settings also uses `429` for its operation limit and `503` for unavailable or busy runtime resources. See [Pi Settings routes](#pi-settings-routes).
 - `500` is used for thrown runtime errors. This includes malformed JSON on most runtime routes, SDK errors, missing memories, and some missing sessions.
 
 The current status codes do not distinguish all client errors from server
@@ -139,7 +140,7 @@ SessionDetail = {
 }
 ```
 
-A transcript entry is a projected `message`, `tool`, `system`, `event`, or `summary` object. Entries include `id`, `type`, `timestamp`, `copyText`, `rolloutFeedback`, and `rolloutFeedbackText` where applicable.
+A transcript entry is a projected `message`, `tool`, `system`, `model-change`, `event`, or `summary` object. Entries include `id`, `type`, `timestamp`, `copyText`, `rolloutFeedback`, and `rolloutFeedbackText` where applicable.
 
 Message entries include role, text, and text, image, or thinking blocks. A completed report message can include `researchReport`. Tool entries can include file, diff, patch, image, bash, subagent, and research-thread data.
 
@@ -268,7 +269,7 @@ Confirmation times use milliseconds since the Unix epoch. `expiresAt: null` mean
 
 The bundled extension publishes `extensionUi.statuses["leyline-ultrafast"]` as `"on"` or `"off"`. A missing status does not mean the extension is available. Ultrafast starts off and applies to the current runtime only. Model changes and runtime reload reset it to off. A new fork starts off.
 
-Compaction and branch summaries do not use Ultrafast.
+Retry and prompt edits preserve Ultrafast when the runtime and model stay unchanged. Compaction and branch summaries do not use Ultrafast.
 
 If an extension changes the model during a run, reset waits for a safe turn or provider boundary.
 
@@ -298,7 +299,8 @@ Response:
     review: true,
     reviewWatch: true,
     terminal: true,
-    fileLinks: true
+    fileLinks: true,
+    piSettings: true
   }
 }
 ```
@@ -308,6 +310,8 @@ The frontend rejects a backend when `name` or `apiVersion` is incompatible. It s
 It shows the desktop review control only when `capabilities.review` is `true`. It opens the automatic review stream only when `capabilities.reviewWatch` is `true`.
 
 Local file actions and the Files settings section require `capabilities.fileLinks: true`.
+
+Models & providers and MCP servers require `capabilities.piSettings: true`. These categories use the selected backend, even inside the global Settings modal.
 
 ## Connection registry
 
@@ -412,6 +416,472 @@ Response:
 ```
 
 The route rejects other values with `400`. An unknown setting key returns `404`.
+
+## Pi Settings routes
+
+These routes use `/api/pi/settings` on the selected backend. Every response sets `Cache-Control: no-store`. Successful requests return `200` without an `ok` envelope.
+
+Configuration is global to that backend's pi agent directory, resolved through `getAgentDir()`. Provider and model edits change `models.json`. MCP edits change `mcp.json`. Native authentication owns `auth.json` and `mcp-auth.json`. These files are separate from Leyline's SQLite overrides.
+
+The API does not edit project MCP files, general pi preferences, model-picker visibility, or Codemode settings. Edits preserve unrelated fields. Explicit deletion and MCP transport changes can remove stored fields that the editor does not display.
+
+### Targets and revisions
+
+Provider reads accept these query parameters:
+
+```text
+sessionId?: string
+cwd?: string
+refresh?: "1"
+```
+
+Provider/model writes and provider actions accept an optional body field:
+
+```text
+target?: { sessionId?: string, cwd?: string }
+```
+
+Without a body target, query `sessionId` and `cwd` supply the target. A target selects the extension context, not a configuration scope. A supplied cwd takes precedence. Without cwd, an open `sessionId` supplies its directory. If neither resolves a directory, the backend uses its process directory. An unknown session ID does not activate a session. A supplied cwd that differs from the open target session returns `409`.
+
+Configuration writes require the latest `revision` from the corresponding inventory. The revision covers the whole file. Missing or stale revisions return `409`. Re-read the inventory before another save.
+
+Revision errors are:
+
+- Missing revision: `Refresh settings before saving.`
+- Stale revision: `This configuration changed outside this editor. Refresh it before saving.`
+- A change during save: `This configuration changed while saving. Refresh it before saving again.`
+
+Writes preserve unknown fields, supported comments, formatting, and existing symlinks. They use a file lock, a second revision check, and atomic replacement. `models.json` permits line comments and trailing commas, but not block comments. `mcp.json` requires JSON without comments or trailing commas. Invalid files, duplicate keys, broken symlinks, and existing files over 2 MiB block writes. Invalid provider configuration can still return a read-only inventory with a warning.
+
+### Provider inventory
+
+#### `GET /api/pi/settings/providers`
+
+Response:
+
+```text
+ProviderInventory = {
+  revision: string | null,
+  providers: ProviderSettings[],
+  warning?: string
+}
+
+ProviderSettings = {
+  id: string,
+  name: string,
+  kind: "builtin" | "extension" | "custom",
+  configured: boolean,
+  authSource: "stored" | "runtime" | "environment" | "fallback"
+    | "models_json_key" | "models_json_command" | null,
+  authLabel: string,
+  authMethods: Array<{ id: "oauth" | "api_key", label: string }>,
+  config: {
+    name: string,
+    baseUrl: string,
+    api: string,
+    authHeader: boolean | null,
+    apiKeyConfigured: boolean,
+    headersConfigured: boolean,
+    canEdit: boolean,
+    hasConfiguration: boolean
+  },
+  models: ProviderModel[],
+  error?: string
+}
+
+ProviderModel = {
+  id: string,
+  name: string,
+  contextWindow: number | null,
+  maxTokens: number | null,
+  reasoning: boolean,
+  input: Array<"text" | "image">,
+  cost: ModelCost,
+  kind: "custom" | "override" | "catalog",
+  overrides: ModelMetadata
+}
+
+ModelMetadata = {
+  name?: string,
+  contextWindow?: number,
+  maxTokens?: number,
+  reasoning?: boolean,
+  input?: Array<"text" | "image">,
+  cost?: ModelCost
+}
+
+ModelCost = {
+  input?: number,
+  output?: number,
+  cacheRead?: number,
+  cacheWrite?: number,
+  tiers?: Array<{
+    inputTokensAbove: number,
+    input?: number,
+    output?: number,
+    cacheRead?: number,
+    cacheWrite?: number
+  }>
+}
+```
+
+`configured` reports credential-source metadata, not a successful model request. Stored keys, tokens, header values, and API-key commands are omitted. Unsafe base URLs appear as an empty string. Model records contain only the listed metadata, not their full SDK configuration. Pricing tiers are read-only here.
+
+Ordinary reads refresh the settings runtime's authentication snapshot with `allowNetwork: false`. Loading project extensions can still run their startup work. `refresh=1` replaces that cwd's settings runtime and reloads extension registrations. It does not refresh an open conversation's catalog. Use the provider `refresh` action for a forced network catalog refresh.
+
+### Provider configuration
+
+#### `PUT /api/pi/settings/providers`
+
+Request:
+
+```text
+{
+  target?: { sessionId?: string, cwd?: string },
+  id: string,
+  revision: string,
+  create?: boolean,
+  values: {
+    name?: string,
+    baseUrl?: string,
+    api?: string,
+    authHeader?: boolean,
+    apiKey?: string | null
+  }
+}
+```
+
+Response: `ProviderInventory`.
+
+`create: true` adds a custom provider and requires `baseUrl` and `api`. Its initial `models` array is empty. Otherwise, the provider must already exist in configuration or the runtime. Omitted fields remain unchanged. At least one field is required. Only `apiKey: null` removes an individual provider field.
+
+IDs have at most 512 characters and cannot contain whitespace, control characters, or reserved prototype names. **Provider IDs cannot contain `/`. Model IDs can contain `/`.** IDs cannot be renamed through these routes.
+
+A base URL must use HTTP or HTTPS without credentials, query, fragment, or surrounding whitespace. API keys accept nonempty text, including pi environment references or `!command`. An empty command is invalid.
+
+Supported `api` selections are:
+
+```text
+openai-completions, mistral-conversations, openai-responses,
+azure-openai-responses, openai-codex-responses, anthropic-messages,
+bedrock-converse-stream, google-generative-ai, google-vertex, pi-messages
+```
+
+An API already used by a model on that provider is also accepted. Provider headers, compatibility fields, and OAuth configuration are preserved but are not editable through this route.
+
+#### `DELETE /api/pi/settings/providers`
+
+Request:
+
+```text
+{ target?: { sessionId?: string, cwd?: string }, id: string, revision: string }
+```
+
+Response: `ProviderInventory`.
+
+This removes the entire `models.json` provider entry, including custom models and overrides. It does not remove a built-in or extension registration or delete stored credentials. Use `logout` separately.
+
+For provider `radius`, or an existing entry with `oauth: "radius"`, changes cannot alter or remove its saved base URL. Pi 0.99.1 retains cached Radius gateway URLs after reload. Such changes return `409`. Use a different provider ID for a different gateway through pi configuration. This editor does not create Radius OAuth configuration.
+
+### Model definitions and overrides
+
+#### `PUT /api/pi/settings/models`
+
+Request:
+
+```text
+{
+  target?: { sessionId?: string, cwd?: string },
+  providerId: string,
+  modelId: string,
+  revision: string,
+  kind: "custom" | "override",
+  create?: boolean,
+  values: {
+    id?: string,
+    name?: string,
+    contextWindow?: number,
+    maxTokens?: number,
+    reasoning?: boolean,
+    input?: Array<"text" | "image">,
+    cost?: {
+      input?: number,
+      output?: number,
+      cacheRead?: number,
+      cacheWrite?: number
+    }
+  }
+}
+```
+
+Response: `ProviderInventory`.
+
+`kind: "custom"` edits `models`. `kind: "override"` edits `modelOverrides`. New custom models require explicit provider `baseUrl` and `api`. A catalog model requires an override instead of a new custom definition. A new override requires an existing catalog model. Existing custom definitions cannot receive an override through this route.
+
+`create: true` requires absent configuration of that kind. Otherwise, that configuration must exist. `values.id`, if supplied, must equal `modelId`.
+
+Token limits must be finite positive numbers. Costs must be finite nonnegative numbers. `input` must be a nonempty list of `text` and/or `image`, without duplicates. A new custom definition with `cost` requires all four rates. Existing custom definitions fill missing rates from existing or effective costs. Override cost changes merge only the supplied rates.
+
+Omitted fields remain unchanged. Null values do not clear model fields. Model API, endpoint, compatibility, input limits, cache policy, and pricing tiers are not editable here.
+
+#### `DELETE /api/pi/settings/models`
+
+Request:
+
+```text
+{
+  target?: { sessionId?: string, cwd?: string },
+  providerId: string,
+  modelId: string,
+  revision: string,
+  kind: "custom" | "override"
+}
+```
+
+Response: `ProviderInventory`.
+
+This deletes the custom definition or the whole override, including fields not shown by the editor. It does not delete catalog models. Removing the last model configuration can remove an otherwise empty provider entry.
+
+### Provider authentication and catalog actions
+
+#### `POST /api/pi/settings/providers/action`
+
+Request:
+
+```text
+{
+  target?: { sessionId?: string, cwd?: string },
+  providerId: string,
+  action: "login" | "logout" | "refresh",
+  authType?: "api_key" | "oauth"
+}
+```
+
+Response: `SettingsOperation`, defined [below](#settings-operations).
+
+Login requires an `authType` listed in that provider's `authMethods`. The SDK supplies private prompts and sign-in events. Logout removes stored credentials only. Environment credentials and `models.json` key references remain. Refresh reloads extension registrations and forces a network catalog refresh in the settings runtime.
+
+Completed result:
+
+```text
+{
+  providerId: string,
+  action: "login" | "logout" | "refresh",
+  credentialChanged?: true,
+  warning?: string
+}
+```
+
+`credentialChanged` occurs for login and logout, not refresh. A warning can mean credentials were saved but catalog synchronization or installation-settings persistence failed.
+
+Provider writes, authentication, and conversation runtime construction share a lock. Before login, Leyline compares provider routes across open, background, and constructing runtimes. A missing model or different API/base URL blocks login before new credentials can reach an old endpoint. This failure occurs inside the operation, with `state: "error"`, rather than as an HTTP `409` from the action request. Reload all affected sessions after active work finishes, or restart the backend.
+
+Saving or authenticating does not refresh live conversation catalogs, abort runs, or reload sessions. Explicit session reload remains separate. Home can request a fresh [`/state` preview](#get-api-pi-state) with `cwd` and `refresh=1`.
+
+### MCP inventory
+
+#### `GET /api/pi/settings/mcp`
+
+Response:
+
+```text
+McpInventory = {
+  revision: string,
+  servers: Array<{
+    name: string,
+    transport: "http" | "stdio",
+    enabled: boolean,
+    exposure: string,
+    url?: string,
+    command?: string,
+    cwd?: string,
+    argsConfigured?: true,
+    argsCount?: number,
+    timeout?: number,
+    headers: Array<{ name: string, configured: true }>,
+    env: Array<{ name: string, configured: true }>,
+    oauth: {
+      clientId?: string,
+      scope?: string,
+      callbackUrl?: string,
+      callbackPort?: number,
+      clientSecretConfigured?: boolean
+    },
+    error?: string
+  }>,
+  warning?: string
+}
+```
+
+Listing reads global `mcp.json` only. It does not connect, resolve secret commands, load project entries, or report conversation connection status. Header values, environment values, arguments, and OAuth client secrets are omitted. URL credentials are removed. URL queries, fragments, and known secrets in display metadata are redacted. `oauth` is empty when no OAuth object exists.
+
+`exposure` defaults to `codemode` for existing entries without a value, matching pi configuration. Leyline still excludes Codemode. New entries default to `deferred`.
+
+### MCP configuration
+
+#### `PUT /api/pi/settings/mcp`
+
+Request:
+
+```text
+{
+  name: string,
+  revision: string,
+  create?: boolean,
+  values: {
+    url?: string,
+    command?: string,
+    args?: string[] | null,
+    cwd?: string | null,
+    enabled?: boolean,
+    exposure?: "deferred" | "direct" | "hidden",
+    timeout?: number | null,
+    headers?: { [name: string]: string },
+    env?: { [name: string]: string },
+    removeHeaders?: string[],
+    removeEnv?: string[],
+    oauth?: {
+      clientId?: string | null,
+      clientSecret?: string | null,
+      scope?: string | null,
+      callbackPort?: number | null,
+      callbackUrl?: string | null
+    }
+  }
+}
+```
+
+Response: `McpInventory`.
+
+Server names permit letters, digits, underscores, and hyphens. `create: true` requires a new name. Otherwise, the entry must exist. Renaming requires a separate create and delete.
+
+Supply `url` for streamable HTTP or `command` for stdio, never both. HTTP URLs require HTTP or HTTPS. A command is a nonempty executable string. Legacy SSE transport is unsupported. Transport changes remove incompatible fields: stdio fields for HTTP, or HTTP fields for stdio.
+
+`args`, `cwd`, and `env` apply only to stdio. `headers` and `oauth` apply only to HTTP. `timeout` is a finite positive number of seconds. Null removes `args`, `cwd`, `timeout`, or an individual OAuth field.
+
+Header and environment maps merge supplied entries. Removal arrays delete named entries. A request cannot set and remove the same entry. Omit unchanged secrets and arguments. Do not send redacted display values as replacements. A new URL must be complete.
+
+OAuth callback ports are integers from 1 to 65535. Callback URLs require HTTP on `localhost`, `127.0.0.1`, or `[::1]`, without credentials, query, or fragment. An explicit URL port must match `callbackPort` when both are supplied.
+
+Only `deferred`, `direct`, and `hidden` are new exposure selections. An existing exposure can be preserved unchanged, including a legacy value. `type`, `toolExposure`, and top-level `autoEnableCodemode` are not editable through this API. Unknown existing fields remain unless transport conversion or explicit deletion removes them.
+
+#### `DELETE /api/pi/settings/mcp`
+
+Request:
+
+```text
+{ name: string, revision: string }
+```
+
+Response: `McpInventory`.
+
+This removes the global entry, including unknown fields. It does not sign out or close conversation connections. Reload open sessions explicitly to apply configuration changes.
+
+### MCP actions
+
+#### `POST /api/pi/settings/mcp/action`
+
+Request:
+
+```text
+{ name: string, action: "check" | "login" | "logout" }
+```
+
+Response: `SettingsOperation`.
+
+Check and login open a temporary native MCP connection, even for a disabled server. They do not change the saved enabled setting. Logout removes native stored credentials without connecting or resolving secrets. Login and logout require HTTP without an `Authorization` header.
+
+Completed result:
+
+```text
+{
+  report: string,
+  tools: Array<{ name: string, description: string, exposure: string }>
+}
+```
+
+The report describes the temporary operation, not conversation connections. Tool metadata excludes resolved configuration secrets and OAuth access tokens. Native diagnostics are limited to controlled messages. The backend process directory supplies the probe's cwd, not a selected session directory.
+
+HTTP actions share an operation lock by normalized server URL, so aliases cannot authenticate concurrently against the same native credential record. Stdio actions use the configuration path and server name. Non-login worker operations have a two-minute deadline. Login has a ten-minute deadline. Cancellation stops prompts, connection setup, and owned processes, but cannot roll back credentials already saved.
+
+### Settings operations
+
+Provider and MCP actions return a private, polled operation. These operations do not appear in session SSE, extension confirmations, or transcript entries. Private describes this transport separation, not access control. The API still has no authentication.
+
+```text
+SettingsOperation = {
+  id: string,
+  state: "running" | "cancelling" | "completed" | "cancelled" | "error",
+  prompt: SettingsPrompt | null,
+  events: SettingsEvent[],
+  result: object | null,
+  error: string
+}
+
+SettingsPrompt = {
+  id: string,
+  type: "text" | "secret" | "select" | "manual_code",
+  message: string,
+  placeholder: string,
+  options?: Array<{ id: string, label: string, description: string }>
+}
+
+SettingsEvent =
+  { type: "auth_url", url: string, instructions: string }
+  | { type: "device_code", verificationUri: string, userCode: string,
+      expiresInSeconds?: number }
+  | { type: "info", message: string, level: string,
+      links?: Array<{ url: string, label: string }> }
+```
+
+`options` occurs only for `select`. `result` uses the action-specific shapes above. `error` is empty until failure. A successful answer or cancellation request does not mean the operation has finished.
+
+Events retain at most 20 entries. Public links require HTTP or HTTPS without URL credentials. Submitted non-select values are redacted from later operation text. Terminal cleanup removes authorization URLs, device codes, and informational links. Terminal operation snapshots remain available for one minute after cleanup. Still-running operations receive cancellation after ten minutes.
+
+#### `GET /api/pi/settings/operations/:id`
+
+Request body: none. Response: `SettingsOperation`.
+
+#### `POST /api/pi/settings/operations/:id`
+
+Request:
+
+```text
+{ promptId: string, value: string }
+```
+
+Response: `SettingsOperation`.
+
+Use the current `prompt.id`. Values can contain at most 32,768 characters. A select value must match an offered option ID. Text values can be empty. Answers are not returned in the snapshot.
+
+#### `DELETE /api/pi/settings/operations/:id`
+
+Request body: none. Response: `SettingsOperation`.
+
+A running operation changes to `cancelling`, clears its events, and receives an abort signal. Poll until a terminal state. Repeated cancellation returns the current snapshot. Cancellation after completion does not undo results.
+
+### Settings errors
+
+HTTP failures use `{ error: string }`. Asynchronous action failures instead use HTTP `200` snapshots with `state: "error"` and an `error` string.
+
+| Status | Condition or exact operation error |
+| --- | --- |
+| `400` | Invalid target, fields, values, configuration changes, or action. |
+| `400` | Answer is not a string or is too long: `Invalid response`. |
+| `400` | Select answer is unavailable: `Select an available option`. |
+| `404` | Missing provider/model configuration, missing MCP action target, or unknown Settings path. |
+| `404` | Unknown or expired operation: `This settings operation expired. Start it again.` |
+| `405` | Unsupported method on inventory, model, or operation routes: `Method not allowed`. |
+| `409` | Missing/stale file revision, invalid stored configuration, duplicate creation, unavailable MCP edit target, Radius URL change, or conflicting settings target. |
+| `409` | Stale answer: `This prompt is no longer active.` |
+| `409` | Duplicate active operation: `An operation for this provider or server is already in progress.` |
+| `429` | Eight active operations already exist: `Too many settings operations are in progress.` |
+| `503` | Settings runtime cannot load, refresh authentication, or acquire capacity, or the backend is shutting down. |
+| `500` | Malformed JSON or unexpected filesystem, SDK, or worker error outside an operation. |
+
+Action paths accept only POST. Other methods on those paths return `404` with `Not found`.
+
+Provider lock waits can return `409` with `Provider settings are busy. Finish or cancel sign-in, then try again.` Errors raised after an action starts remain operation errors regardless of their internal status code.
 
 ## Session routes
 
@@ -535,6 +1005,7 @@ Query:
 
 ```text
 cwd?: string
+refresh?: "1"
 ```
 
 Response:
@@ -543,7 +1014,9 @@ Response:
 { active: Active }
 ```
 
-For a different `cwd`, Leyline creates a temporary, unpersisted runtime state and then disposes it. If `cwd` is absent, it uses the active runtime directory or the server process directory.
+Without refresh, a matching cwd returns the process-wide active runtime snapshot. Otherwise, Leyline creates a temporary runtime preview and then disposes it. `refresh=1` always creates a fresh preview, even for the active cwd. It does not reload or refresh the live conversation catalog.
+
+If `cwd` is absent, Leyline uses the active runtime directory or the server process directory. Home Settings refreshes send an explicit cwd. A temporary preview has an empty `id` and does not become the active session.
 
 ## Filesystem route
 
@@ -1351,6 +1824,8 @@ The route permanently deletes one visible record.
 
 ## Subagent routes
 
+These routes store Leyline overrides in SQLite on the selected backend. Agent defaults uses `global`, Project settings uses `project`, and Session details uses `session`. The UI surface fixes the scope. These overrides are separate from pi `models.json` definitions and overrides.
+
 ### `GET /api/pi/subagents`
 
 **Designation:** Browser configuration route.
@@ -1500,6 +1975,8 @@ Success response:
 The route waits for completion. It returns `500` with `{ error }` for child setup or execution failure. If the HTTP connection closes first, the server aborts the child run.
 
 ## Vision agent routes
+
+Vision settings use the same fixed surfaces and selected-backend SQLite storage as [subagent overrides](#subagent-routes). Model and thinking inherit independently. The composer loads its effective configuration separately from the Settings editor.
 
 ### `GET /api/pi/vision/config`
 

@@ -32,8 +32,10 @@
 - **Pi session**: A persisted, tree-structured JSONL conversation log managed by
   pi.
 - **Project**: A working directory that groups sessions in Leyline.
-- **Project Details**: A project drawer for filtering, sorting, creating,
-  opening, renaming, and deleting sessions.
+- **Project settings**: A drawer for project-level agent overrides and metadata.
+  Its **Sessions** tab filters, sorts, creates, opens, renames, and deletes sessions.
+- **Prompt inspector**: A side pane for one recorded System event's prompt
+  sections, tool changes, and exact event text.
 - **Research artifact**: A completed Markdown report whose numeric citations match the research source ledger.
 - **Runtime**: The live pi session object that runs prompts, tools, shell
   commands, and model operations.
@@ -42,13 +44,15 @@
 - **Sent to agent**: Waiting inputs that pi has already accepted. These inputs
   cannot be edited, reordered, or removed from the queue tray.
 - **Source ledger**: The persisted research list that maps citation numbers to cited, supporting, or excluded sources.
+- **Session details**: A drawer for runtime information, session metadata,
+  and session-level agent overrides.
 - **Session scope**: Data that applies to one session file.
 - **Steering**: A message sent to the active run at its next accepted input
   point. Use Option+Enter during an active run.
 - **Subagent**: A child pi session that runs a delegated task with isolated
   context.
-- **System card**: A collapsed transcript card for recorded system-prompt
-  sections and tool-loadout changes. Expand it to inspect the changes.
+- **System row**: A muted transcript divider for recorded system-prompt and
+  tool changes. Select it to open the prompt inspector.
 - **Thought**: A collapsed or expanded transcript row that contains available
   model reasoning output.
 - **Tool row**: A collapsed or expanded transcript row for a tool call and its

@@ -22,6 +22,12 @@ Leyline finds the nearest parent directory that contains `.git`. If it finds no 
 
 Other modules use the same database for `backend_connections`, `leyline_settings`, `subagent_overrides`, `vision_overrides`, and `rollout_feedback`. Tables appear when their owning modules initialize storage.
 
+Display preferences and saved connections use the native app backend's database. Memory, file-editor settings, feedback, and agent overrides use the selected backend's database. A global memory or override applies to that backend, not every saved connection.
+
+Agent defaults, Project settings, and Session details edit global, project, and session subagent/vision overrides. These controls share `AgentSettings.vue`. They are no longer separate Subagents or Vision drawers. The Memory Inspector remains a separate surface.
+
+Pi provider/model overrides in `models.json` are different from Leyline's subagent and vision overrides. Pi owns global provider, MCP, and credential files outside SQLite. See [Pi configuration storage](../reference/environment#pi-configuration-storage).
+
 Rollout labels can be `helpful` or `unhelpful`, with an optional note. Leyline adds this feedback to transcript entries when it builds session detail. See [SQLite metadata](../developer-guide/architecture#sqlite-metadata) for table ownership.
 
 ## Runtime context
@@ -55,4 +61,4 @@ The browser API also supports create, edit, archive, restore, and permanent dele
 
 ## Path override
 
-Set `LEYLINE_MEMORY_DIR` before Leyline starts to use a different data directory. Backend connections, app settings, memory, model overrides, and rollout feedback then use `memory.sqlite` in that directory.
+Set `LEYLINE_MEMORY_DIR` before the backend starts to use a different data directory. Connections, display/file settings, memory, subagent/vision overrides, and feedback then use `memory.sqlite` there. This variable does not relocate pi configuration or credentials.

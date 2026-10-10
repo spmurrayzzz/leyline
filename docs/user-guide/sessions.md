@@ -15,7 +15,7 @@ A selected session uses the route `/sessions/<encoded-id>`. The start screen use
 
 Command-click a session target to open it in a new tab or window. Use Ctrl-click
 on other platforms or middle-click with a mouse. This behavior also applies to
-**Open** and **Selected** controls in **Project details**.
+**Open** and **Selected** controls in **Project settings → Sessions**.
 
 ## Browse the session list
 
@@ -50,7 +50,7 @@ Pending **Up next** tasks stay with their session when you switch sessions or re
 
 ## Create a session in a project
 
-Select **New session** at the bottom of the sidebar. You can also select **New session** in **Project details**.
+Select **New session** at the bottom of the sidebar. You can also select **New session** in **Project settings → Sessions**.
 
 Leyline creates an empty normal session in the current project CWD. Use the centered composer to send its first prompt.
 
@@ -79,7 +79,7 @@ To rename the selected session, select its name in the workbench header.
 3. Review the **Delete session?** dialog.
 4. Select **Delete**.
 
-You can also start deletion from **Project details**. Leyline does not provide a trash restore control in the interface.
+You can also start deletion from **Project settings → Sessions**. Leyline does not provide a trash restore control in the interface.
 
 ## Open a subagent session
 

@@ -12,7 +12,7 @@ The header shows the Leyline mark, **Open sessions**, the session title, and ava
 
 The project part of the breadcrumb is hidden. The session rename glyph is also hidden, but you can select the title to rename it.
 
-The **Memory**, **Events**, and **Export transcript** icons remain available. Their numeric counts are hidden.
+The **Session details**, **Memory**, **Events**, and **Export transcript** icons remain available. Numeric counts are hidden.
 
 A research session also shows its compact state and source control. The source count is hidden, but the control remains available.
 
@@ -30,6 +30,18 @@ Select **Go to** to open a session from another project.
 The sidebar opens over the workbench. Select the shaded area or a session to close it.
 
 The sidebar can use up to 86 percent of the viewport width, with a maximum width of 320 pixels. **Activity**, **Go to**, and **Add project** use the full viewport. **Add project** keeps its confirmation actions at the bottom.
+
+## Open Settings on mobile
+
+![Mobile Models and providers page with category and provider selectors](../assets/screenshots/settings-mobile.png)
+
+1. Select **Open sessions**.
+2. Select **Open settings** at the bottom of the sidebar.
+3. Use **Category** to select the settings page.
+
+Settings fills the mobile viewport. **Models & providers** and **MCP servers** use a **Provider** or **Server** selector instead of the desktop list. Detail content scrolls within the modal.
+
+Use **Close Leyline settings** to return to the workspace. See [Settings](./settings) for scope, authentication, and reload behavior.
 
 ## Supervise activity on mobile
 

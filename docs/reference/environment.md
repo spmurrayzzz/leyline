@@ -13,8 +13,9 @@ variables come from the user's pi setup.
 | `LEYLINE_SERVER_PORT` | Port for the packaged Electron server. The default is `0`, which selects an available port. Vite does not use this variable. |
 | `LEYLINE_SERVER_ALLOWED_ORIGINS` | Comma-separated frontend origins that can use the backend. Same-origin and loopback clients work without this variable. Use `*` to allow all origins. |
 | `PI_CODING_AGENT_SESSION_DIR` | Session directory for discovery and new sessions. Leyline expands `~` and searches subdirectories for JSONL files. |
+| `PI_CODING_AGENT_DIR` | Pi agent directory resolved by the SDK. Global provider/model/MCP configuration and native credentials use this directory. The default is `~/.pi/agent`. |
 | `PI_ENABLE_CREATE_GOAL` | Set to `1` to expose the goal extension's `create_goal` model tool. |
-| `LEYLINE_MEMORY_DIR` | Directory for shared app metadata and pasted-image attachments. Backend connections, UI settings, memory, rollout feedback, subagent overrides, and vision overrides use `memory.sqlite` in this directory. Vision delegation uses its `attachments` subdirectory. |
+| `LEYLINE_MEMORY_DIR` | Directory for shared app metadata and pasted-image attachments. Backend connections, display and file-editor settings, memory, rollout feedback, subagent overrides, and vision overrides use `memory.sqlite` in this directory. Vision delegation uses its `attachments` subdirectory. |
 | `SHELL` | Login shell used by Electron environment loading and the terminal backend. Electron falls back to the account shell; the terminal has additional shell fallbacks. |
 
 Without `PI_CODING_AGENT_SESSION_DIR`, Leyline uses the session directory from
@@ -29,7 +30,9 @@ Use an absolute path for `LEYLINE_MEMORY_DIR`. Without this variable, Leyline us
 
 The database can contain the `backend_connections`, `leyline_settings`, `memories`, `rollout_feedback`, `subagent_overrides`, and `vision_overrides` tables.
 
-The `leyline_settings` table contains the default backend ID and UI settings.
+The `leyline_settings` table contains the default backend ID, display preferences, and file-editor settings.
+
+Display and saved connections belong to the native app backend. Files, memory, feedback, and agent overrides belong to the selected backend. Each backend uses its own environment and storage directory. Agent defaults, Project settings, and Session details select global, project, and session override scopes within that backend.
 
 Set `LEYLINE_SERVER_ALLOWED_ORIGINS` on a backend when a browser UI connects
 from a different non-loopback origin. Separate origins with commas. Each value
@@ -42,6 +45,26 @@ It also selects different memory, rollout, subagent, and vision metadata, plus t
 The backend API does not have authentication. Do not bind the packaged server
 to an untrusted network. The origin policy restricts browsers, but it does not
 prevent direct network clients from sending requests.
+
+## Pi configuration storage
+
+Models & providers and MCP servers edit pi-owned global files on the selected backend. They do not use `LEYLINE_MEMORY_DIR` or move credentials into Leyline SQLite.
+
+| File under the pi agent directory | Owner |
+| --- | --- |
+| `models.json` | Provider endpoints, custom model definitions, and catalog metadata overrides. Leyline edits only the supported fields. |
+| `auth.json` | Provider credentials written through native `ModelRuntime` authentication. |
+| `mcp.json` | Global MCP server configuration. |
+| `mcp-auth.json` | Native MCP OAuth credentials. |
+| `settings.json` | Pi preferences and installation settings. Leyline has no general editor for this file. Native login can persist installation data. |
+
+The SDK resolves the agent directory through `getAgentDir()`, including `PI_CODING_AGENT_DIR`. A provider Settings target changes extension discovery context, not the global file destination. MCP Settings does not edit project `.pi/mcp.json` or extension registrations.
+
+`models.json` permits line comments and trailing commas. `mcp.json` requires strict JSON. Configuration saves preserve unknown fields and symlink targets and reject stale revisions. See [Pi Settings routes](./api#pi-settings-routes) for accepted fields, secret omissions, and errors.
+
+Provider key references, MCP header/environment values, and secret commands resolve on the selected backend. Saved values are not copied from the browser's native backend. Setting `LEYLINE_MEMORY_DIR` does not relocate pi configuration or change the selected backend's process environment.
+
+Changing provider configuration does not refresh open conversation catalogs. Reload affected sessions explicitly after active work finishes. Settings refresh and Home preview refresh use separate runtimes. See [Provider runtime ownership](../developer-guide/backend-api#provider-runtime-ownership).
 
 ## CLI variables
 

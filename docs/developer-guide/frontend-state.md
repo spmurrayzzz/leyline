@@ -6,16 +6,22 @@
 
 | Owner | State and behavior |
 | --- | --- |
-| `App.vue` | Drawer and sidebar navigator visibility, Git review and research-source state, composer draft, queue-edit draft cache, attachments, edit state, prompt submission, session kind, goal commands, agent settings, project detail selection, and startup motion phases |
+| `App.vue` | Global Settings and contextual drawer visibility, fixed agent scope and request targets, sidebar navigation, Git review and research sources, composer/queue drafts, attachments, prompt edits and submission, session kind, goals, project selection, and startup motion |
 | `useSessionWorkspace.js` | Session list, project grouping, routes, selected detail, activation, runtime snapshots, sidebar activity rows, model, thinking, and Ultrafast controls, rename, delete, fork, reset, and reload |
 | `useBackendConnections.js` | App-wide connection records, window-specific selection, connection tests, and default selection |
 | `useTranscriptPreferences.js` | App-wide transcript display settings, loading state, and save errors |
+| `GlobalSettingsModal.vue` | Category navigation, capability filtering, modal focus, and scope labels |
+| `AgentSettings.vue` | Fixed-scope subagent and vision controls, inheritance display, and available model choices |
+| `ProviderSettings.vue` / `McpSettings.vue` | Inventories, selection, drafts, revisions, mutation errors, and leave guards |
+| `PiSettingsWorkspace.vue` | Searchable list, narrow-layout selector, and bounded detail pane |
+| `useSettingsOperation.js` | Private operation polling, answers, cancellation, and backend-bound cleanup |
 | `useLiveTurnProjection.js` | Optimistic user entries, live assistant blocks, System rows, tools, compaction activity, and live-to-persisted reconciliation |
 | `PromptQueue.vue` | Queue expansion, active edit, action menus, queue mutations, and tray width measurement |
 | `useRuntimeEvents.js` | EventSource lifecycle, connection state, and the local event log |
 | `useMemoryInspector.js` | Visible Memory data, loading, optimistic mutations, dirty-state guards, and drawer state |
 | `useProjectBrowser.js` | Project picker state, folder expansion, and project-browser visibility |
-| `useToolExpansion.js` | System, tool, and skill expansion, copy state, and fullscreen previews |
+| `useToolExpansion.js` | Tool and skill expansion, copy state, and fullscreen previews |
+| `SystemPromptInspector.vue` | Tabs, raw view, event actions, and rendering for the System event selected by `App.vue` |
 | `useWorkbenchScroll.js` | Bottom following, composer space, new-output state, and Jump to latest |
 | `useTerminal.js` | xterm, WebSocket, PTY status, focus, fit, and drawer height |
 | `useDictation.js` | Browser speech-recognition state inside both composer components |
@@ -78,7 +84,7 @@ Activity derives shared-CWD warnings from active or unheld queued work. Its **St
 
 Both composers show a lowercase `ultrafast` chip beside the model and thinking controls for eligible models. A click changes the mode directly, without a confirmation modal.
 
-`useSessionWorkspace.js` owns eligibility, mutation state, and the staged Home choice. Home reads only project-matched runtime previews. Model changes and preview reloads clear its staged Ultrafast choice.
+`useSessionWorkspace.js` owns eligibility, mutation state, and the staged Home choice. Home reads only project-matched runtime previews. Project and model changes clear its staged Ultrafast choice. A same-project refresh retains it only for the same model with current Ultrafast eligibility.
 
 Selected sessions read the extension status from revision-accepted runtime snapshots. The renderer does not construct provider tier fields or calculate Ultrafast costs. See [Ultrafast](./backend-api#ultrafast) for eligibility, reset, and request rules.
 
@@ -120,7 +126,7 @@ At the next turn start, the composable clears the previous turn's matched live r
 
 Settlement, reconnect, and manual compaction schedule immediate detail refreshes. Idle session-info and custom-message changes use a 250 ms debounce. Streaming tool and message events use live projection instead of per-event detail fetches.
 
-## Project browser and Project Details
+## Project browser and Project settings
 
 `useProjectBrowser.js` owns the start-screen project menu and opens the folder browser.
 
@@ -128,7 +134,7 @@ Settlement, reconnect, and manual compaction schedule immediate detail refreshes
 
 `App.vue` owns `projectDetailCwd` and derives the selected project from the session list.
 
-`ProjectDetailDrawer.vue` owns its local filter and sort mode. Session create, open, rename, and delete operations return to `App.vue` and `useSessionWorkspace.js`.
+`ProjectDetailDrawer.vue` renders Project settings with **Settings** and **Sessions** tabs. It owns the tab, filter, and sort mode. The Settings tab receives project-scoped `AgentSettings.vue` through its slot. Session create, open, rename, and delete operations return to `App.vue` and `useSessionWorkspace.js`.
 
 ## Memory Inspector
 
@@ -140,19 +146,45 @@ The composable applies optimistic updates for edit, archive, restore, and delete
 
 Dirty Memory state can block session changes and drawer changes. Memory Changes affect later turns because in-flight prompt context is already built.
 
-## Subagent settings
+## Settings surfaces
 
-`App.vue` owns subagent drawer state and requests. It rejects stale responses by request token and session key.
+`App.vue` owns three distinct surfaces. The gear and native Settings command open `GlobalSettingsModal.vue`. Project actions open Project settings. The session header opens Session details, which contains read-only runtime metadata and session overrides.
 
-`SubagentConfigDrawer.vue` owns the selected override scope. Backend data supplies discovered agents, visible overrides, and effective models.
+The global modal has Display, Connections, Files, Agent defaults, Models & providers, and MCP servers categories. Display and Connections use the native app backend. The other categories use the selected backend. Files requires `fileLinks`. Models & providers and MCP servers require `piSettings`.
 
-## Vision settings and image delegation
+`GlobalSettingsModal.vue` groups categories by owner, fixes the scope label, and uses a selector on narrow layouts. It makes the app root inert, contains keyboard focus, handles Escape, and restores focus on close. Initial focus goes to the dialog container without a visible category highlight.
 
-`App.vue` loads vision configuration for the selected session or staged start-screen project. A request token and target key prevent a response for an old target from replacing current data.
+Electron's `CommandOrControl+,` command opens global Settings idempotently. Command+Shift+E toggles Session details, not global Settings. It does nothing on Home or while blocking overlays are open.
 
-`VisionConfigDrawer.vue` owns the selected scope. It disables **Transcript** before a session exists and lists only models with image support.
+### Agent defaults and overrides
 
-When the parent model cannot receive attached images, `App.vue` shows the effective vision model. It tells the user that the model will call the vision subagent when the prompt runs. The backend saves the attachments and gives the parent a `vision_agent` instruction. The tool call and result appear in the transcript.
+`AgentSettings.vue` replaces the former Subagents and Vision configuration drawers. The containing surface fixes `scope`: global in Agent defaults, project in Project settings, and session in Session details. There is no scope picker inside global Settings.
+
+`App.vue` loads settings against an explicit cwd and optional session path. Request generations and backend/scope/target keys reject stale results. Mutations use the loaded target and require its displayed scope. Session overrides require a saved session context and copy to forks.
+
+The component resolves values from the displayed scope toward broader scopes. A global or project editor must not display a narrower session override as its effective value. Subagent models fall back to the agent definition. Vision model and thinking inherit independently. The vision picker contains only image-capable models.
+
+These overrides use the existing subagent and vision APIs and Leyline SQLite. They are separate from pi `models.json` overrides. See [Settings surfaces and ownership](./architecture#settings-surfaces-and-ownership).
+
+### Provider and MCP workspaces
+
+`ProviderSettings.vue` and `McpSettings.vue` use `PiSettingsWorkspace.vue` for searchable lists and detail panes. Lists and details scroll independently inside the stable modal frame. Notices have a bounded area. Narrow layouts use a selector instead of the list.
+
+`App.vue` captures the provider target when Settings opens. Components own local drafts, inventory revisions, selected entries, and operation state. Generation and backend guards reject late responses. Leave guards cover unsaved drafts, pending operations, and non-cancellable saves.
+
+`src/lib/pi-settings-api.js` sends Settings requests to the selected backend with caching disabled. `useSettingsOperation.js` retains the starting backend URL, polls every 500 ms, and retries most polling errors after two seconds. It sequences answers and poll responses, and cancels owned work during cleanup. A late action response after navigation also receives cancellation.
+
+`PiSettingsOperation.vue` displays private prompts and controlled progress messages. It clears submitted values and uses password inputs for secret and manual-code prompts. Operations never use shared session SSE or extension-confirmation cards. See [Settings operations](../reference/api#settings-operations) for exact shapes.
+
+Provider Refresh sends `refresh=1` to `/settings/providers`, which reloads settings extension registrations. Catalog refresh is a separate provider action. On Home, provider changes trigger `/state` with an explicit cwd and `refresh=1`. Same-project previews retain valid explicit model/thinking choices and recheck Ultrafast eligibility. Request identity and cwd checks reject stale previews.
+
+Settings changes do not refresh a live conversation catalog. The explicit reload control uses the existing session reload path and then refreshes the settings pane. It is unavailable when the selected session cannot reload. Other open sessions remain unchanged.
+
+## Vision image delegation
+
+The composer's `visionConfigData` is separate from `visionSettingsData` in the editor. `loadVisionConfig()` always uses the selected session or staged Home project. Loading or saving editor settings refreshes this effective composer configuration through its own target and request token.
+
+When the parent model cannot receive attached images, `App.vue` shows the effective vision model. The backend saves attachments and gives the parent a `vision_agent` instruction. The parent calls the tool during its turn, and the result appears in the transcript.
 
 ## Deep research
 
@@ -168,9 +200,9 @@ A valid citation event resolves the source, closes an open third rail, and opens
 
 `App.vue` enables review only when `/api/pi/info` reports the `review` capability and the viewport is wider than 1120 pixels.
 
-The selected desktop session mounts `ReviewPane.vue` while the pane is closed. The component prepares the Git status and first Pierre diff before it emits `prepared`.
+The selected desktop session mounts `ReviewPane.vue` while the pane is closed. It loads Git status for the header, but waits for `open` or `prepare` before fetching and preparing the selected diff. Status readiness alone does not emit a successful `prepared` state.
 
-When the backend reports `reviewWatch`, `ReviewPane.vue` opens `/api/pi/review/events?cwd=...`. Each connection and `review_change` event queues a refresh that preserves the selected file. The component closes the stream when its cwd changes or it unmounts.
+When the backend reports `reviewWatch`, `ReviewPane.vue` subscribes to `/api/pi/review/events?cwd=...` only after Git status reports `available`. Non-Git directories receive no watcher. Stream open and `review_change` events queue status refreshes that preserve selection. While closed, changes mark the diff for refresh without rebuilding its preview. The stream closes when the repository becomes unavailable, its cwd changes, or the component unmounts.
 
 A settled runtime event for the selected project and a completed composer shell command still increment the review refresh token. These triggers and the manual refresh control remain available when filesystem watching is unavailable.
 
@@ -178,7 +210,7 @@ Expanded review hides the transcript and uses the full workspace after the sideb
 
 ## Tool expansion and previews
 
-`useToolExpansion.js` stores expanded System, tool, and skill IDs. System cards use `messageTimestamp` as a stable expansion key across live-to-persisted reconciliation. The composable also owns clipboard fallback state and the selected fullscreen tool.
+`useToolExpansion.js` stores tool and skill expansion state, clipboard fallback state, and the selected fullscreen tool. System rows instead open `SystemPromptInspector.vue`. `App.vue` owns the selected event and follows its live-to-persisted handoff without resetting inspector tabs or raw view. See [System messages](./transcript-projection#system-messages).
 
 Expansion state resets when the selected session changes. Preview content remains part of the projected transcript entry.
 
@@ -192,9 +224,9 @@ A selected-session change resets scroll state. The terminal height and composer 
 
 ## Drawer coordination
 
-`App.vue` coordinates Project Details, Settings, Runtime Events, Memory, Subagents, Vision agent, research sources, and sidebar navigators. Opening a navigator closes conflicting drawers and configuration surfaces.
+`App.vue` coordinates global Settings, Project settings, Session details, Runtime events, Memory, research sources, and sidebar navigators. Opening global Settings closes contextual drawers and conflicting overlays. Opening a navigator closes conflicting drawers and configuration surfaces. Subagent and vision controls belong to the fixed-scope settings surfaces, not separate drawers.
 
-Git review and research sources share the desktop third rail. Opening one closes the other. The rail can remain open with contextual drawer state.
+Git review, research sources, and the prompt inspector share the desktop third rail. Opening one closes the others. The rail can remain open with contextual drawer state.
 
 The terminal is independent and can remain open below the workbench. Session changes reconnect it so the PTY uses the selected session CWD.
 

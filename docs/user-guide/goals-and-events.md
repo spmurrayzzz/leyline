@@ -79,6 +79,6 @@ Leyline retains up to 100 events for the current page connection. Reloading the 
 
 Each row shows a time, event type, and short summary. Events can include connection state, runtime activity, tool execution, messages, errors, queue changes, and extension UI changes.
 
-The topbar count shows the retained event count. **Settings** shows the event stream as **Connected**, **Connecting**, or **Error**.
+The topbar count shows the retained event count. **Session details → Runtime** shows the event stream as **Connected**, **Connecting**, or **Error**.
 
-Runtime event rows stay in the drawer. Leyline does not add model-change event rows to the transcript.
+Runtime event rows stay in the drawer. The transcript separately shows model-change dividers from pi's saved model-selection records.

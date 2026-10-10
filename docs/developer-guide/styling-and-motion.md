@@ -21,18 +21,30 @@ Avoid decorative glow, gradients, and extra panels. Existing gradients serve fad
 | `shell.css` | App grid, header, sidebar, and start shell |
 | `topbar.css` | Runtime chrome and workbench header |
 | `workbench.css` | Workbench layout, loading, start, and empty states |
-| `transcript.css` | Messages, Markdown, thinking, feedback, and entry actions |
-| `tools.css` | Tools, skills, subagents, files, diffs, and fullscreen previews |
+| `transcript.css` | Messages, System dividers, Markdown, thinking, feedback, and entry actions |
+| `tools.css` | Prompt inspector, tools, skills, subagents, files, diffs, and fullscreen previews |
 | `composer.css` | Composer, menus, attachments, context, and send states |
 | `memory.css` | Memory Inspector |
 | `review.css` | Git review rail, file list, diff states, resizing, and expanded layout |
 | `research.css` | Research progress, reports, thread cards, source rail, citation preview, and sidebar markers |
-| `settings.css` | Settings, Runtime Events, subagent configuration, and vision configuration |
+| `settings.css` | Global Settings, provider/MCP workspaces, scoped agent controls, contextual drawers, and Runtime events |
 | `modals.css` | Project browser and confirmation dialogs |
 | `terminal.css` | Terminal drawer |
 | `responsive.css` | Reduced-motion and viewport overrides |
 
 Put a rule in the narrowest owning module. Keep `src/style.css` free of component rules.
+
+System events use muted, centered dividers with document and panel icons and plain summary text. Keep them separate from tool cards. The prompt inspector uses **Prompt**/**Changes** and **Tools** tabs, readable Markdown, and simple section separators. Do not add nested section cards.
+
+Above 1120 pixels, the app reserves a column for the inspector. From 761 to 1120 pixels, the inspector overlays the right side below the header. At 760 pixels or less, it fills the width below the header. Export reserves space above 1120 pixels and uses a full-height overlay below that width. Its inspector fills the viewport width at 760 pixels or less.
+
+## Settings layout
+
+Global Settings uses one stable frame, up to 1180 by 820 pixels, with 24-pixel desktop margins. Mobile layouts fill the viewport and replace category navigation with a selector.
+
+Provider and MCP lists and details scroll independently within bounded flex/grid containers. Use `min-height: 0` and keep notices bounded. Do not add fixed pane-height caps or an outer content scroller that extends behind the footer.
+
+The modal initially focuses its container without a visible category highlight. Tab reveals thin neutral focus outlines. Active categories retain their gray selected background. Preserve focus containment, Escape handling, and focus restoration.
 
 ## Tokens
 
@@ -61,6 +73,8 @@ The current motion families include:
 
 `App.vue` tracks newly persisted entry IDs for 300 ms. The current stylesheet does not apply a normal-motion entry animation to that class.
 
+The prompt inspector uses short opacity and horizontal transform transitions in `tools.css`. Its local reduced-motion rule removes those transitions.
+
 ## Reduced motion
 
 `responsive.css` starts with the `prefers-reduced-motion: reduce` rules. These rules shorten transitions and remove keyframe animation.
@@ -82,7 +96,8 @@ When transcript visuals change, compare and update both implementations. Check t
 - summary cards
 - Markdown and code blocks
 - syntax colors
-- collapsed System cards, tool, skill, and subagent rows
+- System dividers and prompt inspectors
+- collapsed tool, skill, and subagent rows
 - research reports, threads, citations, and source ledgers
 - image, file, patch, and diff previews
 - responsive and reduced-motion behavior

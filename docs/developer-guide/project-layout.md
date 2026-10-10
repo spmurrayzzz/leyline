@@ -6,13 +6,21 @@
 - `src/App.vue`: Composes the workspace and coordinates cross-feature state.
 - `src/components/`: Contains focused Vue surfaces for sessions, composers, transcript entries, drawers, pickers, and previews.
 - `src/components/ReviewPane.vue`: Renders changed files and prepared Pierre diffs for the selected project.
+- `src/components/SystemPromptInspector.vue`: Renders prompt sections, tool changes, raw text, and actions for a selected System event.
 - `src/components/ResearchSourcesPane.vue`: Renders cited sources and the complete research ledger.
 - `src/components/ResearchCitationPreview.vue`: Renders the anchored citation preview and mobile bottom sheet.
-- `src/components/VisionConfigDrawer.vue`: Manages transcript, project, and global vision-model overrides.
+- `src/components/GlobalSettingsModal.vue`: Owns global category navigation, capability gates, focus containment, and owner labels.
+- `src/components/AgentSettings.vue`: Renders fixed-scope subagent and vision overrides in global, project, and session surfaces.
+- `src/components/ProjectDetailDrawer.vue`: Renders Project settings and its Sessions tab. Session details lives in `App.vue`.
+- `src/components/ProviderSettings.vue`: Manages provider/model inventories, edits, authentication, and catalog refresh.
+- `src/components/McpSettings.vue`: Manages global MCP configuration and temporary native checks/authentication.
+- `src/components/PiSettingsWorkspace.vue`: Supplies the searchable list, narrow selector, and bounded detail layout.
+- `src/components/PiSettingsOperation.vue`: Displays private authentication prompts, progress, and cancellation.
 - `src/components/ExtensionConfirmations.vue`: Displays pending extension confirmations and sends session-scoped replies.
 - `src/composables/useSessionWorkspace.js`: Owns session, route, activation, and runtime-control state.
 - `src/composables/useBackendConnections.js`: Owns connection records, the default, and window-specific backend selection.
 - `src/composables/useTranscriptPreferences.js`: Owns app-wide transcript display settings.
+- `src/composables/useSettingsOperation.js`: Owns backend-bound operation polling, answers, and cancellation.
 - `src/composables/useLiveTurnProjection.js`: Owns optimistic and live transcript state.
 - `src/composables/useRuntimeEvents.js`: Adapts SSE to frontend callbacks and the event log.
 - `src/composables/useMemoryInspector.js`: Owns Memory Inspector requests and optimistic state.
@@ -25,6 +33,7 @@
 - `src/lib/backend.js`: Builds runtime HTTP and WebSocket URLs for the active backend.
 - `src/lib/leyline-api.js`: Manages the native connection registry, app settings, and backend identity checks.
 - `src/lib/pi-api.js`: Contains frontend runtime API functions.
+- `src/lib/pi-settings-api.js`: Contains selected-backend provider/model/MCP requests and private operation transport.
 - `src/lib/transcript.js`: Configures Markdown and syntax highlighting, then re-exports shared projection helpers.
 - `src/lib/format.js`: Contains UI labels and value formatting.
 - `src/lib/fuzzy.js`: Contains fuzzy search helpers.
@@ -34,10 +43,12 @@
 - `lib/leyline-settings.js`: Defines app setting keys for the native backend and browser.
 - `lib/research-state.js`: Folds branch-local research events and normalizes threads and sources.
 - `lib/research-citations.js`: Validates numbered report links against the research source ledger.
-- `lib/transcript-projection.js`: Projects pi branch entries, including System cards, into shared transcript DTOs.
+- `lib/transcript-projection.js`: Projects pi branch entries, including System events, into shared transcript DTOs.
 - `lib/ultrafast.js`: Defines Ultrafast model and authentication eligibility and shared control identifiers.
 
 These files are outside `src/` because Node.js backend code and browser code import them.
+
+`lib/system-prompt.js` supplies shared System event titles and display metadata for the app and export.
 
 ## Styles
 
@@ -53,7 +64,7 @@ These files are outside `src/` because Node.js backend code and browser code imp
 - `src/styles/memory.css`: Defines the Memory Inspector.
 - `src/styles/review.css`: Defines the resizable and expanded Git review pane.
 - `src/styles/research.css`: Defines research progress, reports, thread cards, source navigation, and sidebar markers.
-- `src/styles/settings.css`: Defines Settings, Runtime Events, subagent configuration, and vision configuration.
+- `src/styles/settings.css`: Defines global Settings, contextual settings drawers, agent controls, provider/MCP workspaces, and Runtime events.
 - `src/styles/modals.css`: Defines the project browser and confirmation dialogs.
 - `src/styles/terminal.css`: Defines the terminal drawer.
 - `src/styles/responsive.css`: Defines reduced-motion and responsive overrides.
@@ -63,6 +74,14 @@ These files are outside `src/` because Node.js backend code and browser code imp
 - `server/backend-connections.js`: Stores named backend connections, the default, and native app settings.
 - `server/pi-api/index.js`: Creates the shared runtime and exports server adapters.
 - `server/pi-api/router.js`: Routes runtime HTTP requests.
+- `server/pi-api/pi-settings-routes.js`: Routes provider/model/MCP configuration and private operations.
+- `server/pi-api/pi-config.js`: Reads pi global files and applies locked, revision-checked atomic edits.
+- `server/pi-api/provider-settings.js`: Builds redacted provider inventory and performs configuration/authentication actions.
+- `server/pi-api/provider-settings-runtime.js`: Leases cwd-bound settings runtimes and owns extension cleanup.
+- `server/pi-api/settings-operations.js`: Stores private operation state and serializes provider work.
+- `server/pi-api/mcp-settings.js`: Manages global MCP configuration and worker actions.
+- `server/pi-api/mcp-settings-worker.js`: Runs disposable sessions with native MCP management.
+- `server/pi-api/mcp-settings-transports.js`: Owns native MCP transports, secret resolution, and process cleanup.
 - `server/pi-api/cors.js`: Applies the shared HTTP and WebSocket origin policy.
 - `server/pi-api/runtime.js`: Owns runtime handles and pi operations.
 - `server/pi-api/sessions.js`: Discovers session JSONL files and session metadata.

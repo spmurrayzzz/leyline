@@ -1,19 +1,31 @@
 # Settings
 
-The **Settings** drawer manages backend connections, file actions, transcript display, subagent defaults, and the vision model. It also shows runtime and session information.
-
-![Settings drawer with backend connections, runtime details, and file editor settings](../assets/screenshots/backend-connections.png)
+**Settings** manages app preferences and defaults for the selected backend. Project and session overrides have separate drawers.
 
 ## Open Settings
 
-Select **Open settings** at the bottom of the sidebar. In Electron on macOS,
-press **Command+Shift+E**.
+Select **Open settings** at the bottom of the sidebar. In Electron, use **Settings…**, **Command+,** on macOS, or **Ctrl+,** on Linux.
+
+The modal has these categories:
+
+| Category | Applies to |
+| --- | --- |
+| **Display** | Transcript display across Leyline windows. |
+| **Connections** | Saved backend connections and the default connection. Each window selects its own active backend. |
+| **Files** | File actions on the selected backend. |
+| **Agent defaults** | Global subagent and vision defaults on the selected backend. |
+| **Models & providers** | Pi provider credentials, custom providers, model definitions, and catalog overrides on the selected backend. |
+| **MCP servers** | Pi's global MCP configuration on the selected backend. |
+
+**Files**, **Models & providers**, and **MCP servers** appear only when the selected backend supports them. On narrow screens, use **Category** to select a page.
+
+Global pi configuration stays in pi's files. Leyline stores its display preferences, connections, and subagent/vision overrides separately. See [Configuration storage](../reference/environment#pi-configuration-storage).
 
 ## Manage backend connections
 
-The **Backend** section lists the native backend and each saved connection. The
-native backend is the server that supplied the current Leyline app. You cannot
-edit or remove it.
+![Connections category in the global Settings modal](../assets/screenshots/backend-connections.png)
+
+Open **Connections** to see the native backend and each saved connection. The native backend supplied the current Leyline app. You cannot edit or remove it.
 
 To add a connection:
 
@@ -23,40 +35,146 @@ To add a connection:
 4. Select **Test**.
 5. Select **Save**.
 
-The URL must use `http` or `https`. It can contain a hostname, an IP address, a
-port, and a base path. Do not add `/api/pi`; Leyline adds that path.
+The URL must use `http` or `https`. It can contain a hostname, an IP address, a port, and a base path. Do not add `/api/pi`; Leyline adds that path.
 
-Each connection has these actions:
+Each saved connection has these actions:
 
 - **Use**: Select the backend for the current window.
 - **Test**: Check the server identity and API version.
 - **Make default**: Select the backend for fresh windows.
-- **Edit**: Change the name or URL of a saved connection.
+- **Edit**: Change the connection name or URL.
 - **Remove**: Delete a connection that is not active in the current window.
 
-Saved connections and the default are app-wide. Each window keeps its active
-backend separately. New Electron windows inherit the active backend from the
-source window unless you open a backend choice in the new window.
+Saved connections and the default are app-wide. New Electron windows inherit the source window's active backend unless you open a different backend in that window.
 
-Command-click, Ctrl-click, or middle-click a backend choice in the sidebar or
-**Settings** to open the home workspace on that backend. Electron opens a
-foreground Leyline window and leaves the source window unchanged.
+Command-click, Ctrl-click, or middle-click a backend choice in the sidebar or **Connections** to open Home on that backend. Electron opens a new window and leaves the source window unchanged.
 
-When you select another backend, Leyline reloads the current window. An active
-agent run continues on the previous backend. Leyline clears an unsent composer
-draft after confirmation.
+When you select another backend in the current window, Leyline reloads that window. An active agent run continues on the previous backend. Leyline clears an unsent composer draft after confirmation.
 
 ::: warning
-The Leyline backend API does not have authentication. Do not expose the server
-to an untrusted network.
+The Leyline backend API does not have authentication. Do not expose the server to an untrusted network. Settings routes can change credentials and execute configured commands.
 :::
 
-For remote browser access, configure the server to allow the frontend origin.
-See [Environment variables](../reference/environment).
+For remote browser access, configure the server to allow the frontend origin. See [Environment variables](../reference/environment).
+
+## Manage models and providers
+
+![Provider connection settings with authentication and endpoint controls](../assets/screenshots/models-providers.png)
+
+Open **Models & providers**. Select a provider in the searchable list, or use the **Provider** selector on a narrow screen. Each provider has **Models** and **Connection** tabs.
+
+The list includes built-in providers, custom configuration, and providers from extensions available in the current project. Configuration changes apply globally on the selected backend.
+
+### Sign in to a provider
+
+1. Select the provider.
+2. Open **Connection**.
+3. Select the applicable **Sign in** method.
+4. Follow pi's prompts in the Settings panel.
+5. Open the authorization link if the provider requests browser login.
+
+Credentials stay on the selected backend. Saved secrets do not appear in the provider details. Authentication prompts and replies do not enter the conversation transcript or Runtime events.
+
+**Configured** means pi found credentials or configuration. It does not confirm account access. Sign-in does not select a model. Use the composer to change the active model.
+
+Use **Sign out** to remove the saved credential through pi. Environment credentials and API-key references can still apply. Removing a reference from `models.json` does not sign out a stored credential.
+
+If a runtime retains older provider URLs, Leyline rejects sign-in before it saves new credentials. Pi shares credentials across sessions. Without this check, an older runtime could send new credentials to a previous endpoint.
+
+Wait for active work to finish, then reload each affected session and retry. A backend restart also clears old runtimes, but clears pending **Up next** tasks. See [Sign-in safety](../reference/troubleshooting#provider-sign-in-is-blocked-after-an-endpoint-change).
+
+### Add or edit a custom provider
+
+1. Select **Add provider**.
+2. Enter a unique **Provider ID** without spaces or `/`.
+3. Enter the **Base URL** and select the **API format**.
+4. Set the display name, authorization-header behavior, or API-key reference as needed.
+5. Select **Save provider**.
+
+The base URL must use HTTP or HTTPS without credentials, query parameters, or a fragment. To change an existing provider, open **Connection**, then select **Edit configuration**. Existing provider IDs cannot change.
+
+An API-key reference accepts `$NAME`, `${NAME}`, a literal key, or `!command`. A bare `NAME` is a literal key. Commands execute on the backend when pi resolves the value. Use only commands that you trust.
+
+Saved references stay hidden. Keep the current reference, replace it, or remove it explicitly. Unchanged fields keep their saved values.
+
+**Remove provider configuration** removes the saved configuration, including fields outside this form. It does not remove built-in or extension definitions, or sign out stored credentials.
+
+Pi 0.99.1 can retain cached model URLs after a Radius gateway URL changes. Leyline therefore rejects changes to existing Radius gateway URLs. Configure a different provider ID through pi for a different gateway. This editor does not create Radius OAuth configuration.
+
+### Manage model definitions and overrides
+
+![Provider Models tab with custom model definitions and catalog controls](../assets/screenshots/provider-models.png)
+
+Open **Models** to search model names or IDs.
+
+- **Add custom model** creates a definition for an endpoint. Set the provider's base URL and API format first.
+- **Override** changes metadata for a catalog model.
+- **Edit** changes an existing custom definition or override.
+- **Reset override** removes all saved overrides for that model, including fields outside the form.
+- **Delete custom model** removes the custom definition.
+
+The form supports display name, context window, maximum output tokens, reasoning support, input types, and token costs. Costs use USD per million tokens. Model IDs can contain `/` and must match the endpoint. An existing model ID cannot change.
+
+Only changed fields are written. Unknown fields, compatibility options, and nested pricing tiers stay intact. A save or deletion fails if it leaves invalid model configuration.
+
+**Refresh catalog** requests the provider's catalog through pi. The **Refresh** button beside **Models & providers** reloads the settings view and extension registrations. Neither action reloads open conversation runtimes.
+
+On Home, saved changes refresh the model choices. Valid explicit model and thinking selections remain selected. For an existing session, use [Reload runtime](#reload-the-runtime).
+
+Model-picker visibility controls and other pi settings are not part of this page.
+
+## Manage MCP servers
+
+![MCP server configuration with explicit connection and sign-in actions](../assets/screenshots/mcp-servers.png)
+
+Open **MCP servers** to manage pi's global `mcp.json` on the selected backend. Opening the page lists configuration without starting server connections.
+
+### Add or edit a server
+
+1. Select **Add server**.
+2. Enter a name with letters, digits, underscores, or hyphens.
+3. Select **Remote HTTP** or **Local process (stdio)**.
+4. Enter the server URL or command.
+5. Set tool exposure, timeout, and enabled state as needed.
+6. Select **Save server**.
+
+For stdio, enter one argument per line without shell quotes. The command runs on the selected backend, which can be a different computer. **Working directory** and environment variables apply to that process.
+
+HTTP servers can use request headers and **Advanced OAuth configuration**. Native OAuth requires a compatible HTTP server without a configured `Authorization` header. The advanced fields do not establish OAuth support by themselves.
+
+Tool exposure has these options:
+
+- **Deferred (tool search)**: Pi discovers tools on demand through tool search.
+- **Direct (always available)**: Tools enter the normal tool list.
+- **Hidden**: Tools stay outside model discovery.
+
+Leyline does not load Codemode. Existing pi exposure values outside these options remain unchanged unless you select another value.
+
+Use **Edit server** to change a server. Its saved name cannot change. Changing transport removes fields that belong to the previous transport. The form lists those fields before you save.
+
+Saved arguments, header values, environment values, and client secrets stay hidden. Blank replacement values keep saved secrets and arguments. Use the explicit removal controls to delete them.
+
+Saving, deleting, or changing **Enabled** does not start or stop connections in open sessions. Reload those sessions to apply the configuration.
+
+### Check a connection or sign in
+
+Select **Check connection** to open a temporary connection and inspect the reported tools. For stdio, this starts the configured command on the selected backend. A check can connect a disabled server without changing its saved enabled state.
+
+**Last check** describes the temporary connection. It does not show the health of connections in open sessions. Diagnostic text excludes raw server output that could contain secrets.
+
+For an eligible HTTP server, select **Sign in** and follow pi's prompts. **Sign out** removes native OAuth credentials without requiring a live connection. Aliases for the same normalized server URL share native OAuth credentials.
+
+**Cancel** stops the settings operation and closes its temporary resources. It cannot undo credential changes that pi already saved. Reload open sessions after authentication or configuration changes.
+
+## Handle external configuration changes
+
+Leyline preserves unknown fields, JSONC comments in `models.json`, and configuration symlinks. It checks each file's revision before a save.
+
+If another process changes the file, the save fails instead of overwriting that edit. Refresh settings, review the current values, and apply the change again. Refresh asks before it discards unsaved form changes.
 
 ## Configure file actions
 
-The **Files** section appears when the selected backend supports file actions.
+Open **Files** when the selected backend supports file actions.
 
 1. Enter an **Editor command**, such as `code --wait` or `nvim`.
 2. Select **Open editor in**: **Automatic**, **Desktop**, or **Leyline terminal**.
@@ -64,74 +182,58 @@ The **Files** section appears when the selected backend supports file actions.
 
 Leave the command blank to use `$EDITOR` on that backend. **Automatic** uses the Leyline terminal for recognized terminal editors. **Desktop** launches the editor on the backend's desktop.
 
-Leyline appends the file path to the command. Optional arguments are supported, but shell operators and substitutions are not. Commands and file actions run on the selected backend, including remote backends. A remote backend does not launch an editor on the browser's machine.
+Leyline appends the file path to the command. Optional arguments are supported, but shell operators and substitutions are not. File actions run on the selected backend. A remote backend does not launch an editor on the browser's computer.
 
 See [Images and previews](./images-and-previews#preview-a-local-file) for local file links and outside-project approval.
 
-## Inspect runtime state
-
-The **Runtime** section shows:
-
-- **Model**: the selected provider and model ID.
-- **Thinking**: the selected thinking level.
-- **Tools**: the enabled tool count.
-- **Context**: used context tokens and the context limit.
-- **Events**: **Connected**, **Connecting**, or **Error**.
-
-These values are read-only in **Settings**. Change the model and thinking level in the composer.
-
 ## Set the thought display default
 
-1. Find **Display**.
+1. Open **Display**.
 2. For **Thoughts**, select **Collapsed** or **Expanded**.
 
-The setting controls the initial state of each new **Thought** or **Thinking** row. If no setting is saved, Leyline uses **Collapsed**.
-
-The setting does not change a row that is already in the transcript. The **Thinking** value in **Runtime** shows the model thinking level.
+The setting controls the initial state of each new **Thought** or **Thinking** row. If no setting is saved, Leyline uses **Collapsed**. Existing rows keep their current state. This setting does not change the model's thinking level.
 
 ## Manage the vision agent
 
-![Vision agent drawer with scoped model and thinking overrides](../assets/screenshots/vision-agent.png)
+![Agent defaults with the image-capable vision model and thinking controls](../assets/screenshots/vision-agent.png)
 
-*The drawer lists only models that support image input. Thinking mode appears when the effective model supports reasoning.*
+Open **Agent defaults** to set the vision model for all projects on the selected backend. Under **Vision agent**, select an image-capable **Vision model**. If **Thinking mode** appears, select a level or **Match parent session**.
 
-1. Find **Agents**.
-2. Select **Manage** beside **Vision agent**.
-3. Select **Transcript**, **Project**, or **Global**.
-4. Select a vision model.
-5. If **Thinking mode** appears, select its thinking level.
+Project and session overrides use their own surfaces:
 
-A **Transcript** override applies only to the current session and copies to forks. A **Project** override applies to all sessions in the project. **Global** supplies the default for other projects.
+- **Project actions → Project settings → Settings**: Override values for that project.
+- **Session details** in the workbench header: Override values for the current session. Forks copy these overrides.
 
-The model and thinking values use transcript, project, then global precedence independently. Select **Inherit from lower scope** to remove a transcript or project model override. Select **None configured** to remove the global model. **Default (no override)** removes the current thinking value. **Match parent session** uses the parent's current thinking level.
+Model and thinking values inherit independently, in session, project, then global order. The displayed effective value starts at the scope of the open surface. A global default does not include a project or session override.
 
-The **Transcript** scope is unavailable before a session exists. On the start screen, the drawer selects **Project**.
+Select the inherited option to remove a project or session override. In **Agent defaults**, **None configured** removes the global model. **Default (no override)** removes its thinking value.
 
-When the active model cannot receive images, Leyline tells it to call `vision_agent`. The tool uses the effective vision model and returns a description. The original images stay in the transcript. See [Images and previews](./images-and-previews).
+Before a session exists, configure global defaults or project overrides. Session overrides require a selected session.
+
+When the active model cannot receive images, Leyline tells it to call `vision_agent`. See [Images and previews](./images-and-previews) for image handling and storage.
 
 ## Manage subagent models
 
-1. Find **Agents**.
-2. Select **Manage** beside **Subagents**.
+Open **Agent defaults** and find **Subagents** to set global model defaults. Use **Project settings** or **Session details** for narrower overrides. See [Subagents](./subagents) for precedence and inheritance.
 
-The **Subagents** drawer manages model defaults by transcript, project, and global scope. See [Subagents](./subagents).
+## Inspect runtime state
+
+Select **Session details** in the workbench header. In Electron on macOS, **Command+Shift+E** opens or closes this drawer. The shortcut does nothing on Home.
+
+![Session details with read-only runtime state and session overrides](../assets/screenshots/session-details.png)
+
+The **Runtime** section shows the model, thinking level, enabled tool count, context usage, and event connection state. These values are read-only. Change the active model and thinking level in the composer.
 
 ## Inspect session state
 
-The **Session** section shows:
+Scroll to **Session** in **Session details** to see the project, session ID, CWD, path, and message count. Use **Copy session ID**, **Copy CWD**, or **Copy path** to copy a value.
 
-- **Project**.
-- **Session ID**.
-- **CWD**.
-- **Path**.
-- **Messages**.
-
-Select **Copy session ID**, **Copy CWD**, or **Copy path** to copy the related value.
+For project metadata and session management, open [Project settings](./projects-and-search#open-project-settings).
 
 ## Reload the runtime
 
-**Reload runtime** is at the bottom of the sidebar, beside **Open settings**. It is not inside the **Settings** drawer.
+**Reload runtime** is at the bottom of the sidebar, beside **Open settings**. Provider and MCP save notices also offer **Reload selected session** when the selected session is idle.
 
-Select **Reload runtime** to reload keybindings, extensions, skills, prompts, and themes for the selected runtime.
+Reload recreates the selected runtime with current pi resources and configuration. It does not reload every open or background session. Reload is disabled without a selected session or during active work.
 
-Reload is disabled when no session is selected or while the selected agent runs.
+Pending **Up next** tasks stay held after reload. Select **Resume** when you are ready to send them. A backend restart clears those unsent tasks.

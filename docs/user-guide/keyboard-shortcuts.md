@@ -99,10 +99,15 @@ When focus is in the terminal, **Escape** stays in the shell unless another surf
 | **Command+Shift+N** | Open the home workspace in a new window. |
 | **Command+W** | Close the current window. |
 | **Command+Shift+T** | Open or close the terminal. |
-| **Command+Shift+E** | Open or close **Settings**. |
+| **Command+,** | Open global **Settings**. |
+| **Command+Shift+E** | Open or close **Session details** for the selected session. |
 | **Command+Shift+M** | Open or close **Memory**. |
 | **Command+E** | Hide or show the desktop sidebar. On mobile, open or close it. |
 | **Escape** | Close an open transient surface. With no open surface, stop the active run. |
 
 **Command+N** requires a current session CWD. Leyline ignores it during session
 creation. **Command+Shift+N** does not create a session.
+
+**Command+Shift+E** does nothing on Home or while a blocking overlay is open.
+**Command+,** opens Settings without toggling an open modal closed. On Linux,
+use **Ctrl+,** or the native **Settings…** menu item.

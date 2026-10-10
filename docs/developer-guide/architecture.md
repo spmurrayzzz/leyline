@@ -81,6 +81,24 @@ backend's filesystem. The review API does not change Git state.
 
 Same-origin and loopback clients work by default. Other frontend origins must be listed in `LEYLINE_SERVER_ALLOWED_ORIGINS`.
 
+## Settings surfaces and ownership
+
+The global Settings modal groups settings by owner, not by one shared storage scope:
+
+| Surface | Owner and storage |
+| --- | --- |
+| Display and Connections | Native app backend, in Leyline SQLite. Display is app-wide. The active connection remains per window. |
+| Files | Selected backend, with editor values in `leyline_settings`. |
+| Agent defaults | Selected backend, with global subagent and vision overrides in SQLite. |
+| Models & providers | Selected backend's pi global `models.json` and native provider authentication. |
+| MCP servers | Selected backend's pi global `mcp.json` and native MCP authentication. |
+| Project settings | Selected backend, with project overrides and project/session metadata. |
+| Session details | Selected backend, with session overrides and read-only runtime/session metadata. |
+
+Models & providers and MCP servers require the backend capability `piSettings`. Provider targets select a cwd for extension discovery. They do not change global file ownership. The modal does not contain Global/Project/Session scope tabs.
+
+Provider settings use separate leased SDK runtimes. MCP management uses disposable native workers. Neither path silently refreshes conversation catalogs or reloads active sessions. See [Pi Settings](./backend-api#pi-settings) for lifecycle and authentication routing rules, and [Frontend state](./frontend-state#settings-surfaces) for UI ownership.
+
 ## Runtime handles and active selection
 
 Leyline creates an `AgentSessionRuntime` when it activates a persisted session. The runtime owns the current `AgentSession` and its cwd-bound services.
@@ -160,7 +178,13 @@ The database currently contains these application tables:
 - `subagent_overrides`
 - `vision_overrides`
 
-`backend_connections` stores named backend URLs. `leyline_settings` stores the default connection ID and UI settings.
+`backend_connections` stores named backend URLs. `leyline_settings` stores the default connection ID, display preferences, and backend file-editor settings.
+
+The app reads connection records and display preferences from the native backend. Files, memory, feedback, and agent overrides use the selected backend's database. Native and selected backends can be the same process.
+
+`subagent_overrides` and `vision_overrides` supply Agent defaults, Project settings, and Session details. Their global scope means all projects on that backend. It does not mean all saved backend connections. Vision model and thinking fields inherit independently.
+
+Pi provider/model configuration, MCP configuration, and native credentials do not use SQLite. They remain in the pi agent directory. See [Pi configuration storage](../reference/environment#pi-configuration-storage) for file ownership and environment boundaries.
 
 Memory, subagent, and vision scopes use canonical project roots and hashed scope IDs. Rollout feedback uses the cwd, session path, session ID, and entry ID.
 

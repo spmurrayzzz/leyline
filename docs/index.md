@@ -40,7 +40,7 @@ features:
   - title: Use a terminal
     details: Open the PTY-backed xterm drawer in the active project through the selected backend.
   - title: Export transcripts
-    details: Save readable HTML with messages, tools, thinking output, collapsed System change cards, and images.
+    details: Save readable HTML with messages, tools, thinking output, System dividers and a prompt inspector, and images.
 ---
 
 ## Leyline workspace

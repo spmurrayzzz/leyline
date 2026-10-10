@@ -35,13 +35,13 @@ The tool selects a model in this order:
 
 The value `inherit` selects the parent model. It succeeds only when that model supports image input.
 
-The **Vision agent** drawer stores overrides in the `vision_overrides` table in `~/.local/share/leyline/memory.sqlite`. The drawer lists only models that report image input support.
+**Agent defaults**, **Project settings**, and **Session details** edit global, project, and session vision values on the selected backend. They store overrides in its `vision_overrides` table. The default database path is `~/.local/share/leyline/memory.sqlite`. The model selector lists only models that report image input support.
 
 ## Thinking selection
 
-The drawer stores model and thinking values independently at each scope. Each value uses session, project, then global precedence. A scope can contain a thinking value without a model value.
+The settings store model and thinking values independently at each scope. Each value uses session, project, then global precedence. A scope can contain a thinking value without a model value.
 
-The **Thinking mode** card appears when the effective vision model supports reasoning. It provides the model's supported levels, **Match parent session**, and **Default (no override)**. **Match parent session** resolves to the parent session's current thinking level when the vision child starts.
+The **Thinking mode** control appears when the effective vision model supports reasoning or a saved thinking override exists. It provides supported levels and **Match parent session**. Global settings offer **Default (no override)**; project and session settings offer inheritance from broader scopes. **Match parent session** uses the parent's current thinking level when the vision child starts.
 
 A session fork copies both values from its session override.
 

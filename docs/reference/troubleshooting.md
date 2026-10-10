@@ -18,7 +18,7 @@ also start the Leyline backend.
 ## A saved backend connection fails
 
 1. Open **Settings**.
-2. Find the connection in **Backend**.
+2. Find the connection in **Connections**.
 3. Select **Test**.
 4. Confirm that the URL contains the scheme, host, and applicable port.
 5. Remove `/api/pi` from the saved URL. Leyline adds this path.
@@ -80,12 +80,84 @@ before the agent accepts them.
 
 ## Model or provider authentication fails
 
-Set the provider credentials in the environment that starts Leyline. Browser
-development inherits the terminal environment. Electron loads the login-shell
-environment on macOS and Linux.
+Open **Settings → Models & providers**, select the provider, then open
+**Connection**. Use an available **Sign in** method and follow pi's prompts.
+**Configured** means credentials or configuration exist; it does not verify
+account access.
 
-Select a model that has configured credentials. The backend rejects a child
-model when its provider has no API key.
+Environment credentials must exist on the selected backend. Browser development
+inherits the terminal environment. Electron loads the login-shell environment
+on macOS and Linux. An API-key reference uses `$NAME` or `${NAME}` for an
+environment variable. A bare `NAME` is a literal value.
+
+After sign-in or configuration changes, reload the affected idle session.
+Select a model whose provider has usable credentials.
+
+## Provider sign-in is blocked after an endpoint change
+
+An open or background runtime can retain an older provider URL. Pi shares saved
+credentials across sessions. Leyline rejects sign-in when those URLs differ,
+because an older runtime could send the new credentials to the previous server.
+
+1. Wait for active work to finish.
+2. Select each affected session and use **Reload runtime**.
+3. Retry sign-in in **Models & providers → Connection**.
+
+A backend restart clears old runtimes too. Finish active work first. A restart
+also clears unsent **Up next** tasks. The sign-in guard does not stop running
+agents or save the new credential.
+
+If settings report that another provider operation is in progress, complete or
+cancel that operation before retrying. Provider changes and runtime creation
+wait for the current authentication operation.
+
+## Settings categories are missing
+
+**Models & providers** and **MCP servers** require the selected backend's
+`piSettings` capability. Update and restart that backend if it predates these
+routes. Rebuild and restart a packaged Electron app after backend changes.
+**Files** separately requires `fileLinks` support.
+
+## A settings save reports an external change
+
+Another process changed the configuration after the form loaded. Refresh
+settings, review the current values, then apply your changes again. Refresh
+asks before it discards an unsaved form. Leyline does not overwrite the other
+process's edit.
+
+If settings report a parse error or a read-only file, correct the file or its
+permissions on the selected backend. Provider/model configuration uses
+`models.json`; MCP configuration uses `mcp.json` in pi's agent directory.
+See [Pi configuration storage](./environment#pi-configuration-storage).
+
+## A Radius gateway URL cannot change
+
+Pi 0.99.1 can reuse cached model URLs after the configured Radius gateway
+changes. Leyline rejects edits that change an existing Radius gateway URL.
+Use a different provider ID for a different gateway. Refreshing or reloading
+does not make this endpoint change safe.
+
+## MCP connection checks fail
+
+Open **Settings → MCP servers**, select the server, then use **Check connection**.
+The report describes a temporary connection, not connections in open sessions.
+
+For stdio, confirm that the command, working directory, and required environment
+exist on the selected backend. A check starts that command even if the server's
+saved **Enabled** setting is off. Raw process output is not shown because it
+can contain secrets.
+
+For HTTP, check the URL, network access, headers, and authentication method.
+Native OAuth requires a compatible server without a configured `Authorization`
+header. Follow pi's sign-in prompts. For a remote backend, the browser must be
+able to reach any required callback listener on that backend.
+
+Use **Cancel** if a check or sign-in does not finish. Cancellation closes the
+temporary resources but cannot undo credentials that pi already saved. Saved
+aliases for the same normalized URL share native OAuth credentials.
+
+Reload affected sessions after saving configuration or credentials. Saving
+**Enabled** alone does not connect or disconnect a server in an open session.
 
 ## Runtime resources do not update
 
@@ -104,7 +176,7 @@ Confirm these items:
 2. Confirm that the agent definition exists in `~/.pi/agent/agents/` or the
    nearest `.pi/agents/` directory.
 3. Confirm that the selected child model exists.
-4. Confirm that its provider has an API key.
+4. Confirm that its provider has usable credentials.
 5. Confirm that each tool in the agent definition is available.
 
 A project agent definition replaces a global definition with the same agent
@@ -224,9 +296,9 @@ directory while Leyline is stopped, then start Leyline again.
 
 ## An image cannot be submitted
 
-If the selected model does not support image input, open **Settings**. Find
-**Agents**, then select **Manage** beside **Vision agent**. Configure a
-transcript, project, or global vision model.
+If the selected model does not support image input, open **Settings → Agent
+defaults** and select a **Vision model**. Use **Project settings** or **Session
+details** for a narrower override.
 
 You can also select a parent model that supports image input. Shell commands
 and `/compact` cannot include image attachments. Vision delegation does not run
@@ -236,7 +308,7 @@ for extension slash commands, so do not attach images to those commands.
 
 Confirm these items:
 
-1. Open the **Vision agent** drawer and check the effective model.
+1. Open **Session details** and check **Vision model** and its inheritance source.
 2. Confirm that the model still exists and supports image input.
 3. Confirm that its provider credentials are available to the Leyline server.
 4. Select **Reload runtime** after you change pi model configuration.

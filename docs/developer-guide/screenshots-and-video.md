@@ -35,6 +35,7 @@ npm run docs:screenshots
 This command intercepts Leyline API calls and supplies sanitized fixtures. Mock coverage includes:
 
 - Backend connections, backend information and capabilities, file editor settings, and the thought display setting
+- Provider/model and MCP inventories with the `piSettings` capability; saved secret values are absent
 - Projects, folder browsing, session lists, detail, activation, and runtime state
 - Git status and selected-file diffs
 - Memory records, subagent configuration, and vision configuration
@@ -61,6 +62,14 @@ Refresh selected assets with `DOCS_SCREENSHOT_FILTER`, a comma-separated list of
 DOCS_SCREENSHOT_FILTER=composer-queue.png,composer-queue-held.png,activity.png,activity-mobile.png npm run docs:screenshots
 ```
 
+For the settings capture set:
+
+```bash
+DOCS_SCREENSHOT_FILTER=backend-connections.png,models-providers.png,provider-models.png,mcp-servers.png,subagents.png,vision-agent.png,project-details.png,session-details.png,settings-mobile.png npm run docs:screenshots
+```
+
+These images show Connections, provider Connection and Models tabs, MCP configuration, Agent defaults, project/session drawers, and mobile provider selection. They read synthetic inventories only. They do not submit configuration or authentication changes.
+
 Use these fixed settings and fixture requirements for refreshed documentation images:
 
 - Desktop viewport: 1440 by 900 CSS pixels
@@ -81,13 +90,13 @@ Use these fixed settings and fixture requirements for refreshed documentation im
 - Deep research captures: three completed threads, six ledger sources, four citations, one excluded source, and a mobile citation preview
 - Other fixtures: Home, workbench, project navigation and details, backend settings, composer controls and shell mode, transcript actions, fullscreen previews, memory, subagents, vision delegation, goals, events, terminal, export, and mobile navigation
 
-Home shows the `ultrafast` chip off. Workbench, composer-control, and mobile-session captures show it on with `openai-codex/gpt-6.1-sol`. The workbench and export include initial and later System cards. `system-message.png` shows the initial declaration collapsed and a later section and tool change expanded.
+Home shows the `ultrafast` chip off. Workbench, composer-control, and mobile-session captures show it on with `openai-codex/gpt-6.1-sol`. The workbench and export include initial and later System dividers. `system-message.png` shows the initial declaration and a later event open in the prompt inspector. That image crops to the dividers and inspector.
 
 These models and settings exist only in the capture fixtures. The command does not change local model configuration.
 
 Each state uses a new browser context. The script uses a fixed date with increasing millisecond ticks, replaces SSE and terminal transports, and waits for a state selector. The tick prevents Vue's event timestamp guard from dropping interactions. The capture disables remaining motion.
 
-The script rejects unrecognized API calls and visible private text. It checks home paths, usernames, repository paths, email addresses, and common credential prefixes.
+The script blocks unrecognized `/api/` requests instead of sending them to a live backend. Before capture, it checks visible text and form values for home paths, usernames, repository paths, email addresses, and common credential prefixes.
 
 ## Review documentation images
 

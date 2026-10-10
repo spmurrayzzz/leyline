@@ -2,7 +2,7 @@
 
 Leyline connects the Vue interface to pi runtimes, bundled extensions, local SQLite data, and a PTY terminal.
 
-- [pi SDK integration](./pi-sdk) covers session discovery, runtime actions, and JSONL history.
+- [pi SDK integration](./pi-sdk) covers session discovery, runtime actions, JSONL history, and native Settings integration.
 - [Goal extension](./goal-extension) covers long-running goals and browser goal state.
 - [Memory integration](./memory-integration) covers durable context, the Memory Inspector, and rollout feedback.
 - [Subagent integration](./subagents) covers agent definitions, model overrides, and child sessions.
@@ -21,7 +21,11 @@ Normal runtimes also append `.pi/LEYLINE_SYSTEM.md` to the system prompt. This p
 
 ## Local metadata
 
-Backend connections, app settings, memory, rollout feedback, and model overrides use SQLite under `~/.local/share/leyline/`. Pi session history remains in JSONL files.
+Backend connections, display and file-editor settings, memory, rollout feedback, and subagent/vision overrides use SQLite under `~/.local/share/leyline/`. Pi session history remains in JSONL files.
+
+Display and saved connections belong to the native app backend. Agent defaults, Project settings, and Session details edit overrides on the selected backend at fixed scopes.
+
+Models & providers and MCP servers require `piSettings` and use pi-owned global files on the selected backend. Provider/model configuration, MCP configuration, and native credentials do not use SQLite. See [Settings integration](./pi-sdk#settings-integration) for the SDK boundary and [Pi Settings routes](../reference/api#pi-settings-routes) for the supported API.
 
 See [SQLite metadata](../developer-guide/architecture#sqlite-metadata) for the table inventory and [Environment variables](../reference/environment) for storage overrides.
 

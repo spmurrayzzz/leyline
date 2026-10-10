@@ -105,7 +105,7 @@ Paste PNG, JPEG, GIF, or WebP images into the composer. Select **×** on an atta
 
 Leyline sends images directly to a model that supports image input. For other models, Leyline saves each image locally. It instructs the model to call `vision_agent` when its turn starts. The tool call and result appear in the transcript.
 
-If no vision model is configured, the warning blocks submission. Open **Settings**, find **Agents**, and select **Manage** beside **Vision agent**.
+If no vision model is configured, the warning blocks submission. Open **Settings → Agent defaults** and select a **Vision model**. Use **Project settings** or **Session details** for narrower overrides.
 
 Shell commands and `/compact` cannot include images. Vision delegation does not run for extension slash commands, so do not attach images to those commands.
 

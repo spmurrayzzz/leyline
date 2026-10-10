@@ -28,14 +28,23 @@ Vite applies normal frontend changes while it continues to run.
 | `Command+Shift+N` | Open the home workspace in a new window. |
 | `Command+W` | Close the current window. |
 | `Command+E` | Show or hide the sidebar. |
-| `Command+Shift+E` | Open Settings. |
+| `Command+,` | Open global Settings. |
+| `Command+Shift+E` | Show or hide Session details for the selected session. |
 | `Command+Shift+M` | Show or hide Memory. |
 | `Command+Shift+T` | Show or hide the terminal. |
-| `Escape` | Stop the active run and close open drawers, dialogs, and menus. |
+| `Escape` | Close open surfaces first. With none open, stop the active run. |
 
-`Command+N` also accepts `Control+N` in the Electron input handler. The other
-listed shortcuts use the macOS Command key. `Command+Shift+N` does not create a
-pi session.
+`Command+N` also accepts `Control+N` in the Electron input handler.
+`Command+Shift+N` does not create a pi session. `Command+Shift+E` does nothing on
+Home or while a blocking overlay is open.
+
+The native **Settings…** item uses `CommandOrControl+,`: `Command+,` on macOS
+and `Ctrl+,` on Linux. It opens global Settings without toggling it closed.
+Linux uses an auto-hidden menu with this Settings item. The other listed
+Command shortcuts use the macOS Command key.
+
+Escape stays in the terminal when it has focus and no other surface consumes
+the key. The renderer handles Escape; Electron does not intercept it.
 
 Command-click, Ctrl-click, or middle-click a session, project, **New session**,
 or backend choice to open its target in a foreground Electron window.

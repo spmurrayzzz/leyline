@@ -89,7 +89,102 @@ const backendInfo = {
     reviewWatch: true,
     terminal: true,
     fileLinks: true,
+    piSettings: true,
   },
+}
+const providerSettings = {
+  revision: 'docs-providers-v1',
+  providers: [
+    {
+      id: 'local',
+      name: 'Local',
+      kind: 'custom',
+      configured: true,
+      authSource: 'models_json_key',
+      authLabel: 'models.json API key',
+      authMethods: [],
+      config: {
+        name: 'Local',
+        baseUrl: 'http://localhost:8000/v1',
+        api: 'openai-completions',
+        authHeader: true,
+        apiKeyConfigured: true,
+        headersConfigured: false,
+        canEdit: true,
+        hasConfiguration: true,
+      },
+      models: availableModels.filter((item) => item.provider === 'local').map((item) => ({
+        id: item.id,
+        name: item.name,
+        contextWindow: item.contextWindow || 131072,
+        maxTokens: 32768,
+        reasoning: true,
+        input: item.supportsImages ? ['text', 'image'] : ['text'],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        kind: 'custom',
+        overrides: {},
+      })),
+    },
+    {
+      id: 'openai',
+      name: 'OpenAI',
+      kind: 'builtin',
+      configured: false,
+      authSource: null,
+      authLabel: 'Not configured',
+      authMethods: [{ id: 'api_key', label: 'API key' }],
+      config: {
+        name: '',
+        baseUrl: '',
+        api: '',
+        authHeader: null,
+        apiKeyConfigured: false,
+        headersConfigured: false,
+        canEdit: true,
+        hasConfiguration: false,
+      },
+      models: [{
+        id: 'gpt-5.4',
+        name: 'GPT-5.4',
+        contextWindow: 272000,
+        maxTokens: 32768,
+        reasoning: true,
+        input: ['text', 'image'],
+        cost: {},
+        kind: 'catalog',
+        overrides: {},
+      }],
+    },
+  ],
+}
+const mcpSettings = {
+  revision: 'docs-mcp-v1',
+  servers: [
+    {
+      name: 'documentation',
+      transport: 'http',
+      enabled: true,
+      url: 'https://docs.example.com/mcp',
+      exposure: 'deferred',
+      timeout: 30,
+      headers: [],
+      env: [],
+      oauth: { scope: 'docs:read', clientSecretConfigured: false },
+    },
+    {
+      name: 'project-files',
+      transport: 'stdio',
+      enabled: false,
+      command: 'node',
+      cwd: '/workspace/harbor',
+      argsConfigured: true,
+      argsCount: 2,
+      exposure: 'direct',
+      headers: [],
+      env: [{ name: 'PROJECT_ROOT', configured: true }],
+      oauth: {},
+    },
+  ],
 }
 const fileSettings = {
   editor: 'code --wait',
@@ -703,7 +798,7 @@ const subagentPayload = {
       model: 'inherit',
       thinking: 'high',
       tools: ['read', 'grep'],
-      overrides: { session: 'local/minimax-m2.7' },
+      overrides: { global: 'local/minimax-m2.7', session: 'local/minimax-m2.7' },
       effectiveModel: 'local/minimax-m2.7',
       modelSource: 'session',
     },
@@ -716,7 +811,7 @@ const subagentPayload = {
       model: 'local/minimax-m2.7',
       thinking: 'medium',
       tools: ['read', 'grep', 'bash'],
-      overrides: { project: 'local/minimax-m2.7' },
+      overrides: { global: 'local/minimax-m2.7', project: 'local/minimax-m2.7' },
       effectiveModel: 'local/minimax-m2.7',
       modelSource: 'project',
     },
@@ -864,10 +959,10 @@ try {
       await sidebar.getByRole('button', { name: 'Project actions' }).click()
       await sidebar.getByRole('button', { name: 'Project settings' }).click()
       const drawer = page.locator('aside[aria-label="Project settings"]')
-      await drawer.getByRole('button', { name: /^Sessions/ }).click()
-      await drawer.getByLabel('Filter sessions').fill('release')
-      await drawer.locator('.project-detail-list-head > span').filter({ hasText: /^2 visible$/ }).waitFor()
-      await drawer.locator('.project-session-card').nth(1).waitFor()
+      await drawer.locator('section[aria-label="Vision agent"][aria-busy="false"]').waitFor()
+      await drawer.locator('section[aria-label="Subagents"][aria-busy="false"]').waitFor()
+      await drawer.getByRole('combobox', { name: /^Vision model/ }).locator('option[value="local/qwen3.6-27b"]:checked').waitFor({ state: 'attached' })
+      await drawer.locator('.settings-metadata-list > div').last().scrollIntoViewIfNeeded()
     },
   })
   await capture({
@@ -881,6 +976,79 @@ try {
       await dialog.getByRole('button', { name: 'Connections', exact: true }).click()
       await dialog.locator('.backend-connection-card').filter({ hasText: 'Team backend' }).waitFor()
       await dialog.locator('button:not(:disabled)').filter({ hasText: /^Add connection$/ }).waitFor()
+    },
+  })
+  await capture({
+    browser,
+    file: path.join(docsOutputDir, 'models-providers.png'),
+    route: '/sessions/demo-session',
+    ready: '.assistant-message',
+    interact: async (page) => {
+      await page.getByRole('button', { name: 'Open settings' }).click()
+      const dialog = page.getByRole('dialog', { name: 'Leyline settings' })
+      await dialog.getByRole('button', { name: 'Models & providers', exact: true }).click()
+      await dialog.locator('.pi-settings-workspace[aria-busy="false"]').waitFor()
+      await dialog.getByRole('button', { name: 'Connection', exact: true }).click()
+      await dialog.getByText('http://localhost:8000/v1', { exact: true }).waitFor()
+      await dialog.getByRole('button', { name: 'Edit configuration', exact: true }).waitFor()
+    },
+  })
+  await capture({
+    browser,
+    file: path.join(docsOutputDir, 'provider-models.png'),
+    route: '/sessions/demo-session',
+    ready: '.assistant-message',
+    interact: async (page) => {
+      await page.getByRole('button', { name: 'Open settings' }).click()
+      const dialog = page.getByRole('dialog', { name: 'Leyline settings' })
+      await dialog.getByRole('button', { name: 'Models & providers', exact: true }).click()
+      await dialog.locator('.pi-settings-workspace[aria-busy="false"]').waitFor()
+      await dialog.getByRole('button', { name: 'Models 3', exact: true }).click()
+      await dialog.locator('.pi-settings-model-row').nth(2).waitFor()
+    },
+  })
+  await capture({
+    browser,
+    file: path.join(docsOutputDir, 'mcp-servers.png'),
+    route: '/sessions/demo-session',
+    ready: '.assistant-message',
+    interact: async (page) => {
+      await page.getByRole('button', { name: 'Open settings' }).click()
+      const dialog = page.getByRole('dialog', { name: 'Leyline settings' })
+      await dialog.getByRole('button', { name: 'MCP servers', exact: true }).click()
+      await dialog.locator('.pi-settings-workspace[aria-busy="false"]').waitFor()
+      await dialog.getByRole('region', { name: 'Server settings' }).getByRole('heading', { name: 'documentation', exact: true }).waitFor()
+      await dialog.getByText('https://docs.example.com/mcp', { exact: true }).waitFor()
+      await dialog.getByRole('button', { name: 'Check connection', exact: true }).waitFor()
+    },
+  })
+  await capture({
+    browser,
+    file: path.join(docsOutputDir, 'session-details.png'),
+    route: '/sessions/demo-session',
+    ready: '.assistant-message',
+    interact: async (page) => {
+      await page.getByRole('button', { name: 'Session details', exact: true }).click()
+      const drawer = page.locator('aside[aria-label="Session details"]')
+      await drawer.locator('section[aria-label="Vision agent"][aria-busy="false"]').waitFor()
+      await drawer.locator('section[aria-label="Subagents"][aria-busy="false"]').waitFor()
+      await drawer.getByRole('heading', { name: 'Runtime Read-only', exact: true }).waitFor()
+    },
+  })
+  await capture({
+    browser,
+    file: path.join(docsOutputDir, 'settings-mobile.png'),
+    route: '/sessions/demo-session',
+    ready: '.composer .mobile-label',
+    viewport: { width: 390, height: 844 },
+    interact: async (page) => {
+      await page.getByRole('button', { name: 'Open sessions' }).click()
+      await page.getByRole('button', { name: 'Open settings' }).click()
+      const dialog = page.getByRole('dialog', { name: 'Leyline settings' })
+      await dialog.getByRole('combobox', { name: 'Settings category' }).selectOption('providers')
+      await dialog.locator('.pi-settings-workspace[aria-busy="false"]').waitFor()
+      await dialog.getByRole('combobox', { name: 'Provider', exact: true }).selectOption('local')
+      await dialog.locator('.pi-settings-model-row').nth(2).waitFor()
     },
   })
   await capture({
@@ -977,15 +1145,18 @@ try {
     route: '/sessions/demo-session',
     ready: '.assistant-message',
     interact: async (page) => {
-      await page.getByRole('button', { name: 'Session details', exact: true }).click()
-      const drawer = page.locator('aside[aria-label="Session details"]')
-      await drawer.locator('section[aria-label="Vision agent"][aria-busy="false"]').waitFor()
-      const section = drawer.locator('section[aria-label="Subagents"][aria-busy="false"]')
+      await page.getByRole('button', { name: 'Open settings' }).click()
+      const dialog = page.getByRole('dialog', { name: 'Leyline settings' })
+      await dialog.getByRole('button', { name: 'Agent defaults', exact: true }).click()
+      await dialog.locator('section[aria-label="Vision agent"][aria-busy="false"]').waitFor()
+      const section = dialog.locator('section[aria-label="Subagents"][aria-busy="false"]')
       await section.waitFor()
       await section.locator('select:not(:disabled)').nth(1).waitFor()
       await section.locator('option[value="local/minimax-m2.7"]').nth(1).waitFor({ state: 'attached' })
       await section.getByRole('combobox', { name: /^reviewer/ }).locator('option[value="local/minimax-m2.7"]:checked').waitFor({ state: 'attached' })
-      await section.scrollIntoViewIfNeeded()
+      await section.getByText('Agent definitions and tools', { exact: true }).click()
+      await section.getByRole('heading', { name: 'researcher', exact: true }).waitFor()
+      await dialog.getByText('Project and session overrides are edited in their own details panels.', { exact: true }).scrollIntoViewIfNeeded()
     },
   })
   await capture({
@@ -1008,15 +1179,16 @@ try {
     route: '/sessions/demo-session',
     ready: '.assistant-message',
     interact: async (page) => {
-      await page.getByRole('button', { name: 'Session details', exact: true }).click()
-      const drawer = page.locator('aside[aria-label="Session details"]')
-      await drawer.locator('section[aria-label="Subagents"][aria-busy="false"]').waitFor()
-      const section = drawer.locator('section[aria-label="Vision agent"][aria-busy="false"]')
+      await page.getByRole('button', { name: 'Open settings' }).click()
+      const dialog = page.getByRole('dialog', { name: 'Leyline settings' })
+      await dialog.getByRole('button', { name: 'Agent defaults', exact: true }).click()
+      await dialog.locator('section[aria-label="Subagents"][aria-busy="false"]').waitFor()
+      const section = dialog.locator('section[aria-label="Vision agent"][aria-busy="false"]')
       await section.waitFor()
       await section.locator('select:not(:disabled)').first().waitFor()
       const modelSelect = section.getByRole('combobox', { name: /^Vision model/ })
       await modelSelect.locator('option[value="local/qwen3.6-27b"]:checked:not(:disabled)').waitFor({ state: 'attached' })
-      await section.getByRole('combobox', { name: /^Thinking mode/ }).locator('option[value="high"]:checked').waitFor({ state: 'attached' })
+      await section.getByRole('combobox', { name: /^Thinking mode/ }).locator('option[value=""]:checked').waitFor({ state: 'attached' })
       await section.scrollIntoViewIfNeeded()
       const selectedVisionModel = await modelSelect.inputValue()
       if (selectedVisionModel !== 'local/qwen3.6-27b') {
@@ -1165,7 +1337,7 @@ try {
   await browser.close()
 }
 
-console.log('Saved documentation and README screenshots')
+console.log('Screenshot capture complete')
 
 async function waitForResearchSources(page) {
   const pane = page.locator('aside[aria-label="Research sources"].open')
@@ -1488,39 +1660,7 @@ async function capture({
       export function parsePatchFiles() { return [] }
     `,
   }))
-  await page.route('**/api/leyline/connections', async (request) => {
-    const method = request.request().method()
-    if (method === 'GET') {
-      return request.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(backendRegistry),
-      })
-    }
-    unexpected.push(`request: ${method} /api/leyline/connections`)
-    return request.abort()
-  })
-  await page.route(
-    `**/api/leyline/settings/${THINKING_DEFAULT_SETTING_KEY}`,
-    async (request) => {
-      const method = request.request().method()
-      if (method === 'GET') {
-        return request.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            key: THINKING_DEFAULT_SETTING_KEY,
-            value: 'collapsed',
-          }),
-        })
-      }
-      unexpected.push(
-        `request: ${method} /api/leyline/settings/${THINKING_DEFAULT_SETTING_KEY}`,
-      )
-      return request.abort()
-    },
-  )
-  await page.route('**/api/pi/**', async (request) => {
+  await page.route('**/api/**', async (request) => {
     const req = request.request()
     const url = new URL(req.url())
     const method = req.method()
@@ -1531,6 +1671,12 @@ async function capture({
       body: JSON.stringify(body),
     })
 
+    if (key === 'GET /api/leyline/connections') return json(backendRegistry)
+    if (key === `GET /api/leyline/settings/${THINKING_DEFAULT_SETTING_KEY}`) {
+      return json({ key: THINKING_DEFAULT_SETTING_KEY, value: 'collapsed' })
+    }
+    if (key === 'GET /api/pi/settings/providers') return json(providerSettings)
+    if (key === 'GET /api/pi/settings/mcp') return json(mcpSettings)
     if (key === 'GET /api/pi/info') return json(backendInfo)
     if (key === 'GET /api/pi/files/settings') return json(fileSettings)
     if (key === 'GET /api/pi/projects') return json({ projects })
@@ -1784,7 +1930,9 @@ async function sanitizeNativeBackendAddress(page) {
 }
 
 async function assertPrivateDataAbsent(page) {
-  const text = await page.locator('body').innerText()
+  const text = await page.locator('body').innerText() + '\n' + await page.locator('input, textarea, select').evaluateAll((elements) => {
+    return elements.map((element) => element.value).join('\n')
+  })
   const captureHost = new URL(baseUrl).host
   const forbidden = [
     '/Users/',

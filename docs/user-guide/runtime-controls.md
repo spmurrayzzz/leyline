@@ -16,6 +16,10 @@ The control and result rows use `provider/model-id` labels. Filtering also match
 
 You cannot change the model during a run, compaction, submission, or runtime reload. Leyline records the selected model in the session and saves it as the pi default for new sessions.
 
+Repeated model selections before the next conversation message update one **Model changed from … to …** divider. Returning to the original model removes it. Initial model setup does not add a divider.
+
+Use [Models & providers](./settings#manage-models-and-providers) for credentials, custom endpoints, and catalog changes. Reload an existing session to apply those changes to its model choices.
+
 ## Select a thinking level
 
 1. Select the **thinking** control.
@@ -38,7 +42,9 @@ Direct `openai` subscription authentication does not support this control. Local
 
 Click the chip while the runtime is idle to enable or disable it. The change is direct, with no confirmation dialog.
 
-The choice applies only to the current runtime/session. It resets on model changes, runtime reload, tree navigation, and fork. Normal agent turns use the selected mode. Compaction and branch summaries remain Standard.
+The choice applies only to the current runtime/session. Model changes, explicit runtime reloads, and reset navigation turn it off. A new fork starts with it off. Retry and prompt edits preserve the choice when the runtime and model stay unchanged.
+
+Normal agent turns use the selected mode. Compaction and branch summaries remain Standard.
 
 On Home, the choice stays staged until Leyline creates the session. Leyline applies it after the staged model and thinking level, before the first prompt.
 

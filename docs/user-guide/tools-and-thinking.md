@@ -30,13 +30,27 @@ Shell rows also show **in context** or **not in context**. This label tells you 
 
 ![System rows in the transcript with a recorded change open in the prompt inspector](../assets/screenshots/system-message.png)
 
-Pi records changes to the system prompt and tool loadout in collapsed **System** cards. The first card can show the full prompt and initial tools. Later cards show changed or removed prompt sections and added or removed tools.
+Pi records the system prompt and tool declarations as System events. Each event appears as a muted, centered divider with a document icon and a short summary. Initial declarations show **System prompt**. Later changes show **System updated**. Older sessions can have no System events.
 
-Select a card to expand its sections and tool descriptions. **Copy** copies the recorded change text. Older sessions can have no System cards.
+Select a divider to open the prompt inspector on the right:
+
+- **Prompt** shows the initial prompt sections as rendered Markdown.
+- **Changes** shows updated or removed sections for a later event. It does not reconstruct the full prompt at that point.
+- **Tools** shows initial or added tools and their descriptions, plus removed tool names. An event with only tool changes opens this tab.
+
+Select **Raw text** to see the exact event text without Markdown formatting. **Copy** copies that same text from either view. Select **Reading view** to return to the tabs.
+
+For a saved event, the **System event actions** menu offers **Fork from here** and **Reset to here**. Reset is unavailable during an active run. Both actions are unavailable during a fork, reset, or compaction.
+
+The inspector reserves transcript space on wide windows. On narrower windows, it overlays the right side. On mobile, it fills the width below the header and blocks interaction with the transcript.
+
+The inspector cannot stay open beside **Review** or **Sources**. Select **Close prompt inspector** to close it. Escape closes the actions menu first, then the inspector. Selection stays open when a live event becomes a saved entry. The inspector closes when you change sessions or backends, or the event leaves the selected branch.
 
 ## Use MCP tools and confirmations
 
 Leyline uses pi's native MCP integration for configured servers. MCP tools use names such as `mcp__<server>__<tool>`. Pi's exposure settings control how the model reaches them. Calls and results appear in the transcript like other tools.
+
+See [Manage MCP servers](./settings#manage-mcp-servers) to configure servers in Settings.
 
 When an extension requests confirmation, Leyline shows a card above the composer. Read the request, then select **Confirm** or **Cancel**. MCP tools use pi's tool pipeline, so permission extensions can request confirmation for them too. Not every tool call requires confirmation.
 

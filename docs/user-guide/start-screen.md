@@ -75,7 +75,7 @@ Select **×** on an attachment to remove it. Leyline sends images directly when 
 
 For other models, Leyline uses the configured project or global vision model. When the prompt runs, the model calls `vision_agent` to inspect the images. The tool call and result appear in the transcript. If no vision model is configured, the warning blocks submission.
 
-Open **Settings**, find **Agents**, and select **Manage** beside **Vision agent** to configure it. Before Leyline creates a session, the drawer selects **Project** and disables **Transcript**.
+Open **Settings → Agent defaults** to select a global **Vision model**. Use **Project actions → Project settings → Settings** for project overrides. Session overrides require an existing session.
 
 Leyline accepts PNG, JPEG, GIF, and WebP image data. The current composer has no fixed count or byte limit.
 
