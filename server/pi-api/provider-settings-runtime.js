@@ -8,6 +8,7 @@ import {
   SessionManager,
   SettingsManager,
 } from '@earendil-works/pi-coding-agent'
+import { refreshCustomProviders, wrapModelRuntime } from './custom-providers.js'
 import { settingsError } from './pi-config.js'
 import { waitForSettings } from './settings-operations.js'
 
@@ -70,6 +71,11 @@ function settingsModelRuntime(runtime, lifetime) {
         signal.throwIfAborted()
         return waitForSettings(target.listCredentials({ ...options, signal }), signal)
       }
+      if (key === 'checkAuth') return (providerId, options = {}) => {
+        const signal = boundedSignal(lifetime, options.signal)
+        signal.throwIfAborted()
+        return waitForSettings(target.checkAuth(providerId, { ...options, signal }), signal)
+      }
       if (key === 'getAvailable') return (providerId, options = {}) => {
         const signal = boundedSignal(lifetime, options.signal)
         signal.throwIfAborted()
@@ -125,9 +131,9 @@ export function createProviderSettingsRuntimes({ isClosing }) {
         cwd, agentDir, settingsManager, noSkills: true, noPromptTemplates: true, noThemes: true, noContextFiles: true,
       })
       const factory = async ({ sessionManager }) => {
-        const modelRuntime = settingsModelRuntime(await ModelRuntime.create({
+        const modelRuntime = settingsModelRuntime(wrapModelRuntime(await ModelRuntime.create({
           authPath: join(agentDir, 'auth.json'), modelsPath: join(agentDir, 'models.json'), refreshOnCreate: false, signal,
-        }), signal)
+        })), signal)
         signal.throwIfAborted()
         const services = { cwd, agentDir, modelRuntime, settingsManager, resourceLoader, diagnostics: [] }
         const previousExtensions = resourceLoader.getExtensions()
@@ -136,7 +142,7 @@ export function createProviderSettingsRuntimes({ isClosing }) {
           await resourceLoader.reload()
           session = await createResourceSession(services, sessionManager)
           signal.throwIfAborted()
-          const refreshed = await modelRuntime.refresh({ allowNetwork: false, signal })
+          const refreshed = await refreshCustomProviders(modelRuntime, { allowNetwork: false, signal })
           if (refreshed.aborted) throw settingsError('Provider settings refresh timed out', 503)
           signal.throwIfAborted()
           return { session, services, diagnostics: services.diagnostics }
@@ -203,7 +209,7 @@ export function createProviderSettingsRuntimes({ isClosing }) {
     try {
       const { runtime } = await waitForSettings(context.ready, boundedSignal(context.controller.signal, options.signal))
       if (isClosing() || context.retired) throw settingsError('Provider settings changed. Refresh and try again.', 409)
-      const result = await runtime.session.modelRuntime.refresh({ allowNetwork: false, signal: options.signal })
+      const result = await refreshCustomProviders(runtime.session.modelRuntime, { allowNetwork: false, signal: options.signal })
       if (result.aborted || runtime.session.modelRuntime.getError()?.includes('Availability refresh:')) {
         throw settingsError('Provider authentication status could not be refreshed. Check project extensions and try again.', 503)
       }

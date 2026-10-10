@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import PiSettingsOperation from './PiSettingsOperation.vue'
 import PiSettingsWorkspace from './PiSettingsWorkspace.vue'
 import { useSettingsOperation } from '../composables/useSettingsOperation'
@@ -39,12 +39,13 @@ const draft = ref(null)
 const modelQuery = ref('')
 const modelLimit = ref(80)
 const operationOwner = ref(null)
+const draftActions = ref(null)
 let generation = 0
 
 const { operation, busy, error: operationError, start, answer, cancel, clear } = useSettingsOperation({
   async onComplete(result) {
     const owner = operationOwner.value
-    if (!owner || owner.generation !== generation || owner.id !== selectedId.value || result?.providerId !== owner.id) return
+    if (!owner || owner.generation !== generation || owner.id !== selectedId.value || result?.providerId !== owner.id || result.action === 'test') return
     reloadRequired.value = true
     emit('changed')
     if (owner.generation === generation) await load(owner.id)
@@ -59,7 +60,7 @@ const items = computed(() => providers.value.map((provider) => ({
   subtitle: `${provider.configured ? 'Configured' : 'Not configured'} · ${provider.models.length} ${provider.models.length === 1 ? 'model' : 'models'}`,
 })))
 const selected = computed(() => providers.value.find((provider) => provider.id === selectedId.value))
-const locked = computed(() => fetching.value || saving.value || props.loading)
+const locked = computed(() => fetching.value || saving.value || props.loading || (busy.value && Boolean(operationOwner.value?.draft)))
 const writable = computed(() => inventory.value?.revision != null && providers.value.every((provider) => provider.config.canEdit))
 const dirty = computed(() => Boolean(draft.value && JSON.stringify(draft.value.values) !== JSON.stringify(draft.value.initial)))
 const filteredModels = computed(() => {
@@ -71,10 +72,26 @@ const apiOptions = computed(() => {
   const current = draft.value?.initial.api
   return current && !apis.includes(current) ? [current, ...apis] : apis
 })
-const operationVisible = computed(() => operationOwner.value?.id === selectedId.value && (operation.value || busy.value || operationError.value))
+const operationVisible = computed(() => operationOwner.value && (operationOwner.value.draft ? operationOwner.value.draft === draft.value : operationOwner.value.id === selectedId.value) && (operation.value || busy.value || operationError.value))
 const canAddModel = computed(() => writable.value && selected.value?.config.baseUrl && selected.value?.config.api)
 
 watch(modelQuery, () => { modelLimit.value = 80 })
+watch(() => [busy.value, operation.value?.state, operationError.value], async () => {
+  const owner = operationOwner.value
+  const actions = draftActions.value
+  const pane = actions?.closest('.pi-settings-detail')
+  if (!owner?.draft || !pane) return
+  const bounds = pane.getBoundingClientRect()
+  const position = actions.getBoundingClientRect()
+  if (position.bottom <= bounds.top || position.top >= bounds.bottom) return
+  await nextTick()
+  if (operationOwner.value === owner && actions.isConnected) actions.scrollIntoView({ block: 'nearest' })
+})
+watch(() => [draft.value?.values, draft.value?.testModelId], () => {
+  if (!operationOwner.value?.draft) return
+  clear()
+  operationOwner.value = null
+}, { deep: true, flush: 'sync' })
 watch(() => [props.target, props.backendName], () => {
   resetLocal()
   inventory.value = null
@@ -102,7 +119,7 @@ function resetLocal() {
 function confirmLeave() {
   const warnings = []
   if (dirty.value) warnings.push('Discard your unsaved changes?')
-  if (busy.value) warnings.push('Stop the current provider operation? Credential changes may already have completed.')
+  if (busy.value) warnings.push(operationOwner.value?.action === 'test' ? 'Stop the current connection test?' : 'Stop the current provider operation? Credential changes may already have completed.')
   if (saving.value) warnings.push('A configuration save is in progress and cannot be cancelled. Leave while it finishes?')
   if (warnings.length && !window.confirm(warnings.join('\n\n'))) return false
   resetLocal()
@@ -169,7 +186,7 @@ function editProvider(create = false) {
   if (!create && !provider) return
   const config = provider?.config
   tab.value = 'connection'
-  openDraft({ type: 'provider', create, providerId: provider?.id }, {
+  openDraft({ type: 'provider', create, providerId: provider?.id, testModelId: provider?.models[0]?.id || '' }, {
     id: provider?.id || '',
     name: config?.name || '',
     baseUrl: config?.baseUrl || '',
@@ -203,7 +220,7 @@ function editModel(model = null) {
 }
 
 function cancelForm() {
-  if (!locked.value) confirmLeave()
+  if (!fetching.value && !saving.value && !props.loading) confirmLeave()
 }
 
 function handleEscape(event) {
@@ -310,6 +327,32 @@ function saveDraft() {
   }
 }
 
+function testDraft(event) {
+  if (locked.value || busy.value || !draft.value || !writable.value || !event.currentTarget.form.reportValidity()) return
+  try {
+    const form = draft.value
+    const providerId = form.type === 'provider' ? form.values.id : form.providerId
+    const modelId = form.type === 'provider' ? form.testModelId : form.values.id
+    validId(providerId)
+    if (providerId.includes('/')) throw new Error('Provider IDs cannot contain slashes.')
+    validId(modelId)
+    const values = form.type === 'provider' ? providerValues(form) : modelValues(form)
+    const body = {
+      providerId,
+      modelId,
+      action: 'test',
+      draft: { type: form.type, create: form.create, revision: inventory.value.revision, values, ...(form.type === 'model' ? { kind: form.kind } : {}) },
+    }
+    const target = { ...props.target }
+    error.value = ''
+    conflict.value = false
+    operationOwner.value = { id: providerId, action: 'test', generation, draft: form, title: `${modelId} · Test draft connection` }
+    void start((baseUrl) => runProviderSettingsAction(target, body, baseUrl))
+  } catch (failure) {
+    showError(failure)
+  }
+}
+
 function removeProvider() {
   if (locked.value || !writable.value || !selected.value) return
   const provider = selected.value
@@ -327,15 +370,15 @@ function removeModel(model) {
   void writeConfig((target) => deleteModelSettings(target, body))
 }
 
-function beginAction(action, authType) {
+function beginAction(action, authType, model) {
   if (locked.value || !selected.value) return
   const provider = selected.value
   if (action === 'logout' && !window.confirm(`Sign out of ${provider.name}? This removes its stored credential. Environment credentials and models.json API-key references are unchanged.`)) return
   if (!confirmLeave()) return
   const target = { ...props.target }
-  const body = { providerId: provider.id, action, ...(authType ? { authType } : {}) }
-  const labels = { login: 'Sign in', logout: 'Sign out', refresh: 'Refresh catalog' }
-  operationOwner.value = { id: provider.id, generation, title: `${provider.name} · ${labels[action]}` }
+  const body = { providerId: provider.id, action, ...(authType ? { authType } : {}), ...(model ? { modelId: model.id } : {}) }
+  const labels = { login: 'Sign in', logout: 'Sign out', refresh: 'Refresh catalog', test: 'Test connection' }
+  operationOwner.value = { id: provider.id, action, generation, title: `${model?.name || provider.name} · ${labels[action]}` }
   void start((baseUrl) => runProviderSettingsAction(target, body, baseUrl))
 }
 
@@ -414,9 +457,9 @@ function metadataRows(value) {
       </nav>
       <p v-if="selected?.error" class="pi-settings-warning">{{ selected.error }}</p>
 
-      <section v-if="operationVisible" :aria-label="operationOwner.title">
+      <section v-if="operationVisible && !operationOwner.draft" :aria-label="operationOwner.title">
         <div class="pi-settings-heading"><h4>{{ operationOwner.title }}</h4></div>
-        <PiSettingsOperation :operation="operation" :busy="busy" :error="operationError" @answer="answer" @cancel="cancel" />
+        <PiSettingsOperation :operation="operation" :busy="busy" :connection-test="operationOwner.action === 'test'" :error="operationError" @answer="answer" @cancel="cancel" />
       </section>
 
       <form v-if="draft" class="pi-settings-form" autocomplete="off" @submit.prevent="saveDraft">
@@ -463,7 +506,7 @@ function metadataRows(value) {
                 <option value="replace">Set a new value</option>
                 <option v-if="!draft.create && selected?.config.apiKeyConfigured" value="remove">Remove from models.json</option>
               </select>
-              <small>Credentials are never returned. Removing this reference does not sign out a stored credential.</small>
+              <small>API keys are optional. Set one only if the endpoint needs it. Removing this reference does not sign out a stored credential.</small>
             </label>
             <label v-if="draft.values.apiKeyAction === 'replace'" class="pi-settings-field full">
               <span>New API-key reference or value</span>
@@ -471,6 +514,11 @@ function metadataRows(value) {
               <small>Use $NAME or ${NAME} for an environment variable, a literal key, or !command. Commands execute on the backend when pi resolves the key.</small>
             </label>
           </div>
+          <label class="pi-settings-field">
+            <span>Model ID to test</span>
+            <input v-model="draft.testModelId" maxlength="512" :disabled="locked" spellcheck="false" />
+            <small>Used only for the connection test. This ID is not saved.</small>
+          </label>
           <p class="settings-note">Unchanged fields keep their saved values.</p>
         </template>
         <template v-else>
@@ -529,10 +577,24 @@ function metadataRows(value) {
             </label>
           </div>
         </template>
-        <div class="pi-settings-actions">
-          <button type="button" class="pi-settings-button" :disabled="locked" @click="cancelForm">Cancel</button>
-          <button type="submit" class="pi-settings-button primary" :disabled="locked || (!draft.create && !dirty)">{{ saving ? 'Saving…' : draft.type === 'provider' ? 'Save provider' : draft.kind === 'override' ? 'Save override' : 'Save model' }}</button>
-          <button v-if="draft.type === 'model' && draft.model && draft.model.kind !== 'catalog'" type="button" class="pi-settings-button danger" :disabled="locked" @click="removeModel(draft.model)">{{ draft.model.kind === 'override' ? 'Reset override' : 'Delete custom model' }}</button>
+        <p class="settings-note">Test connection uses these unsaved settings for a small generation request. It can incur a charge or load a local model. Nothing is saved.</p>
+        <div ref="draftActions" class="pi-settings-draft-actions">
+          <PiSettingsOperation
+            v-if="operationVisible && operationOwner.draft"
+            :operation="operation"
+            :busy="busy"
+            :connection-test="true"
+            :error="operationError"
+            :aria-label="operationOwner.title"
+            @answer="answer"
+            @cancel="cancel"
+          />
+          <div class="pi-settings-actions">
+            <button type="button" class="pi-settings-button" :disabled="fetching || saving || loading" @click="cancelForm">Cancel</button>
+            <button type="submit" class="pi-settings-button primary" :disabled="locked || (!draft.create && !dirty)">{{ saving ? 'Saving…' : draft.type === 'provider' ? 'Save provider' : draft.kind === 'override' ? 'Save override' : 'Save model' }}</button>
+            <button type="button" class="pi-settings-button" :disabled="locked || busy || !writable" @click="testDraft">Test connection</button>
+            <button v-if="draft.type === 'model' && draft.model && draft.model.kind !== 'catalog'" type="button" class="pi-settings-button danger" :disabled="locked" @click="removeModel(draft.model)">{{ draft.model.kind === 'override' ? 'Reset override' : 'Delete custom model' }}</button>
+          </div>
         </div>
       </form>
 
@@ -542,6 +604,7 @@ function metadataRows(value) {
           <button type="button" class="pi-settings-button" :disabled="locked || busy || Boolean(selected.error)" @click="beginAction('refresh')">Refresh catalog</button>
         </div>
         <p v-if="writable && !canAddModel" class="settings-note">Set a base URL and API format in Connection before adding a custom model. Catalog models can be overridden below.</p>
+        <p class="settings-note">Test connection sends a small generation request with saved settings. It can incur a charge or load a local model. A failed test does not block model selection.</p>
         <label class="pi-settings-field">
           <span>Find a model</span>
           <input v-model="modelQuery" type="search" placeholder="Search model names or IDs" />
@@ -553,6 +616,7 @@ function metadataRows(value) {
               <small :title="model.id">{{ modelSummary(model) }}</small>
             </div>
             <div class="pi-settings-model-actions">
+              <button type="button" class="pi-settings-text-button" :disabled="locked || busy || Boolean(selected.error)" :aria-label="`Test connection to ${model.name}`" @click="beginAction('test', undefined, model)">Test connection</button>
               <button type="button" class="pi-settings-text-button" :disabled="locked || !writable" :aria-label="`${model.kind === 'catalog' ? 'Override' : 'Edit'} ${model.name}`" @click="editModel(model)">{{ model.kind === 'catalog' ? 'Override' : 'Edit' }}</button>
             </div>
           </div>
@@ -587,7 +651,7 @@ function metadataRows(value) {
             <div><dt>API-key reference</dt><dd>{{ selected.config.apiKeyConfigured ? 'Saved (value hidden)' : 'Not set' }}</dd></div>
             <div><dt>Additional headers</dt><dd>{{ selected.config.headersConfigured ? 'Saved (values hidden)' : 'Not set' }}</dd></div>
           </dl>
-          <p class="settings-note">Configured means pi found credentials or configuration. It does not verify account access.</p>
+          <p class="settings-note">Configured means saved configuration or credentials are available. Use Test connection in Models to verify access.</p>
           <button v-if="selected.config.hasConfiguration" type="button" class="pi-settings-button danger" :disabled="locked || !writable" @click="removeProvider">Remove provider configuration</button>
         </details>
       </template>

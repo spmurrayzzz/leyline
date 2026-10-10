@@ -19,6 +19,7 @@ import { createEventHub } from './events.js'
 import { createPromptQueue } from './prompt-queue.js'
 import { shutdownSettingsOperations, waitForSettings, withProviderSettingsLock } from './settings-operations.js'
 import { settingsError } from './pi-config.js'
+import { refreshCustomProviders, wrapModelRuntime } from './custom-providers.js'
 import { createProviderSettingsRuntimes, createResourceSession } from './provider-settings-runtime.js'
 import {
   bindRuntimeHandle as bindRuntimeHandleExtensions,
@@ -176,7 +177,7 @@ const providerSettingsRuntimes = createProviderSettingsRuntimes({ isClosing: () 
 const providerSessions = new Set()
 const runtimeDisposals = new WeakMap()
 
-function assertProviderRoutes(providerId, modelRuntime) {
+function assertProviderRoutes(providerId, modelRuntime, action = 'Sign-in') {
   const sessions = new Set([
     ...providerSessions,
     ...[...runtimeHandles.values(), ...hiddenRuntimeHandles].map((handle) => handle.runtime.session),
@@ -188,7 +189,7 @@ function assertProviderRoutes(providerId, modelRuntime) {
       if (!model || model.provider !== providerId) continue
       const next = models.get(`${model.type || 'chat'}\0${model.id}`)
       if (!next || next.baseUrl !== model.baseUrl || next.api !== model.api) {
-        throw settingsError('Sign-in is blocked because an open or background runtime still uses different provider URLs. Wait for active work to finish, then reload every affected session or restart the backend and try again.', 409)
+        throw settingsError(`${action} is blocked because an open or background runtime still uses different provider URLs. Wait for active work to finish, then reload every affected session or restart the backend and try again.`, 409)
       }
     }
   }
@@ -421,8 +422,9 @@ async function buildRuntimeResult(
           try { register(registration) } catch { services.diagnostics.push({ type: 'error', message: 'A provider extension could not be registered.' }) }
         }
       }
-      await services.modelRuntime.refresh({ allowNetwork: false })
     }
+    services.modelRuntime = wrapModelRuntime(services.modelRuntime)
+    await refreshCustomProviders(services.modelRuntime)
     if (!systemPrompt) {
       const extensions = services.resourceLoader.getExtensions()
       extensions.extensions = preferBundledExtensions(extensions).extensions

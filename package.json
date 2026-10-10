@@ -24,6 +24,7 @@
     "mock-backend": "node scripts/mock-backend.js"
   },
   "dependencies": {
+    "@earendil-works/pi-ai": "0.99.1",
     "@earendil-works/pi-coding-agent": "0.99.1",
     "@pierre/diffs": "1.2.0-beta.6",
     "@vitejs/plugin-vue": "6.0.7",

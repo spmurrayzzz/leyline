@@ -1354,6 +1354,13 @@
   padding: 12px 0;
 }
 
+.pi-settings-model-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 12px;
+}
+
 .pi-settings-model-info,
 .pi-settings-tool-row > div {
   flex: 1;
@@ -1405,6 +1412,16 @@
 
 .pi-settings-list-empty {
   padding: 10px 8px;
+}
+
+.pi-settings-draft-actions {
+  display: grid;
+  gap: 14px;
+  scroll-margin-block: 20px;
+}
+
+.pi-settings-draft-actions > .pi-settings-operation {
+  margin: 0;
 }
 
 .pi-settings-operation {

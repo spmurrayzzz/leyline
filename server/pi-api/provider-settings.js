@@ -1,6 +1,8 @@
 import { CredentialSynchronizationError, ModelRuntime } from '@earendil-works/pi-coding-agent'
 import { isSettingsObject, readPiConfig, settingsError, updatePiConfig } from './pi-config.js'
-import { startSettingsOperation, withProviderSettingsLock } from './settings-operations.js'
+import { getBuiltinProviderIds, isCustomProviderAdapter, KEYLESS_AUTH_SOURCE, refreshCustomProviders } from './custom-providers.js'
+import { testProviderConnection } from './provider-connection-test.js'
+import { startSettingsOperation, waitForSettings, withProviderSettingsLock } from './settings-operations.js'
 
 const file = 'models.json'
 const providerFields = ['name', 'baseUrl', 'api', 'authHeader', 'apiKey']
@@ -11,7 +13,6 @@ const authLabels = {
   stored: 'Stored credential', runtime: 'Runtime API key', environment: 'Environment or cloud credentials',
   fallback: 'Extension configuration', models_json_key: 'models.json API key', models_json_command: 'models.json command',
 }
-let builtinIds
 const emptyCredentials = {
   async list() { return [] },
   async read() { return undefined },
@@ -21,19 +22,10 @@ const emptyCredentials = {
 
 async function baseModels(runtime, providerId, configured) {
   const native = runtime.getRegisteredNativeProvider(providerId)
-  if (native) return native.getAllModels?.() ?? native.getModels()
+  if (native && !isCustomProviderAdapter(runtime, providerId)) return native.getAllModels?.() ?? native.getModels()
   if (!configured && !runtime.getRegisteredProviderConfig(providerId)) return runtime.getAllModels(providerId)
   const base = await ModelRuntime.create({ modelsPath: null, refreshOnCreate: false, credentials: emptyCredentials })
   return base.getAllModels(providerId)
-}
-
-async function getBuiltinIds() {
-  builtinIds ??= ModelRuntime.create({
-    modelsPath: null,
-    refreshOnCreate: false,
-    credentials: emptyCredentials,
-  }).then((runtime) => new Set(runtime.getProviders().map((provider) => provider.id)))
-  return builtinIds
 }
 
 function object(value) {
@@ -206,21 +198,23 @@ function combineWarnings(...warnings) {
 }
 
 export function createProviderSettings({ getRuntime, assertProviderRoutes }) {
-  async function inventory(runtime, config, warning) {
-    const builtins = await getBuiltinIds()
+  async function inventory(runtime, config, warning, signal) {
+    const builtins = await getBuiltinProviderIds()
     const extensions = new Set(runtime.getRegisteredProviderIds())
     const providers = new Map(runtime.getProviders().map((provider) => [provider.id, provider]))
     let credentials = []
-    try { credentials = await runtime.listCredentials() } catch { warning = combineWarnings(warning, 'Stored credential metadata could not be read.') }
+    try { credentials = await runtime.listCredentials({ signal }) } catch { signal?.throwIfAborted(); warning = combineWarnings(warning, 'Stored credential metadata could not be read.') }
     const stored = new Map(credentials.map((credential) => [credential.providerId, credential.type]))
     let valid = true
     try { validateConfig(config.data) } catch { valid = false; warning = combineWarnings(warning, 'models.json is invalid. Configuration writes are blocked until it is repaired.') }
     if (runtime.getError()) warning = combineWarnings(warning, 'Pi reported a configuration or catalog error. The catalog may be incomplete.')
     const configuredProviders = valid ? config.data.providers : {}
     const ids = new Set([...providers.keys(), ...Object.keys(configuredProviders), ...stored.keys()])
-    const rows = [...ids].map((providerId) => {
+    const rows = await Promise.all([...ids].map(async (providerId) => {
       const provider = providers.get(providerId)
       const config = own(configuredProviders, providerId) || {}
+      const customAdapter = isCustomProviderAdapter(runtime, providerId)
+      const keyless = customAdapter && (await waitForSettings(runtime.checkAuth(providerId, { signal }), signal))?.source === KEYLESS_AUTH_SOURCE
       const status = runtime.getProviderAuthStatus(providerId)
       const source = status.source === 'runtime' ? 'runtime' : stored.has(providerId) ? 'stored' : status.source !== 'stored' && Object.hasOwn(authLabels, status.source) ? status.source : null
       const custom = new Map((config.models || []).map((model) => [model.id, model]))
@@ -231,10 +225,10 @@ export function createProviderSettings({ getRuntime, assertProviderRoutes }) {
       return {
         id: providerId,
         name: typeof provider?.name === 'string' && provider.name ? provider.name : typeof config.name === 'string' && config.name ? config.name : providerId,
-        kind: extensions.has(providerId) ? 'extension' : builtins.has(providerId) ? 'builtin' : Object.hasOwn(configuredProviders, providerId) || !provider ? 'custom' : 'extension',
-        configured: Boolean((status.configured && status.source !== 'stored') || stored.has(providerId)),
+        kind: extensions.has(providerId) && !customAdapter ? 'extension' : builtins.has(providerId) ? 'builtin' : Object.hasOwn(configuredProviders, providerId) || !provider ? 'custom' : 'extension',
+        configured: Boolean(customAdapter || (status.configured && status.source !== 'stored') || stored.has(providerId)),
         authSource: source,
-        authLabel: source === 'stored' ? stored.get(providerId) === 'oauth' ? 'Stored OAuth credential' : 'Stored API key' : authLabels[source] || 'Not configured',
+        authLabel: keyless ? config.headers && Object.keys(config.headers).length ? 'Custom headers; no API key set' : 'No API key set' : source === 'stored' ? stored.get(providerId) === 'oauth' ? 'Stored OAuth credential' : 'Stored API key' : authLabels[source] || 'Not configured',
         authMethods: authMethods(provider),
         config: {
           name: typeof config.name === 'string' ? config.name : '', baseUrl: safeEndpoint(config.baseUrl), api: typeof config.api === 'string' ? config.api : '',
@@ -250,7 +244,8 @@ export function createProviderSettings({ getRuntime, assertProviderRoutes }) {
         })).sort((a, b) => a.id.localeCompare(b.id)),
         ...(!provider && Object.hasOwn(configuredProviders, providerId) ? { error: 'This provider is not loaded in the selected runtime.' } : {}),
       }
-    }).sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
+    }))
+    rows.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
     return { revision: config.revision, providers: rows, ...(warning ? { warning } : {}) }
   }
 
@@ -260,9 +255,9 @@ export function createProviderSettings({ getRuntime, assertProviderRoutes }) {
       try {
         let config
         try { config = await readPiConfig(file) } catch {
-          return await inventory(lease.modelRuntime, { revision: null, data: null }, 'models.json could not be read. Configuration writes are blocked.')
+          return await inventory(lease.modelRuntime, { revision: null, data: null }, 'models.json could not be read. Configuration writes are blocked.', signal)
         }
-        return await inventory(lease.modelRuntime, config)
+        return await inventory(lease.modelRuntime, config, undefined, signal)
       } finally {
         lease.release()
       }
@@ -272,7 +267,7 @@ export function createProviderSettings({ getRuntime, assertProviderRoutes }) {
   async function refresh(runtime, providerId, options = {}) {
     try {
       const signal = AbortSignal.any([options.signal, AbortSignal.timeout(15000)].filter(Boolean))
-      const result = await runtime.refresh({ allowNetwork: false, providers: [providerId], ...options, signal })
+      const result = await refreshCustomProviders(runtime, { allowNetwork: false, providers: [providerId], ...options, signal })
       if (result.aborted || result.errors.size || runtime.getError()) return 'The catalog could not be fully refreshed.'
     } catch { return 'The catalog could not be refreshed.' }
   }
@@ -321,7 +316,7 @@ export function createProviderSettings({ getRuntime, assertProviderRoutes }) {
           return patches
         })
         const warning = await refresh(modelRuntime, providerId, { signal })
-        return await inventory(modelRuntime, saved, warning)
+        return await inventory(modelRuntime, saved, warning, signal)
       } finally {
         lease.release()
       }
@@ -344,7 +339,7 @@ export function createProviderSettings({ getRuntime, assertProviderRoutes }) {
     return write(target, body.id, body.revision, async (data, runtime) => {
       const existing = Object.hasOwn(data.providers, body.id)
       const provider = runtime.getProvider(body.id)
-      if (body.create && (existing || provider || (await getBuiltinIds()).has(body.id))) throw settingsError('Provider ID already exists', 409)
+      if (body.create && (existing || provider || (await getBuiltinProviderIds()).has(body.id))) throw settingsError('Provider ID already exists', 409)
       if (!body.create && !existing && !provider) throw settingsError('Provider does not exist', 404)
       if (body.values.api !== undefined && !apis.has(body.values.api) && !runtime.getModels(body.id).some((model) => model.api === body.values.api)) {
         throw settingsError('Unsupported provider API')
@@ -435,16 +430,38 @@ export function createProviderSettings({ getRuntime, assertProviderRoutes }) {
   }
 
   async function action(target, body) {
-    fields(body, ['providerId', 'action', 'authType'])
+    fields(body, ['providerId', 'action', 'authType', 'modelId', 'draft'])
     providerId(body.providerId)
-    if (!['login', 'logout', 'refresh'].includes(body.action)) throw settingsError('Unsupported provider action')
+    if (!['login', 'logout', 'refresh', 'test'].includes(body.action)) throw settingsError('Unsupported provider action')
     if (body.authType !== undefined && !['api_key', 'oauth'].includes(body.authType)) throw settingsError('Unsupported authentication method')
+    if (body.action === 'test') {
+      id(body.modelId)
+      if (body.draft !== undefined) {
+        fields(body.draft, ['type', 'create', 'revision', 'values', 'kind'])
+        if (!['provider', 'model'].includes(body.draft.type)) throw settingsError('Invalid connection-test draft')
+        boolean(body.draft.create)
+        if (body.draft.type === 'provider') {
+          fields(body.draft.values, providerFields)
+          for (const [key, value] of Object.entries(body.draft.values)) {
+            if (key === 'apiKey' && value === null) continue
+            if (key === 'authHeader') boolean(value)
+            else if (key === 'baseUrl') endpoint(value)
+            else text(value)
+          }
+        } else {
+          fields(body.draft.values, modelFields)
+          if (!['custom', 'override'].includes(body.draft.kind)) throw settingsError('Invalid model draft kind')
+          metadata(body.draft.values)
+          if (Object.hasOwn(body.draft.values, 'cost')) fields(body.draft.values.cost, costFields)
+        }
+      }
+    } else if (body.modelId !== undefined || body.draft !== undefined) throw settingsError('Model drafts are only supported for a connection test')
     return startSettingsOperation(`provider:${body.providerId}`, (operation) => withProviderSettingsLock(async (signal) => {
       const lease = await getRuntime(target, { refresh: body.action === 'refresh', signal })
       const { modelRuntime, settingsManager } = lease
       try {
         const provider = modelRuntime.getProvider(body.providerId)
-        if (!provider) {
+        if (!provider && !(body.action === 'test' && body.draft?.type === 'provider' && body.draft.create)) {
           if (body.action !== 'logout') throw settingsError('Provider does not exist', 404)
           let credentials
           try { credentials = await modelRuntime.listCredentials({ signal }) } catch { throw settingsError('Stored credential metadata could not be read', 503) }
@@ -453,6 +470,19 @@ export function createProviderSettings({ getRuntime, assertProviderRoutes }) {
         if (body.action === 'login') {
           if (!authMethods(provider).some((method) => method.id === body.authType)) throw settingsError('Authentication method is not available')
           assertProviderRoutes(body.providerId, modelRuntime)
+        }
+        if (body.action === 'test') {
+          let configuration
+          if (body.draft) {
+            const current = await readPiConfig(file)
+            if (body.draft.revision !== current.revision) throw settingsError('The configuration changed. Refresh settings before testing the draft.', 409)
+            validateConfig(current.data)
+            configuration = current.data
+            if (body.draft.type === 'provider' && body.draft.values.api !== undefined
+              && !apis.has(body.draft.values.api) && !modelRuntime.getModels(body.providerId).some((model) => model.api === body.draft.values.api)) throw settingsError('Unsupported provider API')
+            if (body.draft.type === 'provider' && body.draft.create && (provider || Object.hasOwn(configuration.providers, body.providerId))) throw settingsError('Provider ID already exists', 409)
+          }
+          return await testProviderConnection({ source: modelRuntime, body, operation, configuration, assertProviderRoutes })
         }
         return await runAction(body, operation, signal, modelRuntime, settingsManager)
       } finally {

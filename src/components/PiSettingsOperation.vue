@@ -4,6 +4,7 @@ import { computed, ref, watch } from 'vue'
 const props = defineProps({
   operation: { type: Object, default: null },
   busy: Boolean,
+  connectionTest: Boolean,
   error: { type: String, default: '' },
 })
 const emit = defineEmits(['answer', 'cancel'])
@@ -55,9 +56,10 @@ function answer() {
       <div class="pi-settings-actions"><button class="pi-settings-button primary" type="submit" :disabled="submitted">{{ submitted ? 'Waiting…' : 'Continue' }}</button></div>
     </form>
     <p v-if="error || operation?.error" class="settings-error" role="alert">{{ error || operation.error }}</p>
-    <p v-if="state === 'completed'" class="settings-note">Operation finished.</p>
+    <p v-if="state === 'completed' && operation?.result?.action === 'test'" class="settings-note">Connection test passed in {{ (operation.result.durationMs / 1000).toFixed(1) }} seconds<span v-if="operation.result.httpStatus"> (HTTP {{ operation.result.httpStatus }})</span>.</p>
+    <p v-else-if="state === 'completed'" class="settings-note">Operation finished.</p>
     <p v-if="operation?.result?.warning" class="settings-note">{{ operation.result.warning }}</p>
-    <p v-if="state === 'cancelled'" class="settings-note">Operation stopped. Refresh to check whether any credential changes completed before cancellation.</p>
+    <p v-if="state === 'cancelled'" class="settings-note">{{ connectionTest ? 'Connection test stopped.' : 'Operation stopped. Refresh to check whether any credential changes completed before cancellation.' }}</p>
     <div v-if="busy" class="pi-settings-operation-footer">
       <small>{{ state === 'cancelling' ? 'Stopping. Waiting for pi to finish the current request…' : prompt ? 'Waiting for your response' : 'Working…' }}</small>
       <button class="pi-settings-button" type="button" :disabled="state === 'cancelling'" @click="emit('cancel')">Cancel</button>
