@@ -5,6 +5,8 @@ const props = defineProps({
   category: { type: String, default: 'display' },
   backendName: { type: String, default: '' },
   fileLinksAvailable: Boolean,
+  piSettingsAvailable: Boolean,
+  beforeNavigate: { type: Function, default: null },
   opener: { type: Object, default: null },
   fallbackSelector: { type: String, default: '' },
 })
@@ -15,14 +17,21 @@ const categories = [
   { id: 'connections', label: 'Connections', description: 'Save connections here. Each window keeps its own active backend.' },
   { id: 'files', label: 'Files', description: 'Set the editor for files opened on this backend.' },
   { id: 'agents', label: 'Agent defaults', description: 'Used when a project or session has no override.' },
+  { id: 'providers', label: 'Models & providers', description: '' },
+  { id: 'mcp', label: 'MCP servers', description: '' },
 ]
-const availableCategories = computed(() => categories.filter((item) => item.id !== 'files' || props.fileLinksAvailable))
+const availableCategories = computed(() => categories.filter((item) => {
+  if (item.id === 'files') return props.fileLinksAvailable
+  if (['providers', 'mcp'].includes(item.id)) return props.piSettingsAvailable
+  return true
+}))
 const selected = computed(() => availableCategories.value.find((item) => item.id === props.category) || categories[0])
 const groups = computed(() => [
   { label: 'Leyline', items: availableCategories.value.filter((item) => ['display', 'connections'].includes(item.id)) },
-  { label: props.backendName, items: availableCategories.value.filter((item) => ['files', 'agents'].includes(item.id)) },
+  { label: props.backendName, items: availableCategories.value.filter((item) => !['display', 'connections'].includes(item.id)) },
 ])
-const backendScope = computed(() => ['files', 'agents'].includes(selected.value.id))
+const workspacePage = computed(() => ['providers', 'mcp'].includes(selected.value.id))
+const backendScope = computed(() => !['display', 'connections'].includes(selected.value.id))
 const scopeLabel = computed(() => backendScope.value
   ? `${props.backendName} · All projects`
   : selected.value.id === 'connections' ? 'Leyline · Saved connections' : 'Leyline · All windows')
@@ -69,7 +78,7 @@ onUnmounted(() => {
   target?.focus({ preventScroll: true })
 })
 
-watch(() => [props.category, props.fileLinksAvailable], async () => {
+watch(() => [props.category, props.fileLinksAvailable, props.piSettingsAvailable], async () => {
   if (selected.value.id !== props.category) emit('update:category', 'display')
   const focused = modalEl.value?.contains(document.activeElement) ? document.activeElement : null
   await nextTick()
@@ -78,6 +87,15 @@ watch(() => [props.category, props.fileLinksAvailable], async () => {
     focusCategory()
   }
 }, { immediate: true })
+
+function selectCategory(category, event) {
+  if (category === props.category) return
+  if (props.beforeNavigate && !props.beforeNavigate()) {
+    if (event?.target) event.target.value = selected.value.id
+    return
+  }
+  emit('update:category', category)
+}
 
 function handleKeydown(event) {
   if (event.key === 'Escape') {
@@ -108,6 +126,7 @@ function handleKeydown(event) {
       <section
         ref="modalEl"
         class="global-settings-modal"
+        :class="{ 'workspace-settings': workspacePage }"
         role="dialog"
         tabindex="-1"
         aria-modal="true"
@@ -126,7 +145,7 @@ function handleKeydown(event) {
 
         <label class="global-settings-mobile-nav">
           <span>Category</span>
-          <select :value="selected.id" aria-label="Settings category" @change="emit('update:category', $event.target.value)">
+          <select :value="selected.id" aria-label="Settings category" @change="selectCategory($event.target.value, $event)">
             <optgroup v-for="(group, index) in groups" :key="index" :label="group.label">
               <option v-for="item in group.items" :key="item.id" :value="item.id">{{ item.label }}</option>
             </optgroup>
@@ -144,7 +163,7 @@ function handleKeydown(event) {
                 class="global-settings-nav-item"
                 :class="{ active: selected.id === item.id }"
                 :aria-current="selected.id === item.id ? 'page' : undefined"
-                @click="emit('update:category', item.id)"
+                @click="selectCategory(item.id)"
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <template v-if="item.id === 'display'">
@@ -154,6 +173,10 @@ function handleKeydown(event) {
                     <rect x="3" y="3" width="18" height="7" rx="1" /><rect x="3" y="14" width="18" height="7" rx="1" /><path d="M7 6.5h.1M7 17.5h.1" />
                   </template>
                   <path v-else-if="item.id === 'files'" d="M13 3H5v18h14V9zM13 3v6h6M8 14h8M8 17h5" />
+                  <path v-else-if="item.id === 'providers'" d="M8 3v5m8-5v5M5 8h14v3a7 7 0 0 1-7 7v4M12 18a7 7 0 0 1-7-7" />
+                  <template v-else-if="item.id === 'mcp'">
+                    <rect x="8" y="3" width="8" height="6" rx="1" /><rect x="2" y="16" width="7" height="5" rx="1" /><rect x="15" y="16" width="7" height="5" rx="1" /><path d="M12 9v4M5 16v-3h14v3" />
+                  </template>
                   <template v-else>
                     <rect x="4" y="7" width="16" height="13" rx="3" /><path d="M12 7V3M9 12h.1M15 12h.1M9 16h6M1 11v5M23 11v5" />
                   </template>
@@ -176,8 +199,8 @@ function handleKeydown(event) {
               </svg>
               {{ scopeLabel }}
             </div>
-            <h2>{{ selected.label }}</h2>
-            <p>{{ selected.description }}</p>
+            <h2 v-if="!workspacePage">{{ selected.label }}</h2>
+            <p v-if="!workspacePage">{{ selected.description }}</p>
             <slot :name="selected.id" />
           </div>
         </div>

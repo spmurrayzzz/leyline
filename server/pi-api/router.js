@@ -2,8 +2,10 @@ import { setCorsHeaders } from './cors.js'
 import { compactSessionDetailDto } from './dtos.js'
 import { replyExtensionConfirmation } from './extension-ui.js'
 import { getFileSettings, performFileAction, setFileSettings } from './files.js'
+import { createPiSettingsHandler } from './pi-settings-routes.js'
 
 export function createPiApiHandler(api) {
+  const settingsHandler = createPiSettingsHandler(api)
   const {
     activeSessionDto,
     bashSession,
@@ -91,9 +93,12 @@ async function piApiHandler(req, res) {
             reviewWatch: true,
             terminal: true,
             fileLinks: true,
+            piSettings: true,
           },
         })
       }
+
+      if (url.pathname.startsWith('/settings/')) return settingsHandler(req, res, url)
 
       if (url.pathname === '/files/settings') {
         if (req.method === 'GET') return json(res, await getFileSettings())
@@ -173,7 +178,7 @@ async function piApiHandler(req, res) {
           return json(res, { error: 'Method not allowed' }, 405)
         }
   
-        const active = await runtimeState(url.searchParams.get('cwd'))
+        const active = await runtimeState(url.searchParams.get('cwd'), { refresh: url.searchParams.get('refresh') === '1' })
         return json(res, { active })
       }
   

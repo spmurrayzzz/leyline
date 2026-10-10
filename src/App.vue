@@ -24,6 +24,8 @@ const ResearchSourcesPane = defineAsyncComponent(() => import('./components/Rese
 const MemoryInspector = defineAsyncComponent(() => import('./components/MemoryInspector.vue'))
 const AgentSettings = defineAsyncComponent(() => import('./components/AgentSettings.vue'))
 const GlobalSettingsModal = defineAsyncComponent(() => import('./components/GlobalSettingsModal.vue'))
+const ProviderSettings = defineAsyncComponent(() => import('./components/ProviderSettings.vue'))
+const McpSettings = defineAsyncComponent(() => import('./components/McpSettings.vue'))
 import ExtensionConfirmations from './components/ExtensionConfirmations.vue'
 import StartComposer from './components/StartComposer.vue'
 import SessionComposer from './components/SessionComposer.vue'
@@ -85,6 +87,9 @@ const eventLogOpen = ref(false)
 const settingsOpen = ref(false)
 const settingsCategory = ref('display')
 const settingsOpener = shallowRef(null)
+const piSettingsPane = ref(null)
+const piSettingsTarget = shallowRef({})
+const piSettingsActionError = ref('')
 const sessionDetailsOpen = ref(false)
 const backendConnectionFormOpen = ref(false)
 const backendConnectionEditingId = ref('')
@@ -195,6 +200,7 @@ const {
 const fileLinksAvailable = computed(() => {
   return activeBackendConnectionInfo.value?.capabilities?.fileLinks === true
 })
+const piSettingsAvailable = computed(() => activeBackendConnectionInfo.value?.capabilities?.piSettings === true)
 const reviewEnabled = computed(() => {
   return activeBackendConnectionInfo.value?.capabilities?.review === true
 })
@@ -445,6 +451,11 @@ const {
   updateRuntimeSessionSnapshot,
   visibleProjects,
 } = sessionWorkspace
+const piSettingsCanReload = computed(() => Boolean(piSettingsTarget.value.sessionId
+  && piSettingsTarget.value.sessionId === selectedSessionId.value
+  && !activeRuntimeSession.value?.state?.isStreaming
+  && !activeRuntimeSession.value?.state?.isCompacting
+  && !promptSubmitting.value && !sessionActivating.value))
 workbenchScroll.bind({ selectedSessionId, liveItems })
 const homeComposerVisible = computed(() => !initializing.value && Boolean(
   startupRun.value || (!selectedSession.value && !sessionLoading.value && !sessionSwitching.value),
@@ -1151,6 +1162,7 @@ onMounted(async () => {
   window.addEventListener('leyline:new-session', handleNativeNewSession)
   window.addEventListener('leyline:toggle-terminal', handleNativeToggleTerminal)
   window.addEventListener('leyline:open-settings', handleNativeOpenSettings)
+  window.addEventListener('leyline:toggle-session-details', handleNativeToggleSessionDetails)
   window.addEventListener('leyline:toggle-memory', handleNativeToggleMemory)
   window.addEventListener('leyline:toggle-sidebar', handleNativeToggleSidebar)
   const backendInitialization = await initializeBackendConnections()
@@ -1176,6 +1188,7 @@ onUnmounted(() => {
   window.removeEventListener('leyline:new-session', handleNativeNewSession)
   window.removeEventListener('leyline:toggle-terminal', handleNativeToggleTerminal)
   window.removeEventListener('leyline:open-settings', handleNativeOpenSettings)
+  window.removeEventListener('leyline:toggle-session-details', handleNativeToggleSessionDetails)
   window.removeEventListener('leyline:toggle-memory', handleNativeToggleMemory)
   window.removeEventListener('leyline:toggle-sidebar', handleNativeToggleSidebar)
   closeResearchCitationPreview()
@@ -1502,6 +1515,11 @@ async function handleNativeToggleTerminal() {
 function handleNativeOpenSettings() {
   if (settingsOpen.value || filePreview.value || fileMenu.value || deleteConfirmActive.value) return
   openGlobalSettings()
+}
+
+function handleNativeToggleSessionDetails() {
+  if (settingsOpen.value || filePreview.value || fileMenu.value || deleteConfirmActive.value || initializing.value) return
+  toggleSessionDetails()
 }
 
 function handleNativeToggleMemory() {
@@ -1838,8 +1856,36 @@ function liveItemClass(item) {
 }
 
 
+function confirmPiSettingsLeave() {
+  return piSettingsPane.value?.confirmLeave?.() !== false
+}
+
+function closeGlobalSettings() {
+  if (confirmPiSettingsLeave()) settingsOpen.value = false
+}
+
+async function reloadFromSettings() {
+  if (!piSettingsCanReload.value || reloadingSession.value) return
+  piSettingsActionError.value = ''
+  await reloadSession()
+  piSettingsActionError.value = sessionError.value || ''
+  if (!piSettingsActionError.value) {
+    await nextTick()
+    piSettingsPane.value?.refresh?.()
+  }
+}
+
+function refreshModelsFromSettings() {
+  if (!selectedSessionId.value) void loadStartRuntimeState(newSessionCwd.value, { refresh: true })
+}
+
 function openGlobalSettings(category) {
   if (memoryDirty.value && !confirmDiscardMemoryChanges()) return
+  if (settingsOpen.value && category && category !== settingsCategory.value && !confirmPiSettingsLeave()) return
+  if (!settingsOpen.value) {
+    piSettingsTarget.value = { sessionId: selectedSessionId.value || '', cwd: scopedConfigTarget()?.cwd || '' }
+    piSettingsActionError.value = ''
+  }
   settingsOpener.value = document.activeElement
   if (typeof category === 'string') settingsCategory.value = category
   closeImageFullscreen()
@@ -1857,7 +1903,7 @@ function openGlobalSettings(category) {
 }
 
 function toggleGlobalSettings(category) {
-  if (settingsOpen.value && !category) settingsOpen.value = false
+  if (settingsOpen.value && !category) closeGlobalSettings()
   else openGlobalSettings(category)
 }
 
@@ -3195,9 +3241,10 @@ async function submitStartDraft() {
 function handleGlobalKeydown(event) {
   if (settingsOpen.value) {
     if (event.key === 'Escape') {
+      if (event.target?.closest?.('.global-settings-modal')) return
       event.preventDefault()
       event.stopPropagation()
-      settingsOpen.value = false
+      closeGlobalSettings()
     } else if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
       event.preventDefault()
     }
@@ -4454,9 +4501,11 @@ function closePickerMenus() {
       v-model:category="settingsCategory"
       :backend-name="activeBackendConnection.name"
       :file-links-available="fileLinksAvailable"
+      :pi-settings-available="piSettingsAvailable"
+      :before-navigate="confirmPiSettingsLeave"
       :opener="settingsOpener"
       fallback-selector=".session-details-toggle, [aria-label='Open settings'], [aria-label='Open sessions']"
-      @close="settingsOpen = false"
+      @close="closeGlobalSettings"
     >
       <template #connections>
         <section class="settings-group backend-settings-group">
@@ -4618,6 +4667,28 @@ function closePickerMenus() {
       </template>
       <template #files>
         <FileLinkSettings :backend-name="activeBackendConnection.name" />
+      </template>
+      <template #providers>
+        <p v-if="piSettingsActionError" class="settings-error" role="alert">{{ piSettingsActionError }}</p>
+        <ProviderSettings
+          ref="piSettingsPane"
+          :target="piSettingsTarget"
+          :backend-name="activeBackendConnection.name"
+          :can-reload="piSettingsCanReload"
+          :loading="reloadingSession"
+          @changed="refreshModelsFromSettings"
+          @reload="reloadFromSettings"
+        />
+      </template>
+      <template #mcp>
+        <p v-if="piSettingsActionError" class="settings-error" role="alert">{{ piSettingsActionError }}</p>
+        <McpSettings
+          ref="piSettingsPane"
+          :backend-name="activeBackendConnection.name"
+          :can-reload="piSettingsCanReload"
+          :reloading="reloadingSession"
+          @reload="reloadFromSettings"
+        />
       </template>
       <template #agents>
         <AgentSettings

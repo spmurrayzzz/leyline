@@ -116,10 +116,12 @@ export async function activatePiSession(session) {
   return data.active
 }
 
-export async function fetchPiRuntimeState(cwd) {
-  const query = cwd ? `?cwd=${encodeURIComponent(cwd)}` : ''
+export async function fetchPiRuntimeState(cwd, { refresh = false } = {}) {
+  const params = new URLSearchParams()
+  if (cwd) params.set('cwd', cwd)
+  if (refresh) params.set('refresh', '1')
   const data = await apiRequest(
-    `/api/pi/state${query}`,
+    `/api/pi/state${params.size ? `?${params}` : ''}`,
     'Failed to load runtime state',
   )
   return data.active

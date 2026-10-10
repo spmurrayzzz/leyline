@@ -320,26 +320,54 @@ export function useSessionWorkspace({
     })
   }
 
-  async function loadStartRuntimeState(cwd) {
+  async function loadStartRuntimeState(cwd, { refresh = false } = {}) {
     const targetCwd = cwd?.trim()
     if (!targetCwd || selectedSession.value) return
     const pending = startRuntimeRequests.get(targetCwd)
-    if (pending) return pending
-    startRuntimeState.value = null
-    startSelectedModel.value = null
-    startSelectedThinkingLevel.value = null
-    startUltrafastEnabled.value = false
+    if (startRuntimeState.value?.cwd !== targetCwd) {
+      startRuntimeState.value = null
+      startSelectedModel.value = null
+      startSelectedThinkingLevel.value = null
+      startUltrafastEnabled.value = false
+    }
+    if (pending && !refresh) return pending
 
     const request = (async () => {
       try {
-        const state = await fetchPiRuntimeState(targetCwd)
-        if (newSessionCwd.value !== targetCwd || selectedSession.value) return
-        startRuntimeState.value = state
+        const state = await fetchPiRuntimeState(targetCwd, { refresh })
+        if (startRuntimeRequests.get(targetCwd) !== request
+          || newSessionCwd.value !== targetCwd || selectedSession.value) return
+        const availableModels = state.state.availableModels || []
+        const selectedModel = startSelectedModel.value
+        const model = selectedModel
+          ? availableModels.find((model) => modelKey(model) === modelKey(selectedModel))
+          : null
+        const levels = model?.availableThinkingLevels || state.state.availableThinkingLevels || []
+        const thinkingLevel = levels.includes(startSelectedThinkingLevel.value)
+          ? startSelectedThinkingLevel.value
+          : null
+        const nextModel = model || state.state.model
+        startUltrafastEnabled.value = startUltrafastEnabled.value
+          && nextModel?.supportsUltrafast === true
+          && modelKey(nextModel) === selectedModelKey.value
+          && availableModels.some((model) => modelKey(model) === modelKey(nextModel)
+            && model.supportsUltrafast === true)
+        startSelectedModel.value = model || null
+        startSelectedThinkingLevel.value = thinkingLevel
+        startRuntimeState.value = {
+          ...state,
+          state: {
+            ...state.state,
+            model: nextModel,
+            availableThinkingLevels: levels,
+            thinkingLevel: thinkingLevel ?? clampThinkingLevel(state.state.thinkingLevel, levels),
+          },
+        }
         sessionError.value = ''
       } catch (error) {
-        if (newSessionCwd.value === targetCwd
-          && !selectedSession.value
-          && !startRuntimeState.value) {
+        if (startRuntimeRequests.get(targetCwd) === request
+          && newSessionCwd.value === targetCwd
+          && !selectedSession.value) {
           sessionError.value = error.message
         }
       }

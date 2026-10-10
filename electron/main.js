@@ -124,7 +124,7 @@ async function createWindow(initialCommand, initialUrl = '') {
       && key === 't'
       && input.meta
       && input.shift
-    const isOpenSettings = input.type === 'keyDown'
+    const isToggleSessionDetails = input.type === 'keyDown'
       && key === 'e'
       && input.meta
       && input.shift
@@ -141,7 +141,7 @@ async function createWindow(initialCommand, initialUrl = '') {
       && !isNewSession
       && !isCloseWindow
       && !isToggleTerminal
-      && !isOpenSettings
+      && !isToggleSessionDetails
       && !isToggleMemory
       && !isToggleSidebar
     ) return
@@ -151,7 +151,7 @@ async function createWindow(initialCommand, initialUrl = '') {
     if (isNewSession) sendNewSessionCommand(window)
     if (isCloseWindow) window.close()
     if (isToggleTerminal) sendToggleTerminalCommand(window)
-    if (isOpenSettings) sendOpenSettingsCommand(window)
+    if (isToggleSessionDetails) sendToggleSessionDetailsCommand(window)
     if (isToggleMemory) sendToggleMemoryCommand(window)
     if (isToggleSidebar) sendToggleSidebarCommand(window)
   })
@@ -215,6 +215,10 @@ function sendToggleTerminalCommand(window) {
 
 function sendOpenSettingsCommand(window) {
   sendWindowCommand(window, 'leyline:open-settings')
+}
+
+function sendToggleSessionDetailsCommand(window) {
+  sendWindowCommand(window, 'leyline:toggle-session-details')
 }
 
 function sendToggleMemoryCommand(window) {

@@ -17,6 +17,9 @@ import {
 } from './export-renderer.js'
 import { createEventHub } from './events.js'
 import { createPromptQueue } from './prompt-queue.js'
+import { shutdownSettingsOperations, waitForSettings, withProviderSettingsLock } from './settings-operations.js'
+import { settingsError } from './pi-config.js'
+import { createProviderSettingsRuntimes, createResourceSession } from './provider-settings-runtime.js'
 import {
   bindRuntimeHandle as bindRuntimeHandleExtensions,
   cleanupExtensionConfirmations,
@@ -69,12 +72,14 @@ import {
   setVisionOverride,
 } from './vision.js'
 import {
+  AgentSessionRuntime,
   createAgentSessionFromServices,
   createAgentSessionRuntime,
   createAgentSessionServices,
   createMcpExtension,
   createToolSearchExtension,
   getAgentDir,
+  ModelRuntime,
   SessionManager,
 } from '@earendil-works/pi-coding-agent'
 import {
@@ -167,6 +172,33 @@ const runtimeHandles = new Map()
 const hiddenRuntimeHandles = new Set()
 const runtimeHandlePromises = new Map()
 const pendingRuntimeCreations = new Set()
+const providerSettingsRuntimes = createProviderSettingsRuntimes({ isClosing: () => runtimeShuttingDown })
+const providerSessions = new Set()
+const runtimeDisposals = new WeakMap()
+
+function assertProviderRoutes(providerId, modelRuntime) {
+  const sessions = new Set([
+    ...providerSessions,
+    ...[...runtimeHandles.values(), ...hiddenRuntimeHandles].map((handle) => handle.runtime.session),
+  ])
+  const models = new Map(modelRuntime.getAllModels(providerId).map((model) => [`${model.type || 'chat'}\0${model.id}`, model]))
+  for (const session of sessions) {
+    const previous = [...session.modelRuntime.getAllModels(providerId), session.model, session.state?.model]
+    for (const model of previous) {
+      if (!model || model.provider !== providerId) continue
+      const next = models.get(`${model.type || 'chat'}\0${model.id}`)
+      if (!next || next.baseUrl !== model.baseUrl || next.api !== model.api) {
+        throw settingsError('Sign-in is blocked because an open or background runtime still uses different provider URLs. Wait for active work to finish, then reload every affected session or restart the backend and try again.', 409)
+      }
+    }
+  }
+}
+
+async function settingsRuntime(target = {}, options = {}) {
+  const handle = target.sessionId ? runtimeHandles.get(target.sessionId) : null
+  if (handle && target.cwd && handle.runtime.cwd !== target.cwd) throw settingsError('The settings target changed. Reopen settings.', 409)
+  return providerSettingsRuntimes.getRuntime({ cwd: target.cwd || handle?.runtime.cwd || process.cwd() }, options)
+}
 
 function trackRuntimeCreation(operation) {
   return (...args) => {
@@ -297,8 +329,20 @@ function childSessionMarker(manager) {
   })?.data
 }
 
-async function createRuntimeResult(
-  { cwd, agentDir, sessionManager, sessionStartEvent },
+function createRuntimeResult(...args) {
+  return withProviderSettingsLock(async (signal) => {
+    const result = await buildRuntimeResult(...args)
+    if (signal.aborted || runtimeShuttingDown) {
+      await disposeRuntime(new AgentSessionRuntime(result.session, result.services, createRuntime))
+      throw new Error('Runtime is shutting down')
+    }
+    providerSessions.add(result.session)
+    return result
+  })
+}
+
+async function buildRuntimeResult(
+  { cwd, agentDir, sessionManager, sessionStartEvent, reloadServices },
   { model, thinkingLevel } = {},
 ) {
   if (runtimeShuttingDown) throw new Error('Runtime is shutting down')
@@ -315,7 +359,13 @@ async function createRuntimeResult(
     ...(child?.toolPolicy?.excludeTools || []),
     ...(child ? [SUBAGENT_DELEGATION_TOOL] : []),
   ])]
-  const services = await createAgentSessionServices({
+  const services = reloadServices ? {
+    ...reloadServices,
+    modelRuntime: await ModelRuntime.create({
+      authPath: join(agentDir, 'auth.json'), modelsPath: join(agentDir, 'models.json'),
+    }),
+    diagnostics: [],
+  } : await createAgentSessionServices({
     cwd,
     agentDir,
     resourceLoaderOptions: {
@@ -356,36 +406,60 @@ async function createRuntimeResult(
         : { appendSystemPromptOverride: appendLeylineSystemPrompt }),
     },
   })
-  if (!systemPrompt) {
-    const extensions = services.resourceLoader.getExtensions()
-    extensions.extensions = preferBundledExtensions(extensions).extensions
-  }
-  if (child?.allowImages) {
-    services.settingsManager.applyOverrides({ images: { blockImages: false } })
-  }
-  const selectedModel = resolveSubagentModel(services.modelRuntime, model)
-  if (modelRequested(model) && !selectedModel) {
-    throw new Error(`Unknown subagent model: ${formatSubagentModel(model)}`)
-  }
-  if (selectedModel && !services.modelRuntime.hasConfiguredAuth(selectedModel.provider)) {
-    throw new Error(`No API key for ${selectedModel.provider}/${selectedModel.id}`)
-  }
-  const runtime = {
-    ...(await createAgentSessionFromServices({
+  const previousExtensions = reloadServices && services.resourceLoader.getExtensions()
+  let runtime
+  try {
+    if (reloadServices) {
+      await services.resourceLoader.reload()
+      const registrations = services.resourceLoader.getExtensions().runtime
+      for (const [key, register] of [
+        ['pendingProviderRegistrations', ({ name, config }) => services.modelRuntime.registerProvider(name, config)],
+        ['pendingNativeProviderRegistrations', ({ provider }) => services.modelRuntime.registerNativeProvider(provider)],
+        ['pendingVirtualModelRegistrations', ({ definition }) => services.modelRuntime.registerVirtualModel(definition)],
+      ]) {
+        for (const registration of registrations[key]) {
+          try { register(registration) } catch { services.diagnostics.push({ type: 'error', message: 'A provider extension could not be registered.' }) }
+        }
+      }
+      await services.modelRuntime.refresh({ allowNetwork: false })
+    }
+    if (!systemPrompt) {
+      const extensions = services.resourceLoader.getExtensions()
+      extensions.extensions = preferBundledExtensions(extensions).extensions
+    }
+    if (child?.allowImages) {
+      services.settingsManager.applyOverrides({ images: { blockImages: false } })
+    }
+    const selectedModel = resolveSubagentModel(services.modelRuntime, model)
+    if (modelRequested(model) && !selectedModel) {
+      throw new Error(`Unknown subagent model: ${formatSubagentModel(model)}`)
+    }
+    if (selectedModel && !services.modelRuntime.hasConfiguredAuth(selectedModel.provider)) {
+      throw new Error(`No API key for ${selectedModel.provider}/${selectedModel.id}`)
+    }
+    runtime = {
+      ...(await createAgentSessionFromServices({
+        services,
+        sessionManager,
+        sessionStartEvent,
+        model: selectedModel,
+        thinkingLevel,
+        tools,
+        excludeTools,
+      })),
       services,
-      sessionManager,
-      sessionStartEvent,
-      model: selectedModel,
-      thinkingLevel,
-      tools,
-      excludeTools,
-    })),
-    services,
-    diagnostics: services.diagnostics,
+      diagnostics: services.diagnostics,
+    }
+    forceOneAtATime(runtime.session)
+    installVisionDelegationContext(runtime.session)
+    return runtime
+  } catch (error) {
+    if (runtime || services.resourceLoader.getExtensions() !== previousExtensions) {
+      const session = runtime?.session || await createResourceSession(services)
+      await disposeRuntime(new AgentSessionRuntime(session, services, createRuntime))
+    }
+    throw error
   }
-  forceOneAtATime(runtime.session)
-  installVisionDelegationContext(runtime.session)
-  return runtime
 }
 
 const createRuntime = (options) => createRuntimeResult(options)
@@ -1373,12 +1447,25 @@ async function discardActiveSession() {
   await discardRuntimeHandle(activeHandle)
 }
 
-async function disposeRuntime(runtime) {
-  try {
-    await runtime.session.abort()
-  } finally {
-    await runtime.dispose()
-  }
+function disposeRuntime(runtime) {
+  const session = runtime.session
+  if (runtimeDisposals.has(session)) return runtimeDisposals.get(session)
+  const disposal = (async () => {
+    try {
+      await waitForSettings(session.abort(), AbortSignal.timeout(3000))
+    } finally {
+      try {
+        await waitForSettings(runtime.dispose(), AbortSignal.timeout(3000))
+      } catch (error) {
+        session.dispose()
+        throw error
+      } finally {
+        providerSessions.delete(session)
+      }
+    }
+  })()
+  runtimeDisposals.set(session, disposal)
+  return disposal
 }
 
 function discardRuntimeHandle(handle) {
@@ -1408,7 +1495,8 @@ function shutdownRuntime() {
   if (runtimeShutdownPromise) return runtimeShutdownPromise
   runtimeShuttingDown = true
   runtimeShutdownPromise = Promise.resolve().then(async () => {
-    await closeSessionSummaryWorkers()
+    await Promise.all([closeSessionSummaryWorkers(), shutdownSettingsOperations()])
+    await providerSettingsRuntimes.dispose()
     const interruptions = [
       ...runtimeHandles.values(),
       ...hiddenRuntimeHandles,
@@ -1473,6 +1561,7 @@ const reloadSession = trackRuntimeCreation(async (handle) => {
   else sessionManager.resetLeaf()
 
   handle.reloading = true
+  providerSettingsRuntimes.invalidate(handle.runtime.cwd)
   let replacement
   let applied = false
   try {
@@ -1480,6 +1569,7 @@ const reloadSession = trackRuntimeCreation(async (handle) => {
       cwd: sessionManager.getCwd(),
       agentDir: handle.runtime.services.agentDir,
       sessionManager,
+      reloadServices: handle.runtime.services,
       sessionStartEvent: {
         type: 'session_start',
         reason: 'reload',
@@ -1654,9 +1744,9 @@ function toActiveSessionDetailDto(handle = activeHandle) {
   return handleSessionDetailDto(handle)
 }
 
-const runtimeState = trackRuntimeCreation(async (cwd) => {
+const runtimeState = trackRuntimeCreation(async (cwd, { refresh = false } = {}) => {
   const targetCwd = cwd || activeRuntime?.cwd || process.cwd()
-  if (activeRuntime?.cwd === targetCwd) return activeSessionDto()
+  if (!refresh && activeRuntime?.cwd === targetCwd) return activeSessionDto()
 
   const result = await createAgentSessionRuntime(createRuntime, {
     cwd: targetCwd,
@@ -1961,6 +2051,7 @@ export function createPiRuntimeApi() {
   return {
   activeRuntimeCwd: () => activeRuntime?.cwd,
   activeSessionDto,
+  assertProviderRoutes,
   bashSession,
   compactSession,
   createMemory,
@@ -1996,6 +2087,7 @@ export function createPiRuntimeApi() {
   resolveVisionConfig,
   runtimeHandleForId,
   runtimeState,
+  settingsRuntime,
   setMemoryStatus,
   setSubagentModelOverride,
   deleteSubagentModelOverride,
