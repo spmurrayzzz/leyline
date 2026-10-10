@@ -12,7 +12,7 @@
 | `useTranscriptPreferences.js` | App-wide transcript display settings, loading state, and save errors |
 | `GlobalSettingsModal.vue` | Category navigation, capability filtering, modal focus, and scope labels |
 | `AgentSettings.vue` | Fixed-scope subagent and vision controls, inheritance display, and available model choices |
-| `ProviderSettings.vue` / `McpSettings.vue` | Inventories, selection, drafts, revisions, mutation errors, and leave guards |
+| `ProviderSettings.vue` / `McpSettings.vue` | Inventories, selection, drafts, revisions, mutation errors, connection tests or MCP checks, and leave guards |
 | `PiSettingsWorkspace.vue` | Searchable list, narrow-layout selector, and bounded detail pane |
 | `useSettingsOperation.js` | Private operation polling, answers, cancellation, and backend-bound cleanup |
 | `useLiveTurnProjection.js` | Optimistic user entries, live assistant blocks, System rows, tools, compaction activity, and live-to-persisted reconciliation |
@@ -175,6 +175,12 @@ These overrides use the existing subagent and vision APIs and Leyline SQLite. Th
 `src/lib/pi-settings-api.js` sends Settings requests to the selected backend with caching disabled. `useSettingsOperation.js` retains the starting backend URL, polls every 500 ms, and retries most polling errors after two seconds. It sequences answers and poll responses, and cancels owned work during cleanup. A late action response after navigation also receives cancellation.
 
 `PiSettingsOperation.vue` displays private prompts and controlled progress messages. It clears submitted values and uses password inputs for secret and manual-code prompts. Operations never use shared session SSE or extension-confirmation cards. See [Settings operations](../reference/api#settings-operations) for exact shapes.
+
+`ProviderSettings.vue` offers **Test connection** per saved model and beside **Save** in provider and model editors. Editor tests send unsaved form values and the inventory revision without saving configuration or changing live runtimes or transcripts. The provider editor has a separate test-only model ID that is never saved. API keys stay optional, and removing a key reference does not sign out a stored credential.
+
+Draft progress, results, errors, and the operation's **Cancel** control appear beside **Save** and **Test connection** inside `.pi-settings-draft-actions`. A state change uses `scrollIntoView({ block: 'nearest' })` only when that group already intersects the detail viewport. It does not jump to the form's top or pull the user back after they scroll away. Saved-provider authentication and non-draft operations keep their separate placement above the form.
+
+Changing draft values or the test-only model ID clears the previous test result. Operation ownership ties feedback to the current draft, provider, and request generation. Navigation and backend changes clear owned operations, while server revision checks reject draft tests against changed configuration. Test completion does not emit a settings-change event or request a runtime reload. A failed test does not block saving or model selection. See [Provider connection tests](./backend-api#provider-connection-tests) for probe limits, refused APIs, and shared OAuth-token refresh.
 
 Provider Refresh sends `refresh=1` to `/settings/providers`, which reloads settings extension registrations. Catalog refresh is a separate provider action. On Home, provider changes trigger `/state` with an explicit cwd and `refresh=1`. Same-project previews retain valid explicit model/thinking choices and recheck Ultrafast eligibility. Request identity and cwd checks reject stale previews.
 

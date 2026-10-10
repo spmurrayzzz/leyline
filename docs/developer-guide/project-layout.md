@@ -12,10 +12,10 @@
 - `src/components/GlobalSettingsModal.vue`: Owns global category navigation, capability gates, focus containment, and owner labels.
 - `src/components/AgentSettings.vue`: Renders fixed-scope subagent and vision overrides in global, project, and session surfaces.
 - `src/components/ProjectDetailDrawer.vue`: Renders Project settings and its Sessions tab. Session details lives in `App.vue`.
-- `src/components/ProviderSettings.vue`: Manages provider/model inventories, edits, authentication, and catalog refresh.
+- `src/components/ProviderSettings.vue`: Manages provider/model inventories, edits, authentication, catalog refresh, and saved/draft connection tests with feedback beside draft actions.
 - `src/components/McpSettings.vue`: Manages global MCP configuration and temporary native checks/authentication.
 - `src/components/PiSettingsWorkspace.vue`: Supplies the searchable list, narrow selector, and bounded detail layout.
-- `src/components/PiSettingsOperation.vue`: Displays private authentication prompts, progress, and cancellation.
+- `src/components/PiSettingsOperation.vue`: Displays private authentication prompts, progress, connection-test results, and cancellation.
 - `src/components/ExtensionConfirmations.vue`: Displays pending extension confirmations and sends session-scoped replies.
 - `src/composables/useSessionWorkspace.js`: Owns session, route, activation, and runtime-control state.
 - `src/composables/useBackendConnections.js`: Owns connection records, the default, and window-specific backend selection.
@@ -76,8 +76,10 @@ These files are outside `src/` because Node.js backend code and browser code imp
 - `server/pi-api/router.js`: Routes runtime HTTP requests.
 - `server/pi-api/pi-settings-routes.js`: Routes provider/model/MCP configuration and private operations.
 - `server/pi-api/pi-config.js`: Reads pi global files and applies locked, revision-checked atomic edits.
-- `server/pi-api/provider-settings.js`: Builds redacted provider inventory and performs configuration/authentication actions.
-- `server/pi-api/provider-settings-runtime.js`: Leases cwd-bound settings runtimes and owns extension cleanup.
+- `server/pi-api/provider-settings.js`: Builds redacted provider inventory, performs configuration/authentication actions, and validates and dispatches connection tests.
+- `server/pi-api/provider-settings-runtime.js`: Leases cwd-bound settings runtimes, bounds inventory checks, and owns extension cleanup.
+- `server/pi-api/custom-providers.js`: Registers native custom-provider adapters, synchronizes metadata through `refreshModels()`, and wraps public `ModelRuntime` streaming for optional credentials.
+- `server/pi-api/provider-connection-test.js`: Owns saved/draft probes, temporary runtimes, authentication and route checks, output/time limits, and controlled errors.
 - `server/pi-api/settings-operations.js`: Stores private operation state and serializes provider work.
 - `server/pi-api/mcp-settings.js`: Manages global MCP configuration and worker actions.
 - `server/pi-api/mcp-settings-worker.js`: Runs disposable sessions with native MCP management.
@@ -137,5 +139,5 @@ Normal runtimes load all seven bundled extensions. Isolated custom-prompt childr
 
 - `vite.config.js`: Configures Vue, VitePress middleware, and the pi API plugin.
 - `index.html`: Provides the frontend HTML entry.
-- `package.json`: Defines runtime dependencies and commands.
+- `package.json`: Defines runtime dependencies and commands. Direct `@earendil-works/pi-ai` and `@earendil-works/pi-coding-agent` versions stay aligned, currently at `0.99.1`.
 - `.nvmrc`: Pins Node.js `v22.19.0` for local work.

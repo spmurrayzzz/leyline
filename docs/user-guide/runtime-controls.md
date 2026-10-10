@@ -18,7 +18,7 @@ You cannot change the model during a run, compaction, submission, or runtime rel
 
 Repeated model selections before the next conversation message update one **Model changed from … to …** divider. Returning to the original model removes it. Initial model setup does not add a divider.
 
-Use [Models & providers](./settings#manage-models-and-providers) for credentials, custom endpoints, and catalog changes. Reload an existing session to apply those changes to its model choices.
+Use [Models & providers](./settings#manage-models-and-providers) for credentials, custom endpoints, and catalog changes. Custom compatible models can remain selectable without an API key. [Test connection](./settings#test-a-model-connection) is optional and does not change the selected model. Reload an existing session to apply saved changes to its model choices.
 
 ## Select a thinking level
 

@@ -19,10 +19,12 @@ repository's CLI launcher remain Apple silicon macOS-specific; do not use
 - A modern local browser
 - A configured pi coding-agent environment
 
-Each model provider needs usable credentials. Configure them through
-[Settings → Models & providers](../user-guide/settings#sign-in-to-a-provider),
-pi's existing files, or the backend environment. Your tools and extensions
-can require additional environment variables.
+Configure a model through
+[Settings → Models & providers](../user-guide/settings#manage-models-and-providers).
+Supply credentials only when the provider requires them. Custom compatible
+endpoints can work without an API key. Credentials can also come from pi's
+existing files or the backend environment. Your tools and extensions can
+require additional environment variables.
 
 Electron is optional. Use Electron to test the desktop package, desktop
 shortcuts, login-shell environment loading, and window state.

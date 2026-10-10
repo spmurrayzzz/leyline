@@ -100,15 +100,15 @@ const providerSettings = {
       name: 'Local',
       kind: 'custom',
       configured: true,
-      authSource: 'models_json_key',
-      authLabel: 'models.json API key',
-      authMethods: [],
+      authSource: null,
+      authLabel: 'No API key set',
+      authMethods: [{ id: 'api_key', label: 'API key' }],
       config: {
         name: 'Local',
         baseUrl: 'http://localhost:8000/v1',
         api: 'openai-completions',
-        authHeader: true,
-        apiKeyConfigured: true,
+        authHeader: null,
+        apiKeyConfigured: false,
         headersConfigured: false,
         canEdit: true,
         hasConfiguration: true,
@@ -1009,6 +1009,43 @@ try {
   })
   await capture({
     browser,
+    file: path.join(docsOutputDir, 'provider-connection-test.png'),
+    route: '/sessions/demo-session',
+    ready: '.assistant-message',
+    interact: async (page) => {
+      await page.getByRole('button', { name: 'Open settings' }).click()
+      const dialog = page.getByRole('dialog', { name: 'Leyline settings' })
+      await dialog.getByRole('button', { name: 'Models & providers', exact: true }).click()
+      await dialog.locator('.pi-settings-workspace[aria-busy="false"]').waitFor()
+      await dialog.getByRole('button', { name: 'Connection', exact: true }).click()
+      await dialog.getByRole('button', { name: 'Edit configuration', exact: true }).click()
+      await dialog.getByRole('textbox', { name: /^Base URL/ }).fill('http://localhost:9000/v1')
+      const actions = dialog.locator('.pi-settings-draft-actions')
+      await actions.getByRole('button', { name: 'Test connection', exact: true }).click()
+      await actions.getByText('Connection test passed in 0.2 seconds (HTTP 200).', { exact: true }).waitFor()
+      await actions.scrollIntoViewIfNeeded()
+    },
+  })
+  await capture({
+    browser,
+    file: path.join(docsOutputDir, 'model-connection-test.png'),
+    route: '/sessions/demo-session',
+    ready: '.assistant-message',
+    interact: async (page) => {
+      await page.getByRole('button', { name: 'Open settings' }).click()
+      const dialog = page.getByRole('dialog', { name: 'Leyline settings' })
+      await dialog.getByRole('button', { name: 'Models & providers', exact: true }).click()
+      await dialog.locator('.pi-settings-workspace[aria-busy="false"]').waitFor()
+      await dialog.getByRole('button', { name: 'Edit MiniMax M2.7', exact: true }).click()
+      await dialog.getByRole('textbox', { name: /^Display name/ }).fill('MiniMax M2.7 (draft)')
+      const actions = dialog.locator('.pi-settings-draft-actions')
+      await actions.getByRole('button', { name: 'Test connection', exact: true }).click()
+      await actions.getByText('Connection test passed in 0.2 seconds (HTTP 200).', { exact: true }).waitFor()
+      await actions.scrollIntoViewIfNeeded()
+    },
+  })
+  await capture({
+    browser,
     file: path.join(docsOutputDir, 'mcp-servers.png'),
     route: '/sessions/demo-session',
     ready: '.assistant-message',
@@ -1676,6 +1713,15 @@ async function capture({
       return json({ key: THINKING_DEFAULT_SETTING_KEY, value: 'collapsed' })
     }
     if (key === 'GET /api/pi/settings/providers') return json(providerSettings)
+    if (key === 'POST /api/pi/settings/providers/action') {
+      const body = req.postDataJSON()
+      if (body.action === 'test' && body.providerId === 'local' && body.modelId === model.id && body.draft?.revision === providerSettings.revision) {
+        return json({
+          id: 'docs-connection-test', state: 'completed', prompt: null, events: [], error: '',
+          result: { providerId: body.providerId, modelId: body.modelId, action: 'test', durationMs: 200, httpStatus: 200 },
+        })
+      }
+    }
     if (key === 'GET /api/pi/settings/mcp') return json(mcpSettings)
     if (key === 'GET /api/pi/info') return json(backendInfo)
     if (key === 'GET /api/pi/files/settings') return json(fileSettings)

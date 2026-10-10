@@ -32,8 +32,10 @@ The terminal does not use the HTTP router. It uses a WebSocket upgrade at `/api/
 | `server/pi-api/router.js` | HTTP method and path dispatch |
 | `server/pi-api/pi-settings-routes.js` | Provider, model, MCP, and private operation routes |
 | `server/pi-api/pi-config.js` | Pi configuration parsing, revisions, file locks, and atomic edits |
-| `server/pi-api/provider-settings.js` | Redacted provider inventory, model/provider edits, and native authentication |
-| `server/pi-api/provider-settings-runtime.js` | Cwd-bound settings runtime leases and resource cleanup |
+| `server/pi-api/provider-settings.js` | Redacted provider inventory, model/provider edits, native authentication, and connection-test dispatch |
+| `server/pi-api/provider-settings-runtime.js` | Cwd-bound settings runtime leases, bounded inventory checks, and resource cleanup |
+| `server/pi-api/custom-providers.js` | Optional credentials, native custom-provider registration, catalog synchronization, and public `ModelRuntime` wrapper |
+| `server/pi-api/provider-connection-test.js` | Saved and draft connection probes, authentication resolution, routing guards, request limits, and controlled errors |
 | `server/pi-api/settings-operations.js` | Private prompts, operation snapshots, cancellation, and provider serialization |
 | `server/pi-api/mcp-settings.js` | Global MCP configuration, redacted inventory, and worker ownership |
 | `server/pi-api/mcp-settings-worker.js` | Disposable native MCP management session |
@@ -109,7 +111,7 @@ Normal runtimes load the bundled output-budget, ultrafast, goal, memory, subagen
 
 Children with an isolated custom system prompt retain only output-budget. They omit context files, skills, native extension factories, and the Leyline prompt. Vision children use this isolated path.
 
-`services.modelRuntime` is pi's `ModelRuntime`. It supplies model lookup, available snapshots, and authentication state. Use this current SDK terminology in new integration work.
+`services.modelRuntime` wraps pi's public `ModelRuntime` through `custom-providers.js`. It supplies model lookup, available snapshots, authentication state, and streaming with optional credentials. The wrapper uses public SDK methods and native providers, without patching SDK internals.
 
 Research creation writes a `leyline-research` marker before extension binding. The bound extension adds its lead protocol and exposes `research_update` only for that session.
 
@@ -135,11 +137,21 @@ Pi owns the global configuration files resolved through `getAgentDir()`. Leyline
 
 See [Pi Settings routes](../reference/api#pi-settings-routes) for exact fields, methods, revisions, operation shapes, and errors. This API is deliberately smaller than pi's configuration schema. General preferences, model-picker visibility, project MCP editing, and Codemode configuration are outside this surface.
 
+### Optional provider credentials
+
+API keys are optional for custom compatible providers. Saved models remain selectable without credentials, and the endpoint reports any authentication failure. Removing an `apiKey` reference from `models.json` does not remove a stored credential.
+
+`custom-providers.js` registers native adapters only for custom providers without an existing built-in, extension, or OAuth registration. Native credentials, extension behavior, and OAuth remain authoritative. Each adapter's native `refreshModels()` reloads configured metadata and publishes it through `context.publish()`. This keeps the catalog synchronized even when an extension calls SDK refresh directly.
+
+The public `ModelRuntime` wrapper resolves native authentication and streams through the selected provider. SDK-required placeholders stay internal: Leyline never persists them or sends them over HTTP. Request cleanup removes placeholders even with duplicate or case-variant headers or an explicit empty caller key. Keyless Google requests use an empty `x-goog-api-key` header.
+
+The direct `@earendil-works/pi-ai` dependency supplies streaming helpers. Keep its version aligned with `@earendil-works/pi-coding-agent`, currently `0.99.1`.
+
 ### Provider runtime ownership
 
 `provider-settings-runtime.js` caches separate settings runtimes by resolved cwd. Each request acquires a lease and releases it in `finally`. These runtimes never replace conversation handles.
 
-The pool permits four contexts, including contexts still retiring. It retires unused contexts for capacity. A leased context cannot be replaced by Refresh. Construction, authentication-status reads, and catalog refresh have 15-second bounds. Interactive authentication uses the longer operation lifetime. Disposal waits up to three seconds before session disposal. A late or failed creation remains owned until cleanup finishes.
+The pool permits four contexts, including contexts still retiring. It retires unused contexts for capacity. A leased context cannot be replaced by Refresh. Construction, credential metadata reads, `checkAuth()`, `getAvailable()`, and catalog refresh have 15-second bounds. Inventory requests also use a 15-second signal. Interactive authentication uses the longer operation lifetime. Disposal waits up to three seconds before session disposal. A late or failed creation remains owned until cleanup finishes.
 
 Each resource-loader extension set receives an in-memory session owner, including failed creation and cold Refresh paths. `AgentSessionRuntime.dispose()` supplies shutdown before replacement. Reusing a loader does not permit an extension set to escape shutdown. Lifetime signals block late provider publication after retirement.
 
@@ -150,6 +162,23 @@ Provider mutations, authentication, and conversation construction share a proces
 Existing work is not silently aborted or reloaded. A save refreshes only its settings runtime. `GET /state?cwd=...&refresh=1` builds and disposes a fresh Home preview without changing conversation catalogs.
 
 Pi 0.99.1 retains cached Radius gateway URLs after reload. Leyline rejects changes that alter or remove an existing Radius base URL. A different gateway requires a different provider identity. Provider IDs cannot contain `/`, but model IDs can.
+
+### Provider connection tests
+
+The provider `test` action runs as a private, cancellable settings operation. `provider-settings.js` validates requests and acquires the settings runtime lease. `provider-connection-test.js` owns the probe, temporary draft runtimes, authentication resolution, request limits, and controlled result messages.
+
+Saved tests use the selected model's saved settings. Draft tests combine current configuration with unsaved provider or model form values. The draft carries the whole-file revision, and a mismatch fails the operation before the probe. A provider editor supplies a test-only model ID, which is not saved.
+
+Draft tests do not write configuration, change live runtimes, or add transcript entries. A draft API-key replacement stays runtime-only. Removing a draft key reference still preserves native stored credentials. Native extensions and OAuth continue to control authentication. OAuth resolution can refresh shared tokens, so route guards run before authentication and virtual-model routing. Draft endpoint or API changes cannot reuse a stored OAuth credential.
+
+The probe requests 16 output tokens with `maxRetries: 0` and a 30-second deadline. This deadline starts inside the probe, after queueing and settings runtime acquisition. Tests refuse these paths rather than make an unsafe request:
+
+- Codex (`openai-codex-responses`), which cannot enforce the output limit
+- direct OpenAI Responses with ChatGPT-subscription authentication, for the same reason
+- OpenAI Responses models (`openai-responses`) with `supportsMaxOutputTokens: false`
+- Bedrock (`bedrock-converse-stream`), whose native retries cannot be disabled
+
+Virtual models resolve to a physical model before its support checks and probe. Provider drafts require a physical test model. Tests can incur a charge or load a local model. Failure does not block saving or model selection. Results expose duration and HTTP status when available, with controlled errors instead of raw provider payloads.
 
 ### Private authentication operations
 

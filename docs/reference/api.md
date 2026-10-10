@@ -525,7 +525,7 @@ ModelCost = {
 }
 ```
 
-`configured` reports credential-source metadata, not a successful model request. Stored keys, tokens, header values, and API-key commands are omitted. Unsafe base URLs appear as an empty string. Model records contain only the listed metadata, not their full SDK configuration. Pricing tiers are read-only here.
+`configured` reports saved configuration or available credentials, not a successful model request. Custom compatible models can be available without an API key. Stored keys, tokens, header values, and API-key commands are omitted. Unsafe base URLs appear as an empty string. Model records contain only the listed metadata, not their full SDK configuration. Pricing tiers are read-only here.
 
 Ordinary reads refresh the settings runtime's authentication snapshot with `allowNetwork: false`. Loading project extensions can still run their startup work. `refresh=1` replaces that cwd's settings runtime and reloads extension registrations. It does not refresh an open conversation's catalog. Use the provider `refresh` action for a forced network catalog refresh.
 
@@ -557,7 +557,7 @@ Response: `ProviderInventory`.
 
 IDs have at most 512 characters and cannot contain whitespace, control characters, or reserved prototype names. **Provider IDs cannot contain `/`. Model IDs can contain `/`.** IDs cannot be renamed through these routes.
 
-A base URL must use HTTP or HTTPS without credentials, query, fragment, or surrounding whitespace. API keys accept nonempty text, including pi environment references or `!command`. An empty command is invalid.
+A base URL must use HTTP or HTTPS without credentials, query, fragment, or surrounding whitespace. API keys are optional. When supplied, they accept nonempty text, including pi environment references or `!command`. An empty command is invalid. Omitting a key does not hide a saved custom compatible model, and no placeholder key needs to be stored.
 
 Supported `api` selections are:
 
@@ -642,7 +642,7 @@ Response: `ProviderInventory`.
 
 This deletes the custom definition or the whole override, including fields not shown by the editor. It does not delete catalog models. Removing the last model configuration can remove an otherwise empty provider entry.
 
-### Provider authentication and catalog actions
+### Provider authentication, catalog, and connection tests
 
 #### `POST /api/pi/settings/providers/action`
 
@@ -652,8 +652,10 @@ Request:
 {
   target?: { sessionId?: string, cwd?: string },
   providerId: string,
-  action: "login" | "logout" | "refresh",
-  authType?: "api_key" | "oauth"
+  action: "login" | "logout" | "refresh" | "test",
+  authType?: "api_key" | "oauth",
+  modelId?: string,
+  draft?: ProviderTestDraft | ModelTestDraft
 }
 ```
 
@@ -672,11 +674,83 @@ Completed result:
 }
 ```
 
-`credentialChanged` occurs for login and logout, not refresh. A warning can mean credentials were saved but catalog synchronization or installation-settings persistence failed.
+This result shape applies to login, logout, and refresh. `credentialChanged` occurs for login and logout, not refresh or connection tests. A warning can mean credentials were saved but catalog synchronization or installation-settings persistence failed.
 
 Provider writes, authentication, and conversation runtime construction share a lock. Before login, Leyline compares provider routes across open, background, and constructing runtimes. A missing model or different API/base URL blocks login before new credentials can reach an old endpoint. This failure occurs inside the operation, with `state: "error"`, rather than as an HTTP `409` from the action request. Reload all affected sessions after active work finishes, or restart the backend.
 
 Saving or authenticating does not refresh live conversation catalogs, abort runs, or reload sessions. Explicit session reload remains separate. Home can request a fresh [`/state` preview](#get-api-pi-state) with `cwd` and `refresh=1`.
+
+#### Connection test requests
+
+`action: "test"` requires `modelId`. Without `draft`, it tests the saved model and provider settings. `modelId` and `draft` are rejected for other actions.
+
+Editor tests supply one of these drafts:
+
+```text
+ProviderTestDraft = {
+  type: "provider",
+  create: boolean,
+  revision: string,
+  values: {
+    name?: string,
+    baseUrl?: string,
+    api?: string,
+    authHeader?: boolean,
+    apiKey?: string | null
+  }
+}
+
+ModelTestDraft = {
+  type: "model",
+  create: boolean,
+  revision: string,
+  kind: "custom" | "override",
+  values: {
+    name?: string,
+    contextWindow?: number,
+    maxTokens?: number,
+    reasoning?: boolean,
+    input?: Array<"text" | "image">,
+    cost?: {
+      input?: number,
+      output?: number,
+      cacheRead?: number,
+      cacheWrite?: number
+    }
+  }
+}
+```
+
+`revision` is the current `ProviderInventory.revision`. A mismatch fails the operation before the probe. It appears in a polled `state: "error"` snapshot, not as HTTP `409` from the initial action request. Draft values use the same field validation as configuration edits. `values` can be empty to test an unchanged form.
+
+Provider drafts overlay the saved provider configuration in memory. `create: true` permits a new, unique provider ID; a new provider needs a base URL and API format. The root `modelId` is its physical test model, not a saved definition. Model drafts overlay a custom definition or catalog override. The root `modelId` is the current model form's ID.
+
+Tests do not save configuration, select a conversation model, reload live runtimes, or append transcript entries. A draft key replacement applies only to the test runtime. `apiKey: null` removes the draft's `models.json` reference but retains any stored credential. Native extension authentication and credential precedence remain authoritative.
+
+Successful result:
+
+```text
+{
+  providerId: string,
+  modelId: string,
+  action: "test",
+  durationMs: number,
+  httpStatus?: number
+}
+```
+
+`durationMs` measures the probe, including its draft preparation and authentication. It excludes queueing and settings runtime acquisition. `httpStatus` is present when the transport supplies it. Failures use the operation's `error` field; raw response bodies and secrets are not returned. When only a structured provider error code is available, the message identifies it as a provider-reported error rather than an observed HTTP status.
+
+The probe requests 16 output tokens, disables retries, and has a 30-second deadline after settings runtime setup. It can incur a charge or load a local model. Cancellation uses the normal route under [Settings operations](#settings-operations). A failed test does not block saving or model selection.
+
+Tests reject these paths before sending the test generation request:
+
+- `openai-codex-responses`: the output limit cannot be enforced.
+- Direct OpenAI Responses with ChatGPT-subscription authentication: the output limit cannot be enforced.
+- `openai-responses` with `compat.supportsMaxOutputTokens: false`: the output limit would be omitted.
+- `bedrock-converse-stream`: native automatic retries cannot be disabled.
+
+Virtual models resolve to physical models before the probe. OAuth route guards run before virtual routing and before physical authentication. Token resolution can refresh shared OAuth credentials. Cancellation cannot undo a refresh that already completed. Provider drafts require a physical model and cannot change an OAuth provider's endpoint or API while using its stored login.
 
 ### MCP inventory
 

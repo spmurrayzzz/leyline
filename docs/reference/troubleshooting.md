@@ -78,11 +78,30 @@ reload. A runtime reload leaves them held until you select **Resume**. A backend
 restart clears pending tasks. They are not saved in the session transcript
 before the agent accepts them.
 
+## A custom model is missing from the picker
+
+1. Confirm that Settings uses the intended backend.
+2. Open **Models & providers** and select the provider.
+3. Confirm that its **Models** tab contains a saved model definition.
+4. Reload the affected idle session after saving configuration changes.
+
+Saving a provider alone does not add models. **Model ID to test** is also a
+test-only field, not a saved definition. Use **Add custom model** to add a model.
+
+Custom compatible models do not need a placeholder API key. Leave the key
+unset if the endpoint does not require authentication. Home refreshes model
+choices after a save; existing sessions need **Reload runtime**.
+
 ## Model or provider authentication fails
 
-Open **Settings → Models & providers**, select the provider, then open
-**Connection**. Use an available **Sign in** method and follow pi's prompts.
-**Configured** means credentials or configuration exist; it does not verify
+Open **Settings → Models & providers** and select **Test connection** beside
+the model. In a provider or model editor, the same button tests unsaved values.
+Feedback and **Cancel** appear beside the editor's Save/Test controls.
+
+An HTTP 401 means authentication is required or the credentials were rejected.
+An HTTP 403 means access was denied. Open **Connection** and use an available
+**Sign in** method or edit the API-key reference if the endpoint needs it.
+**Configured** means credentials or configuration exist. It does not verify
 account access.
 
 Environment credentials must exist on the selected backend. Browser development
@@ -91,7 +110,30 @@ on macOS and Linux. An API-key reference uses `$NAME` or `${NAME}` for an
 environment variable. A bare `NAME` is a literal value.
 
 After sign-in or configuration changes, reload the affected idle session.
-Select a model whose provider has usable credentials.
+A failed connection test does not hide a model or prevent saving.
+
+## A provider connection test is unavailable
+
+The installed pi SDK cannot enforce the test's output limit for Codex,
+ChatGPT-subscription access through direct OpenAI Responses, or Responses
+models with `supportsMaxOutputTokens: false`. Bedrock also cannot disable its
+native retries. Leyline refuses tests whose limits it cannot enforce.
+Normal model selection and use remain available.
+
+A provider editor needs a physical **Model ID to test**. Saved virtual models
+can route to a physical model for testing. Draft endpoint or API changes cannot
+use a stored OAuth login. See [Connection tests](../user-guide/settings#test-a-model-connection)
+for limits and credential behavior.
+
+## A provider connection test times out
+
+The probe has a 30-second deadline after settings runtime setup. A local server
+can take longer to load its first model. Confirm that the server is ready,
+then retry. Check the base URL and backend network access if no request arrives.
+
+Use **Cancel** to stop a pending test. The editor keeps its unsaved fields.
+If another process changes configuration, refresh settings before retrying a
+draft test. Testing does not save the draft or add conversation messages.
 
 ## Provider sign-in is blocked after an endpoint change
 
@@ -105,7 +147,8 @@ because an older runtime could send the new credentials to the previous server.
 
 A backend restart clears old runtimes too. Finish active work first. A restart
 also clears unsent **Up next** tasks. The sign-in guard does not stop running
-agents or save the new credential.
+agents or save the new credential. OAuth connection tests use the same URL
+safety check before they can refresh shared tokens.
 
 If settings report that another provider operation is in progress, complete or
 cancel that operation before retrying. Provider changes and runtime creation
@@ -176,7 +219,7 @@ Confirm these items:
 2. Confirm that the agent definition exists in `~/.pi/agent/agents/` or the
    nearest `.pi/agents/` directory.
 3. Confirm that the selected child model exists.
-4. Confirm that its provider has usable credentials.
+4. Confirm that its provider has usable credentials if authentication is required.
 5. Confirm that each tool in the agent definition is available.
 
 A project agent definition replaces a global definition with the same agent
@@ -310,7 +353,7 @@ Confirm these items:
 
 1. Open **Session details** and check **Vision model** and its inheritance source.
 2. Confirm that the model still exists and supports image input.
-3. Confirm that its provider credentials are available to the Leyline server.
+3. If the provider requires authentication, confirm that its credentials are available to the Leyline server.
 4. Select **Reload runtime** after you change pi model configuration.
 5. Confirm that the image is PNG, JPEG, GIF, or WebP.
 

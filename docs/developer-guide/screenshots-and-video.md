@@ -65,10 +65,12 @@ DOCS_SCREENSHOT_FILTER=composer-queue.png,composer-queue-held.png,activity.png,a
 For the settings capture set:
 
 ```bash
-DOCS_SCREENSHOT_FILTER=backend-connections.png,models-providers.png,provider-models.png,mcp-servers.png,subagents.png,vision-agent.png,project-details.png,session-details.png,settings-mobile.png npm run docs:screenshots
+DOCS_SCREENSHOT_FILTER=backend-connections.png,models-providers.png,provider-models.png,provider-connection-test.png,model-connection-test.png,mcp-servers.png,subagents.png,vision-agent.png,project-details.png,session-details.png,settings-mobile.png npm run docs:screenshots
 ```
 
-These images show Connections, provider Connection and Models tabs, MCP configuration, Agent defaults, project/session drawers, and mobile provider selection. They read synthetic inventories only. They do not submit configuration or authentication changes.
+These images show Connections, provider Connection and Models tabs, draft connection-test feedback, MCP configuration, Agent defaults, project/session drawers, and mobile provider selection. Provider fixtures include a keyless local endpoint. The editor captures show test results beside Save/Test controls.
+
+Inventories and connection-test responses are synthetic. The capture handler accepts only the expected fixture test action. It never sends a real provider request or submits configuration or authentication changes.
 
 Use these fixed settings and fixture requirements for refreshed documentation images:
 

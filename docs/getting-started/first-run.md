@@ -27,7 +27,9 @@ OpenAI Responses models. See [Runtime controls](../user-guide/runtime-controls#u
 for model and authentication limits.
 
 If no usable model is available, open **Settings → Models & providers**.
-Sign in to a provider or add a custom endpoint and model. See
+Sign in when the provider requires authentication, or add a custom endpoint
+and model without a key. **Test connection** can check saved settings or
+unsaved editor values before the first prompt. See
 [Provider settings](../user-guide/settings#manage-models-and-providers).
 
 ## Use the workbench

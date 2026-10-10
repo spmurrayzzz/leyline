@@ -64,6 +64,8 @@ The SDK resolves the agent directory through `getAgentDir()`, including `PI_CODI
 
 Provider key references, MCP header/environment values, and secret commands resolve on the selected backend. Saved values are not copied from the browser's native backend. Setting `LEYLINE_MEMORY_DIR` does not relocate pi configuration or change the selected backend's process environment.
 
+Provider API keys are optional. Draft connection tests resolve the current form values on that backend without writing them to these files. Native OAuth token refresh remains a credential operation and can update `auth.json`.
+
 Changing provider configuration does not refresh open conversation catalogs. Reload affected sessions explicitly after active work finishes. Settings refresh and Home preview refresh use separate runtimes. See [Provider runtime ownership](../developer-guide/backend-api#provider-runtime-ownership).
 
 ## CLI variables

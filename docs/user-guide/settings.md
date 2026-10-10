@@ -65,6 +65,8 @@ Open **Models & providers**. Select a provider in the searchable list, or use th
 
 The list includes built-in providers, custom configuration, and providers from extensions available in the current project. Configuration changes apply globally on the selected backend.
 
+API keys are optional for custom compatible endpoints. Leave the key unset when the endpoint does not need one. Leyline does not require a placeholder key.
+
 ### Sign in to a provider
 
 1. Select the provider.
@@ -75,7 +77,7 @@ The list includes built-in providers, custom configuration, and providers from e
 
 Credentials stay on the selected backend. Saved secrets do not appear in the provider details. Authentication prompts and replies do not enter the conversation transcript or Runtime events.
 
-**Configured** means pi found credentials or configuration. It does not confirm account access. Sign-in does not select a model. Use the composer to change the active model.
+**Configured** means saved configuration or credentials are available. It does not confirm account access. Use [Test connection](#test-a-model-connection) to check a model request. Sign-in does not select a model. Use the composer to change the active model.
 
 Use **Sign out** to remove the saved credential through pi. Environment credentials and API-key references can still apply. Removing a reference from `models.json` does not sign out a stored credential.
 
@@ -92,6 +94,8 @@ Wait for active work to finish, then reload each affected session and retry. A b
 5. Select **Save provider**.
 
 The base URL must use HTTP or HTTPS without credentials, query parameters, or a fragment. To change an existing provider, open **Connection**, then select **Edit configuration**. Existing provider IDs cannot change.
+
+Saving a provider does not add model definitions. Open **Models**, then select **Add custom model** to add a model. The provider form's **Model ID to test** checks a model without saving its definition.
 
 An API-key reference accepts `$NAME`, `${NAME}`, a literal key, or `!command`. A bare `NAME` is a literal key. Commands execute on the backend when pi resolves the value. Use only commands that you trust.
 
@@ -122,6 +126,42 @@ Only changed fields are written. Unknown fields, compatibility options, and nest
 On Home, saved changes refresh the model choices. Valid explicit model and thinking selections remain selected. For an existing session, use [Reload runtime](#reload-the-runtime).
 
 Model-picker visibility controls and other pi settings are not part of this page.
+
+### Test a model connection
+
+**Test connection** sends a short generation request through the selected backend. It is optional. A failed test does not block saving or model selection.
+
+To test saved settings, open **Models** and select **Test connection** beside the model.
+
+To test a provider before saving:
+
+1. Open **Add provider** or **Edit configuration**.
+2. Enter the connection settings.
+3. Enter an endpoint model ID in **Model ID to test**.
+4. Select **Test connection** beside **Save provider**.
+
+![Provider editor with unsaved connection settings and a successful test beside Save](../assets/screenshots/provider-connection-test.png)
+
+The model editor also has **Test connection** beside **Save model** or **Save override**. It uses the current **Model ID** and unsaved form values.
+
+![Model editor with test feedback above the Save and Test connection controls](../assets/screenshots/model-connection-test.png)
+
+Progress, **Cancel**, and the result appear above the editor's Save/Test controls. The form keeps its unsaved values. Changing a field clears the previous result.
+
+A test does not save form values, select a model, reload a live session, or add conversation messages. Removing a draft key reference still preserves stored credentials. Native OAuth can refresh saved tokens during a test; cancellation cannot undo that refresh.
+
+Tests request up to 16 output tokens, disable automatic retries, and allow 30 seconds for the probe after settings runtime setup. A test can incur a charge or load a local model. Success confirms the short request, not every model capability.
+
+This pi version cannot enforce those limits for:
+
+- Codex models using `openai-codex-responses`.
+- Direct OpenAI Responses with ChatGPT-subscription authentication.
+- `openai-responses` models with `supportsMaxOutputTokens: false`.
+- Bedrock, whose native automatic retries cannot be disabled.
+
+Leyline explains why a test is unavailable before it sends the test generation request. These limits do not prevent normal model use.
+
+Virtual model tests route to a physical model first. Provider editors require a physical **Model ID to test**. Draft endpoint or API changes cannot use a stored OAuth login. Tests can also be blocked by the [provider URL safety check](../reference/troubleshooting#provider-sign-in-is-blocked-after-an-endpoint-change).
 
 ## Manage MCP servers
 
@@ -168,7 +208,7 @@ For an eligible HTTP server, select **Sign in** and follow pi's prompts. **Sign 
 
 ## Handle external configuration changes
 
-Leyline preserves unknown fields, JSONC comments in `models.json`, and configuration symlinks. It checks each file's revision before a save.
+Leyline preserves unknown fields, JSONC comments in `models.json`, and configuration symlinks. It checks each file's revision before a save or draft connection test.
 
 If another process changes the file, the save fails instead of overwriting that edit. Refresh settings, review the current values, and apply the change again. Refresh asks before it discards unsaved form changes.
 
