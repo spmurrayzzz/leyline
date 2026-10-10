@@ -32,7 +32,7 @@ The terminal does not use the HTTP router. It uses a WebSocket upgrade at `/api/
 | `server/pi-api/router.js` | HTTP method and path dispatch |
 | `server/pi-api/pi-settings-routes.js` | Provider, model, MCP, and private operation routes |
 | `server/pi-api/pi-config.js` | Pi configuration parsing, revisions, file locks, and atomic edits |
-| `server/pi-api/provider-settings.js` | Redacted provider inventory, model/provider edits, native authentication, and connection-test dispatch |
+| `server/pi-api/provider-settings.js` | Redacted provider inventory, catalog lookup, model/provider edits, native authentication, and connection-test dispatch |
 | `server/pi-api/provider-settings-runtime.js` | Cwd-bound settings runtime leases, bounded inventory checks, and resource cleanup |
 | `server/pi-api/custom-providers.js` | Optional credentials, native custom-provider registration, catalog synchronization, and public `ModelRuntime` wrapper |
 | `server/pi-api/provider-connection-test.js` | Saved and draft connection probes, authentication resolution, routing guards, request limits, and controlled errors |
@@ -137,6 +137,14 @@ Pi owns the global configuration files resolved through `getAgentDir()`. Leyline
 
 See [Pi Settings routes](../reference/api#pi-settings-routes) for exact fields, methods, revisions, operation shapes, and errors. This API is deliberately smaller than pi's configuration schema. General preferences, model-picker visibility, project MCP editing, and Codemode configuration are outside this surface.
 
+### Model metadata and catalog lookup
+
+`provider-settings.js` exposes effective model metadata and saved overrides, including `thinkingLevelMap` and `compat.supportsDeveloperRole`. Model writes and connection-test drafts accept both fields. A supplied map replaces the holder's map, and `{}` removes it. Missing levels inherit pi/provider behavior. Developer-role `null` removes only that flag, preserving other compatibility fields. Writes remove empty overrides and otherwise empty provider entries. See [Model definitions and overrides](../reference/api#model-definitions-and-overrides) for accepted values.
+
+`GET /settings/catalog/models` uses the target's settings runtime and `getAllModels()`. It matches each whitespace-separated query word against model ID, name, and provider ID without case sensitivity. Queries allow at most 256 characters. Chat-only results sort by model ID and provider ID, then stop at 20 entries. The response includes metadata, API format, and compatibility fields, but no costs, URLs, authentication, or headers.
+
+Ordinary lookup uses the backend runtime cache. Explicit `refresh=1` replaces the settings runtime, reloads extensions, and requests a forced network refresh. Refresh checks returned `errors`, `aborted`, and runtime errors, as well as thrown errors. If the SDK refresh fails, lookup adds a warning and searches the cached catalog. Runtime acquisition failures remain request errors. Neither lookup nor refresh changes a live conversation. See [Catalog lookup](../reference/api#catalog-lookup) for the target and response contract.
+
 ### Optional provider credentials
 
 API keys are optional for custom compatible providers. Saved models remain selectable without credentials, and the endpoint reports any authentication failure. Removing an `apiKey` reference from `models.json` does not remove a stored credential.
@@ -168,6 +176,10 @@ Pi 0.99.1 retains cached Radius gateway URLs after reload. Leyline rejects chang
 The provider `test` action runs as a private, cancellable settings operation. `provider-settings.js` validates requests and acquires the settings runtime lease. `provider-connection-test.js` owns the probe, temporary draft runtimes, authentication resolution, request limits, and controlled result messages.
 
 Saved tests use the selected model's saved settings. Draft tests combine current configuration with unsaved provider or model form values. The draft carries the whole-file revision, and a mismatch fails the operation before the probe. A provider editor supplies a test-only model ID, which is not saved.
+
+Draft map and developer-role resets must match Save. `source.getModel()` already includes saved overrides, so it cannot supply a removed override's inherited value. `inheritedMetadata()` recovers defaults from custom definitions, raw native models, or static legacy extension definitions. Override changes that remove no saved entries can use the effective model.
+
+For built-in defaults, the probe creates a separate offline `ModelRuntime` with a public `InMemoryModelsStore`. It seeds that store from a read-only snapshot of the selected backend's pi `models-store.json`. SDK refresh applies the normal catalog timestamp rules. This recovery never writes drafts, credentials, or the live catalog cache. Dynamic legacy extensions with unavailable defaults cannot test resets. The error directs the user to Save, then test the saved model, without rerunning extension hooks.
 
 Draft tests do not write configuration, change live runtimes, or add transcript entries. A draft API-key replacement stays runtime-only. Removing a draft key reference still preserves native stored credentials. Native extensions and OAuth continue to control authentication. OAuth resolution can refresh shared tokens, so route guards run before authentication and virtual-model routing. Draft endpoint or API changes cannot reuse a stored OAuth credential.
 

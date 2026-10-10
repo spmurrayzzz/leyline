@@ -6,6 +6,7 @@ import { useSettingsOperation } from '../composables/useSettingsOperation'
 import {
   deleteModelSettings,
   deleteProviderSettings,
+  fetchCatalogModels,
   fetchProviderSettings,
   runProviderSettingsAction,
   saveModelSettings,
@@ -40,6 +41,23 @@ const modelQuery = ref('')
 const modelLimit = ref(80)
 const operationOwner = ref(null)
 const draftActions = ref(null)
+const modelSection = ref('model')
+const modelBody = ref(null)
+const modelNav = ref(null)
+const catalogSearch = ref(null)
+const catalogLookupButton = ref(null)
+const thinkingLevels = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']
+const catalogOpen = ref(false)
+const catalogQuery = ref('')
+const catalogResults = ref([])
+const catalogSelected = ref('')
+const catalogCopyModel = ref(true)
+const catalogCopyMap = ref(true)
+const catalogCopyRole = ref(true)
+const catalogLoading = ref(false)
+const catalogError = ref('')
+const catalogWarning = ref('')
+let catalogGeneration = 0
 let generation = 0
 
 const { operation, busy, error: operationError, start, answer, cancel, clear } = useSettingsOperation({
@@ -74,13 +92,40 @@ const apiOptions = computed(() => {
 })
 const operationVisible = computed(() => operationOwner.value && (operationOwner.value.draft ? operationOwner.value.draft === draft.value : operationOwner.value.id === selectedId.value) && (operation.value || busy.value || operationError.value))
 const canAddModel = computed(() => writable.value && selected.value?.config.baseUrl && selected.value?.config.api)
+const editingModel = computed(() => draft.value?.type === 'model')
+const modelSections = [{ id: 'model', label: 'Model' }, { id: 'thinking', label: 'Thinking & compatibility' }, { id: 'pricing', label: 'Pricing' }]
+const catalogEntry = computed(() => catalogResults.value.find((entry) => `${entry.providerId}/${entry.id}` === catalogSelected.value))
+const catalogModelValues = computed(() => {
+  const entry = catalogEntry.value
+  if (!entry) return {}
+  const values = {}
+  if (!draft.value?.model && typeof entry.id === 'string' && entry.id.trim()) values.id = entry.id
+  if (typeof entry.name === 'string' && entry.name.trim()) values.name = entry.name
+  for (const key of ['contextWindow', 'maxTokens']) {
+    if (Number.isFinite(entry[key]) && entry[key] > 0) values[key] = entry[key]
+  }
+  if (Array.isArray(entry.input) && entry.input.length && entry.input.every((value) => ['text', 'image'].includes(value))) {
+    values.input = [...new Set(entry.input)]
+  }
+  if (typeof entry.reasoning === 'boolean') values.reasoning = entry.reasoning
+  return values
+})
+const catalogModelRows = computed(() => [
+  ...(catalogModelValues.value.id ? [{ label: 'Model ID', value: catalogModelValues.value.id }] : []),
+  ...metadataRows(catalogModelValues.value),
+])
+const canCopyCatalog = computed(() => Boolean(catalogEntry.value && (
+  (catalogCopyModel.value && catalogModelRows.value.length)
+  || (catalogCopyMap.value && catalogEntry.value.thinkingLevelMap)
+  || (catalogCopyRole.value && catalogEntry.value.compat?.supportsDeveloperRole !== undefined)
+)))
 
 watch(modelQuery, () => { modelLimit.value = 80 })
 watch(() => [busy.value, operation.value?.state, operationError.value], async () => {
   const owner = operationOwner.value
   const actions = draftActions.value
   const pane = actions?.closest('.pi-settings-detail')
-  if (!owner?.draft || !pane) return
+  if (!owner?.draft || !pane || editingModel.value) return
   const bounds = pane.getBoundingClientRect()
   const position = actions.getBoundingClientRect()
   if (position.bottom <= bounds.top || position.top >= bounds.bottom) return
@@ -103,17 +148,29 @@ watch(() => [props.target, props.backendName], () => {
   void load()
 }, { deep: true, immediate: true, flush: 'sync' })
 
-onBeforeUnmount(() => { generation += 1 })
+onBeforeUnmount(() => { generation += 1; catalogGeneration += 1 })
 
 function resetLocal() {
   generation += 1
+  catalogGeneration += 1
   clear()
   operationOwner.value = null
   draft.value = null
+  modelSection.value = 'model'
   error.value = ''
   conflict.value = false
   fetching.value = false
   saving.value = false
+  catalogOpen.value = false
+  catalogQuery.value = ''
+  catalogResults.value = []
+  catalogSelected.value = ''
+  catalogCopyModel.value = true
+  catalogCopyMap.value = true
+  catalogCopyRole.value = true
+  catalogLoading.value = false
+  catalogError.value = ''
+  catalogWarning.value = ''
 }
 
 function confirmLeave() {
@@ -216,6 +273,8 @@ function editModel(model = null) {
     reasoning: metadata.reasoning ?? false,
     input: metadata.input?.length ? [...metadata.input].sort().join(',') : model ? '' : 'text',
     cost: Object.fromEntries(costs.map(({ id }) => [id, metadata.cost[id] ?? (model ? '' : 0)])),
+    thinkingLevelMap: metadata.thinkingLevelMap ? { ...metadata.thinkingLevelMap } : {},
+    supportsDeveloperRole: metadata.compat?.supportsDeveloperRole === true ? 'true' : metadata.compat?.supportsDeveloperRole === false ? 'false' : '',
   })
 }
 
@@ -227,12 +286,17 @@ function handleEscape(event) {
   if (!draft.value) return
   event.preventDefault()
   event.stopPropagation()
-  cancelForm()
+  if (catalogOpen.value) void toggleCatalog(false)
+  else cancelForm()
+}
+
+function fieldError(field, message) {
+  return Object.assign(new Error(message), { field })
 }
 
 function validId(value) {
   if (!value || value.length > 512 || /[\s\u0000-\u001f\u007f]/u.test(value) || ['__proto__', 'prototype', 'constructor'].includes(value)) {
-    throw new Error('Use an ID without spaces or control characters (up to 512 characters).')
+    throw fieldError('id', 'Use an ID without spaces or control characters (up to 512 characters).')
   }
 }
 
@@ -265,13 +329,13 @@ function modelValues(form) {
     const value = form.values[key]
     if (!custom && value === form.initial[key]) continue
     if (key === 'name') {
-      if (!value.trim()) throw new Error('Enter a model display name.')
+      if (!value.trim()) throw fieldError(key, 'Enter a model display name.')
       values.name = value.trim()
     } else if (key === 'contextWindow' || key === 'maxTokens') {
-      if (!Number.isFinite(value) || value <= 0) throw new Error('Token limits must be positive numbers.')
+      if (!Number.isFinite(value) || value <= 0) throw fieldError(key, 'Token limits must be positive numbers.')
       values[key] = value
     } else if (key === 'input') {
-      if (!value) throw new Error('Select the model input types.')
+      if (!value) throw fieldError(key, 'Select the model input types.')
       values.input = value.split(',')
     } else values[key] = value
   }
@@ -279,10 +343,27 @@ function modelValues(form) {
   for (const { id } of costs) {
     const value = form.values.cost[id]
     if (!custom && value === form.initial.cost[id]) continue
-    if (!Number.isFinite(value) || value < 0) throw new Error('Costs must be zero or a positive number.')
+    if (!Number.isFinite(value) || value < 0) throw fieldError(`cost.${id}`, 'Costs must be zero or a positive number.')
     changedCosts[id] = value
   }
   if (Object.keys(changedCosts).length) values.cost = changedCosts
+  const mapValue = form.values.thinkingLevelMap || {}
+  const mapInitial = form.initial.thinkingLevelMap || {}
+  if (custom || JSON.stringify(mapValue) !== JSON.stringify(mapInitial)) {
+    const map = {}
+    for (const [level, entry] of Object.entries(mapValue)) {
+      if (!thinkingLevels.includes(level)) continue
+      if (entry === null) map[level] = null
+      else if (typeof entry === 'string' && entry.trim() && entry === entry.trim() && entry.length <= 256 && !/[\u0000-\u001f\u007f]/u.test(entry)) map[level] = entry
+      else throw fieldError(`thinkingLevelMap.${level}`, `Enter a provider value for thinking level ${level} without surrounding spaces or control characters (up to 256 characters), or select Provider default or Unsupported.`)
+    }
+    if (!custom || Object.keys(map).length) values.thinkingLevelMap = map
+  }
+  if (custom || form.values.supportsDeveloperRole !== form.initial.supportsDeveloperRole) {
+    const role = form.values.supportsDeveloperRole
+    if (role === 'true' || role === 'false') values.compat = { supportsDeveloperRole: role === 'true' }
+    else if (!custom) values.compat = { supportsDeveloperRole: null }
+  }
   return values
 }
 
@@ -306,8 +387,32 @@ async function writeConfig(request, preferredId = selectedId.value) {
   }
 }
 
-function saveDraft() {
-  if (locked.value || !draft.value || !writable.value) return
+function revealModelField(field) {
+  if (!field || !editingModel.value) return
+  const owner = draft.value
+  modelSection.value = field.closest('[data-model-section]')?.dataset.modelSection || 'model'
+  void nextTick(() => {
+    if (draft.value !== owner || !field.isConnected) return
+    field.focus()
+    field.reportValidity()
+  })
+}
+
+function showDraftError(failure, form) {
+  showError(failure)
+  if (failure.field) revealModelField(form.elements.namedItem(failure.field))
+}
+
+function showInvalidField(form) {
+  const field = form.querySelector('input:invalid, select:invalid')
+  if (!field) return false
+  if (editingModel.value) revealModelField(field)
+  else form.reportValidity()
+  return true
+}
+
+function saveDraft(event) {
+  if (locked.value || !draft.value || !writable.value || catalogOpen.value || showInvalidField(event.currentTarget)) return
   try {
     const form = draft.value
     validId(form.values.id)
@@ -323,12 +428,12 @@ function saveDraft() {
       void writeConfig((target) => saveModelSettings(target, body))
     }
   } catch (failure) {
-    showError(failure)
+    showDraftError(failure, event.currentTarget)
   }
 }
 
 function testDraft(event) {
-  if (locked.value || busy.value || !draft.value || !writable.value || !event.currentTarget.form.reportValidity()) return
+  if (locked.value || busy.value || !draft.value || !writable.value || showInvalidField(event.currentTarget.form)) return
   try {
     const form = draft.value
     const providerId = form.type === 'provider' ? form.values.id : form.providerId
@@ -349,8 +454,122 @@ function testDraft(event) {
     operationOwner.value = { id: providerId, action: 'test', generation, draft: form, title: `${modelId} · Test draft connection` }
     void start((baseUrl) => runProviderSettingsAction(target, body, baseUrl))
   } catch (failure) {
-    showError(failure)
+    showDraftError(failure, event.currentTarget.form)
   }
+}
+
+function mapMode(level) {
+  const value = draft.value?.values.thinkingLevelMap?.[level]
+  return value === null ? 'unsupported' : value === undefined ? 'default' : 'value'
+}
+
+function mapDisplayValue(level) {
+  const value = draft.value?.values.thinkingLevelMap?.[level]
+  if (value === null) return 'null'
+  if (value === undefined) return 'Inherited'
+  return value
+}
+
+function setMapMode(level, mode) {
+  const map = draft.value.values.thinkingLevelMap || (draft.value.values.thinkingLevelMap = {})
+  if (mode === 'default') delete map[level]
+  else if (mode === 'unsupported') map[level] = null
+  else map[level] = level === 'off' ? 'none' : level
+}
+
+function setMapValue(level, text) {
+  draft.value.values.thinkingLevelMap[level] = text
+}
+
+function thinkingMapSummary(map) {
+  return thinkingLevels.filter((level) => map[level] !== undefined).map((level) => `${level} \u2192 ${map[level] === null ? 'unsupported' : map[level]}`).join(', ')
+}
+
+function providerName(id) {
+  return providers.value.find((provider) => provider.id === id)?.name || id
+}
+
+function selectModelSection(section) {
+  modelSection.value = section
+  if (modelBody.value) modelBody.value.scrollTop = 0
+}
+
+async function toggleCatalog(open) {
+  if (locked.value) return
+  catalogOpen.value = open
+  if (open && !catalogQuery.value) catalogQuery.value = draft.value.values.id || draft.value.values.name
+  await nextTick()
+  if (open) {
+    catalogSearch.value?.focus({ preventScroll: true })
+    if (catalogQuery.value.trim() && !catalogResults.value.length && !catalogLoading.value) void searchCatalog(false)
+  } else catalogLookupButton.value?.focus({ preventScroll: true })
+}
+
+function excludedCompat(entry) {
+  return Object.keys(entry?.compat || {}).filter((key) => key !== 'supportsDeveloperRole')
+}
+
+function catalogCardNote(entry) {
+  const parts = []
+  if (entry.contextWindow) parts.push(`${tokenFormatter.format(entry.contextWindow)} context`)
+  parts.push(entry.thinkingLevelMap ? 'Thinking map' : 'No thinking map')
+  if (entry.compat?.supportsDeveloperRole !== undefined) parts.push(entry.compat.supportsDeveloperRole ? 'Developer role' : 'No developer role')
+  return parts.join(' \u00b7 ')
+}
+
+async function searchCatalog(refresh) {
+  if (locked.value || catalogLoading.value || !editingModel.value) return
+  const query = catalogQuery.value.trim()
+  if (!query) {
+    catalogError.value = 'Enter a model name or ID to search.'
+    return
+  }
+  const token = ++catalogGeneration
+  if (catalogSearch.value?.parentElement?.contains(document.activeElement)) catalogSearch.value.focus({ preventScroll: true })
+  catalogLoading.value = true
+  catalogError.value = ''
+  catalogWarning.value = ''
+  try {
+    const result = await fetchCatalogModels({ ...props.target }, query, { refresh })
+    if (token !== catalogGeneration || !editingModel.value) return
+    catalogResults.value = result.models.filter((model) => !(model.providerId === draft.value.providerId && model.id === draft.value.values.id))
+    const entry = catalogEntry.value || catalogResults.value[0]
+    if (entry) selectCatalog(entry)
+    else catalogSelected.value = ''
+    catalogWarning.value = result.warning || ''
+    if (!catalogResults.value.length) catalogError.value = 'No matching catalog entries. Configure the model manually.'
+  } catch (failure) {
+    if (token === catalogGeneration) catalogError.value = failure.message || 'Catalog search failed.'
+  } finally {
+    if (token === catalogGeneration) catalogLoading.value = false
+  }
+}
+
+function selectCatalog(entry) {
+  if (!entry || locked.value) return
+  catalogSelected.value = `${entry.providerId}/${entry.id}`
+  catalogCopyModel.value = Boolean(catalogModelRows.value.length)
+  catalogCopyMap.value = Boolean(entry.thinkingLevelMap && Object.keys(entry.thinkingLevelMap).length)
+  catalogCopyRole.value = entry.compat?.supportsDeveloperRole !== undefined
+}
+
+async function copyCatalog() {
+  const entry = catalogEntry.value
+  if (locked.value || catalogLoading.value || !entry || !editingModel.value || !canCopyCatalog.value) return
+  const copyModel = catalogCopyModel.value && catalogModelRows.value.length > 0
+  if (copyModel) {
+    const values = { ...catalogModelValues.value }
+    if (values.input) values.input = [...values.input].sort().join(',')
+    Object.assign(draft.value.values, values)
+  }
+  if (catalogCopyMap.value && entry.thinkingLevelMap) draft.value.values.thinkingLevelMap = { ...entry.thinkingLevelMap }
+  if (catalogCopyRole.value && entry.compat?.supportsDeveloperRole !== undefined) {
+    draft.value.values.supportsDeveloperRole = String(entry.compat.supportsDeveloperRole)
+  }
+  catalogOpen.value = false
+  modelSection.value = copyModel ? 'model' : 'thinking'
+  await nextTick()
+  modelNav.value?.querySelector('.active')?.focus({ preventScroll: true })
 }
 
 function removeProvider() {
@@ -407,6 +626,12 @@ function metadataRows(value) {
     const entry = value[key]
     rows.push({ label, value: Array.isArray(entry) ? entry.join(' + ') || 'Unknown' : typeof entry === 'boolean' ? entry ? 'Yes' : 'No' : entry })
   }
+  if (value?.thinkingLevelMap && Object.keys(value.thinkingLevelMap).length) {
+    rows.push({ label: 'Thinking levels', value: thinkingMapSummary(value.thinkingLevelMap) })
+  }
+  if (value?.compat?.supportsDeveloperRole != null) {
+    rows.push({ label: 'Developer role', value: value.compat.supportsDeveloperRole ? 'Supported' : 'Not supported' })
+  }
   for (const { id, label } of costs) {
     if (value?.cost?.[id] != null) rows.push({ label: `${label} / million tokens`, value: `$${value.cost[id]}` })
   }
@@ -419,6 +644,7 @@ function metadataRows(value) {
   <PiSettingsWorkspace
     title="Models & providers"
     description="Keep each provider’s models and connection settings together."
+    :class="{ 'pi-settings-model-workspace': editingModel }"
     :items="items"
     :selected-id="selectedId"
     kind="provider"
@@ -444,14 +670,14 @@ function metadataRows(value) {
     </template>
 
     <template v-if="selected || draft">
-      <div class="pi-settings-heading">
+      <div v-if="!editingModel" class="pi-settings-heading">
         <div>
           <h3>{{ draft?.type === 'provider' && draft.create ? 'Add a custom provider' : selected?.name }}</h3>
           <p v-if="selected && !(draft?.type === 'provider' && draft.create)" class="settings-note">{{ selected.id }} · {{ sourceLabel(selected.kind) }}</p>
         </div>
         <span v-if="selected && !(draft?.type === 'provider' && draft.create)" class="pi-settings-status">{{ selected.configured ? 'Configured' : 'Not configured' }}</span>
       </div>
-      <nav v-if="selected && !(draft?.type === 'provider' && draft.create)" class="pi-settings-tabs" aria-label="Provider details">
+      <nav v-if="selected && !editingModel && !(draft?.type === 'provider' && draft.create)" class="pi-settings-tabs" aria-label="Provider details">
         <button type="button" :class="{ active: tab === 'models' }" :aria-current="tab === 'models' ? 'page' : undefined" :disabled="locked" @click="selectTab('models')">Models {{ selected.models.length }}</button>
         <button type="button" :class="{ active: tab === 'connection' }" :aria-current="tab === 'connection' ? 'page' : undefined" :disabled="locked" @click="selectTab('connection')">Connection</button>
       </nav>
@@ -462,8 +688,8 @@ function metadataRows(value) {
         <PiSettingsOperation :operation="operation" :busy="busy" :connection-test="operationOwner.action === 'test'" :error="operationError" @answer="answer" @cancel="cancel" />
       </section>
 
-      <form v-if="draft" class="pi-settings-form" autocomplete="off" @submit.prevent="saveDraft">
-        <div class="pi-settings-heading">
+      <form v-if="draft" class="pi-settings-form" :class="{ 'pi-settings-model-editor': editingModel }" :novalidate="editingModel" autocomplete="off" @submit.prevent="saveDraft">
+        <div v-if="!editingModel" class="pi-settings-heading">
           <h4>{{ draft.type === 'provider' ? draft.create ? 'Provider configuration' : 'Edit provider configuration' : draft.kind === 'custom' ? draft.create ? 'Add a custom model' : 'Edit custom model' : 'Edit catalog overrides' }}</h4>
         </div>
         <template v-if="draft.type === 'provider'">
@@ -522,63 +748,198 @@ function metadataRows(value) {
           <p class="settings-note">Unchanged fields keep their saved values.</p>
         </template>
         <template v-else>
-          <p class="settings-note">{{ draft.kind === 'override' ? 'Only changed fields are saved as overrides. Other catalog values remain inherited.' : 'Only changed fields are updated on existing definitions.' }} Unknown settings, compatibility options, and nested pricing tiers are preserved.</p>
-          <details v-if="draft.model">
-            <summary>Effective metadata and saved overrides</summary>
-            <p class="settings-note">Effective metadata reported by the selected runtime. It can be incomplete when the provider is not loaded.</p>
-            <dl class="pi-settings-metadata">
-              <div v-for="row in metadataRows(draft.model)" :key="row.label"><dt>{{ row.label }}</dt><dd>{{ row.value }}</dd></div>
-            </dl>
-            <template v-if="draft.model.kind === 'override'">
-              <h4>Saved overrides</h4>
-              <dl class="pi-settings-metadata">
-                <div v-for="row in metadataRows(draft.model.overrides)" :key="row.label"><dt>{{ row.label }}</dt><dd>{{ row.value }}</dd></div>
-              </dl>
-              <p v-if="!metadataRows(draft.model.overrides).length" class="settings-note">No editable metadata overrides. Other saved settings may exist.</p>
-            </template>
-            <p class="settings-note">Source: {{ sourceLabel(draft.model.kind) }}. Original catalog values are not returned separately.</p>
-          </details>
-          <div class="pi-settings-form-grid">
-            <label class="pi-settings-field full">
-              <span>Model ID</span>
-              <input v-model="draft.values.id" required maxlength="512" :readonly="Boolean(draft.model)" :disabled="locked" spellcheck="false" />
-              <small>{{ draft.model ? 'Model IDs cannot be changed.' : 'Must match the model ID served by the endpoint. To override a catalog model, cancel and select it from the list.' }}</small>
-            </label>
-            <label class="pi-settings-field full">
-              <span>Display name</span>
-              <input v-model="draft.values.name" required :disabled="locked" />
-            </label>
-            <label class="pi-settings-field">
-              <span>Context window</span>
-              <input v-model.number="draft.values.contextWindow" type="number" min="1" step="any" :required="!draft.model" :disabled="locked" />
-              <small>Input and output tokens combined.</small>
-            </label>
-            <label class="pi-settings-field">
-              <span>Maximum output tokens</span>
-              <input v-model.number="draft.values.maxTokens" type="number" min="1" step="any" :required="!draft.model" :disabled="locked" />
-            </label>
-            <label class="pi-settings-field">
-              <span>Reasoning support</span>
-              <select v-model="draft.values.reasoning" :disabled="locked"><option :value="false">No</option><option :value="true">Yes</option></select>
-            </label>
-            <label class="pi-settings-field">
-              <span>Supported input</span>
-              <select v-model="draft.values.input" :disabled="locked">
-                <option v-if="!draft.initial.input" value="" disabled>Unknown (unchanged)</option>
-                <option value="text">Text</option>
-                <option value="image,text">Text and images</option>
-                <option value="image">Images</option>
+          <header class="pi-settings-model-header">
+            <div>
+              <p class="settings-note">{{ selected?.name }} · {{ draft.values.id || 'New model' }}</p>
+              <h4>{{ catalogOpen ? 'Find a model configuration' : draft.kind === 'override' ? 'Edit catalog overrides' : draft.create ? 'Add a custom model' : 'Edit custom model' }}</h4>
+            </div>
+            <button v-if="!catalogOpen" ref="catalogLookupButton" type="button" class="pi-settings-button" :disabled="locked" @click="toggleCatalog(true)">Find in catalog</button>
+          </header>
+          <template v-if="catalogOpen">
+            <div class="pi-settings-catalog-search">
+              <input ref="catalogSearch" v-model="catalogQuery" type="search" aria-label="Search catalog" placeholder="Model name or ID" maxlength="256" :disabled="locked" :readonly="catalogLoading" spellcheck="false" @keydown.enter.prevent="searchCatalog(false)" />
+              <button type="button" class="pi-settings-button" :disabled="locked || catalogLoading" @click="searchCatalog(false)">{{ catalogLoading ? 'Searching…' : 'Search' }}</button>
+              <button type="button" class="pi-settings-button" :disabled="locked || catalogLoading" title="Refresh the backend catalog" @click="searchCatalog(true)">Refresh</button>
+            </div>
+            <div v-if="catalogWarning || catalogError" class="pi-settings-catalog-notices">
+              <p v-if="catalogWarning" class="pi-settings-warning" role="status">{{ catalogWarning }}</p>
+              <p v-if="catalogError" class="settings-error" role="alert">{{ catalogError }}</p>
+            </div>
+            <label v-if="catalogResults.length" class="pi-settings-field pi-settings-catalog-picker">
+              <span>Catalog match</span>
+              <select :value="catalogSelected" :disabled="locked || catalogLoading" @change="selectCatalog(catalogResults.find((entry) => `${entry.providerId}/${entry.id}` === $event.target.value))">
+                <option v-for="entry in catalogResults" :key="`${entry.providerId}/${entry.id}`" :value="`${entry.providerId}/${entry.id}`">{{ providerName(entry.providerId) }} · {{ entry.name }}</option>
               </select>
             </label>
-            <label v-for="rate in costs" :key="rate.id" class="pi-settings-field">
-              <span>{{ rate.label }} cost</span>
-              <input v-model.number="draft.values.cost[rate.id]" type="number" min="0" step="any" :required="!draft.model" :disabled="locked" />
-              <small>USD per million tokens{{ draft.model && draft.initial.cost[rate.id] === '' ? '; blank keeps the current setting' : '' }}.</small>
-            </label>
-          </div>
+            <div class="pi-settings-catalog" :aria-busy="catalogLoading">
+              <div class="pi-settings-catalog-results" aria-label="Catalog matches">
+                <p class="settings-note">{{ catalogResults.length ? `${catalogResults.length} matches · Backend catalog` : 'Search the backend catalog by model name or ID.' }}</p>
+                <button
+                  v-for="entry in catalogResults"
+                  :key="`${entry.providerId}/${entry.id}`"
+                  type="button"
+                  class="pi-settings-catalog-result"
+                  :class="{ active: catalogSelected === `${entry.providerId}/${entry.id}` }"
+                  :aria-current="catalogSelected === `${entry.providerId}/${entry.id}` ? 'true' : undefined"
+                  :disabled="locked || catalogLoading"
+                  @click="selectCatalog(entry)"
+                >
+                  <span>{{ providerName(entry.providerId) }}</span>
+                  <strong>{{ entry.name }}</strong>
+                  <small>{{ entry.id }}</small>
+                  <small>{{ catalogCardNote(entry) }}</small>
+                </button>
+              </div>
+              <div class="pi-settings-catalog-review">
+                <template v-if="catalogEntry">
+                  <h4>{{ providerName(catalogEntry.providerId) }} · {{ catalogEntry.name }}</h4>
+                  <p class="settings-note">Provider-specific settings. Check that these values match your endpoint.</p>
+                  <label class="pi-settings-catalog-check">
+                    <input v-model="catalogCopyModel" type="checkbox" :disabled="locked || catalogLoading || !catalogModelRows.length" />
+                    <span><strong>Model details</strong><small v-if="!catalogModelRows.length">Not specified by this entry.</small></span>
+                  </label>
+                  <dl v-if="catalogModelRows.length" class="pi-settings-catalog-map">
+                    <div v-for="row in catalogModelRows" :key="row.label"><dt>{{ row.label }}</dt><dd>{{ row.value }}</dd></div>
+                  </dl>
+                  <label class="pi-settings-catalog-check">
+                    <input v-model="catalogCopyMap" type="checkbox" :disabled="locked || catalogLoading || !catalogEntry.thinkingLevelMap" />
+                    <span><strong>Thinking level map</strong><small v-if="!catalogEntry.thinkingLevelMap">Not specified by this entry.</small></span>
+                  </label>
+                  <dl v-if="catalogEntry.thinkingLevelMap" class="pi-settings-catalog-map">
+                    <div v-for="level in thinkingLevels" :key="level">
+                      <dt>{{ level }}</dt>
+                      <dd>{{ catalogEntry.thinkingLevelMap[level] === null ? 'Unsupported' : catalogEntry.thinkingLevelMap[level] === undefined ? 'Provider default' : `Send "${catalogEntry.thinkingLevelMap[level]}"` }}</dd>
+                    </div>
+                  </dl>
+                  <label class="pi-settings-catalog-check">
+                    <input v-model="catalogCopyRole" type="checkbox" :disabled="locked || catalogLoading || catalogEntry.compat?.supportsDeveloperRole === undefined" />
+                    <span>
+                      <strong>Developer role</strong>
+                      <small>{{ catalogEntry.compat?.supportsDeveloperRole === undefined ? 'Not specified by this entry.' : catalogEntry.compat.supportsDeveloperRole ? 'Supported' : 'Not supported. Use system messages.' }}</small>
+                    </span>
+                  </label>
+                  <p class="settings-note pi-settings-catalog-kept">Your endpoint, API format, costs, and credentials stay unchanged. {{ draft.model ? 'The existing model ID stays unchanged.' : 'You can edit the copied model ID to match your endpoint.' }}</p>
+                  <details v-if="excludedCompat(catalogEntry).length">
+                    <summary>Other provider settings are excluded</summary>
+                    <p class="settings-note">{{ excludedCompat(catalogEntry).join(', ') }}</p>
+                  </details>
+                </template>
+                <p v-else class="pi-settings-empty">{{ catalogLoading ? 'Searching the backend catalog…' : 'Choose a catalog entry to review its fields. You can also return to the editor and configure them manually.' }}</p>
+              </div>
+            </div>
+          </template>
+          <template v-else>
+            <nav ref="modelNav" class="pi-settings-tabs pi-settings-model-tabs" aria-label="Model editor sections">
+              <button v-for="section in modelSections" :key="section.id" type="button" :class="{ active: modelSection === section.id }" :aria-current="modelSection === section.id ? 'page' : undefined" @click="selectModelSection(section.id)">{{ section.label }}</button>
+            </nav>
+            <div ref="modelBody" class="pi-settings-model-body">
+              <section v-show="modelSection === 'model'" data-model-section="model" aria-label="Model details">
+                <div class="pi-settings-form-grid">
+                  <label class="pi-settings-field">
+                    <span>Model ID</span>
+                    <input v-model="draft.values.id" name="id" required maxlength="512" :readonly="Boolean(draft.model)" :disabled="locked" spellcheck="false" />
+                    <small>{{ draft.model ? 'Model IDs cannot be changed.' : 'Must match the ID served by your endpoint.' }}</small>
+                  </label>
+                  <label class="pi-settings-field">
+                    <span>Display name</span>
+                    <input v-model="draft.values.name" name="name" required :disabled="locked" />
+                  </label>
+                  <label class="pi-settings-field">
+                    <span>Context window</span>
+                    <input v-model.number="draft.values.contextWindow" name="contextWindow" type="number" min="1" step="any" :required="!draft.model" :disabled="locked" />
+                    <small>Input and output tokens combined.</small>
+                  </label>
+                  <label class="pi-settings-field">
+                    <span>Maximum output tokens</span>
+                    <input v-model.number="draft.values.maxTokens" name="maxTokens" type="number" min="1" step="any" :required="!draft.model" :disabled="locked" />
+                  </label>
+                  <label class="pi-settings-field">
+                    <span>Supported input</span>
+                    <select v-model="draft.values.input" name="input" :disabled="locked">
+                      <option v-if="!draft.initial.input" value="" disabled>Unknown (unchanged)</option>
+                      <option value="text">Text</option>
+                      <option value="image,text">Text and images</option>
+                      <option value="image">Images</option>
+                    </select>
+                  </label>
+                </div>
+                <p class="settings-note">{{ draft.kind === 'override' ? 'Only changed fields are saved as overrides.' : 'Unedited settings are preserved.' }}</p>
+                <details v-if="draft.model" class="pi-settings-extra">
+                  <summary>Effective metadata and saved overrides</summary>
+                  <p class="settings-note">Metadata from the selected runtime. It can be incomplete when the provider is not loaded.</p>
+                  <dl class="pi-settings-metadata">
+                    <div v-for="row in metadataRows(draft.model)" :key="row.label"><dt>{{ row.label }}</dt><dd>{{ row.value }}</dd></div>
+                  </dl>
+                  <template v-if="draft.model.kind === 'override'">
+                    <h4>Saved overrides</h4>
+                    <dl class="pi-settings-metadata">
+                      <div v-for="row in metadataRows(draft.model.overrides)" :key="row.label"><dt>{{ row.label }}</dt><dd>{{ row.value }}</dd></div>
+                    </dl>
+                    <p v-if="!metadataRows(draft.model.overrides).length" class="settings-note">No editable metadata overrides. Other saved settings may exist.</p>
+                  </template>
+                  <p class="settings-note">Source: {{ sourceLabel(draft.model.kind) }}. Original catalog values are not returned separately.</p>
+                  <button v-if="draft.model.kind !== 'catalog'" type="button" class="pi-settings-text-button pi-settings-model-remove" :disabled="locked" @click="removeModel(draft.model)">{{ draft.model.kind === 'override' ? 'Reset override' : 'Delete custom model' }}</button>
+                </details>
+              </section>
+              <section v-show="modelSection === 'thinking'" data-model-section="thinking" aria-label="Thinking and compatibility">
+                <div class="pi-settings-thinking-controls">
+                  <label class="pi-settings-field">
+                    <span>Reasoning support</span>
+                    <select v-model="draft.values.reasoning" :disabled="locked"><option :value="false">No</option><option :value="true">Yes</option></select>
+                  </label>
+                  <p class="settings-note">{{ draft.values.reasoning ? 'Provider default inherits pi’s behavior. Unsupported removes a level from the composer.' : 'Enable reasoning support to edit the thinking map.' }}</p>
+                </div>
+                <table class="pi-settings-thinking-map">
+                  <thead><tr><th>Pi level</th><th>Behavior</th><th>Provider value</th></tr></thead>
+                  <tbody>
+                    <tr v-for="level in thinkingLevels" :key="level">
+                      <td><code>{{ level }}</code></td>
+                      <td>
+                        <select :value="mapMode(level)" :disabled="locked || !draft.values.reasoning" :aria-label="`${level} thinking behavior`" @change="setMapMode(level, $event.target.value)">
+                          <option value="default">Provider default</option>
+                          <option value="unsupported">Unsupported</option>
+                          <option value="value">Send value</option>
+                        </select>
+                      </td>
+                      <td>
+                        <input :value="mapDisplayValue(level)" :name="`thinkingLevelMap.${level}`" :disabled="locked || !draft.values.reasoning || mapMode(level) !== 'value'" :required="mapMode(level) === 'value'" maxlength="256" :aria-label="`${level} provider value`" spellcheck="false" @input="setMapValue(level, $event.target.value)" />
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div class="pi-settings-thinking-controls pi-settings-role-control">
+                  <label class="pi-settings-field">
+                    <span>Developer role</span>
+                    <select v-model="draft.values.supportsDeveloperRole" :disabled="locked">
+                      <option value="">Provider default</option>
+                      <option value="true">Supported</option>
+                      <option value="false">Not supported</option>
+                    </select>
+                  </label>
+                  <p class="settings-note">Choose Not supported when the template requires system messages. Other compatibility options stay unchanged.</p>
+                </div>
+              </section>
+              <section v-show="modelSection === 'pricing'" data-model-section="pricing" aria-label="Model pricing">
+                <p class="settings-note">USD per million tokens. Costs belong to this provider and are never copied from the catalog.</p>
+                <div class="pi-settings-form-grid">
+                  <label v-for="rate in costs" :key="rate.id" class="pi-settings-field">
+                    <span>{{ rate.label }} cost</span>
+                    <input v-model.number="draft.values.cost[rate.id]" :name="`cost.${rate.id}`" type="number" min="0" step="any" :required="!draft.model" :disabled="locked" />
+                    <small v-if="draft.model && draft.initial.cost[rate.id] === ''">Blank keeps the current setting.</small>
+                  </label>
+                </div>
+              </section>
+            </div>
+          </template>
         </template>
-        <p class="settings-note">Test connection uses these unsaved settings for a small generation request. It can incur a charge or load a local model. Nothing is saved.</p>
-        <div ref="draftActions" class="pi-settings-draft-actions">
+        <div v-if="editingModel && catalogOpen" class="pi-settings-model-footer">
+          <p class="settings-note">Copy into the draft, then edit and save.</p>
+          <div class="pi-settings-actions">
+            <button type="button" class="pi-settings-button" :disabled="locked" @click="toggleCatalog(false)">Back to editor</button>
+            <button type="button" class="pi-settings-button primary" :disabled="locked || catalogLoading || !canCopyCatalog" @click="copyCatalog">Copy into draft</button>
+          </div>
+        </div>
+        <div v-else ref="draftActions" class="pi-settings-draft-actions" :class="{ 'pi-settings-model-footer': editingModel }">
           <PiSettingsOperation
             v-if="operationVisible && operationOwner.draft"
             :operation="operation"
@@ -589,11 +950,11 @@ function metadataRows(value) {
             @answer="answer"
             @cancel="cancel"
           />
+          <p class="settings-note">Test connection uses this unsaved draft. It can incur a charge or load a local model.</p>
           <div class="pi-settings-actions">
             <button type="button" class="pi-settings-button" :disabled="fetching || saving || loading" @click="cancelForm">Cancel</button>
-            <button type="submit" class="pi-settings-button primary" :disabled="locked || (!draft.create && !dirty)">{{ saving ? 'Saving…' : draft.type === 'provider' ? 'Save provider' : draft.kind === 'override' ? 'Save override' : 'Save model' }}</button>
             <button type="button" class="pi-settings-button" :disabled="locked || busy || !writable" @click="testDraft">Test connection</button>
-            <button v-if="draft.type === 'model' && draft.model && draft.model.kind !== 'catalog'" type="button" class="pi-settings-button danger" :disabled="locked" @click="removeModel(draft.model)">{{ draft.model.kind === 'override' ? 'Reset override' : 'Delete custom model' }}</button>
+            <button type="submit" class="pi-settings-button primary" :disabled="locked || (!draft.create && !dirty)">{{ saving ? 'Saving…' : draft.type === 'provider' ? 'Save provider' : draft.kind === 'override' ? 'Save override' : 'Save model' }}</button>
           </div>
         </div>
       </form>

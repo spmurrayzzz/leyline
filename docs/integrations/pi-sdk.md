@@ -44,9 +44,17 @@ Native `ModelRuntime.login()` and `logout()` handle provider credentials. Privat
 
 Native authentication can update shared credentials before an operation finishes. Leyline serializes provider changes against runtime construction and blocks login while another runtime retains different provider routes. It never refreshes a live conversation's `ModelRuntime` after endpoint or authentication edits. Explicit reload applies changes to that session.
 
+Catalog lookup uses the settings runtime's `getAllModels()`, not the authenticated `getAvailable()` list. It returns at most 20 matching chat models from the backend cache. Explicit lookup refresh replaces the settings runtime and calls `ModelRuntime.refresh({ allowNetwork: true, force: true })`. A resolved refresh can still fail: check returned `errors`, `aborted`, and runtime errors, as well as exceptions. If the SDK refresh fails, lookup reports a warning and uses cached results. Runtime acquisition failures remain request errors.
+
 Provider inventory refresh and catalog refresh operate on settings runtimes. Home refresh uses a separate `/state?cwd=...&refresh=1` preview. Pi 0.99.1 retains cached Radius gateway URLs, so Leyline blocks changes to existing Radius base URLs. See [Pi Settings](../developer-guide/backend-api#pi-settings) for lease limits, cleanup, routing checks, and refresh boundaries.
 
 `provider-connection-test.js` probes saved models or unsaved form values through private settings operations. Drafts require the current configuration revision and use temporary runtimes. Tests do not write configuration, change live runtimes, or add transcript entries. Draft API-key replacements stay runtime-only. OAuth tests can refresh shared tokens, so route guards precede authentication and virtual-model routing. Draft endpoint or API changes cannot reuse stored OAuth credentials.
+
+Draft `thinkingLevelMap` replacement and `compat.supportsDeveloperRole` reset must preserve SDK inheritance. `getModel()` contains effective metadata, including saved overrides. Reset recovery uses custom definitions, raw native models, or static legacy extension definitions rather than treating the effective model as defaults.
+
+Built-in reset recovery uses a separate offline `ModelRuntime` and the public `InMemoryModelsStore` from `@earendil-works/pi-ai`. Leyline reads the provider's `models-store.json` entry into that store and explicitly refreshes with `allowNetwork: false`. The SDK applies its catalog timestamp rules. With `modelsPath: null`, a `modelsStorePath` alone does not restore this cache. Recovery writes neither drafts nor credentials nor the live cache.
+
+Override edits that remove no saved entries can use the effective model. Pi 0.99.1 does not expose inherited metadata from dynamic legacy extension hooks. Resets that need those defaults refuse the draft test and direct the user to Save, then test the saved model. See [Provider connection tests](../developer-guide/backend-api#provider-connection-tests) for recovery ownership.
 
 Probes request 16 output tokens, set `maxRetries: 0`, and use a 30-second deadline after settings runtime acquisition. Tests refuse Codex, direct OpenAI Responses subscription authentication, `openai-responses` with `supportsMaxOutputTokens: false`, and Bedrock. These paths cannot enforce the output limit or disable retries. See [Provider connection tests](../developer-guide/backend-api#provider-connection-tests) for ownership and result handling.
 

@@ -1,4 +1,7 @@
-import { ModelRuntime } from '@earendil-works/pi-coding-agent'
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { getAgentDir, ModelRuntime } from '@earendil-works/pi-coding-agent'
+import { InMemoryModelsStore } from '@earendil-works/pi-ai'
 import { isCustomProviderAdapter, streamResolvedProvider, supportsProviderFetch, withOptionalCredentials, wrapModelRuntime } from './custom-providers.js'
 import { settingsError } from './pi-config.js'
 import { waitForSettings } from './settings-operations.js'
@@ -14,7 +17,48 @@ function mergeMetadata(base, values) {
   return { ...base, ...values, ...(values.cost ? { cost: { ...base?.cost, ...values.cost } } : {}) }
 }
 
-function draftModel(source, body, configuration) {
+function mergeDraftMetadata(base, values) {
+  const model = mergeMetadata(base, values)
+  if (values.thinkingLevelMap && !Object.keys(values.thinkingLevelMap).length) delete model.thinkingLevelMap
+  if (values.compat) {
+    model.compat = { ...base?.compat, ...values.compat }
+    if (model.compat.supportsDeveloperRole === null) delete model.compat.supportsDeveloperRole
+    if (!Object.keys(model.compat).length) delete model.compat
+  }
+  return model
+}
+
+async function inheritedMetadata(source, providerId, modelId, provider, signal) {
+  const extension = source.getRegisteredProviderConfig(providerId)
+  if (extension?.refreshModels || extension?.oauth?.modifyModels) {
+    throw settingsError('Pi does not expose inherited metadata for this provider extension. Save the model and test the saved settings instead.')
+  }
+  if (extension?.models) return extension.models.find((model) => (model.type || 'chat') === 'chat' && model.id === modelId) || {}
+  const definition = provider.models?.find((model) => model.id === modelId)
+  if (definition) return { thinkingLevelMap: definition.thinkingLevelMap, compat: { ...provider.compat, ...definition.compat } }
+  const native = source.getRegisteredNativeProvider(providerId)
+  let base
+  if (native && !isCustomProviderAdapter(source, providerId)) {
+    base = native.getModels().find((model) => model.id === modelId)
+  } else {
+    const modelsStore = new InMemoryModelsStore()
+    try {
+      const text = await readFile(join(getAgentDir(), 'models-store.json'), { encoding: 'utf8', signal })
+      const entry = (text ? JSON.parse(text.replace(/^\uFEFF/, '')) : {})[providerId]
+      if (entry) await modelsStore.write(providerId, entry, { signal })
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw settingsError('Could not read catalog defaults for the draft test. Refresh the catalog and try again.')
+    }
+    const runtime = await ModelRuntime.create({ modelsPath: null, modelsStore, credentials: emptyCredentials, refreshOnCreate: false, signal })
+    const result = await runtime.refresh({ providers: [providerId], allowNetwork: false, signal })
+    if (result.aborted || result.errors.size || runtime.getError()) throw settingsError('Could not restore catalog defaults for the draft test. Refresh the catalog and try again.')
+    base = runtime.getModel(providerId, modelId)
+  }
+  if (!base) throw settingsError('Inherited model metadata is unavailable. Save the model and test the saved settings instead.')
+  return { thinkingLevelMap: base.thinkingLevelMap, compat: { ...base.compat, ...provider.compat } }
+}
+
+async function draftModel(source, body, configuration, signal) {
   const provider = structuredClone(configuration.providers?.[body.providerId] || {})
   const draft = body.draft
   if (draft.type === 'provider') {
@@ -24,11 +68,11 @@ function draftModel(source, body, configuration) {
     }
   } else if (draft.kind === 'override') {
     provider.modelOverrides ||= {}
-    provider.modelOverrides[body.modelId] = mergeMetadata(provider.modelOverrides[body.modelId], draft.values)
+    provider.modelOverrides[body.modelId] = mergeDraftMetadata(provider.modelOverrides[body.modelId], draft.values)
   } else {
     const definitions = provider.models ||= []
     const index = definitions.findIndex((model) => model.id === body.modelId)
-    const model = mergeMetadata(index < 0 ? { id: body.modelId } : definitions[index], draft.values)
+    const model = mergeDraftMetadata(index < 0 ? { id: body.modelId } : definitions[index], draft.values)
     if (index < 0) definitions.push(model)
     else definitions[index] = model
   }
@@ -45,6 +89,24 @@ function draftModel(source, body, configuration) {
   model.baseUrl = base?.api === 'pi-virtual' ? base.baseUrl : definition.baseUrl ?? provider.baseUrl ?? base?.baseUrl
   model.headers = { ...base?.headers, ...overrides.headers, ...definition.headers }
   model.compat = { ...provider.compat, ...base?.compat, ...definition.compat, ...overrides.compat }
+  if (draft.type === 'model' && model.api !== 'pi-virtual'
+    && (Object.hasOwn(draft.values, 'thinkingLevelMap') || Object.hasOwn(draft.values, 'compat'))) {
+    const previous = configuration.providers?.[body.providerId]?.modelOverrides?.[body.modelId]
+    const needsDefaults = draft.kind !== 'override'
+      || (Object.hasOwn(draft.values, 'thinkingLevelMap')
+        && Object.keys(previous?.thinkingLevelMap || {}).some((level) => !Object.hasOwn(overrides.thinkingLevelMap || {}, level)))
+      || (draft.values.compat?.supportsDeveloperRole === null && Object.hasOwn(previous?.compat || {}, 'supportsDeveloperRole'))
+    const inherited = needsDefaults || !base ? await inheritedMetadata(source, body.providerId, body.modelId, provider, signal) : base
+    if (Object.hasOwn(draft.values, 'thinkingLevelMap')) {
+      model.thinkingLevelMap = inherited.thinkingLevelMap || overrides.thinkingLevelMap
+        ? { ...inherited.thinkingLevelMap, ...overrides.thinkingLevelMap } : undefined
+    }
+    if (Object.hasOwn(draft.values, 'compat')) {
+      const role = overrides.compat?.supportsDeveloperRole ?? inherited.compat?.supportsDeveloperRole
+      if (role === undefined) delete model.compat.supportsDeveloperRole
+      else model.compat.supportsDeveloperRole = role
+    }
+  }
   if (!model.api || (!model.baseUrl && model.api !== 'pi-virtual')) throw settingsError('Enter a base URL and API format before testing.')
   return { provider, model }
 }
@@ -58,8 +120,7 @@ function checkTestSupport(model, resolution) {
   if (model.api === 'bedrock-converse-stream') throw settingsError('Connection tests are unavailable for this API because pi cannot disable automatic retries.')
 }
 
-async function prepareDraft(source, body, configuration, signal) {
-  const { provider, model } = draftModel(source, body, configuration)
+async function prepareDraft(source, body, configuration, signal, { provider, model }) {
   checkTestSupport(model)
   const native = source.getRegisteredNativeProvider(body.providerId)
   const extension = native && !isCustomProviderAdapter(source, body.providerId)
@@ -118,7 +179,8 @@ export async function testProviderConnection({ source, body, operation, configur
   let providerStatus
   try {
     const context = { messages: [{ role: 'user', content: 'Reply with OK.', timestamp: Date.now() }] }
-    let model = body.draft ? draftModel(source, body, configuration).model : source.getModel(body.providerId, body.modelId)
+    const draftModelResult = body.draft ? await waitForSettings(draftModel(source, body, configuration, signal), signal) : null
+    let model = draftModelResult?.model || source.getModel(body.providerId, body.modelId)
     if (!model) throw settingsError('Save a valid model definition before testing the connection.', 404)
     const virtual = model.api === 'pi-virtual'
     if (virtual) {
@@ -131,7 +193,7 @@ export async function testProviderConnection({ source, body, operation, configur
     }
     checkTestSupport(model)
     if (source.isUsingOAuth(model.provider)) assertProviderRoutes(model.provider, source, 'Connection test')
-    const draft = body.draft && !virtual ? await waitForSettings(prepareDraft(source, body, configuration, signal), signal) : null
+    const draft = body.draft && !virtual ? await waitForSettings(prepareDraft(source, body, configuration, signal, draftModelResult), signal) : null
     const resolution = draft?.resolution || await waitForSettings(wrapModelRuntime(source).getAuth(model, { signal }), signal)
     if (!resolution) throw settingsError('The provider could not resolve its authentication.')
     checkTestSupport(model, resolution)

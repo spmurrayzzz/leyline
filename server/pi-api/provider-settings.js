@@ -6,8 +6,9 @@ import { startSettingsOperation, waitForSettings, withProviderSettingsLock } fro
 
 const file = 'models.json'
 const providerFields = ['name', 'baseUrl', 'api', 'authHeader', 'apiKey']
-const modelFields = ['name', 'contextWindow', 'maxTokens', 'reasoning', 'input', 'cost']
+const modelFields = ['name', 'contextWindow', 'maxTokens', 'reasoning', 'input', 'cost', 'thinkingLevelMap', 'compat']
 const costFields = ['input', 'output', 'cacheRead', 'cacheWrite']
+const thinkingLevels = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']
 const apis = new Set(['openai-completions', 'mistral-conversations', 'openai-responses', 'azure-openai-responses', 'openai-codex-responses', 'anthropic-messages', 'bedrock-converse-stream', 'google-generative-ai', 'google-vertex', 'pi-messages'])
 const authLabels = {
   stored: 'Stored credential', runtime: 'Runtime API key', environment: 'Environment or cloud credentials',
@@ -98,6 +99,21 @@ function cost(value, complete = false) {
   }
 }
 
+function thinkingLevelMap(value) {
+  object(value)
+  for (const [level, entry] of Object.entries(value)) {
+    if (!thinkingLevels.includes(level)) throw settingsError('Invalid thinking level')
+    if (entry !== null && (typeof entry !== 'string' || !entry.trim() || entry !== entry.trim() || entry.length > 256 || /[\u0000-\u001f\u007f]/u.test(entry))) {
+      throw settingsError('Thinking level values must be text without surrounding spaces or control characters')
+    }
+  }
+}
+
+function compat(value) {
+  object(value)
+  if (Object.hasOwn(value, 'supportsDeveloperRole') && value.supportsDeveloperRole !== null) boolean(value.supportsDeveloperRole)
+}
+
 function metadata(value) {
   object(value)
   if (Object.hasOwn(value, 'name')) text(value.name)
@@ -105,6 +121,8 @@ function metadata(value) {
   if (Object.hasOwn(value, 'reasoning')) boolean(value.reasoning)
   if (Object.hasOwn(value, 'input')) input(value.input)
   if (Object.hasOwn(value, 'cost')) cost(value.cost)
+  if (Object.hasOwn(value, 'thinkingLevelMap')) thinkingLevelMap(value.thinkingLevelMap)
+  if (Object.hasOwn(value, 'compat')) compat(value.compat)
 }
 
 function validateConfig(data) {
@@ -176,6 +194,15 @@ function safeMetadata(value = {}) {
   for (const key of ['contextWindow', 'maxTokens']) if (Number.isFinite(value[key]) && value[key] > 0) result[key] = value[key]
   if (typeof value.reasoning === 'boolean') result.reasoning = value.reasoning
   if (Array.isArray(value.input)) result.input = value.input.filter((entry) => ['text', 'image'].includes(entry))
+  if (isSettingsObject(value.thinkingLevelMap)) {
+    const map = Object.fromEntries(thinkingLevels
+      .filter((level) => value.thinkingLevelMap[level] === null || typeof value.thinkingLevelMap[level] === 'string')
+      .map((level) => [level, value.thinkingLevelMap[level]]))
+    if (Object.keys(map).length) result.thinkingLevelMap = map
+  }
+  if (isSettingsObject(value.compat) && typeof value.compat.supportsDeveloperRole === 'boolean') {
+    result.compat = { supportsDeveloperRole: value.compat.supportsDeveloperRole }
+  }
   if (isSettingsObject(value.cost)) {
     result.cost = Object.fromEntries(costFields.filter((key) => Number.isFinite(value.cost[key]) && value.cost[key] >= 0).map((key) => [key, value.cost[key]]))
     if (Array.isArray(value.cost.tiers)) {
@@ -297,6 +324,14 @@ export function createProviderSettings({ getRuntime, assertProviderRoutes }) {
             else parent[key] = patch.value
           }
           const provider = own(candidate.providers, providerId)
+          if (provider?.modelOverrides) {
+            for (const [modelId, override] of Object.entries(provider.modelOverrides)) {
+              if (isSettingsObject(override) && !Object.keys(override).length) {
+                delete provider.modelOverrides[modelId]
+                patches.push({ path: ['providers', providerId, 'modelOverrides', modelId], value: undefined })
+              }
+            }
+          }
           if (provider && Object.entries(provider).every(([key, value]) => ['models', 'modelOverrides'].includes(key) && Object.keys(value).length === 0)) {
             delete candidate.providers[providerId]
             patches.push({ path: ['providers', providerId], value: undefined })
@@ -372,6 +407,7 @@ export function createProviderSettings({ getRuntime, assertProviderRoutes }) {
       if (!body.create && !Object.keys(body.values).length) throw settingsError('No model changes supplied')
       if (Object.hasOwn(body.values, 'id') && body.values.id !== body.modelId) throw settingsError('Model IDs cannot be renamed')
       if (Object.hasOwn(body.values, 'cost')) fields(body.values.cost, costFields)
+      if (Object.hasOwn(body.values, 'compat')) fields(body.values.compat, ['supportsDeveloperRole'])
       metadata(body.values)
     }
   }
@@ -393,9 +429,15 @@ export function createProviderSettings({ getRuntime, assertProviderRoutes }) {
         throw settingsError('Set the provider baseUrl and api before adding a custom model')
       }
       const values = Object.fromEntries(Object.entries(body.values).filter(([key]) => key !== 'id'))
+      if (body.kind === 'override' && !existing) {
+        if (values.compat?.supportsDeveloperRole === null) delete values.compat
+        if (values.thinkingLevelMap && !Object.keys(values.thinkingLevelMap).length) delete values.thinkingLevelMap
+      }
       if (!Object.keys(values).length && body.kind === 'override') throw settingsError('No override changes supplied')
       if (body.kind === 'custom' && !existing) {
         if (values.cost) cost(values.cost, true)
+        if (values.thinkingLevelMap && !Object.keys(values.thinkingLevelMap).length) delete values.thinkingLevelMap
+        if (values.compat && (values.compat.supportsDeveloperRole === null || !Object.keys(values.compat).length)) delete values.compat
         return [{ path: ['providers', body.providerId, 'models', -1], value: { id: body.modelId, ...values } }]
       }
       if (body.kind === 'custom' && values.cost) {
@@ -408,10 +450,21 @@ export function createProviderSettings({ getRuntime, assertProviderRoutes }) {
           }
         }
       }
+      const holder = body.kind === 'custom' ? config.models[index] : config?.modelOverrides?.[body.modelId]
       const path = ['providers', body.providerId, ...(body.kind === 'custom' ? ['models', index] : ['modelOverrides', body.modelId])]
-      return Object.entries(values).flatMap(([key, value]) => key === 'cost'
-        ? Object.entries(value).map(([rate, amount]) => ({ path: [...path, 'cost', rate], value: amount }))
-        : [{ path: [...path, key], value }])
+      return Object.entries(values).flatMap(([key, value]) => {
+        if (key === 'cost') return Object.entries(value).map(([rate, amount]) => ({ path: [...path, 'cost', rate], value: amount }))
+        if (key === 'thinkingLevelMap') return [{ path: [...path, 'thinkingLevelMap'], value: Object.keys(value).length ? value : undefined }]
+        if (key === 'compat') {
+          const existingCompat = isSettingsObject(holder?.compat) ? holder.compat : {}
+          if (value.supportsDeveloperRole === null) {
+            const remaining = Object.keys(existingCompat).filter((entry) => entry !== 'supportsDeveloperRole')
+            return [{ path: remaining.length ? [...path, 'compat', 'supportsDeveloperRole'] : [...path, 'compat'], value: undefined }]
+          }
+          return [{ path: [...path, 'compat', 'supportsDeveloperRole'], value: value.supportsDeveloperRole }]
+        }
+        return [{ path: [...path, key], value }]
+      })
     })
   }
 
@@ -453,6 +506,7 @@ export function createProviderSettings({ getRuntime, assertProviderRoutes }) {
           if (!['custom', 'override'].includes(body.draft.kind)) throw settingsError('Invalid model draft kind')
           metadata(body.draft.values)
           if (Object.hasOwn(body.draft.values, 'cost')) fields(body.draft.values.cost, costFields)
+          if (Object.hasOwn(body.draft.values, 'compat')) fields(body.draft.values.compat, ['supportsDeveloperRole'])
         }
       }
     } else if (body.modelId !== undefined || body.draft !== undefined) throw settingsError('Model drafts are only supported for a connection test')
@@ -526,5 +580,47 @@ export function createProviderSettings({ getRuntime, assertProviderRoutes }) {
     }
   }
 
-  return { list, saveProvider, deleteProvider, saveModel, deleteModel, action }
+  async function catalog(target, query, refreshCatalog) {
+    if (typeof query !== 'string' || query.length > 256) throw settingsError('Invalid catalog search')
+    const words = query.toLowerCase().split(/\s+/).filter(Boolean)
+    if (!words.length) return { models: [] }
+    return withProviderSettingsLock(async (signal) => {
+      const lease = await getRuntime(target, { refresh: refreshCatalog, signal })
+      const { modelRuntime } = lease
+      let warning
+      try {
+        if (refreshCatalog) {
+          const refreshWarning = 'The catalog could not be fully refreshed. Results come from the cached catalog.'
+          try {
+            const result = await modelRuntime.refresh({ allowNetwork: true, force: true, signal })
+            if (result.aborted || result.errors.size || modelRuntime.getError()) warning = refreshWarning
+          } catch {
+            warning = refreshWarning
+          }
+        }
+        const matches = modelRuntime.getAllModels()
+          .filter((model) => (model.type || 'chat') === 'chat')
+          .filter((model) => words.every((word) => `${model.id} ${model.name} ${model.provider}`.toLowerCase().includes(word)))
+          .sort((a, b) => a.id.localeCompare(b.id) || String(a.provider).localeCompare(String(b.provider)))
+          .slice(0, 20)
+          .map((model) => ({
+            providerId: model.provider,
+            id: model.id,
+            name: model.name,
+            api: model.api,
+            reasoning: model.reasoning,
+            input: model.input,
+            contextWindow: model.contextWindow,
+            maxTokens: model.maxTokens,
+            ...(model.thinkingLevelMap ? { thinkingLevelMap: model.thinkingLevelMap } : {}),
+            ...(isSettingsObject(model.compat) ? { compat: model.compat } : {}),
+          }))
+        return { models: matches, ...(warning ? { warning } : {}) }
+      } finally {
+        lease.release()
+      }
+    }, AbortSignal.timeout(15000))
+  }
+
+  return { list, saveProvider, deleteProvider, saveModel, deleteModel, action, catalog }
 }

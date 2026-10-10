@@ -117,15 +117,71 @@ Open **Models** to search model names or IDs.
 - **Reset override** removes all saved overrides for that model, including fields outside the form.
 - **Delete custom model** removes the custom definition.
 
-The form supports display name, context window, maximum output tokens, reasoning support, input types, and token costs. Costs use USD per million tokens. Model IDs can contain `/` and must match the endpoint. An existing model ID cannot change.
+The editor uses the workspace width and temporarily hides the provider list. Its sections share one draft:
 
-Only changed fields are written. Unknown fields, compatibility options, and nested pricing tiers stay intact. A save or deletion fails if it leaves invalid model configuration.
+| Section | Fields |
+| --- | --- |
+| **Model** | Model ID, display name, context window, maximum output tokens, and supported input. |
+| **Thinking & compatibility** | Reasoning support, the thinking level map, and developer-role support. |
+| **Pricing** | Input, output, cache-read, and cache-write costs in USD per million tokens. |
+
+**Save model**, **Save override**, and **Test connection** stay below the fields. Changing sections keeps your unsaved values. Validation opens the section that contains an invalid field and focuses that field.
+
+Model IDs can contain `/` and must match the endpoint. An existing model ID cannot change. **Reset override** and **Delete custom model** are inside **Model → Effective metadata and saved overrides**.
+
+Only changed fields are written. Unedited fields, other compatibility options, and nested pricing tiers stay intact. A save or deletion fails if it leaves invalid model configuration.
 
 **Refresh catalog** requests the provider's catalog through pi. The **Refresh** button beside **Models & providers** reloads the settings view and extension registrations. Neither action reloads open conversation runtimes.
 
 On Home, saved changes refresh the model choices. Valid explicit model and thinking selections remain selected. For an existing session, use [Reload runtime](#reload-the-runtime).
 
 Model-picker visibility controls and other pi settings are not part of this page.
+
+### Find a configuration in the catalog
+
+![Catalog search with provider variants, selected import fields, and a fixed Copy into draft button](../assets/screenshots/model-catalog.png)
+
+1. Open **Add custom model**, **Edit**, or **Override**.
+2. Select **Find in catalog**.
+3. Enter a model name or ID, then select **Search** or press Enter.
+4. Select a provider variant and review its values.
+5. Clear any import groups that you do not want.
+6. Select **Copy into draft**.
+7. Adjust the copied fields for your endpoint, then save.
+
+Lookup searches the backend's cached pi catalog and shows up to 20 matches. **Refresh** requests a network update without discarding the model draft. If refresh fails, Leyline warns when results still come from the cache. You can also enter values manually.
+
+Results and review scroll separately. Search, **Back to editor**, and **Copy into draft** stay visible. Escape returns to the editor before it cancels the draft.
+
+The review offers these import groups when the entry supplies them:
+
+- **Model details**: Display name, supported input, context window, maximum output, and reasoning support. New custom models also receive the catalog ID.
+- **Thinking level map**: The provider values and unsupported levels for that entry.
+- **Developer role**: Whether the endpoint accepts developer messages.
+
+**Model details** starts selected. Missing model-detail fields leave your draft unchanged. Review imported values before saving. Costs, endpoint, API format, credentials, and other compatibility flags never copy.
+
+![Model section populated from the catalog, with the imported ID still editable](../assets/screenshots/model-editor.png)
+
+Copy opens **Model** when **Model details** is selected. Otherwise, it opens **Thinking & compatibility**. A new model's copied ID can include a provider prefix, such as `qwen/`. Edit it to match the ID served by your endpoint. Existing model IDs stay unchanged, including when you create a new override.
+
+A catalog entry describes one provider's deployment. Check its token limits and template behavior against your server. Copy does not save configuration, contact the model endpoint, or select a conversation model.
+
+### Set thinking and developer-role compatibility
+
+![Thinking and compatibility section with a Qwen thinking map and developer role disabled](../assets/screenshots/model-thinking.png)
+
+Open **Thinking & compatibility**. Enable **Reasoning support** to edit the map for `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, and `max`.
+
+| Behavior | Saved value | Effect |
+| --- | --- | --- |
+| **Provider default** | Key omitted | Use pi's inherited behavior for that level. |
+| **Unsupported** | `null` | Remove the level from the composer's choices. |
+| **Send value** | A string | Map the pi level to the value your endpoint accepts. |
+
+For example, **Send value** with `none` writes `"off": "none"`. This differs from **Unsupported**, which writes `"off": null`. Setting every row to **Provider default** removes the saved map.
+
+**Developer role** has three choices: **Provider default**, **Supported**, and **Not supported**. Select **Not supported** when the chat template requires system messages instead of developer messages. **Provider default** removes that model's explicit flag. Other compatibility settings remain unchanged.
 
 ### Test a model connection
 
@@ -144,9 +200,9 @@ To test a provider before saving:
 
 The model editor also has **Test connection** beside **Save model** or **Save override**. It uses the current **Model ID** and unsaved form values.
 
-![Model editor with test feedback above the Save and Test connection controls](../assets/screenshots/model-connection-test.png)
+![Tabbed model editor with test feedback beside the fixed Save and Test connection controls](../assets/screenshots/model-connection-test.png)
 
-Progress, **Cancel**, and the result appear above the editor's Save/Test controls. The form keeps its unsaved values. Changing a field clears the previous result.
+Progress, **Cancel**, and the result appear beside Save/Test. In the model editor, these controls stay visible below the current section. The form keeps its unsaved values. Changing a field clears the previous result.
 
 A test does not save form values, select a model, reload a live session, or add conversation messages. Removing a draft key reference still preserves stored credentials. Native OAuth can refresh saved tokens during a test; cancellation cannot undo that refresh.
 
@@ -162,6 +218,8 @@ This pi version cannot enforce those limits for:
 Leyline explains why a test is unavailable before it sends the test generation request. These limits do not prevent normal model use.
 
 Virtual model tests route to a physical model first. Provider editors require a physical **Model ID to test**. Draft endpoint or API changes cannot use a stored OAuth login. Tests can also be blocked by the [provider URL safety check](../reference/troubleshooting#provider-sign-in-is-blocked-after-an-endpoint-change).
+
+Tests apply the same thinking-map and developer-role reset rules as Save. Some legacy provider extensions cannot expose their inherited defaults. If Leyline cannot resolve a reset, save the model first, then test its saved settings from **Models**.
 
 ## Manage MCP servers
 

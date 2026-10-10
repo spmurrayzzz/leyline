@@ -29,6 +29,14 @@ function targetQuery(target, { refresh = false } = {}) {
 export const fetchProviderSettings = (target, options) => request(`/providers${targetQuery(target, options)}`)
 export const saveProviderSettings = (target, body) => request('/providers', { method: 'PUT', body: { ...body, target } })
 export const deleteProviderSettings = (target, body) => request('/providers', { method: 'DELETE', body: { ...body, target } })
+export const fetchCatalogModels = (target, query, { refresh = false, signal } = {}) => {
+  const params = new URLSearchParams()
+  if (target?.sessionId) params.set('sessionId', target.sessionId)
+  if (target?.cwd) params.set('cwd', target.cwd)
+  params.set('q', query)
+  if (refresh) params.set('refresh', '1')
+  return request(`/catalog/models?${params}`, { signal })
+}
 export const saveModelSettings = (target, body) => request('/models', { method: 'PUT', body: { ...body, target } })
 export const deleteModelSettings = (target, body) => request('/models', { method: 'DELETE', body: { ...body, target } })
 export const runProviderSettingsAction = (target, body, baseUrl) => request('/providers/action', { method: 'POST', body: { ...body, target }, baseUrl })

@@ -36,8 +36,12 @@ Memory, subagents, HTML export, and an embedded terminal support session work.
 Each window can use the native backend or a saved backend connection.
 
 Settings includes provider sign-in, custom endpoints, model definitions and
-overrides, and MCP server configuration. Changes use pi's files on the selected
-backend. Project and session details hold their own agent overrides.
+overrides, and MCP server configuration. Find a starting configuration in the
+backend catalog, review the fields to copy, then adjust model limits, thinking
+maps, and developer-role compatibility. Provider costs and connection settings
+stay separate. Changes use pi's files on the selected backend. See
+[Model settings](docs/user-guide/settings.md#find-a-configuration-in-the-catalog).
+Project and session details hold their own agent overrides.
 
 Deep research sessions divide a question into parallel, source-backed threads.
 Leyline keeps the plan and worker sessions inspectable and validates numbered

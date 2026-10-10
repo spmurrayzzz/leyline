@@ -157,6 +157,47 @@ const providerSettings = {
     },
   ],
 }
+const qwenCatalogModel = {
+  providerId: 'openrouter',
+  id: 'qwen/qwen3.8-27b',
+  name: 'Qwen3.8 27B',
+  api: 'openai-completions',
+  reasoning: true,
+  input: ['text', 'image'],
+  contextWindow: 1000000,
+  maxTokens: 131072,
+  thinkingLevelMap: { off: 'none', minimal: null, low: 'low', medium: 'medium', high: null, xhigh: 'xhigh', max: null },
+  compat: { supportsDeveloperRole: false, thinkingFormat: 'openrouter', supportsStrictMode: true },
+}
+const modelCatalog = [
+  qwenCatalogModel,
+  {
+    ...qwenCatalogModel,
+    providerId: 'huggingface',
+    id: 'Qwen/Qwen3.8-27B',
+    contextWindow: 262144,
+    maxTokens: 32768,
+    thinkingLevelMap: { ...qwenCatalogModel.thinkingLevelMap, off: null },
+    compat: { supportsDeveloperRole: false, supportsStrictMode: true },
+  },
+  {
+    ...qwenCatalogModel,
+    providerId: 'groq',
+    contextWindow: 131042,
+    maxTokens: 16384,
+    thinkingLevelMap: { ...qwenCatalogModel.thinkingLevelMap, high: 'high', xhigh: null },
+    compat: { supportsStrictMode: true },
+  },
+]
+const catalogProviderSettings = {
+  ...providerSettings,
+  providers: [
+    ...providerSettings.providers,
+    ...[['openrouter', 'OpenRouter'], ['huggingface', 'Hugging Face'], ['groq', 'Groq']].map(([id, name]) => ({
+      ...providerSettings.providers[1], id, name, models: [],
+    })),
+  ],
+}
 const mcpSettings = {
   revision: 'docs-mcp-v1',
   servers: [
@@ -1009,6 +1050,46 @@ try {
   })
   await capture({
     browser,
+    file: path.join(docsOutputDir, 'model-catalog.png'),
+    route: '/sessions/demo-session',
+    ready: '.assistant-message',
+    scenario: 'model-catalog',
+    interact: openModelCatalog,
+  })
+  await capture({
+    browser,
+    file: path.join(docsOutputDir, 'model-editor.png'),
+    route: '/sessions/demo-session',
+    ready: '.assistant-message',
+    scenario: 'model-catalog',
+    interact: async (page) => {
+      const dialog = await openModelCatalog(page)
+      await dialog.getByRole('button', { name: 'Copy into draft', exact: true }).click()
+      await dialog.locator('[data-model-section="model"]').waitFor()
+      if (await dialog.locator('input[name="id"]').inputValue() !== qwenCatalogModel.id) throw new Error('Catalog ID was not copied')
+      if (await dialog.locator('input[name="contextWindow"]').inputValue() !== String(qwenCatalogModel.contextWindow)) throw new Error('Catalog limits were not copied')
+    },
+  })
+  await capture({
+    browser,
+    file: path.join(docsOutputDir, 'model-thinking.png'),
+    route: '/sessions/demo-session',
+    ready: '.assistant-message',
+    scenario: 'model-catalog',
+    interact: async (page) => {
+      const dialog = await openModelCatalog(page)
+      await dialog.getByRole('button', { name: 'Copy into draft', exact: true }).click()
+      await dialog.locator('input[name="id"]').fill('qwen3.8-27b')
+      await dialog.locator('input[name="contextWindow"]').fill('262144')
+      await dialog.locator('input[name="maxTokens"]').fill('32768')
+      await dialog.getByRole('button', { name: 'Thinking & compatibility', exact: true }).click()
+      await dialog.locator('[data-model-section="thinking"]').waitFor()
+      if (await dialog.getByRole('combobox', { name: 'high thinking behavior', exact: true }).inputValue() !== 'unsupported') throw new Error('Catalog thinking map was not copied')
+      if (await dialog.locator('.pi-settings-role-control select').inputValue() !== 'false') throw new Error('Catalog developer role was not copied')
+    },
+  })
+  await capture({
+    browser,
     file: path.join(docsOutputDir, 'provider-connection-test.png'),
     route: '/sessions/demo-session',
     ready: '.assistant-message',
@@ -1087,6 +1168,15 @@ try {
       await dialog.getByRole('combobox', { name: 'Provider', exact: true }).selectOption('local')
       await dialog.locator('.pi-settings-model-row').nth(2).waitFor()
     },
+  })
+  await capture({
+    browser,
+    file: path.join(docsOutputDir, 'model-catalog-mobile.png'),
+    route: '/sessions/demo-session',
+    ready: '.composer .mobile-label',
+    scenario: 'model-catalog',
+    viewport: { width: 390, height: 844 },
+    interact: openModelCatalog,
   })
   await capture({
     browser,
@@ -1644,6 +1734,30 @@ function detailFor(scenario) {
   }
 }
 
+async function openModelCatalog(page) {
+  const sidebarButton = page.getByRole('button', { name: 'Open sessions', exact: true })
+  if (await sidebarButton.isVisible()) await sidebarButton.click()
+  await page.getByRole('button', { name: 'Open settings', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Leyline settings' })
+  await dialog.waitFor()
+  const category = dialog.getByRole('combobox', { name: 'Settings category', exact: true })
+  if (await category.isVisible()) await category.selectOption('providers')
+  else await dialog.getByRole('button', { name: 'Models & providers', exact: true }).click()
+  await dialog.locator('.pi-settings-workspace[aria-busy="false"]').waitFor()
+  await dialog.getByRole('button', { name: 'Add custom model', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Find in catalog', exact: true }).click()
+  const search = dialog.getByRole('searchbox', { name: 'Search catalog', exact: true })
+  await search.fill('qwen3.8')
+  await search.press('Enter')
+  await dialog.locator('.pi-settings-catalog-result').first().waitFor({ state: 'attached' })
+  await dialog.locator('.pi-settings-catalog[aria-busy="false"]').waitFor()
+  const match = dialog.locator('.pi-settings-catalog-picker select')
+  if (await match.isVisible()) await match.selectOption(`${qwenCatalogModel.providerId}/${qwenCatalogModel.id}`)
+  else await dialog.locator('.pi-settings-catalog-result').filter({ hasText: 'OpenRouter' }).click()
+  await dialog.locator('.pi-settings-catalog-review').getByRole('heading', { name: 'OpenRouter · Qwen3.8 27B', exact: true }).waitFor()
+  return dialog
+}
+
 async function capture({
   browser,
   file,
@@ -1712,7 +1826,13 @@ async function capture({
     if (key === `GET /api/leyline/settings/${THINKING_DEFAULT_SETTING_KEY}`) {
       return json({ key: THINKING_DEFAULT_SETTING_KEY, value: 'collapsed' })
     }
-    if (key === 'GET /api/pi/settings/providers') return json(providerSettings)
+    if (key === 'GET /api/pi/settings/providers') return json(scenario === 'model-catalog' ? catalogProviderSettings : providerSettings)
+    if (key === 'GET /api/pi/settings/catalog/models') {
+      const words = (url.searchParams.get('q') || '').trim().toLowerCase().split(/\s+/).filter(Boolean)
+      return json({ models: words.length ? modelCatalog
+        .filter((entry) => words.every((word) => `${entry.id} ${entry.name} ${entry.providerId}`.toLowerCase().includes(word)))
+        .sort((a, b) => a.id.localeCompare(b.id) || a.providerId.localeCompare(b.providerId)) : [] })
+    }
     if (key === 'POST /api/pi/settings/providers/action') {
       const body = req.postDataJSON()
       if (body.action === 'test' && body.providerId === 'local' && body.modelId === model.id && body.draft?.revision === providerSettings.revision) {

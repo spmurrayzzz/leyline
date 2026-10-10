@@ -52,7 +52,8 @@ Models & providers and MCP servers edit pi-owned global files on the selected ba
 
 | File under the pi agent directory | Owner |
 | --- | --- |
-| `models.json` | Provider endpoints, custom model definitions, and catalog metadata overrides. Leyline edits only the supported fields. |
+| `models.json` | Provider endpoints, custom model definitions, and catalog metadata overrides, including thinking maps and developer-role support. Leyline edits only the supported fields. |
+| `models-store.json` | Pi's catalog cache. Draft reset recovery reads a snapshot into a separate in-memory store without changing this file. |
 | `auth.json` | Provider credentials written through native `ModelRuntime` authentication. |
 | `mcp.json` | Global MCP server configuration. |
 | `mcp-auth.json` | Native MCP OAuth credentials. |
@@ -65,6 +66,10 @@ The SDK resolves the agent directory through `getAgentDir()`, including `PI_CODI
 Provider key references, MCP header/environment values, and secret commands resolve on the selected backend. Saved values are not copied from the browser's native backend. Setting `LEYLINE_MEMORY_DIR` does not relocate pi configuration or change the selected backend's process environment.
 
 Provider API keys are optional. Draft connection tests resolve the current form values on that backend without writing them to these files. Native OAuth token refresh remains a credential operation and can update `auth.json`.
+
+Catalog lookup searches the selected backend's settings runtime cache. Explicit lookup Refresh reloads that runtime and requests a network catalog refresh. If the SDK refresh fails, lookup can return cached results with a warning. Lookup adds no environment variable or separate browser catalog.
+
+Draft thinking-map and developer-role resets recover built-in defaults through a separate offline `ModelRuntime`, seeded from this backend's `models-store.json`. Recovery respects SDK catalog timestamps and never writes drafts, credentials, or the live cache.
 
 Changing provider configuration does not refresh open conversation catalogs. Reload affected sessions explicitly after active work finishes. Settings refresh and Home preview refresh use separate runtimes. See [Provider runtime ownership](../developer-guide/backend-api#provider-runtime-ownership).
 

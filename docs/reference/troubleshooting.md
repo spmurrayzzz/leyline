@@ -92,6 +92,24 @@ Custom compatible models do not need a placeholder API key. Leave the key
 unset if the endpoint does not require authentication. Home refreshes model
 choices after a save; existing sessions need **Reload runtime**.
 
+## The endpoint rejects a thinking level or developer role
+
+Open **Settings → Models & providers**, edit the model, then open **Thinking & compatibility**.
+
+- Select **Not supported** for **Developer role** if the template requires system messages.
+- Mark rejected thinking levels as **Unsupported**, or supply the exact values that your server accepts.
+- Use **Provider default** to remove an explicit override. This differs from `null`, which marks a level as unsupported.
+
+**Find in catalog** can supply a starting map, but entries describe specific provider deployments. Check the imported model ID, token limits, and reasoning support before saving. Reload the affected session after saving. See [Thinking and compatibility](../user-guide/settings#set-thinking-and-developer-role-compatibility).
+
+A successful connection test confirms one short request. It does not verify every thinking level or chat-template behavior.
+
+## Catalog lookup has no match or cannot refresh
+
+Use a more specific model name or ID. Lookup searches the backend's cached pi catalog and returns up to 20 matches. Each provider variant remains separate.
+
+Select **Refresh** inside lookup to request a network update. A refresh failure can leave cached matches available with a warning. You can return to the editor and configure the model manually. Refresh does not discard the draft or reload an open conversation.
+
 ## Model or provider authentication fails
 
 Open **Settings → Models & providers** and select **Test connection** beside
@@ -124,6 +142,11 @@ A provider editor needs a physical **Model ID to test**. Saved virtual models
 can route to a physical model for testing. Draft endpoint or API changes cannot
 use a stored OAuth login. See [Connection tests](../user-guide/settings#test-a-model-connection)
 for limits and credential behavior.
+
+A draft reset can also require inherited metadata that pi cannot expose for a
+legacy provider extension. In that case, save the model and use **Test connection**
+from its **Models** row. Leyline does not guess those defaults or rerun extension
+hooks to reconstruct them.
 
 ## A provider connection test times out
 

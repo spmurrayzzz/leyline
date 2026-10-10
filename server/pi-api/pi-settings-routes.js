@@ -38,6 +38,8 @@ export function createPiSettingsHandler(api) {
       } else if (url.pathname === '/settings/models') {
         if (req.method === 'PUT') return json(res, await providers.saveModel(bodyTarget, values))
         if (req.method === 'DELETE') return json(res, await providers.deleteModel(bodyTarget, values))
+      } else if (url.pathname === '/settings/catalog/models' && req.method === 'GET') {
+        return json(res, await providers.catalog(target, url.searchParams.get('q') || '', url.searchParams.get('refresh') === '1'))
       } else if (url.pathname === '/settings/providers/action' && req.method === 'POST') {
         return sendOperation(res, await providers.action(bodyTarget, values))
       } else if (url.pathname === '/settings/mcp') {

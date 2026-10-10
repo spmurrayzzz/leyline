@@ -427,7 +427,7 @@ The API does not edit project MCP files, general pi preferences, model-picker vi
 
 ### Targets and revisions
 
-Provider reads accept these query parameters:
+Provider inventory and catalog reads accept these target and refresh query parameters:
 
 ```text
 sessionId?: string
@@ -497,6 +497,8 @@ ProviderModel = {
   reasoning: boolean,
   input: Array<"text" | "image">,
   cost: ModelCost,
+  thinkingLevelMap?: ThinkingLevelMap,
+  compat?: { supportsDeveloperRole: boolean },
   kind: "custom" | "override" | "catalog",
   overrides: ModelMetadata
 }
@@ -507,7 +509,19 @@ ModelMetadata = {
   maxTokens?: number,
   reasoning?: boolean,
   input?: Array<"text" | "image">,
-  cost?: ModelCost
+  cost?: ModelCost,
+  thinkingLevelMap?: ThinkingLevelMap,
+  compat?: { supportsDeveloperRole: boolean }
+}
+
+ThinkingLevelMap = {
+  off?: string | null,
+  minimal?: string | null,
+  low?: string | null,
+  medium?: string | null,
+  high?: string | null,
+  xhigh?: string | null,
+  max?: string | null
 }
 
 ModelCost = {
@@ -528,6 +542,55 @@ ModelCost = {
 `configured` reports saved configuration or available credentials, not a successful model request. Custom compatible models can be available without an API key. Stored keys, tokens, header values, and API-key commands are omitted. Unsafe base URLs appear as an empty string. Model records contain only the listed metadata, not their full SDK configuration. Pricing tiers are read-only here.
 
 Ordinary reads refresh the settings runtime's authentication snapshot with `allowNetwork: false`. Loading project extensions can still run their startup work. `refresh=1` replaces that cwd's settings runtime and reloads extension registrations. It does not refresh an open conversation's catalog. Use the provider `refresh` action for a forced network catalog refresh.
+
+### Catalog lookup
+
+#### `GET /api/pi/settings/catalog/models?q=&refresh=`
+
+Query:
+
+```text
+q?: string
+refresh?: "1"
+sessionId?: string
+cwd?: string
+```
+
+The [target rules](#targets-and-revisions) also apply here. `q` accepts at most 256 characters. A longer query returns `400`. An omitted, empty, or whitespace-only query returns `{ models: [] }` without acquiring or refreshing a runtime.
+
+Search splits `q` into whitespace-separated words. Each word must match a substring of the combined model ID, name, and provider ID, without case sensitivity. Only chat models qualify, including models without an explicit type. Results sort by model ID, then provider ID, and contain at most 20 entries. Search does not filter by authentication availability.
+
+Response:
+
+```text
+{
+  models: Array<{
+    providerId: string,
+    id: string,
+    name: string,
+    api: string,
+    reasoning: boolean,
+    input: Array<"text" | "image">,
+    contextWindow: number,
+    maxTokens: number,
+    thinkingLevelMap?: ThinkingLevelMap,
+    compat?: object
+  }>,
+  warning?: string
+}
+```
+
+Entries contain runtime metadata, API format, and compatibility fields. They omit costs, base URLs, authentication, and headers. Unlike provider inventory, catalog lookup can return compatibility fields beyond `supportsDeveloperRole`. These fields are not all editable or copied by the UI.
+
+Ordinary search uses the selected backend's settings runtime cache through `getAllModels()`. It does not query a separate browser catalog. `refresh=1` replaces that settings runtime, reloads extensions, and requests `ModelRuntime.refresh({ allowNetwork: true, force: true })`. Neither search nor refresh changes a live conversation.
+
+A refresh exception, returned `errors` or `aborted` state, or runtime error adds this warning while lookup uses the cached catalog:
+
+```text
+The catalog could not be fully refreshed. Results come from the cached catalog.
+```
+
+Runtime acquisition failures remain HTTP errors rather than cached-result responses.
 
 ### Provider configuration
 
@@ -604,6 +667,8 @@ Request:
     maxTokens?: number,
     reasoning?: boolean,
     input?: Array<"text" | "image">,
+    thinkingLevelMap?: ThinkingLevelMap,
+    compat?: { supportsDeveloperRole?: boolean | null },
     cost?: {
       input?: number,
       output?: number,
@@ -622,7 +687,13 @@ Response: `ProviderInventory`.
 
 Token limits must be finite positive numbers. Costs must be finite nonnegative numbers. `input` must be a nonempty list of `text` and/or `image`, without duplicates. A new custom definition with `cost` requires all four rates. Existing custom definitions fill missing rates from existing or effective costs. Override cost changes merge only the supplied rates.
 
-Omitted fields remain unchanged. Null values do not clear model fields. Model API, endpoint, compatibility, input limits, cache policy, and pricing tiers are not editable here.
+Omitted fields remain unchanged. A supplied `thinkingLevelMap` replaces the map on the custom definition or override. It accepts only the seven keys in `ThinkingLevelMap`.
+
+A string specifies the provider value. It must be nonempty, at most 256 characters, and contain no surrounding spaces or control characters. `null` marks that level unsupported. Missing keys inherit pi/provider behavior. `{}` removes the map from that definition or override.
+
+`compat` accepts only `supportsDeveloperRole`. A boolean sets the flag. `null` removes only that flag from the definition or override, preserving other compatibility fields. An empty compatibility object is removed after the flag reset. Writes also remove empty model overrides and otherwise empty provider entries. A new override still requires a change beyond reset-only values.
+
+Other null model values are invalid. Model API, endpoint, other compatibility fields, input limits, cache policy, and pricing tiers are not editable here.
 
 #### `DELETE /api/pi/settings/models`
 
@@ -711,6 +782,8 @@ ModelTestDraft = {
     maxTokens?: number,
     reasoning?: boolean,
     input?: Array<"text" | "image">,
+    thinkingLevelMap?: ThinkingLevelMap,
+    compat?: { supportsDeveloperRole?: boolean | null },
     cost?: {
       input?: number,
       output?: number,
@@ -722,6 +795,8 @@ ModelTestDraft = {
 ```
 
 `revision` is the current `ProviderInventory.revision`. A mismatch fails the operation before the probe. It appears in a polled `state: "error"` snapshot, not as HTTP `409` from the initial action request. Draft values use the same field validation as configuration edits. `values` can be empty to test an unchanged form.
+
+Model drafts use the same map-replacement and developer-role reset rules as Save. Resets recover inherited metadata instead of retaining the removed override's effective value. If a dynamic legacy extension does not expose the required defaults, the operation refuses the draft test. Its error directs the user to save the model and test the saved settings instead.
 
 Provider drafts overlay the saved provider configuration in memory. `create: true` permits a new, unique provider ID; a new provider needs a base URL and API format. The root `modelId` is its physical test model, not a saved definition. Model drafts overlay a custom definition or catalog override. The root `modelId` is the current model form's ID.
 

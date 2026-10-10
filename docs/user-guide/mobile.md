@@ -43,6 +43,16 @@ Settings fills the mobile viewport. **Models & providers** and **MCP servers** u
 
 Use **Close Leyline settings** to return to the workspace. See [Settings](./settings) for scope, authentication, and reload behavior.
 
+### Edit a model or copy catalog fields
+
+The model editor temporarily hides the category and provider selectors. **Model**, **Thinking & compatibility**, and **Pricing** share one draft. Save/Test stay visible below the fields.
+
+![Mobile model lookup with a catalog-match selector, field review, and fixed Back and Copy controls](../assets/screenshots/model-catalog-mobile.png)
+
+**Find in catalog** replaces the fields with search and review. Use **Catalog match** to choose a provider variant. Search and the Back/Copy controls stay visible while the review scrolls.
+
+Copying **Model details** opens **Model**, where you can edit a new model's imported ID. **Back to editor** keeps your draft. See [Catalog lookup](./settings#find-a-configuration-in-the-catalog) for copied fields and exclusions.
+
 ## Supervise activity on mobile
 
 ![Full-screen mobile Activity view with session status and controls](../assets/screenshots/activity-mobile.png)
