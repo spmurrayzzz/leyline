@@ -20,7 +20,7 @@ export function formatMode(value) {
 
 export function projectName(cwd) {
   if (!cwd) return 'unknown'
-  return cwd.split('/').filter(Boolean).at(-1) || cwd
+  return cwd.split(/[\\/]/).filter(Boolean).at(-1) || cwd
 }
 
 export function formatDate(value) {

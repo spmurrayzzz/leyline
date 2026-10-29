@@ -1,5 +1,6 @@
 import MarkdownIt from 'markdown-it'
 import { configureMarkdownLinks } from '../../lib/markdown-file-links.js'
+import { autolinkBareFilenames } from './display-preferences'
 import highlightJsSource from '../../node_modules/@earendil-works/pi-coding-agent/dist/core/export-html/vendor/highlight.min.js?raw'
 import {
   imageBlocksFor,
@@ -38,16 +39,16 @@ export function renderedMessage(entry) {
 }
 
 export function renderedText(text) {
-  return markdown.render(text || '')
+  return markdown.render(text || '', { autolinkBareFilenames: autolinkBareFilenames.value })
 }
 
 export function renderedBlock(block, { streaming = false } = {}) {
   const renderer = streaming ? streamingMarkdown : markdown
-  return renderer.render(block.text || '')
+  return renderer.render(block.text || '', { autolinkBareFilenames: autolinkBareFilenames.value })
 }
 
 export function renderedMarkdownPreview(preview) {
-  return previewMarkdown.render(preview?.content || '', {})
+  return previewMarkdown.render(preview?.content || '', { autolinkBareFilenames: autolinkBareFilenames.value })
 }
 
 export function toolCommandCode(entry) {

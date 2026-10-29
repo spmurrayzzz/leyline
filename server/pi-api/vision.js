@@ -1,8 +1,5 @@
 import { createHash } from 'node:crypto'
-import { mkdirSync } from 'node:fs'
-import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
+import { openMemoryDb } from './leyline-db.js'
 import { overrideContext, scopeIdentity } from './override-context.js'
 
 const SCOPES = new Set(['global', 'project', 'session'])
@@ -372,10 +369,7 @@ function effectiveOverride(overrides, field) {
 }
 
 function openDb() {
-  mkdirSync(dirname(dbPath()), { recursive: true })
-  const db = new DatabaseSync(dbPath())
-  db.exec('PRAGMA journal_mode = WAL')
-  db.exec('PRAGMA busy_timeout = 5000')
+  const db = openMemoryDb()
   db.exec(`
     CREATE TABLE IF NOT EXISTS vision_overrides (
       scope TEXT NOT NULL CHECK (scope IN ('global', 'project', 'session')),
@@ -398,10 +392,4 @@ function openDb() {
     db.exec('ALTER TABLE vision_overrides ADD COLUMN thinking TEXT')
   }
   return db
-}
-
-function dbPath() {
-  const dir = process.env.LEYLINE_MEMORY_DIR
-    || join(homedir(), '.local', 'share', 'leyline')
-  return join(dir, 'memory.sqlite')
 }

@@ -1,8 +1,4 @@
-import { mkdirSync } from 'node:fs'
-import { mkdir } from 'node:fs/promises'
-import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
+import { openMemoryDb } from './leyline-db.js'
 
 const FEEDBACK_LABELS = new Set(['helpful', 'unhelpful'])
 
@@ -60,8 +56,6 @@ export async function setRolloutFeedback({
   }
   const note = String(feedbackText || '').trim()
 
-  await mkdir(dirname(dbPath()), { recursive: true })
-
   const db = openDb()
   try {
     const updatedAt = Date.now()
@@ -108,8 +102,7 @@ export async function setRolloutFeedback({
 }
 
 function openDb() {
-  mkdirSync(dirname(dbPath()), { recursive: true })
-  const db = new DatabaseSync(dbPath())
+  const db = openMemoryDb()
   db.exec(`
     CREATE TABLE IF NOT EXISTS rollout_feedback (
       cwd TEXT NOT NULL,
@@ -132,12 +125,4 @@ function ensureFeedbackTextColumn(db) {
   const columns = db.prepare('PRAGMA table_info(rollout_feedback)').all()
   if (columns.some((column) => column.name === 'feedback_text')) return
   db.exec("ALTER TABLE rollout_feedback ADD COLUMN feedback_text TEXT NOT NULL DEFAULT ''")
-}
-
-function dbPath() {
-  return join(leylineDataDir(), 'memory.sqlite')
-}
-
-function leylineDataDir() {
-  return process.env.LEYLINE_MEMORY_DIR || join(homedir(), '.local', 'share', 'leyline')
 }

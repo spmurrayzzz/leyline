@@ -271,7 +271,7 @@ function captureShortcut(event) {
           <div v-else class="dictation-model-actions">
             <span class="dictation-note">{{ model.installed ? `Downloaded on ${host}` : `Download this model on ${host} before using the composer microphone.` }}</span>
             <button v-if="!model.installed" class="dictation-button" type="button" :disabled="locked || pending.has(`remove:${model.id}`)" @click="run(`download:${model.id}`, () => dictation.downloadModel(model.id))">Download · {{ bytesLabel(model.bytes) }}</button>
-            <button v-else class="dictation-button dictation-button-quiet" type="button" :disabled="locked || pending.has(`remove:${model.id}`)" @click="removeModel">{{ pending.has(`remove:${model.id}`) ? 'Removing…' : `Remove model from ${host}` }}</button>
+            <button v-else class="dictation-button" type="button" :disabled="locked || pending.has(`remove:${model.id}`)" @click="removeModel">{{ pending.has(`remove:${model.id}`) ? 'Removing…' : `Remove model from ${host}` }}</button>
           </div>
           <small class="dictation-note">Model files stay on {{ host }} until you remove them. Selecting a model does not download it.</small>
         </div>

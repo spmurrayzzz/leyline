@@ -58,7 +58,8 @@ export function exportShareMeta(id) {
   }
 }
 
-export async function renderSessionExportHtml(detail, shareMeta = {}) {
+export async function renderSessionExportHtml(detail, shareMeta = {}, options = {}) {
+  const renderEnv = { autolinkBareFilenames: options.autolinkBareFilenames === true }
   const session = detail.session
   const title = session.name || session.firstMessage || 'Untitled session'
   const entries = detail.entries
@@ -66,7 +67,7 @@ export async function renderSessionExportHtml(detail, shareMeta = {}) {
     .map(toExportEntry)
   const entryIndices = new Map(entries.map((entry, index) => [entry, index]))
   const body = groupToolActivity(entries).map(item => {
-    if (item.type !== 'tool-activity') return renderExportEntry(item, entryIndices.get(item))
+    if (item.type !== 'tool-activity') return renderExportEntry(item, entryIndices.get(item), renderEnv)
     const summary = activitySummary(item.items)
     const inspectOnly = Boolean(singleSubagentEntry(item))
     const disclosure = inspectOnly
@@ -84,7 +85,7 @@ export async function renderSessionExportHtml(detail, shareMeta = {}) {
 <span class="mobile-activity-heading"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 4.5-9 4.5-9-4.5L12 3ZM3 12l9 4.5 9-4.5M3 16.5l9 4.5 9-4.5" /></svg><strong>${item.items.length} tool ${item.items.length === 1 ? 'call' : 'calls'}</strong><span class="mobile-activity-state" title="${escapeHtml(statusLabel)}" aria-label="${escapeHtml(statusLabel)}">${summary.busy ? '<span class="mobile-activity-spinner" aria-hidden="true"></span>' : ''}${outcomeHtml}</span>${disclosure}</span>
 <span class="mobile-activity-breakdown">${item.operations.map(operation => `<span>${escapeHtml(operation)}</span>`).join('')}</span>
 </button>
-<div class="mobile-activity-list">${item.items.map(call => renderExportEntry(activityEntry(call), entryIndices.get(call))).join('\n')}</div>
+<div class="mobile-activity-list">${item.items.map(call => renderExportEntry(activityEntry(call), entryIndices.get(call), renderEnv)).join('\n')}</div>
 </section>`
   }).join('\n')
   const researchSources = renderExportResearchSources(session.research)
@@ -229,11 +230,11 @@ function toExportEntry(entry) {
   return next
 }
 
-function renderExportEntry(entry, index) {
+function renderExportEntry(entry, index, env) {
   if (entry.type === 'tool') return renderExportTool(entry, index)
-  if (entry.type === 'system') return renderExportSystem(entry, index)
+  if (entry.type === 'system') return renderExportSystem(entry, index, env)
   if (entry.type === 'model-change') return renderExportModelChange(entry)
-  return renderExportMessage(entry)
+  return renderExportMessage(entry, env)
 }
 
 function renderExportModelChange(entry) {
@@ -324,18 +325,18 @@ function renderSystemFileDiff(preview) {
   }
 }
 
-function renderExportProjectContextFile(file, initial) {
+function renderExportProjectContextFile(file, initial, env) {
   const label = `<code title="${escapeHtml(file.path)}">${escapeHtml(file.label)}</code>`
   if (file.status === 'unchanged' && !initial) {
-    return `<details class="system-prompt-file is-unchanged"><summary>${label}<span> · unchanged</span></summary><div class="system-prompt-prose markdown-body">${renderMarkdown(file.content)}</div></details>`
+    return `<details class="system-prompt-file is-unchanged"><summary>${label}<span> · unchanged</span></summary><div class="system-prompt-prose markdown-body">${renderMarkdown(file.content, env)}</div></details>`
   }
   const content = file.preview
     ? renderSystemFileDiff(file.preview)
-    : `<div class="system-prompt-prose markdown-body">${renderMarkdown(file.content)}</div>`
+    : `<div class="system-prompt-prose markdown-body">${renderMarkdown(file.content, env)}</div>`
   return `<div class="system-prompt-file"><h4>${label}${initial ? '' : `<span> · ${escapeHtml(file.statusLabel)}</span>`}</h4>${content}</div>`
 }
 
-function renderExportSystem(entry, index) {
+function renderExportSystem(entry, index, env) {
   const info = systemPromptInfo(entry)
   const sections = entry.sections || []
   const tools = [
@@ -349,8 +350,8 @@ function renderExportSystem(entry, index) {
     const files = section.name === 'project_context' ? context.files : []
     const body = files.length
       ? [...files.filter((file) => file.status !== 'unchanged'), ...files.filter((file) => file.status === 'unchanged')]
-        .map((file) => renderExportProjectContextFile(file, info.initial)).join('')
-      : section.removed ? '' : `<div class="system-prompt-prose markdown-body">${renderMarkdown(section.text)}</div>`
+        .map((file) => renderExportProjectContextFile(file, info.initial, env)).join('')
+      : section.removed ? '' : `<div class="system-prompt-prose markdown-body">${renderMarkdown(section.text, env)}</div>`
     const notice = section.name === 'project_context' && context.notice
       ? `<p class="system-prompt-notice">${escapeHtml(context.notice)}</p>` : ''
     return `<section class="system-prompt-section">
@@ -359,10 +360,10 @@ ${notice}${body}
 </section>`
   }).join('') || (tools.length
     ? '<p class="system-prompt-empty">No prompt sections changed in this event.</p>'
-    : `<div class="system-prompt-prose markdown-body">${renderMarkdown(entry.text)}</div>`)
+    : `<div class="system-prompt-prose markdown-body">${renderMarkdown(entry.text, env)}</div>`)
   const toolContent = tools.map((tool) => `<section class="system-prompt-section">
 <h3><code>${escapeHtml(tool.name)}</code>${tool.removed ? '<span> · removed</span>' : info.initial ? '' : '<span> · added</span>'}</h3>
-${tool.removed ? '' : `<div class="system-prompt-prose markdown-body">${renderMarkdown(tool.description)}</div>`}
+${tool.removed ? '' : `<div class="system-prompt-prose markdown-body">${renderMarkdown(tool.description, env)}</div>`}
 </section>`).join('') || `<p class="system-prompt-empty">${info.initial ? 'No tools declared in this event.' : 'No tools changed in this event.'}</p>`
 
   return `<details class="system-prompt-export" name="system-inspectors" data-system-index="${index}">
@@ -593,7 +594,7 @@ function highlightExportJson(json) {
   return html + escapeHtml(json.slice(offset))
 }
 
-function renderExportMessage(entry) {
+function renderExportMessage(entry, env) {
   const skills = skillSummaries(entry)
   const classes = [
     'message compact-message transcript-message',
@@ -605,10 +606,10 @@ function renderExportMessage(entry) {
   ].filter(Boolean).join(' ')
 
   return `<article class="${classes}">
-${skills.length ? renderSkillSummaries(entry, skills) : ''}
+${skills.length ? renderSkillSummaries(entry, skills, env) : ''}
 <div class="message-meta message-meta-row"><span>${escapeHtml(entry.label)}</span></div>
 ${renderExportResearchReportHeading(entry)}
-${renderMessageBody(entry)}
+${renderMessageBody(entry, env)}
 ${renderMessageImages(entry)}
 </article>`
 }
@@ -639,20 +640,20 @@ function renderExportResearchSources(research) {
   return `<section class="export-research-sources"><header><strong>Sources</strong><span>${escapeHtml(research.sourceCount)} total · ${escapeHtml(research.citedSourceCount)} cited · ${escapeHtml(research.excludedSourceCount)} excluded</span></header>${sources}</section>`
 }
 
-function renderMessageBody(entry) {
+function renderMessageBody(entry, env) {
   if (entry.role === 'assistant' && entry.blocks?.length) {
-    return messageBlocksFor(entry).map(renderMessageBlock).join('\n')
+    return messageBlocksFor(entry).map(block => renderMessageBlock(block, env)).join('\n')
   }
 
   if (skillSummaries(entry).length) {
     const userMessage = parseSkillPrompt(entry.text)?.userMessage
-    return userMessage ? `<div class="entry-text markdown-body">${renderMarkdown(userMessage)}</div>` : ''
+    return userMessage ? `<div class="entry-text markdown-body">${renderMarkdown(userMessage, env)}</div>` : ''
   }
 
-  return `<div class="entry-text markdown-body">${renderMarkdown(entry.text)}</div>`
+  return `<div class="entry-text markdown-body">${renderMarkdown(entry.text, env)}</div>`
 }
 
-function renderMessageBlock(block) {
+function renderMessageBlock(block, env) {
   if (block.type === 'thinking') {
     return `<div class="thinking-block is-expanded">
 <button class="thinking-trigger" type="button">
@@ -668,11 +669,11 @@ function renderMessageBlock(block) {
   }
 
   return `<div class="entry-text markdown-body assistant-text-block">
-${renderMarkdown(block.text || '')}
+${renderMarkdown(block.text || '', env)}
 </div>`
 }
 
-function renderSkillSummaries(entry, skills) {
+function renderSkillSummaries(entry, skills, env) {
   const rows = skills.map((skill) => {
     return `<span class="skill-summary" title="${escapeHtml(skill.location || '')}">${skillIcon()}<strong>${escapeHtml(skill.name)}</strong><span class="skill-kind">Skill</span><svg class="chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg></span>`
   }).join('')
@@ -680,7 +681,7 @@ function renderSkillSummaries(entry, skills) {
 
   return `<div class="skill-message-header"><details><summary>${rows}</summary>
 <div class="skill-expanded entry-text markdown-body">
-${renderMarkdown(content)}
+${renderMarkdown(content, env)}
 </div>
 </details></div>`
 }

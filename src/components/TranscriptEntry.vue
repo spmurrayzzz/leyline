@@ -69,10 +69,21 @@ const emit = defineEmits([
 const feedbackDraft = ref('')
 const noteOpen = ref(false)
 const thinkingExpanded = ref(props.thinkingInitiallyExpanded)
+const thinkingContentMounted = ref(props.thinkingInitiallyExpanded)
+const skillContentMounted = ref(props.skillExpanded)
 const toolContentMounted = ref(props.toolExpanded)
 const systemInfo = computed(() => systemPromptInfo(props.entry))
+const toolJsonHtml = computed(() => renderedToolJson(props.entry))
 const skills = computed(() => skillSummaries(props.entry))
 const skillName = computed(() => skillReadName(props.entry))
+
+watch(thinkingExpanded, (expanded) => {
+  if (expanded) thinkingContentMounted.value = true
+})
+
+watch(() => props.skillExpanded, (expanded) => {
+  if (expanded) skillContentMounted.value = true
+})
 
 watch(() => props.toolExpanded, (expanded) => {
   if (expanded) toolContentMounted.value = true
@@ -428,6 +439,7 @@ function openMarkdownContent(event) {
                 imageSrc(entry.preview),
                 'Read image preview',
                 $event,
+                entry.preview,
               )"
             >
               <img :src="imageSrc(entry.preview)" alt="Read image preview" />
@@ -449,9 +461,9 @@ function openMarkdownContent(event) {
           <template v-else-if="hasToolResult(entry)">
             <div class="tool-preview-clip tool-plain-preview">
               <pre
-                v-if="renderedToolJson(entry)"
+                v-if="toolJsonHtml"
                 class="tool-output json-output"
-                v-html="renderedToolJson(entry)"
+                v-html="toolJsonHtml"
               ></pre>
               <pre v-else class="tool-output">{{ entry.text }}</pre>
             </div>
@@ -471,7 +483,7 @@ function openMarkdownContent(event) {
   <article
     v-else
     class="message compact-message transcript-message"
-    :class="[entryClass(entry), { 'skill-message': skills.length }]"
+    :class="[entryClass(entry), { 'has-feedback-note': noteOpen, 'skill-message': skills.length }]"
   >
     <div v-if="skills.length" class="skill-message-header">
       <button
@@ -495,6 +507,7 @@ function openMarkdownContent(event) {
       <div class="skill-expand-wrapper" :class="{ 'is-expanded': skillExpanded }">
         <div class="skill-expand-inner">
           <div
+            v-if="skillContentMounted"
             class="skill-expanded entry-text markdown-body"
             v-html="renderedText(skillContent(entry))"
             @click="openMarkdownContent"
@@ -647,7 +660,7 @@ function openMarkdownContent(event) {
           </button>
           <div class="thinking-expand-wrapper" :class="{ 'is-expanded': thinkingExpanded }">
             <div class="thinking-expand-inner">
-              <pre>{{ block.text }}</pre>
+              <pre v-if="thinkingContentMounted">{{ block.text }}</pre>
             </div>
           </div>
         </div>

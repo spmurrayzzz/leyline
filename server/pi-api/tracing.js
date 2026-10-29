@@ -1,7 +1,7 @@
-import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { createPiTracingExtension } from '@elune/embedded/pi'
 import { readBackendSettings, writeBackendSettings } from '../backend-connections.js'
+import { leylineDataDir } from './leyline-db.js'
 
 const { createElune } = await import(import.meta.resolve('@elune/embedded').replace(/\.asar\//, '.asar.unpacked/'))
 const SETTING = 'tracing.enabled'
@@ -98,9 +98,8 @@ export function createTracing({ broadcastEvent, getChildMarker }) {
   function getStore() {
     config()
     if (!store) {
-      const root = process.env.LEYLINE_MEMORY_DIR || join(homedir(), '.local', 'share', 'leyline')
       store = createElune({
-        databasePath: join(root, 'elune', 'elune.db'),
+        databasePath: join(leylineDataDir(), 'elune', 'elune.db'),
         onError: cause => {
           if (cause?.name !== 'TypeError' && cause?.message !== 'Trace not found') report(cause)
         },

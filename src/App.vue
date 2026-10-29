@@ -88,6 +88,7 @@ import {
   imageBlocksFor,
   imageSrc,
   messageBlocksFor,
+  renderedText,
   renderedToolJson,
   textFromBlocks,
   toolCommandCode,
@@ -890,10 +891,10 @@ const {
   closeToolFullscreen,
   isSkillExpanded,
   toggleSkill,
-  entryCopyText,
   liveAssistantDisplayBlocks,
   liveAssistantDisplayCopyText,
   copyEntry,
+  copyImageSource,
   copyTranscriptItem,
   copyTitle,
 } = toolExpansion
@@ -907,6 +908,7 @@ const {
   approveFile,
   goBackFile,
   previewFileMenu,
+  openFileActionMenu,
   fileMenuAction,
 } = useFileLinks({
   sessionId: computed(() => sessionDetail.value?.session?.id || selectedSessionId.value),
@@ -925,11 +927,14 @@ const {
 })
 const transcriptPreferences = useTranscriptPreferences()
 const {
+  autolinkBareFilenames,
   error: transcriptPreferencesError,
   load: loadTranscriptPreferences,
+  setAutolinkBareFilenames,
   setThinkingDefault,
   thinkingDefault,
 } = transcriptPreferences
+const autolinkPreview = computed(() => renderedText('README.md and example.com'))
 const thinkingInitiallyExpanded = computed(
   () => thinkingDefault.value === 'expanded',
 )
@@ -1177,7 +1182,7 @@ const canSubmitDraft = computed(() => {
   if (imageSupportWarning.value || dictationSubmissionPending.value) return false
   if (dictation.active && dictation.phase !== 'testing') return true
   if (shellModeDraft.value) return Boolean(shellDraft.value)
-  return draft.value.trim() || attachedImages.value.length > 0
+  return Boolean(draft.value.trim()) || attachedImages.value.length > 0
 })
 const eventStreamLabel = computed(() => {
   if (eventStreamConnected.value) return 'Connected'
@@ -3789,10 +3794,10 @@ function removeAttachedImage(index) {
   })
 }
 
-function openImageFullscreen(src, title = 'Image preview', event) {
+function openImageFullscreen(src, title = 'Image preview', event, file = null) {
   if (!src) return
   imageOpener.value = event?.currentTarget || document.activeElement
-  fullscreenImage.value = { src, title }
+  fullscreenImage.value = { src, title, file }
 }
 
 function openToolFullscreen(entry, event) {
@@ -5526,35 +5531,65 @@ function closePickerMenus() {
 
       </template>
       <template #display>
-        <div class="settings-choice-group">
-          <span>
-            <strong>Thought rows</strong>
-            <small>Initial state in live and saved transcripts</small>
-          </span>
-          <div class="settings-choice-options" :data-active="thinkingDefault" role="group" aria-label="Thought display">
-            <span class="settings-choice-thumb" aria-hidden="true" />
-            <button
-              type="button"
-              :class="{ active: thinkingDefault === 'collapsed' }"
-              :aria-pressed="thinkingDefault === 'collapsed'"
-              @click="setThinkingDefault('collapsed')"
-            >Collapsed</button>
-            <button
-              type="button"
-              :class="{ active: thinkingDefault === 'expanded' }"
-              :aria-pressed="thinkingDefault === 'expanded'"
-              @click="setThinkingDefault('expanded')"
-            >Expanded</button>
+        <div class="settings-choice-group settings-display-card">
+          <div class="settings-choice-heading">
+            <span>
+              <strong>Thought rows</strong>
+              <small>Initial state in live and saved transcripts</small>
+            </span>
+            <div class="settings-choice-options" :data-active="thinkingDefault" role="group" aria-label="Thought display">
+              <span class="settings-choice-thumb" aria-hidden="true" />
+              <button
+                type="button"
+                :class="{ active: thinkingDefault === 'collapsed' }"
+                :aria-pressed="thinkingDefault === 'collapsed'"
+                @click="setThinkingDefault('collapsed')"
+              >Collapsed</button>
+              <button
+                type="button"
+                :class="{ active: thinkingDefault === 'expanded' }"
+                :aria-pressed="thinkingDefault === 'expanded'"
+                @click="setThinkingDefault('expanded')"
+              >Expanded</button>
+            </div>
+          </div>
+          <p v-if="transcriptPreferencesError" class="settings-error" role="alert">{{ transcriptPreferencesError }}</p>
+          <p class="settings-note">Applies to new rows. Rows already in the transcript keep their current state.</p>
+          <div class="settings-thought-preview" aria-label="Thought display preview">
+            <span>Preview</span>
+            <div>{{ thinkingDefault === 'expanded' ? '⌄' : '›' }} Thought</div>
+            <p v-if="thinkingDefault === 'expanded'">I’ll check the active branch and its runtime state before making a change.</p>
+          </div>
+          <p class="settings-note">This setting does not change the model’s thinking level.</p>
+        </div>
+        <div class="settings-choice-group settings-display-card settings-display-followup">
+          <div class="settings-choice-heading">
+            <span>
+              <strong>Link bare filenames as web addresses</strong>
+              <small>How filenames such as README.md appear in transcripts</small>
+            </span>
+            <div class="settings-choice-options" :data-active="autolinkBareFilenames ? 'expanded' : 'collapsed'" role="group" aria-label="Bare filename links">
+              <span class="settings-choice-thumb" aria-hidden="true" />
+              <button
+                type="button"
+                :class="{ active: !autolinkBareFilenames }"
+                :aria-pressed="!autolinkBareFilenames"
+                @click="setAutolinkBareFilenames(false)"
+              >Off</button>
+              <button
+                type="button"
+                :class="{ active: autolinkBareFilenames }"
+                :aria-pressed="autolinkBareFilenames"
+                @click="setAutolinkBareFilenames(true)"
+              >On</button>
+            </div>
+          </div>
+          <p class="settings-note">Off keeps bare filenames as plain text. On restores Markdown autolinking. Explicit URLs and local-file links are unaffected.</p>
+          <div class="settings-thought-preview" aria-label="Filename link preview">
+            <span>Preview</span>
+            <div class="entry-text markdown-body" v-html="autolinkPreview"></div>
           </div>
         </div>
-        <p v-if="transcriptPreferencesError" class="settings-error" role="alert">{{ transcriptPreferencesError }}</p>
-        <p class="settings-note">Applies to new rows. Rows already in the transcript keep their current state.</p>
-        <div class="settings-thought-preview" aria-label="Thought display preview">
-          <span>Preview</span>
-          <div>{{ thinkingDefault === 'expanded' ? '⌄' : '›' }} Thought</div>
-          <p v-if="thinkingDefault === 'expanded'">I’ll check the active branch and its runtime state before making a change.</p>
-        </div>
-        <p class="settings-note">This setting does not change the model’s thinking level.</p>
       </template>
       <template #files>
         <FileLinkSettings ref="piSettingsPane" :backend-name="activeBackendConnection.name" />
@@ -5738,6 +5773,27 @@ function closePickerMenus() {
             </div>
             <div>
               <button
+                v-if="fullscreenImage.file?.path"
+                type="button"
+                @click="copyTranscriptItem('file-path', fullscreenImage.file.path)"
+              >{{ copiedEntryId === 'file-path' ? 'Copied' : 'Copy path' }}</button>
+              <button
+                v-if="fullscreenImage.file?.path"
+                type="button"
+                aria-label="Image file actions"
+                aria-haspopup="menu"
+                @click="openFileActionMenu(fullscreenImage.file, $event)"
+              >Actions</button>
+              <button
+                class="copy-button"
+                type="button"
+                :title="copiedEntryId === 'fullscreen-image' ? 'Copied' : 'Copy image'"
+                aria-label="Copy image"
+                @click="copyImageSource(fullscreenImage.src, 'fullscreen-image')"
+              >
+                <CopyIcon :copied="copiedEntryId === 'fullscreen-image'" />
+              </button>
+              <button
                 type="button"
                 title="Close image preview"
                 aria-label="Close image preview"
@@ -5763,7 +5819,11 @@ function closePickerMenus() {
         <section ref="toolDialog" class="tool-fullscreen" role="dialog" aria-modal="true" aria-label="Tool preview" tabindex="-1" @click.stop>
           <header class="tool-fullscreen-header">
             <div>
-              <span>{{ fullscreenTool.label }}</span>
+              <span>{{ fullscreenTool.preview?.kind === 'image'
+                ? 'Read image preview'
+                : fullscreenTool.preview?.kind === 'file'
+                  ? 'Read file preview'
+                  : fullscreenTool.label }}</span>
               <code v-if="fullscreenTool.code" :title="fullscreenTool.code">{{ fullscreenTool.code }}</code>
             </div>
             <div>
@@ -5791,10 +5851,22 @@ function closePickerMenus() {
                 </button>
               </div>
               <button
+                v-if="fullscreenTool.preview?.path"
+                type="button"
+                @click="copyTranscriptItem('file-path', fullscreenTool.preview.path)"
+              >{{ copiedEntryId === 'file-path' ? 'Copied' : 'Copy path' }}</button>
+              <button
+                v-if="fullscreenTool.preview?.path"
+                type="button"
+                aria-label="Tool file actions"
+                aria-haspopup="menu"
+                @click="openFileActionMenu(fullscreenTool.preview, $event)"
+              >Actions</button>
+              <button
                 class="copy-button"
                 type="button"
                 :title="copyTitle(fullscreenTool.id)"
-                @click="copyTranscriptItem(fullscreenTool.id, entryCopyText(fullscreenTool))"
+                @click="copyEntry(fullscreenTool)"
               >
                 <CopyIcon :copied="copiedEntryId === fullscreenTool.id" />
               </button>

@@ -396,7 +396,7 @@ async function untrackedPatch(root, path) {
     '--no-index',
     ...DIFF_FORMAT_ARGS,
     '--',
-    devNull,
+    process.platform === 'win32' ? 'nul' : devNull,
     path,
   ], [0, 1])
   if (result.code === 1 && !/^diff --git /m.test(result.stdout)) {

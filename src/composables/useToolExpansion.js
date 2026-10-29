@@ -76,7 +76,38 @@ export function useToolExpansion() {
   }
 
   async function copyEntry(entry) {
+    if (await copyEntryImage(entry)) return
     await copyTranscriptItem(entry.id, entryCopyText(entry))
+  }
+
+  async function copyEntryImage(entry) {
+    const preview = entry?.preview
+    if (preview?.kind !== 'image' || !preview.data) return false
+
+    try {
+      if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') return false
+      const blob = await clipboardImageBlob(preview)
+      if (!blob) return false
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+      markCopied(entry.id)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  async function copyImageSource(src, id = 'fullscreen-image') {
+    if (!src || !navigator.clipboard?.write || typeof ClipboardItem === 'undefined') return false
+
+    try {
+      const blob = await clipboardPngBlob(await (await fetch(src)).blob())
+      if (!blob) return false
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })])
+      markCopied(id)
+      return true
+    } catch {
+      return false
+    }
   }
 
   async function copyTranscriptItem(id, text) {
@@ -96,6 +127,10 @@ export function useToolExpansion() {
       textarea.remove()
     }
 
+    markCopied(id)
+  }
+
+  function markCopied(id) {
     copiedEntryId.value = id
     clearTimeout(copiedTimer)
     copiedTimer = setTimeout(() => {
@@ -129,9 +164,34 @@ export function useToolExpansion() {
     liveAssistantDisplayBlocks,
     liveAssistantDisplayCopyText,
     copyEntry,
+    copyImageSource,
     copyTranscriptItem,
     copyTitle,
     dispose,
+  }
+}
+
+async function clipboardImageBlob(preview) {
+  const source = await (await fetch(`data:${preview.mimeType || 'image/png'};base64,${preview.data}`)).blob()
+  return clipboardPngBlob(source)
+}
+
+async function clipboardPngBlob(source) {
+  if (source.type === 'image/png') return source
+
+  // The async clipboard API reliably accepts PNG in Chromium/Electron, while
+  // a read tool may hand us JPEG, GIF, WebP, or BMP data.
+  const image = await createImageBitmap(source)
+  try {
+    const canvas = document.createElement('canvas')
+    canvas.width = image.width
+    canvas.height = image.height
+    const context = canvas.getContext('2d')
+    if (!context) return null
+    context.drawImage(image, 0, 0)
+    return await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
+  } finally {
+    image.close()
   }
 }
 

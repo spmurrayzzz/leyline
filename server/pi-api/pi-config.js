@@ -7,6 +7,7 @@ import lockfile from 'proper-lockfile'
 
 const files = new Set(['models.json', 'mcp.json'])
 const maxBytes = 2 * 1024 * 1024
+const retryableRenameCodes = new Set(['EPERM', 'EBUSY', 'EACCES'])
 
 export function settingsError(message, statusCode = 400) {
   return Object.assign(new Error(message), { statusCode })
@@ -122,10 +123,21 @@ export async function updatePiConfig(file, revision, changes) {
     } finally {
       await descriptor.close()
     }
-    if ((await readAt(path, file)).revision !== current.revision) {
-      throw settingsError('This configuration changed while saving. Refresh it before saving again.', 409)
+    for (let attempt = 0; ; attempt += 1) {
+      if ((await readAt(path, file)).revision !== current.revision) {
+        throw settingsError('This configuration changed while saving. Refresh it before saving again.', 409)
+      }
+      try {
+        await rename(temporary, path)
+        break
+      } catch (error) {
+        if (!retryableRenameCodes.has(error.code)) throw error
+        if (attempt >= 4) {
+          throw settingsError(`${file} could not be saved. It may be open in another program or not writable. Close any program using it and try again.`, 409)
+        }
+        await new Promise((resolve) => setTimeout(resolve, 50 * 2 ** attempt))
+      }
     }
-    await rename(temporary, path)
     temporary = undefined
     return await readAt(path, file)
   } finally {

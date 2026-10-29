@@ -1,8 +1,12 @@
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, markRaw, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { backendDisplayAddress } from '../lib/backend'
 import { sessionTime } from '../lib/format'
 import { useModalFocus } from '../composables/useModalFocus'
+
+const isWindows = /Win/i.test(navigator.platform || navigator.userAgent || '')
+const quickSwitchShortcutLabel = isWindows ? 'Ctrl+K' : '⌘K'
+const activityShortcutLabel = isWindows ? 'Ctrl+Shift+A' : '⌘⇧A'
 
 const props = defineProps({
   activityActionError: {
@@ -314,7 +318,7 @@ watch(
     }
 
     if (!visibleCwds.has(navigationProjectCwd.value)) {
-      navigationProjectCwd.value = preferredProjectCwd()
+      navigationProjectCwd.value = sidebarRootCwdForSelected()
         || projects[0]?.cwd
         || ''
     }
@@ -326,13 +330,17 @@ watch(
   () => [
     props.selectedSession?.id || '',
     props.selectedSession?.cwd || '',
+    props.selectedSession?.parentSessionPath || '',
     props.newSessionCwd,
   ],
-  ([sessionId, sessionCwd, newSessionCwd]) => {
-    if (sessionId && sessionCwd) {
-      lastSessionByProject.set(sessionCwd, sessionId)
-      navigationProjectCwd.value = sessionCwd
-      return
+  ([sessionId, sessionCwd, parentPath, newSessionCwd]) => {
+    if (sessionId && (sessionCwd || parentPath)) {
+      if (sessionCwd) lastSessionByProject.set(sessionCwd, sessionId)
+      const rootCwd = sidebarRootCwdForSelected() || sessionCwd
+      if (rootCwd) {
+        navigationProjectCwd.value = rootCwd
+        return
+      }
     }
     if (newSessionCwd) navigationProjectCwd.value = newSessionCwd
   },
@@ -361,9 +369,17 @@ const orderedProjects = computed(() => {
 })
 
 const currentProject = computed(() => {
-  return orderedProjects.value.find((project) => {
+  const parentCwd = parentProjectCwdForSelected()
+  if (parentCwd) {
+    const parentProject = orderedProjects.value.find((project) => project.cwd === parentCwd)
+    if (parentProject) return parentProject
+  }
+  const found = orderedProjects.value.find((project) => {
     return project.cwd === navigationProjectCwd.value
-  }) || orderedProjects.value[0] || null
+  })
+  if (found) return found
+  if (props.selectedSession?.id) return null
+  return orderedProjects.value[0] || null
 })
 
 const currentProjectSessions = computed(() => {
@@ -840,9 +856,26 @@ onUnmounted(() => {
   sessionResizeObserver?.disconnect()
 })
 
-function preferredProjectCwd() {
-  return props.selectedSession?.cwd || props.newSessionCwd || ''
+function parentProjectCwdForSelected() {
+  const selected = props.selectedSession
+  const parentPath = selected?.parentSessionPath
+  if (!selected?.isSubagentSession || !parentPath) return ''
+  for (const project of props.visibleProjects) {
+    if ((project.sessions || []).some((session) => session.path === parentPath)) {
+      return project.cwd
+    }
+  }
+  return ''
 }
+
+function sidebarRootCwdForSelected() {
+  return parentProjectCwdForSelected()
+    || props.selectedSession?.cwd
+    || props.newSessionCwd
+    || ''
+}
+
+
 
 function updateSessionViewport() {
   if (!sessionScroll.value) return
@@ -1786,7 +1819,7 @@ const vFocusSelect = {
             <strong>{{ activitySummary }}</strong>
             <small>Activity</small>
           </span>
-          <kbd class="sidebar-project-shortcut-key" aria-hidden="true"><span class="key-mod">⌘⇧</span>A</kbd>
+          <kbd class="sidebar-project-shortcut-key" aria-hidden="true">{{ activityShortcutLabel }}</kbd>
         </button>
         <button
           class="sidebar-project-shortcut"
@@ -1803,7 +1836,7 @@ const vFocusSelect = {
             <strong>Go to</strong>
             <small>Projects and sessions</small>
           </span>
-          <kbd class="sidebar-project-shortcut-key" aria-hidden="true"><span class="key-mod">⌘</span>K</kbd>
+          <kbd class="sidebar-project-shortcut-key" aria-hidden="true">{{ quickSwitchShortcutLabel }}</kbd>
         </button>
         <button
           class="sidebar-project-shortcut"

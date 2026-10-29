@@ -294,7 +294,7 @@
   contain-intrinsic-block-size: auto 40px;
 }
 
-.workbench > .message:has(.feedback-note-popover),
+.workbench > .message.has-feedback-note,
 .live-stack > .live-item:has(.feedback-note-popover) {
   content-visibility: visible;
 }
@@ -1544,6 +1544,75 @@
   }
 }
 
+/*
+ * Electron-only (Chromium) scroll mitigations. Gated by the `.electron`
+ * root class set in src/main.js from the Electron UA token; browsers never
+ * match, so Firefox/Chrome-the-browser are unaffected. Revert by deleting
+ * this block. [unverified — user validation in the native GUI]
+ *
+ * 1. content-visibility:auto (above) makes Chromium layout+paint each
+ *    transcript row as it scrolls into view; pre-render rows instead so
+ *    scrolling is compositor work. Costs more upfront layout on load.
+ * 2. Drop `filter` from row transitions / enter-leave states: animating
+ *    blur over large rows forces per-frame filter raster in Chromium.
+ *    Opacity/transform motion is unchanged.
+ */
+.electron .workbench > .message,
+.electron .workbench > .tool-card,
+.electron .workbench > .event-row,
+.electron .workbench > .model-change-row,
+.electron .workbench > .system-prompt-row,
+.electron .live-stack > .live-item {
+  content-visibility: visible;
+}
+
+/*
+ * Composite the transcript scroller under Electron (user-validated
+ * 2026-10-19 across three sessions: scrollbar dragging became "super
+ * smooth"). Without this hint Chromium did not composite .workbench,
+ * so during continuous scrollbar drags the scroller's contents —
+ * most visibly pasted images — presented a beat behind the scroll
+ * offset (offset opposite the drag, catch-up, reset), while discrete
+ * wheel steps masked it. Earlier experiments that changed nothing and
+ * were reverted: overflow-anchor: none (Exp. 1), content-visibility:
+ * auto under Electron (Exp. 2). DevTools traces had already acquitted
+ * layout/paint/raster; the fault was presentation cadence, not work.
+ */
+.electron .workbench {
+  will-change: scroll-position;
+}
+
+.electron .workbench > .message,
+.electron .workbench > .tool-card,
+.electron .workbench > .model-change-row,
+.electron .workbench > .system-prompt-row,
+.electron .workbench > .live-stack,
+.electron .workbench > .empty-session-panel,
+.electron .workbench > .session-loading-panel,
+.electron .workbench > .init-panel,
+.electron .workbench > .start-panel,
+.electron .workbench > .error-note {
+  transition:
+    opacity var(--motion-base) var(--ease-decelerate),
+    transform var(--motion-base) var(--ease-decelerate);
+}
+
+.electron .live-row-enter-active {
+  transition:
+    opacity 360ms var(--ease-decelerate),
+    transform 360ms var(--ease-decelerate);
+}
+
+.electron .live-row-leave-active {
+  transition:
+    opacity var(--motion-fast) var(--ease-accelerate),
+    transform var(--motion-fast) var(--ease-accelerate);
+}
+
+.electron .live-row-enter-from,
+.electron .live-row-leave-to {
+  filter: none;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .compaction-boundary {

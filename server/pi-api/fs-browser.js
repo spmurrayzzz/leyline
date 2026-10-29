@@ -15,6 +15,9 @@ export async function readDirectory(path, cwd) {
   if (isWindowsAbsolute(input) && platform() !== 'win32') {
     throw new Error('Windows paths are not available on this environment')
   }
+  if (platform() === 'win32' && isDriveRelative(input)) {
+    throw new Error('Drive-relative paths are not supported. Use an absolute path such as C:\\foo')
+  }
 
   const { directory, prefix, direct } = splitInput(input)
   const current = normalizeFsPath(directory, cwd)
@@ -22,16 +25,18 @@ export async function readDirectory(path, cwd) {
   if (!info.isDirectory()) throw new Error('Path is not a folder')
 
   const entries = await readdir(current, { withFileTypes: true })
-  const directories = entries
-    .filter((entry) => entry.isDirectory())
+  const candidates = entries
     .filter((entry) => entry.name.toLowerCase().startsWith(prefix.toLowerCase()))
     .filter((entry) => direct || prefix.startsWith('.') || !entry.name.startsWith('.'))
-    .map((entry) => ({
+  const directories = (await Promise.all(candidates.map(async (entry) => {
+    if (!await isDirectoryEntry(current, entry)) return null
+    return {
       name: entry.name,
       fullPath: join(current, entry.name),
       path: join(current, entry.name),
       hidden: entry.name.startsWith('.'),
-    }))
+    }
+  }))).filter(Boolean)
     .sort((a, b) => a.name.localeCompare(b.name))
 
   const root = parse(current).root
@@ -48,8 +53,22 @@ export async function readDirectory(path, cwd) {
   }
 }
 
+async function isDirectoryEntry(directory, entry) {
+  if (entry.isDirectory()) return true
+  if (!entry.isSymbolicLink()) return false
+  try {
+    return (await stat(join(directory, entry.name))).isDirectory()
+  } catch {
+    return false
+  }
+}
+
 function splitInput(input) {
   if (input === '~') return { directory: '~', prefix: '', direct: true }
+
+  if (platform() === 'win32' && isBareUncShare(input)) {
+    return { directory: input, prefix: '', direct: true }
+  }
 
   if (input.endsWith('/') || input.endsWith('\\')) {
     return { directory: input, prefix: '', direct: true }
@@ -84,4 +103,15 @@ function isExplicitRelative(value) {
 
 function isWindowsAbsolute(value) {
   return /^[a-zA-Z]:[/\\]/.test(value) || value.startsWith('\\\\')
+}
+
+function isDriveRelative(value) {
+  return /^[a-zA-Z]:(?![/\\])/.test(value)
+}
+
+function isBareUncShare(value) {
+  const normalized = value.replace(/\//g, '\\')
+  if (!normalized.startsWith('\\\\')) return false
+  const parts = normalized.split('\\').filter(Boolean)
+  return parts.length === 2 && parts[0] !== '?' && parts[0] !== '.'
 }

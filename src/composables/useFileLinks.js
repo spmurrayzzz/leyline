@@ -66,7 +66,15 @@ export function useFileLinks({ sessionId, available, copyText, openEditorTermina
     const rect = menuAnchor?.getBoundingClientRect()
     const x = event.clientX || rect?.left || 8
     const y = event.clientY || rect?.bottom || 8
-    fileMenu.value = { target, path: target.href, x, y, loading: true }
+    fileMenu.value = {
+      target,
+      path: target.href,
+      x,
+      y,
+      loading: true,
+      copyPathShown: target.copyPathShown === true,
+      currentPreview: Boolean(target.fromPreview),
+    }
     try {
       requireAvailable(target)
       const data = await requestFile(target, 'resolve')
@@ -143,7 +151,26 @@ export function useFileLinks({ sessionId, available, copyText, openEditorTermina
   }
 
   function previewFileMenu(event) {
-    if (filePreview.value) void openFileMenu({ ...filePreview.value.target, anchor: event.currentTarget }, event)
+    if (filePreview.value) {
+      void openFileMenu({
+        ...filePreview.value.target,
+        anchor: event.currentTarget,
+        fromPreview: filePreview.value.path,
+        copyPathShown: true,
+      }, event)
+    }
+  }
+
+  function openFileActionMenu(file, event) {
+    if (!file?.path) return
+    void openFileMenu({
+      anchor: event.currentTarget,
+      href: file.path,
+      basePath: '',
+      sessionId: sessionId.value,
+      fromPreview: file.path,
+      copyPathShown: true,
+    }, event)
   }
 
   async function fileMenuAction(action) {
@@ -174,6 +201,7 @@ export function useFileLinks({ sessionId, available, copyText, openEditorTermina
     approveFile,
     goBackFile,
     previewFileMenu,
+    openFileActionMenu,
     fileMenuAction,
   }
 }

@@ -183,12 +183,6 @@
   cursor: not-allowed;
 }
 
-.dictation-button-quiet {
-  border-color: transparent;
-  background: transparent;
-  color: #aaa;
-}
-
 .dictation-button:focus-visible,
 .dictation-row select:focus-visible,
 .dictation-row input:focus-visible,

@@ -10,6 +10,7 @@ import { createDictationService } from './dictation.js'
 import {
   app,
   BrowserWindow,
+  clipboard,
   dialog,
   Menu,
   MenuItem,
@@ -66,6 +67,10 @@ app.on('second-instance', (_event, argv) => {
   if (command) sendWindowCommand(window, command.name, command.detail)
 })
 
+function hasPrimaryModifier(input) {
+  return process.platform === 'darwin' ? input.meta : input.control
+}
+
 async function createWindow(initialCommand, initialUrl = '') {
   await app.whenReady()
   await environmentReady
@@ -79,7 +84,7 @@ async function createWindow(initialCommand, initialUrl = '') {
     minWidth: 360,
     minHeight: 420,
     backgroundColor: '#0b0b10',
-    autoHideMenuBar: process.platform === 'linux',
+    autoHideMenuBar: process.platform === 'linux' || process.platform === 'win32',
     webPreferences: {
       backgroundThrottling: false,
       contextIsolation: true,
@@ -106,6 +111,7 @@ async function createWindow(initialCommand, initialUrl = '') {
     event.preventDefault()
     openExternalUrl(navigationUrl)
   })
+  installContextMenu(window)
 
   if (windowState.isMaximized) window.maximize()
   if (windowState.isFullScreen) window.setFullScreen(true)
@@ -119,7 +125,7 @@ async function createWindow(initialCommand, initialUrl = '') {
     const key = input.key?.toLowerCase()
     const isNewWindow = input.type === 'keyDown'
       && key === 'n'
-      && input.meta
+      && hasPrimaryModifier(input)
       && input.shift
     const isNewSession = input.type === 'keyDown'
       && key === 'n'
@@ -127,22 +133,22 @@ async function createWindow(initialCommand, initialUrl = '') {
       && !input.shift
     const isCloseWindow = input.type === 'keyDown'
       && key === 'w'
-      && input.meta
+      && hasPrimaryModifier(input)
     const isToggleTerminal = input.type === 'keyDown'
       && key === 't'
-      && input.meta
+      && hasPrimaryModifier(input)
       && input.shift
     const isToggleSessionDetails = input.type === 'keyDown'
       && key === 'e'
-      && input.meta
+      && hasPrimaryModifier(input)
       && input.shift
     const isToggleMemory = input.type === 'keyDown'
       && key === 'm'
-      && input.meta
+      && hasPrimaryModifier(input)
       && input.shift
     const isToggleSidebar = input.type === 'keyDown'
       && key === 'e'
-      && input.meta
+      && hasPrimaryModifier(input)
       && !input.shift
     if (
       !isNewWindow
@@ -180,6 +186,110 @@ function isOpenableUrl(url) {
       || protocol === 'https:'
       || protocol === 'mailto:'
       || protocol === 'tel:'
+  } catch {
+    return false
+  }
+}
+
+function installContextMenu(window) {
+  window.webContents.on('context-menu', (_event, params) => {
+    // Leyline's renderer already provides a richer menu for local-file links.
+    if (isLocalFileLinkContext(params)) return
+    const template = contextMenuTemplate(window, params)
+    if (!template.length) return
+    Menu.buildFromTemplate(template).popup({ window })
+  })
+}
+
+function isLocalFileLinkContext(params) {
+  return params.titleText?.startsWith('Preview file:')
+    || (params.linkURL?.endsWith('#') && Boolean(params.linkText))
+}
+
+function contextMenuTemplate(window, params) {
+  const template = []
+  const addSeparator = () => {
+    if (template.length && template.at(-1).type !== 'separator') {
+      template.push({ type: 'separator' })
+    }
+  }
+  const editFlags = params.editFlags || {}
+
+  if (params.isEditable) {
+    if (params.misspelledWord) {
+      const suggestions = params.dictionarySuggestions || []
+      if (suggestions.length) {
+        for (const suggestion of suggestions) {
+          template.push({
+            label: suggestion,
+            click: () => window.webContents.replaceMisspelling(suggestion),
+          })
+        }
+      } else {
+        template.push({ label: 'No spelling suggestions', enabled: false })
+      }
+      template.push({
+        label: 'Add to Dictionary',
+        click: () => {
+          window.webContents.session.addWordToSpellCheckerDictionary(params.misspelledWord)
+        },
+      })
+      addSeparator()
+    }
+    template.push(
+      { role: 'undo', enabled: editFlags.canUndo },
+      { role: 'redo', enabled: editFlags.canRedo },
+      { type: 'separator' },
+      { role: 'cut', enabled: editFlags.canCut },
+      { role: 'copy', enabled: editFlags.canCopy },
+      { role: 'paste', enabled: editFlags.canPaste },
+      { role: 'delete', enabled: editFlags.canDelete },
+      { type: 'separator' },
+      { role: 'selectAll', enabled: editFlags.canSelectAll },
+    )
+  } else if (params.selectionText?.trim()) {
+    template.push({ role: 'copy' }, { role: 'selectAll' })
+  }
+
+  if (params.mediaType === 'image' && params.hasImageContents) {
+    addSeparator()
+    template.push({
+      label: 'Copy Image',
+      click: () => window.webContents.copyImageAt(params.x, params.y),
+    })
+  }
+
+  if (params.linkURL && !isLocalFileLinkContext(params)) {
+    addSeparator()
+    if (isExternalLink(params) && isOpenableUrl(params.linkURL)) {
+      template.push({
+        label: 'Open Link',
+        click: () => openExternalUrl(params.linkURL),
+      })
+    }
+    template.push({
+      label: 'Copy Link Address',
+      click: () => clipboard.writeText(params.linkURL),
+    })
+  }
+
+  if (!app.isPackaged) {
+    addSeparator()
+    template.push({
+      label: 'Inspect Element',
+      click: () => window.webContents.inspectElement(params.x, params.y),
+    })
+  }
+
+  while (template.at(-1)?.type === 'separator') template.pop()
+  return template
+}
+
+function isExternalLink(params) {
+  try {
+    const link = new URL(params.linkURL)
+    if (['mailto:', 'tel:'].includes(link.protocol)) return true
+    return link.origin !== new URL(params.pageURL).origin
   } catch {
     return false
   }

@@ -9,6 +9,9 @@ import ServiceTierPicker from './ServiceTierPicker.vue'
 import PromptQueue from './PromptQueue.vue'
 import { formatMode } from '../lib/format'
 
+const isWindows = /Win/i.test(navigator.platform || navigator.userAgent || '')
+const steerShortcutLabel = isWindows ? 'Alt+Enter' : 'Option+Enter'
+
 const props = defineProps({
   dictation: { type: Object, required: true },
   dictationSubmitting: Boolean,
@@ -557,7 +560,7 @@ async function insertNewline() {
                 :disabled="submitDisabled || promptQueue.held || shellMode || shellRunning"
                 :title="shellMode || shellRunning ? 'Shell commands run in queue order' : promptQueue.held ? 'Resume the queue before steering' : 'Deliver at the agent’s next input boundary'"
                 @click="submitFromMenu('steer')"
-              ><span>Steer current run</span><kbd>Option+Enter</kbd></button>
+              ><span>Steer current run</span><kbd>{{ steerShortcutLabel }}</kbd></button>
             </div>
           </div>
         </div>

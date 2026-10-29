@@ -12,6 +12,7 @@ export function useWorkbenchScroll({ workbench, composerRef, isActive = () => tr
   const userScrollActive = ref(false)
   const hasNewOutput = ref(false)
   let scrollFrame
+  let scrollEventFrame
   let scrollAnimationFrame
   let scrollSettleFrame
   let userScrollTimer
@@ -44,6 +45,8 @@ export function useWorkbenchScroll({ workbench, composerRef, isActive = () => tr
   function scheduleBottomScroll() {
     if (!isActive()) return
     cancelAnimationFrame(scrollFrame)
+    cancelAnimationFrame(scrollEventFrame)
+    scrollEventFrame = undefined
     scrollFrame = requestAnimationFrame(() => {
       scrollToLatest()
     })
@@ -121,10 +124,20 @@ export function useWorkbenchScroll({ workbench, composerRef, isActive = () => tr
       hasNewOutput.value = false
       return
     }
-    const distance = distanceFromWorkbenchBottom()
-    if (distance >= bottomStickBufferPx) stickToBottom.value = false
-    else if (!userScrollActive.value) stickToBottom.value = true
-    if (stickToBottom.value) hasNewOutput.value = false
+    if (scrollEventFrame) return
+    scrollEventFrame = requestAnimationFrame(() => {
+      scrollEventFrame = undefined
+      if (!isActive() || !workbench.value) return
+      if (bottomScrollActive || resizePinActive) {
+        stickToBottom.value = true
+        hasNewOutput.value = false
+        return
+      }
+      const distance = distanceFromWorkbenchBottom()
+      if (distance >= bottomStickBufferPx) stickToBottom.value = false
+      else if (!userScrollActive.value) stickToBottom.value = true
+      if (stickToBottom.value) hasNewOutput.value = false
+    })
   }
 
   function handleWorkbenchWheel(event) {
@@ -149,6 +162,8 @@ export function useWorkbenchScroll({ workbench, composerRef, isActive = () => tr
     resizePinActive = false
     userScrollActive.value = true
     cancelAnimationFrame(scrollFrame)
+    cancelAnimationFrame(scrollEventFrame)
+    scrollEventFrame = undefined
     cancelAnimationFrame(scrollAnimationFrame)
     cancelAnimationFrame(scrollSettleFrame)
     cancelAnimationFrame(workbenchResizeFrame)
@@ -172,6 +187,8 @@ export function useWorkbenchScroll({ workbench, composerRef, isActive = () => tr
   function resetWorkbenchScrollState() {
     scrollRevision++
     cancelAnimationFrame(scrollFrame)
+    cancelAnimationFrame(scrollEventFrame)
+    scrollEventFrame = undefined
     clearTimeout(userScrollTimer)
     cancelAnimationFrame(scrollAnimationFrame)
     cancelAnimationFrame(scrollSettleFrame)
@@ -209,11 +226,14 @@ export function useWorkbenchScroll({ workbench, composerRef, isActive = () => tr
       const target = workbenchBottom()
       const progress = Math.min(1, (now - startedAt) / scrollAnimationMs)
       const eased = 1 - Math.pow(1 - progress, 3)
-      workbench.value.scrollTop = start + (target - start) * eased
+      const nextTop = start + (target - start) * eased
+      if (Math.abs(workbench.value.scrollTop - nextTop) > 0.5) {
+        workbench.value.scrollTop = nextTop
+      }
       if (progress < 1) {
         scrollAnimationFrame = requestAnimationFrame(tick)
       } else {
-        workbench.value.scrollTop = target
+        if (workbench.value.scrollTop !== target) workbench.value.scrollTop = target
         settleWorkbenchAtBottom()
       }
     }
@@ -231,7 +251,8 @@ export function useWorkbenchScroll({ workbench, composerRef, isActive = () => tr
         bottomScrollActive = false
         return
       }
-      workbench.value.scrollTop = workbenchBottom()
+      const bottom = workbenchBottom()
+      if (workbench.value.scrollTop !== bottom) workbench.value.scrollTop = bottom
       if (now - startedAt < scrollSettleMs) {
         scrollSettleFrame = requestAnimationFrame(settle)
       } else {
@@ -257,6 +278,8 @@ export function useWorkbenchScroll({ workbench, composerRef, isActive = () => tr
     scrollRevision++
     clearTimeout(userScrollTimer)
     cancelAnimationFrame(scrollFrame)
+    cancelAnimationFrame(scrollEventFrame)
+    scrollEventFrame = undefined
     cancelAnimationFrame(scrollAnimationFrame)
     cancelAnimationFrame(scrollSettleFrame)
     cancelAnimationFrame(workbenchResizeFrame)
@@ -306,6 +329,8 @@ export function useWorkbenchScroll({ workbench, composerRef, isActive = () => tr
     composerResizeObserver?.disconnect()
     workbenchResizeObserver?.disconnect()
     cancelAnimationFrame(scrollFrame)
+    cancelAnimationFrame(scrollEventFrame)
+    scrollEventFrame = undefined
     cancelAnimationFrame(scrollAnimationFrame)
     cancelAnimationFrame(scrollSettleFrame)
     cancelAnimationFrame(workbenchResizeFrame)

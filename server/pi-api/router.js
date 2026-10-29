@@ -4,6 +4,8 @@ import { replyExtensionConfirmation } from './extension-ui.js'
 import { getFileSettings, performFileAction, setFileSettings } from './files.js'
 import { createPiSettingsHandler } from './pi-settings-routes.js'
 import { createTracingHandler } from './tracing-routes.js'
+import { readBackendSettings } from '../backend-connections.js'
+import { AUTOLINK_BARE_FILENAMES_SETTING_KEY } from '../../lib/leyline-settings.js'
 
 export function createPiApiHandler(api) {
   const settingsHandler = createPiSettingsHandler(api)
@@ -804,9 +806,12 @@ async function piApiHandler(req, res) {
   
         const id = decodeURIComponent(exportMatch[1])
         const detail = await exportSessionDetail(id)
+        const autolinkBareFilenames = readBackendSettings([
+          AUTOLINK_BARE_FILENAMES_SETTING_KEY,
+        ])[AUTOLINK_BARE_FILENAMES_SETTING_KEY] === 'on'
         return html(
           res,
-          await renderSessionExportHtml(detail, exportShareMeta(id)),
+          await renderSessionExportHtml(detail, exportShareMeta(id), { autolinkBareFilenames }),
           exportFilename(detail),
           url.searchParams.get('disposition') === 'inline',
         )

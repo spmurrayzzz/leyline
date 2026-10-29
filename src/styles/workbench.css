@@ -8,7 +8,7 @@
   transition: padding-bottom var(--terminal-shift-duration) var(--terminal-shift-easing);
   scrollbar-color: #4b4658 transparent;
   scrollbar-gutter: stable;
-  scrollbar-width: thin;
+  scrollbar-width: auto;
 }
 
 .terminal-open .workbench {
@@ -17,8 +17,13 @@
   );
 }
 
+/* Wide, easy-to-grab transcript scrollbar. The composer fade overlay
+   stops short of this strip (composer.css) so the thumb is never
+   veiled near the bottom: a native scrollbar cannot outrank a sibling
+   overlay with z-index, so keeping the overlay off the strip is what
+   puts it "on top". */
 .workbench::-webkit-scrollbar {
-  width: 10px;
+  width: 20px;
 }
 
 .workbench::-webkit-scrollbar-track {
@@ -26,7 +31,7 @@
 }
 
 .workbench::-webkit-scrollbar-thumb {
-  border: 3px solid #111217;
+  border: 5px solid #111217;
   border-radius: 999px;
   background: #4b4658;
 }

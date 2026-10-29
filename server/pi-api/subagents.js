@@ -1,8 +1,8 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync } from 'node:fs'
-import { homedir } from 'node:os'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
+import { getAgentDir } from '@earendil-works/pi-coding-agent'
 import { DEFAULT_SUBAGENT_BATCH_SIZE, SUBAGENT_BATCH_SIZE_SETTING_KEY } from '../../lib/leyline-settings.js'
+import { openMemoryDb } from './leyline-db.js'
 import { overrideContext, safeRealpath, scopeIdentity } from './override-context.js'
 
 const SCOPES = new Set(['global', 'project', 'session'])
@@ -193,7 +193,7 @@ export function copySessionSubagentOverrides({ cwd, fromSessionPath, toSessionPa
 
 function discoverAgents(cwd) {
   const agents = new Map()
-  loadAgents(join(homedir(), '.pi', 'agent', 'agents'), 'user', agents)
+  loadAgents(join(getAgentDir(), 'agents'), 'user', agents)
   const projectDir = findNearestAgentsDir(cwd)
   if (projectDir) loadAgents(projectDir, 'project', agents)
   return [...agents.values()]
@@ -290,10 +290,7 @@ function batchConfig(db, context) {
 }
 
 function openDb() {
-  mkdirSync(dirname(dbPath()), { recursive: true })
-  const db = new DatabaseSync(dbPath())
-  db.exec('PRAGMA journal_mode = WAL')
-  db.exec('PRAGMA busy_timeout = 5000')
+  const db = openMemoryDb()
   db.exec(`
     CREATE TABLE IF NOT EXISTS leyline_settings (
       key TEXT PRIMARY KEY,
@@ -324,10 +321,4 @@ function openDb() {
       ON subagent_overrides(session_id, updated_at DESC);
   `)
   return db
-}
-
-function dbPath() {
-  const dir = process.env.LEYLINE_MEMORY_DIR
-    || join(homedir(), '.local', 'share', 'leyline')
-  return join(dir, 'memory.sqlite')
 }

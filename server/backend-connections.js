@@ -1,15 +1,16 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { mkdirSync } from 'node:fs'
-import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
-import { NETWORK_ACCESS_PORT_SETTING_KEY, NETWORK_ACCESS_SETTING_KEY, THINKING_DEFAULT_SETTING_KEY } from '../lib/leyline-settings.js'
+import { AUTOLINK_BARE_FILENAMES_SETTING_KEY, NETWORK_ACCESS_PORT_SETTING_KEY, NETWORK_ACCESS_SETTING_KEY, THINKING_DEFAULT_SETTING_KEY } from '../lib/leyline-settings.js'
 import { networkAccessStatus, setNetworkAccess } from './network-access.js'
 import { setCorsHeaders } from './pi-api/cors.js'
 import { json, readJson } from './pi-api/http.js'
+import { openMemoryDb } from './pi-api/leyline-db.js'
 
 const BUILTIN_CONNECTION_ID = 'builtin'
 const THINKING_DEFAULT_VALUES = new Set(['collapsed', 'expanded'])
+const DISPLAY_SETTING_VALUES = new Map([
+  [THINKING_DEFAULT_SETTING_KEY, THINKING_DEFAULT_VALUES],
+  [AUTOLINK_BARE_FILENAMES_SETTING_KEY, new Set(['on', 'off'])],
+])
 const PINNED_CONNECTION_ID_MAX_LENGTH = 128
 const PINNED_SESSION_ID_MAX_LENGTH = 128
 const PINNED_MAX_PER_CONNECTION = 200
@@ -115,7 +116,8 @@ export async function backendConnectionsHandler(req, res) {
     const settingsMatch = url.pathname.match(/^\/settings\/([^/]+)$/)
     if (settingsMatch) {
       const key = decodeURIComponent(settingsMatch[1])
-      if (key !== THINKING_DEFAULT_SETTING_KEY) {
+      const allowedValues = DISPLAY_SETTING_VALUES.get(key)
+      if (!allowedValues) {
         return json(res, { error: 'Unknown setting' }, 404)
       }
       const db = openDb()
@@ -128,8 +130,11 @@ export async function backendConnectionsHandler(req, res) {
         }
         const body = await readJson(req)
         const value = String(body?.value ?? '')
-        if (!THINKING_DEFAULT_VALUES.has(value)) {
-          return json(res, { error: 'Value must be "collapsed" or "expanded"' }, 400)
+        if (!allowedValues.has(value)) {
+          const message = key === THINKING_DEFAULT_SETTING_KEY
+            ? 'Value must be "collapsed" or "expanded"'
+            : 'Value must be "on" or "off"'
+          return json(res, { error: message }, 400)
         }
         setSetting(db, key, value)
         return json(res, { key, value })
@@ -446,9 +451,7 @@ function validUrl(value) {
 }
 
 function openDb() {
-  mkdirSync(dirname(dbPath()), { recursive: true })
-  const db = new DatabaseSync(dbPath())
-  db.exec('PRAGMA busy_timeout = 2000')
+  const db = openMemoryDb()
   db.exec(`
     CREATE TABLE IF NOT EXISTS backend_connections (
       id TEXT PRIMARY KEY,
@@ -474,10 +477,4 @@ function openDb() {
       ON pinned_sessions(connection_id, pinned_at DESC);
   `)
   return db
-}
-
-function dbPath() {
-  const dir = process.env.LEYLINE_MEMORY_DIR
-    || join(homedir(), '.local', 'share', 'leyline')
-  return join(dir, 'memory.sqlite')
 }

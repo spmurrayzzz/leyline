@@ -1,9 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { mkdirSync } from 'node:fs'
 import { readdir, realpath } from 'node:fs/promises'
-import { homedir } from 'node:os'
-import { basename, dirname, join, resolve } from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
+import { basename, dirname, resolve } from 'node:path'
+import { openMemoryDb } from './leyline-db.js'
 
 const SCOPES = new Set(['global', 'project', 'session'])
 const STATUSES = new Set(['active', 'archived'])
@@ -304,10 +302,7 @@ function memoryCounts(rows) {
 }
 
 function openDb() {
-  mkdirSync(dirname(dbPath()), { recursive: true })
-  const db = new DatabaseSync(dbPath())
-  db.exec('PRAGMA journal_mode = WAL')
-  db.exec('PRAGMA busy_timeout = 5000')
+  const db = openMemoryDb()
   db.exec(`
     CREATE TABLE IF NOT EXISTS memories (
       id TEXT PRIMARY KEY,
@@ -361,10 +356,4 @@ function openDb() {
     WHERE tags_json IS NULL OR tags_json = ''
   `).run()
   return db
-}
-
-function dbPath() {
-  const dir = process.env.LEYLINE_MEMORY_DIR
-    || join(homedir(), '.local', 'share', 'leyline')
-  return join(dir, 'memory.sqlite')
 }

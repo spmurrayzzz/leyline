@@ -66,13 +66,14 @@ function handleKey(event) {
   <div ref="element" class="file-context-menu" :style="position" role="menu" aria-label="File actions" tabindex="-1" @keydown="handleKey" @contextmenu.prevent>
     <code :title="menu.path">{{ menu.path }}</code>
     <span v-if="menu.loading" class="file-menu-note" role="status">Reading file location…</span>
-    <button type="button" role="menuitem" :disabled="menu.loading" @click="emit('action', 'preview')">Preview file</button>
+    <button v-if="!menu.currentPreview" type="button" role="menuitem" :disabled="menu.loading" @click="emit('action', 'preview')">Preview file</button>
     <template v-if="!menu.loading && !menu.error">
+      <button v-if="menu.openAvailable" type="button" role="menuitem" @click="emit('action', 'open')">Open with default application</button>
       <button v-if="menu.editorAvailable" type="button" role="menuitem" @click="emit('action', 'editor')">Open in editor</button>
       <button v-else type="button" role="menuitem" @click="emit('action', 'settings')">Configure editor…</button>
       <button v-if="menu.revealLabel" type="button" role="menuitem" @click="emit('action', 'reveal')">{{ menu.revealLabel }}</button>
     </template>
-    <button type="button" role="menuitem" :disabled="menu.loading" @click="emit('action', 'copy')">Copy path</button>
+    <button v-if="!menu.copyPathShown" type="button" role="menuitem" :disabled="menu.loading" @click="emit('action', 'copy')">Copy path</button>
     <span v-if="menu.error" class="file-menu-note" role="status">{{ menu.error }}</span>
   </div>
 </template>

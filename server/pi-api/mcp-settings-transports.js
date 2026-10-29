@@ -1,14 +1,14 @@
 import { spawn } from 'node:child_process'
-import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { pathToFileURL } from 'node:url'
 import { getShellConfig } from '@earendil-works/pi-coding-agent'
 
-const require = createRequire(import.meta.resolve('@earendil-works/pi-coding-agent'))
-const { StdioTransport, StreamableHttpTransport } = await import(pathToFileURL(require.resolve('@earendil-works/pi-mcp', {
-  conditions: new Set(['node', 'import']),
-})).href)
+// Resolve pi-mcp relative to pi-coding-agent so both use the same package
+// instance. pi-mcp 1.3 is ESM-only (its exports map has no CJS entry), so
+// CJS require.resolve fails; import.meta.resolve with the coding-agent
+// package as parent keeps the same-instance guarantee under ESM conditions.
+const piMcpUrl = import.meta.resolve('@earendil-works/pi-mcp', import.meta.resolve('@earendil-works/pi-coding-agent'))
+const { StdioTransport, StreamableHttpTransport } = await import(piMcpUrl)
 
 export function killMcpProcess(pid) {
   if (process.platform === 'win32') {

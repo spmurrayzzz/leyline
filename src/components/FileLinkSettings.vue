@@ -86,7 +86,7 @@ async function save() {
           <option value="terminal">Leyline terminal</option>
         </select>
       </label>
-      <small>Use a command with optional arguments, such as <code>code --wait</code> or <code>nvim</code>. Leyline appends the file path. Shell operators and substitutions are not supported.</small>
+      <small>Use a command with optional arguments, such as <code>code --wait</code> or <code>nvim</code>; on Windows, an editor executable path such as <code>C:\path\to\editor.exe</code> also works. Leyline appends the file path. Shell operators and substitutions are not supported.</small>
       <small v-if="effectiveEditor">Current: <code>{{ effectiveEditor }}</code> · {{ terminalEditor ? 'Leyline terminal' : 'Desktop' }}</small>
       <small v-else>No editor is configured, and this backend has no <code>$EDITOR</code>.</small>
       <p v-if="error" class="backend-connection-error" role="alert">{{ error }}</p>

@@ -1,6 +1,8 @@
 .composer-fade {
   position: absolute;
-  right: 0;
+  /* Stop short of the workbench scrollbar strip (20px, workbench.css)
+     so the transcript scrollbar thumb is never hidden behind the fade. */
+  right: 20px;
   bottom: 0;
   left: 0;
   height: 190px;

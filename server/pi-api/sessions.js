@@ -1,5 +1,4 @@
 import { open, readdir, stat } from 'node:fs/promises'
-import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
 import { StringDecoder } from 'node:string_decoder'
 import {
@@ -12,6 +11,7 @@ import {
   messageText,
   SUBAGENT_SESSION_CUSTOM_TYPE,
 } from './session-summary.js'
+import { canonicalCwdKey, expandUserPath } from './path-input.js'
 
 const SESSION_DIR_ENV = 'PI_CODING_AGENT_SESSION_DIR'
 const PROJECT_HEADER_SCAN_LIMIT = 1024 * 1024
@@ -71,9 +71,10 @@ export async function listPersistedProjects() {
   const projects = new Map()
 
   for (const record of records) {
-    const current = projects.get(record.cwd)
+    const key = canonicalCwdKey(record.cwd)
+    const current = projects.get(key)
     if (current && current.modified >= record.modified) continue
-    projects.set(record.cwd, record)
+    projects.set(key, record)
   }
 
   return [...projects.values()]
@@ -101,19 +102,15 @@ export async function listSessionsForProject(cwd) {
     ? await sessionFiles(sessionDir)
     : await defaultSessionFiles()
   const records = await readSessionFileRecords(files)
-  return records.filter((record) => record.cwd === cwd)
+  if (typeof cwd !== 'string' || !cwd.trim()) return []
+  const targetKey = canonicalCwdKey(cwd)
+  return records.filter((record) => canonicalCwdKey(record.cwd) === targetKey)
 }
 
 export function configuredSessionDir(cwd) {
   const envSessionDir = process.env[SESSION_DIR_ENV]
-  if (envSessionDir) return expandTildePath(envSessionDir)
+  if (envSessionDir) return expandUserPath(envSessionDir)
   return SettingsManager.create(cwd, getAgentDir()).getSessionDir()
-}
-
-function expandTildePath(value) {
-  if (value === '~') return homedir()
-  if (value.startsWith('~/')) return homedir() + value.slice(1)
-  return value
 }
 
 async function listSessionsFromFiles(files) {
@@ -133,7 +130,7 @@ function markSubagentSessions(sessions) {
   }))
 }
 
-async function sessionFiles(sessionDir) {
+async function sessionFiles(sessionDir, isRoot = true) {
   try {
     const entries = await readdir(sessionDir, { withFileTypes: true })
     const files = entries
@@ -141,11 +138,18 @@ async function sessionFiles(sessionDir) {
       .map((entry) => join(sessionDir, entry.name))
     const dirs = entries.filter((entry) => entry.isDirectory())
     const nested = await Promise.all(
-      dirs.map((entry) => sessionFiles(join(sessionDir, entry.name))),
+      dirs.map((entry) => sessionFiles(join(sessionDir, entry.name), false)),
     )
     return [...files, ...nested.flat()]
-  } catch {
-    return []
+  } catch (error) {
+    // sessionFiles is only called for an explicitly configured dir (env var
+    // or settings); the unconfigured default goes through
+    // defaultSessionFiles, which keeps the silent empty-list behaviour.
+    if (!isRoot) return []
+    throw new Error(
+      `Unable to read configured session directory: ${sessionDir}`,
+      { cause: error },
+    )
   }
 }
 

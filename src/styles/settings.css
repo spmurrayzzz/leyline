@@ -778,8 +778,29 @@
   color: #e7e7e7;
 }
 
+.global-settings-modal .settings-choice-group.settings-display-card,
+.settings-choice-group.settings-display-card {
+  display: block;
+}
+
+.settings-choice-group .settings-choice-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.settings-choice-group .settings-choice-heading > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.settings-display-followup {
+  margin-top: 32px;
+}
+
 .settings-thought-preview {
-  margin-top: 28px;
+  margin-top: 18px;
   border: 1px solid #2b2b2b;
   border-radius: 9px;
   background: #121212;
@@ -1714,7 +1735,7 @@
 }
 
 .pi-settings-thinking-map input {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 .pi-settings-thinking-map input:disabled {

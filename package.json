@@ -15,7 +15,7 @@
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",
     "local-publish": "./scripts/local-publish.sh",
-    "electron:dev": "LEYLINE_DEV_SERVER_URL=http://localhost:5173 electron .",
+    "electron:dev": "node scripts/electron-dev.js",
     "electron:build": "./scripts/electron-build.sh",
     "screenshot": "node scripts/screenshot.js",
     "docs:screenshots": "node scripts/docs-screenshots.js",

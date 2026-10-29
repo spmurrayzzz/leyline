@@ -47,12 +47,13 @@ const selectedPath = computed(() => {
 })
 const actionLabel = computed(() => {
   if (loading.value) return 'Checking…'
-  if (exactMatch.value || query.value.endsWith('/')) return 'Add folder'
+  if (exactMatch.value || canonicalQuery(query.value).endsWith('/')) return 'Add folder'
   return 'Create & add'
 })
 const exactMatch = computed(() => {
-  const leaf = splitBrowseQuery(query.value).filter
-  return entries.value.some((entry) => entry.name === leaf)
+  const leaf = splitBrowseQuery(query.value).filter.toLowerCase()
+  if (!leaf) return false
+  return entries.value.some((entry) => entry.name.toLowerCase() === leaf)
 })
 
 onMounted(() => {
@@ -74,6 +75,13 @@ watch(query, () => browseQuery())
 
 async function browseQuery() {
   const generation = ++browseGeneration
+  if (isDriveRelativeQuery(query.value)) {
+    entries.value = []
+    highlightedIndex.value = -1
+    loading.value = false
+    error.value = 'Drive-relative paths are not supported. Use an absolute path such as C:\\foo'
+    return
+  }
   if (!looksLikePath(query.value)) {
     entries.value = []
     highlightedIndex.value = -1
@@ -86,7 +94,7 @@ async function browseQuery() {
   error.value = ''
 
   try {
-    const data = await fetchFsDirectory(directory, props.activeCwd)
+    const data = await fetchFsDirectory(nativeBrowsePath(directory), props.activeCwd)
     if (generation !== browseGeneration) return
     parentPath.value = data.parentPath || data.path || ''
     parentParentPath.value = data.parent || ''
@@ -108,7 +116,8 @@ async function browseQuery() {
 function filterEntries(items) {
   const { filter } = splitBrowseQuery(query.value)
   const normalizedFilter = filter.toLowerCase()
-  const direct = query.value.trim().endsWith('/') || query.value.trim() === '~'
+  const canonical = canonicalQuery(query.value)
+  const direct = canonical.endsWith('/') || canonical === '~'
   return items.filter((entry) => {
     const name = entry.name.toLowerCase()
     if (!direct && entry.name.startsWith('.') && !filter.startsWith('.')) {
@@ -179,14 +188,49 @@ function trapFocus(event) {
   }
 }
 
+function defaultHighlightIndex() {
+  if (!rows.value.length) return -1
+  return parentParentPath.value && entries.value.length ? 1 : 0
+}
+
+// Picker path helpers adapted from OpenCode (MIT) — opencode/packages/app/src/workspaces/selection/domain.ts: normalizePickerPath, normalizePickerDrive, trimPickerPath, joinPickerPath, pickerRoot, pickerParent, canonicalPickerPath, nativePickerPath, displayPickerPath. Internal canonical form is `/`; conversion to native `\` happens only at submit/display/fetch boundaries.
+function stripSurroundingQuotes(value) {
+  if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
+    return value.slice(1, -1)
+  }
+  return value
+}
+
+function canonicalQuery(value) {
+  return normalizePickerDrive(stripSurroundingQuotes(value.trim()))
+}
+
+function isDriveRelativeQuery(value) {
+  return /^[A-Za-z]:[^/\\]/.test(stripSurroundingQuotes(value.trim()))
+}
+
 function looksLikePath(value) {
-  return /^(~\/?|\/|\.\.?\/)/.test(value.trim())
+  if (isDriveRelativeQuery(value)) return false
+  const path = canonicalQuery(value)
+  if (!path) return false
+  return (
+    path === '~' ||
+    path.startsWith('~/') ||
+    path.startsWith('/') ||
+    path.startsWith('./') ||
+    path.startsWith('../') ||
+    /^[A-Za-z]:\//.test(path)
+  )
 }
 
 function splitBrowseQuery(value) {
-  const path = value.trim() || '~/'
+  const path = canonicalQuery(value) || '~/'
   if (path === '~') return { directory: '~/', filter: '' }
   if (path.endsWith('/')) return { directory: path, filter: '' }
+  const root = pickerRoot(path)
+  if (root && trimPickerPath(path) === root) {
+    return { directory: `${root}/`, filter: '' }
+  }
   const index = path.lastIndexOf('/')
   if (index === -1) return { directory: './', filter: path }
   return {
@@ -197,39 +241,184 @@ function splitBrowseQuery(value) {
 
 function ensureTrailingSlash(value) {
   if (!value) return value
-  return value.endsWith('/') ? value : `${value}/`
+  const trimmed = trimPickerPath(value)
+  const shown = displayPickerPath(trimmed, '', home.value)
+  const separator = /^[A-Za-z]:/.test(shown) || shown.startsWith('\\\\') ? '\\' : '/'
+  return shown.endsWith(separator) ? shown : `${shown}${separator}`
 }
 
 function resolvedSubmitPath() {
-  const path = query.value.trim()
+  const path = canonicalQuery(query.value)
   if (!path) return ''
   const { filter } = splitBrowseQuery(path)
   if (path === '~') return normalizeSubmitPath(parentPath.value || home.value)
   if (path.endsWith('/')) return normalizeSubmitPath(parentPath.value || path)
 
-  const match = entries.value.find((entry) => entry.name === filter)
+  const match = entries.value.find(
+    (entry) => entry.name.toLowerCase() === filter.toLowerCase(),
+  )
   if (match) return normalizeSubmitPath(match.fullPath || match.path)
-  if (parentPath.value && filter) {
-    return normalizeSubmitPath(appendPathSegment(parentPath.value, filter))
-  }
+  const parent = parentPath.value
+    ? normalizePickerPath(parentPath.value)
+    : pickerParent(path)
+  if (parent && filter) return normalizeSubmitPath(joinPickerPath(parent, filter))
   return normalizeSubmitPath(path)
 }
 
 function appendPathSegment(parent, segment) {
-  if (parent.endsWith('/')) return `${parent}${segment}`
-  return `${parent}/${segment}`
-}
-
-function defaultHighlightIndex() {
-  if (!rows.value.length) return -1
-  return parentParentPath.value && entries.value.length ? 1 : 0
+  return joinPickerPath(parent, segment)
 }
 
 function normalizeSubmitPath(value) {
-  const path = value.trim()
+  const path = (value || '').trim()
   if (!path) return ''
-  if (path === '/') return path
-  return path.replace(/\/+$/, '')
+  const canonical = pickerRoot(path) ? canonicalPickerPath(path) : trimPickerPath(path)
+  return nativePickerPath(canonical)
+}
+
+function normalizePickerPath(input) {
+  const value = input.replaceAll('\\', '/')
+
+  if (value.startsWith('//') && !value.startsWith('///')) {
+    return '//' + value.slice(2).replace(/\/+/g, '/')
+  }
+
+  return value.replace(/\/+/g, '/')
+}
+
+function normalizePickerDrive(input) {
+  const value = normalizePickerPath(input)
+
+  if (/^[A-Za-z]:$/.test(value)) return value + '/'
+
+  return value
+}
+
+function trimPickerPath(input) {
+  const value = normalizePickerDrive(input)
+
+  if (value === '/' || value === '//' || /^[A-Za-z]:\/$/.test(value)) return value
+
+  return value.replace(/\/+$/, '')
+}
+
+function joinPickerPath(base, relative) {
+  const root = trimPickerPath(base ?? '')
+  const path = trimPickerPath(relative).replace(/^\/+/, '')
+
+  if (!root) return path
+
+  if (!path) return root
+
+  if (root.endsWith('/')) return root + path
+
+  return root + '/' + path
+}
+
+function pickerRoot(input) {
+  const value = normalizePickerDrive(input)
+
+  if (value.startsWith('//')) {
+    const [server, share] = value.slice(2).split('/')
+
+    if (server && share) return `//${server}/${share}`
+
+    return '//'
+  }
+
+  if (value.startsWith('/')) return '/'
+
+  if (/^[A-Za-z]:\//.test(value)) return value.slice(0, 3)
+
+  return ''
+}
+
+function pickerParent(input) {
+  const value = trimPickerPath(input)
+  const root = pickerRoot(value)
+
+  if (value === root) return value
+
+  if (value === '/' || value === '//' || /^[A-Za-z]:\/$/.test(value)) return value
+  const index = value.lastIndexOf('/')
+
+  if (index < root.length) return root
+
+  if (index <= 0) return '/'
+
+  if (index === 2 && /^[A-Za-z]:/.test(value)) return value.slice(0, 3)
+
+  return value.slice(0, index)
+}
+
+function canonicalPickerPath(path) {
+  const value = normalizePickerDrive(path)
+  const root = pickerRoot(value)
+  const parts = value.slice(root.length).split('/')
+
+  const resolved = parts.reduce((output, part) => {
+    if (!part || part === '.') return output
+
+    if (part === '..') {
+      output.pop()
+
+      return output
+    }
+
+    output.push(part)
+
+    return output
+  }, [])
+
+  return joinPickerPath(root, resolved.join('/'))
+}
+
+function nativePickerPath(path) {
+  const value = trimPickerPath(path)
+
+  if (/^[A-Za-z]:\//.test(value) || value.startsWith('//')) {
+    return value.replaceAll('/', '\\')
+  }
+
+  return value
+}
+
+// The browse fetch is the one place a picker path is handed to the backend
+// (fs-browser.js), whose contract is: a trailing separator means "list this
+// directory", while without one the last segment is treated as a name prefix
+// matched in the parent directory. nativePickerPath() trims that separator,
+// which would make the backend list one level too high, so restore it here —
+// and only here; submit/display paths keep the trimmed canonical form.
+function nativeBrowsePath(directory) {
+  const native = nativePickerPath(directory)
+  if (!directory.endsWith('/')) return native
+  const separator = /^[A-Za-z]:/.test(native) || native.startsWith('\\\\') ? '\\' : '/'
+  return native.endsWith(separator) ? native : `${native}${separator}`
+}
+
+function pickerTilde(absolute, homePath) {
+  const path = trimPickerPath(absolute)
+
+  if (!homePath) return ''
+  const root = trimPickerPath(homePath)
+
+  if (/^[A-Za-z]:\//.test(root)) return ''
+
+  if (path === root) return '~'
+
+  if (path.startsWith(root + '/')) return '~' + path.slice(root.length)
+
+  return ''
+}
+
+function displayPickerPath(path, input, homePath) {
+  const value = trimPickerPath(path)
+
+  if (/^[A-Za-z]:\//.test(trimPickerPath(homePath)) || /^[A-Za-z]:\//.test(value)) {
+    return value.replaceAll('/', '\\')
+  }
+
+  return pickerTilde(value, homePath) || value
 }
 </script>
 
@@ -258,7 +447,7 @@ function normalizeSubmitPath(value) {
             ref="inputEl"
             v-model="query"
             aria-label="Project folder path"
-            placeholder="~/dev/project"
+            placeholder="e.g. C:\dev\project or ~/dev/project"
             :disabled="busy"
             @keydown="handleKeydown"
           />
