@@ -4343,7 +4343,7 @@ function closePickerMenus() {
               active: reviewOpen,
               'has-review-changes': reviewSummary.state === 'ready'
                 && reviewSummary.available && reviewSummary.totalFiles > 0,
-              preparing: !reviewReady,
+              preparing: !reviewReady && (reviewSummary.state === 'loading' || reviewOpenRequested),
               'review-error': reviewSummary.state === 'error',
               'review-unavailable': reviewSummary.state === 'ready'
                 && !reviewSummary.available,
