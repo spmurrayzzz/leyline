@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { DIFFS_TAG_NAME, File, FileDiff, parsePatchFiles } from '@pierre/diffs'
+import { DIFFS_TAG_NAME, File, FileDiff, parsePatchFiles, processFile } from '@pierre/diffs'
 
 const props = defineProps({
   preview: { type: Object, default: null },
@@ -142,13 +142,24 @@ function renderDiff(preview) {
 
 function renderPatch(preview) {
   const parsed = parsePatchFiles(preview.patch || '')
-  const fileDiff = parsed.flatMap((patch) => patch.files || [])[0]
+  let fileDiff = parsed.flatMap((patch) => patch.files || [])[0]
   if (!fileDiff) throw new Error('No diff found in tool output')
+  const { oldText, newText } = preview.context || {}
+  if (typeof oldText === 'string' && typeof newText === 'string') {
+    try {
+      fileDiff = processFile(preview.patch, {
+        oldFile: { name: fileDiff.prevName || fileDiff.name, contents: oldText },
+        newFile: { name: fileDiff.name, contents: newText },
+        throwOnError: true,
+      }) || fileDiff
+    } catch {}
+  }
 
   instance = new FileDiff({
     ...options,
     diffStyle: 'unified',
     hunkSeparators: 'metadata',
+    ...(preview.context ? { collapsedContextThreshold: 0 } : {}),
   })
   instance.render({ fileContainer: diffContainer, fileDiff })
 }

@@ -84,7 +84,7 @@ const renderedDiffSections = computed(() => {
     ...section,
     renderKey: `${generation}:${index}`,
     preview: section.patch && !section.binary && !section.tooLarge
-      ? { kind: 'patch', patch: section.patch }
+      ? { kind: 'patch', patch: section.patch, context: section.context }
       : null,
   }))
 })

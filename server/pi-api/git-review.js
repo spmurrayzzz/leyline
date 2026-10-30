@@ -1,7 +1,9 @@
 import { execFile } from 'node:child_process'
+import { createHash } from 'node:crypto'
+import { constants } from 'node:fs'
 import { lstat, open, realpath, stat } from 'node:fs/promises'
 import { devNull } from 'node:os'
-import { resolve } from 'node:path'
+import { isAbsolute, relative, resolve, sep } from 'node:path'
 
 const CONFLICTED_STATUS = new Set(['DD', 'AU', 'UD', 'UA', 'DU', 'AA', 'UU'])
 const DIFF_FORMAT_ARGS = [
@@ -15,6 +17,8 @@ const DIFF_FORMAT_ARGS = [
 const GIT_BINARY_PROBE_BYTES = 8000
 const GIT_IGNORE_BATCH_SIZE = 512
 const MAX_GIT_OUTPUT = 20 * 1024 * 1024
+const MAX_DIFF_CONTEXT_BYTES = 1024 * 1024
+const MAX_DIFF_CONTEXT_LINES = 40000
 const MAX_RENDERABLE_DIFF_BYTES = 1024 * 1024
 const MAX_RENDERABLE_DIFF_LINES = 5000
 const MAX_REVIEW_FILES = 500
@@ -76,10 +80,9 @@ export async function readGitReviewDiff(cwd, path) {
   const file = files.find((item) => item.path === path)
   if (!file) throw new Error('This file is no longer available for review')
 
-  return {
-    diffs: await fileDiffs(root, file),
-    path: file.path,
-  }
+  const diffs = await fileDiffs(root, file)
+  if (/\.vue$/i.test(file.path)) await addDiffContext(root, file, diffs)
+  return { diffs, path: file.path }
 }
 
 export async function resolveGitReviewWatchTarget(cwd) {
@@ -342,8 +345,9 @@ async function branchName(root) {
 
 async function fileDiffs(root, file) {
   const paths = file.oldPath ? [file.oldPath, file.path] : [file.path]
+  const contextArgs = /\.vue$/i.test(file.path) ? ['--full-index'] : []
   if (file.conflicted) {
-    return [diffSection('conflict', await conflictPatch(root, paths))]
+    return [diffSection('conflict', await conflictPatch(root, paths, contextArgs))]
   }
 
   const diffs = []
@@ -353,6 +357,7 @@ async function fileDiffs(root, file) {
       'diff',
       '--cached',
       ...DIFF_FORMAT_ARGS,
+      ...contextArgs,
       '--find-renames',
     ]
     if (head.code === 0) args.push('HEAD')
@@ -363,16 +368,16 @@ async function fileDiffs(root, file) {
   if (file.untracked) {
     diffs.push(file.path.endsWith('/')
       ? diffSection('working', '', { directory: true })
-      : diffSection('working', await untrackedPatch(root, file.path)))
+      : diffSection('working', await untrackedPatch(root, file.path, contextArgs)))
   } else if (file.unstaged) {
-    diffs.push(diffSection('working', await workingPatch(root, paths)))
+    diffs.push(diffSection('working', await workingPatch(root, paths, contextArgs)))
   }
   return diffs
 }
 
-async function conflictPatch(root, paths) {
+async function conflictPatch(root, paths, extraArgs) {
   for (const side of ['--ours', '--theirs', '--base']) {
-    const patch = await workingPatch(root, paths, [side])
+    const patch = await workingPatch(root, paths, [side, ...extraArgs])
     if (/^diff --git /m.test(patch)) return patch
   }
   return ''
@@ -390,11 +395,12 @@ async function workingPatch(root, paths, extraArgs = []) {
   return result.stdout
 }
 
-async function untrackedPatch(root, path) {
+async function untrackedPatch(root, path, extraArgs) {
   const result = await runGit(root, [
     'diff',
     '--no-index',
     ...DIFF_FORMAT_ARGS,
+    ...extraArgs,
     '--',
     devNull,
     path,
@@ -429,6 +435,88 @@ function diffSection(scope, output, metadata = {}) {
     scope,
     tooLarge,
     ...metadata,
+  }
+}
+
+async function addDiffContext(root, file, diffs) {
+  let bytesRemaining = MAX_DIFF_CONTEXT_BYTES
+  let linesRemaining = MAX_DIFF_CONTEXT_LINES
+  for (const section of diffs) {
+    const { patch } = section
+    if (!patch || section.binary || section.tooLarge) continue
+    if (patch.match(/^diff --git /gm)?.length !== 1) continue
+    const index = /^index ([a-f0-9]{40}|[a-f0-9]{64})\.\.([a-f0-9]{40}|[a-f0-9]{64})(?: (\d+))?$/m.exec(patch)
+    if (!index || index[1].length !== index[2].length) continue
+    const [, oldId, newId, mode] = index
+    const modes = [...patch.matchAll(/^(?:old mode|new mode|new file mode|deleted file mode) (\d+)$/gm)]
+      .map((match) => match[1])
+    if (mode) modes.push(mode)
+    if (!modes.length || modes.some((value) => !['100644', '100755'].includes(value))) continue
+    const oldAbsent = /^0+$/.test(oldId)
+    const newAbsent = /^0+$/.test(newId)
+    const hunks = [...patch.matchAll(/^@@ -\d+(?:,(\d+))? \+\d+(?:,(\d+))? @@/gm)]
+    if (!hunks.length || hunks.some((hunk) => (
+      hunk[1] === '0' && !oldAbsent || hunk[2] === '0' && !newAbsent
+    ))) continue
+
+    try {
+      const oldText = oldAbsent ? '' : await readDiffBlob(root, oldId, bytesRemaining)
+      if (oldText === undefined) continue
+      const oldBytes = Buffer.byteLength(oldText)
+      const oldLines = lineCount(oldText)
+      if (oldLines > linesRemaining) continue
+      const newText = newAbsent ? '' : section.scope === 'staged'
+        ? await readDiffBlob(root, newId, bytesRemaining - oldBytes)
+        : await readDiffWorktree(root, file.path, newId, bytesRemaining - oldBytes)
+      if (newText === undefined) continue
+      const lines = oldLines + lineCount(newText)
+      if (lines > linesRemaining) continue
+      section.context = { oldText, newText }
+      bytesRemaining -= oldBytes + Buffer.byteLength(newText)
+      linesRemaining -= lines
+    } catch {}
+  }
+}
+
+async function readDiffBlob(root, objectId, limit) {
+  const size = await runGit(root, ['--no-lazy-fetch', 'cat-file', '-s', objectId])
+  if (Number(size.stdout.trim()) > limit) return
+  const result = await runGit(root, ['--no-lazy-fetch', 'cat-file', 'blob', objectId])
+  return matchingDiffText(result.stdout, objectId)
+}
+
+async function readDiffWorktree(root, path, objectId, limit) {
+  const rootPath = await realpath(root)
+  const filePath = resolve(rootPath, path)
+  const difference = relative(rootPath, filePath)
+  if (difference === '..' || difference.startsWith(`..${sep}`) || isAbsolute(difference)) return
+  if (await realpath(filePath) !== filePath) return
+  const file = await open(filePath, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
+  try {
+    const info = await file.stat()
+    if (!info.isFile() || info.size > limit) return
+    const current = await lstat(filePath)
+    if (await realpath(filePath) !== filePath || current.dev !== info.dev || current.ino !== info.ino) return
+    const buffer = Buffer.alloc(info.size + 1)
+    let length = 0
+    while (length < buffer.length) {
+      const { bytesRead } = await file.read(buffer, length, buffer.length - length, null)
+      if (!bytesRead) break
+      length += bytesRead
+    }
+    if (length > info.size) return
+    return matchingDiffText(buffer.subarray(0, length).toString('utf8'), objectId)
+  } finally {
+    await file.close()
+  }
+}
+
+function matchingDiffText(contents, objectId) {
+  if (contents.includes('\0')) return
+  for (const candidate of [contents, contents.replace(/\r\n/g, '\n')]) {
+    const hash = createHash(objectId.length === 64 ? 'sha256' : 'sha1')
+      .update(`blob ${Buffer.byteLength(candidate)}\0`).update(candidate).digest('hex')
+    if (hash === objectId) return candidate
   }
 }
 
