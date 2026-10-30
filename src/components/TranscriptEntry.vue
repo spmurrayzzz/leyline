@@ -2,6 +2,17 @@
 import { defineAsyncComponent } from 'vue'
 
 const PierrePreview = defineAsyncComponent(() => import('./PierrePreview.vue'))
+
+const viewState = new Map()
+const viewStateLimit = 2000
+
+function saveViewState(id, state) {
+  if (!id) return
+  viewState.delete(id)
+  viewState.set(id, state)
+  if (viewState.size <= viewStateLimit) return
+  viewState.delete(viewState.keys().next().value)
+}
 </script>
 
 <script setup>
@@ -39,6 +50,10 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  sessionKey: {
+    type: String,
+    default: '',
+  },
   skillExpanded: Boolean,
   systemPromptSelected: Boolean,
   subagentInspectorSelected: Boolean,
@@ -66,9 +81,11 @@ const emit = defineEmits([
   'toggle-tool',
 ])
 
-const feedbackDraft = ref('')
-const noteOpen = ref(false)
-const thinkingExpanded = ref(props.thinkingInitiallyExpanded)
+const stateKey = `${props.sessionKey}:${props.entry?.id || ''}`
+const cachedViewState = viewState.get(stateKey)
+const feedbackDraft = ref(cachedViewState?.feedbackDraft || '')
+const noteOpen = ref(cachedViewState?.noteOpen === true)
+const thinkingExpanded = ref(cachedViewState?.thinkingExpanded ?? props.thinkingInitiallyExpanded)
 const toolContentMounted = ref(props.toolExpanded)
 const systemInfo = computed(() => systemPromptInfo(props.entry))
 const skills = computed(() => skillSummaries(props.entry))
@@ -76,6 +93,14 @@ const skillName = computed(() => skillReadName(props.entry))
 
 watch(() => props.toolExpanded, (expanded) => {
   if (expanded) toolContentMounted.value = true
+})
+
+watch([feedbackDraft, noteOpen, thinkingExpanded], ([draft, open, thinking]) => {
+  saveViewState(stateKey, {
+    feedbackDraft: draft,
+    noteOpen: open,
+    thinkingExpanded: thinking,
+  })
 })
 const helpfulThumbPaths = [
   'M7 10v11',

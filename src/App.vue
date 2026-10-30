@@ -57,6 +57,7 @@ import { useToolExpansion } from './composables/useToolExpansion'
 import { useTranscriptPreferences } from './composables/useTranscriptPreferences'
 import { useWorkbenchScroll } from './composables/useWorkbenchScroll'
 import { backendDisplayAddress, backendHttpUrl } from './lib/backend'
+import { useTranscriptWindow } from './composables/useTranscriptWindow'
 import { fuzzyScore } from './lib/fuzzy'
 import { createTraceClient } from './lib/trace-client'
 import {
@@ -382,7 +383,7 @@ let composerScannerSettlingTimer = null
 let composerCommitTimer = null
 const workbenchScroll = useWorkbenchScroll({
   workbench, composerRef, isActive: () => !traceWorkbenchCovered.value && !subagentSelection.value,
-  prepareEntry: expandEntryActivity,
+  prepareEntry: prepareTranscriptEntry,
 })
 const {
   composerHeight,
@@ -428,6 +429,16 @@ const persistedTranscriptItems = computed(() => groupToolActivity(
   entries.value.map(entry => ({ ...entry, persistedEntry: entry })),
 ))
 const liveTranscriptItems = computed(() => groupToolActivity(liveFlowItems.value))
+const transcriptWindow = useTranscriptWindow({
+  container: workbench,
+  items: persistedTranscriptItems,
+  follow: stickToBottom,
+})
+const {
+  bottomPad: transcriptBottomPad,
+  rows: transcriptRows,
+  topPad: transcriptTopPad,
+} = transcriptWindow
 const compactionBoundary = computed(() => {
   if (!compactingContext.value) return null
   const cutEntryId = compaction.value?.cutEntryId
@@ -463,6 +474,18 @@ function expandEntryActivity(entryId) {
   if (group && !isActivityExpanded(group)) {
     expandedActivity.value = new Map(expandedActivity.value).set(group.id, true)
   }
+  return group?.id || entryId
+}
+function prepareTranscriptEntry(entryId) {
+  transcriptWindow.revealEntry(expandEntryActivity(entryId))
+}
+function handleTranscriptWheel(event) {
+  transcriptWindow.clearReveal()
+  handleWorkbenchWheel(event)
+}
+function handleTranscriptTouchMove(event) {
+  transcriptWindow.clearReveal()
+  handleWorkbenchTouchMove(event)
 }
 function toggleActivity(group, event) {
   const subagent = singleSubagentEntry(group)
@@ -1380,6 +1403,7 @@ watch(selectedSessionId, (sessionId, previousSessionId) => {
   promptError.value = ''
   seenEntryIds.value = new Set()
   animatingEntryIds.value = new Set()
+  transcriptWindow.reset()
   resetWorkbenchScrollState()
 })
 
@@ -4596,8 +4620,8 @@ function closePickerMenus() {
         }"
         @pointerdown.passive="handleWorkbenchPointerDown"
         @scroll="handleWorkbenchScroll"
-        @touchmove.passive="handleWorkbenchTouchMove"
-        @wheel.passive="handleWorkbenchWheel"
+        @touchmove.passive="handleTranscriptTouchMove"
+        @wheel.passive="handleTranscriptWheel"
       >
         <div
           v-if="initializing"
@@ -4782,13 +4806,20 @@ function closePickerMenus() {
             && !inProjectNewSessionRun
             && persistedTranscriptItems.length > 0"
         >
+          <div
+            v-if="transcriptTopPad"
+            class="transcript-pad transcript-pad-top"
+            :style="{ height: `${transcriptTopPad}px` }"
+            aria-hidden="true"
+          ></div>
           <template
-            v-for="(item, itemIndex) in persistedTranscriptItems"
+            v-for="{ item, index } in transcriptRows"
             :key="`${selectedSession.id}:${item.id}`"
           >
             <MobileToolActivity
               v-if="item.type === 'tool-activity'"
-              :class="{ 'is-frozen': compactionBoundary?.resolved && itemIndex < compactionBoundary.index }"
+              :data-entry-id="item.id"
+              :class="{ 'is-frozen': compactionBoundary?.resolved && index < compactionBoundary.index }"
               :group="item"
               :expanded="isActivityExpanded(item)"
               @toggle="toggleActivity"
@@ -4799,6 +4830,7 @@ function closePickerMenus() {
                   :key="activityEntry(call).toolCallId || activityEntry(call).id"
                   :data-entry-id="activityEntry(call).id"
                   :copied-entry-id="copiedEntryId"
+                  :session-key="selectedSession?.id || ''"
                   :entry="activityEntry(call)"
                   :research-cwd="selectedSession?.cwd || ''"
                   :tool-expanded="isActivityExpanded(item) && isToolExpanded(activityEntry(call))"
@@ -4819,9 +4851,10 @@ function closePickerMenus() {
             <TranscriptEntry
               v-else
               :data-entry-id="item.id"
+              :session-key="selectedSession?.id || ''"
               :class="{
                 'message-enter': isEnteringEntry(item),
-                'is-frozen': compactionBoundary?.resolved && itemIndex < compactionBoundary.index,
+                'is-frozen': compactionBoundary?.resolved && index < compactionBoundary.index,
               }"
               :copied-entry-id="copiedEntryId"
               :entry="activityEntry(item)"
@@ -4846,6 +4879,12 @@ function closePickerMenus() {
               @toggle-tool="toggleTool"
             />
           </template>
+          <div
+            v-if="transcriptBottomPad"
+            class="transcript-pad transcript-pad-bottom"
+            :style="{ height: `${transcriptBottomPad}px` }"
+            aria-hidden="true"
+          ></div>
         </template>
 
         <TransitionGroup
@@ -4877,6 +4916,7 @@ function closePickerMenus() {
                   :key="activityEntry(call).toolCallId || activityEntry(call).id"
                   :data-entry-id="activityEntry(call).id"
                   :copied-entry-id="copiedEntryId"
+                  :session-key="selectedSession?.id || ''"
                   :entry="activityEntry(call)"
                   :research-cwd="selectedSession?.cwd || ''"
                   :tool-expanded="isActivityExpanded(item) && isToolExpanded(activityEntry(call))"
@@ -4897,6 +4937,7 @@ function closePickerMenus() {
             <TranscriptEntry
               v-else-if="item.type === 'system' || item.type === 'model-change'"
               :copied-entry-id="copiedEntryId"
+              :session-key="selectedSession?.id || ''"
               :entry="item.persistedEntry || item"
               :system-prompt-selected="systemPromptEntry?.id === (item.persistedEntry || item).id"
               @open-system-prompt="openSystemPrompt"
@@ -4905,6 +4946,7 @@ function closePickerMenus() {
             <TranscriptEntry
               v-else-if="item.type === 'message' || item.type === 'summary'"
               :copied-entry-id="copiedEntryId"
+              :session-key="selectedSession?.id || ''"
               :entry="item.persistedEntry || item"
               :research-cwd="selectedSession?.cwd || ''"
               :skill-expanded="isSkillExpanded(item.persistedEntry || item)"

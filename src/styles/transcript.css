@@ -259,11 +259,11 @@
   isolation: isolate;
 }
 
-.workbench > .message,
-.workbench > .tool-card,
-.workbench > .event-row,
-.workbench > .model-change-row,
-.workbench > .system-prompt-row,
+.workbench > .transcript-pad {
+  flex: none;
+  pointer-events: none;
+}
+
 .live-stack > .live-item {
   content-visibility: auto;
 }

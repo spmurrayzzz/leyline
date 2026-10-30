@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { highlightedText as highlightFuzzyText } from '../lib/fuzzy'
 import { SERVICE_TIERS, SERVICE_TIER_STATUS_KEY, ULTRAFAST_STATUS_KEY, serviceTierFromStatuses } from '../../lib/ultrafast.js'
 import {
@@ -29,6 +29,7 @@ import {
 
 const PROJECT_AGE_REFRESH_MS = 60 * 60 * 1000
 const RECENT_PROJECT_WINDOW_MS = 30 * 24 * 60 * 60 * 1000
+const fastSwitchMs = 60
 
 function modelServiceTiers(model) {
   if (Array.isArray(model?.serviceTiers)) {
@@ -484,7 +485,12 @@ export function useSessionWorkspace({
   async function selectSession(session, options = {}) {
     const token = ++sessionSelectionToken
     invalidateSessionRefresh()
-    sessionSwitching.value = true
+    let fading = false
+    const fadeTimer = setTimeout(() => {
+      if (!isCurrentSessionSelection(token, session.id)) return
+      fading = true
+      sessionSwitching.value = true
+    }, fastSwitchMs)
     const switchStarted = Date.now()
     selectedSessionId.value = session.id
     markRuntimeSessionRead(session.id)
@@ -495,13 +501,15 @@ export function useSessionWorkspace({
 
     try {
       const data = await fetchSessionDetail(session)
+      clearTimeout(fadeTimer)
       if (!isCurrentSessionSelection(token, session.id)) return
       sessionDetail.value = data
       activeRuntimeSession.value = null
       liveTurn?.reset?.()
       updateSessionRoute(session.id, options)
       const elapsed = Date.now() - switchStarted
-      if (elapsed < 150) await wait(150 - elapsed)
+      if (fading && elapsed < 150) await wait(150 - elapsed)
+      await nextTick()
       if (!isCurrentSessionSelection(token, session.id)) return
       sessionLoading.value = false
       sessionSwitching.value = false
@@ -517,6 +525,7 @@ export function useSessionWorkspace({
         sessionError.value = error.message
       }
     } finally {
+      clearTimeout(fadeTimer)
       if (!isCurrentSessionSelection(token, session.id)) return
       sessionLoading.value = false
       sessionSwitching.value = false
