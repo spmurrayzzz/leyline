@@ -10,7 +10,7 @@ Leyline uses a mobile layout when the viewport is 760 pixels wide or less.
 
 Select the Leyline mark to return to Home. Use **Open sessions** to open the sidebar. Select a session title to rename it.
 
-Use **Session actions** (three dots) for traces, session details, Git review, memory, runtime events, and export. Available controls depend on the session and backend.
+Use **Session actions** (three dots) for traces, session details, Git review, memory, and export. Available controls depend on the session and backend.
 
 On Home, the three-dot button opens **Session details**, which lists the enabled tools.
 

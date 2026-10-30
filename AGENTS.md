@@ -29,7 +29,7 @@
   vision runtimes, independently of trace view lifetime. Home previews and
   Settings probes do not install it. Keep trace views lazy and mount only
   one Inspector, Workspace, or Explorer. Reuse the runtime WebSocket for small commit
-  and configuration notices without adding trace payloads to the event log.
+  and configuration notices without full trace payloads.
 - Current pi SDK usage includes:
   - `SessionManager.listAll()` for standard session discovery.
   - `SessionManager.open(path)` and `getBranch()` for persisted transcripts.
@@ -47,7 +47,7 @@
   - The composer stays available during active runs. Enter queues the next task,
     Option+Enter sends steering, and Shift+Enter adds a line break. Stop holds
     remaining unsent tasks until Resume; an empty queue returns to normal Send.
-  - Memory, Project Details, Settings, Runtime events, previews, and the terminal
+  - Memory, Project Details, Settings, previews, and the terminal
     use focused drawers or overlays.
 - Screenshot workflows assume the dev server is running at `http://localhost:5173/`:
   - `npm run screenshot` writes the current local state to `screenshots/current.png`.

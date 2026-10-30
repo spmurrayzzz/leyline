@@ -62,12 +62,9 @@ import { fuzzyScore } from './lib/fuzzy'
 import { createTraceClient } from './lib/trace-client'
 import {
   compactNumber,
-  eventTime,
   formatMode,
   modelChip,
   projectName,
-  toolLabel,
-  toolTarget,
 } from './lib/format'
 import {
   compactPiSession,
@@ -129,7 +126,6 @@ const draft = ref('')
 const attachedImages = ref([])
 const fullscreenImage = ref(null)
 const workbench = ref(null)
-const eventLogOpen = ref(false)
 const settingsOpen = ref(false)
 const settingsCategory = ref('display')
 const settingsOpener = shallowRef(null)
@@ -998,17 +994,13 @@ const {
   sessionLoading,
   liveTurnActive,
   settingsOpen,
-  eventLogOpen,
 })
 const {
-  appendRuntimeEvent,
   closeEventStream,
-  eventLog,
   eventStreamConnected,
   eventStreamError,
   eventStreamErrorRevision,
   openEventStream,
-  runtimeEvents,
   setEventSessionId,
   subscribeTraces,
 } = useRuntimeEvents({
@@ -1017,10 +1009,6 @@ const {
       runtimeCwdBySessionId.set(activeSession.id, activeSession.cwd)
     }
     applyQueueSnapshot(activeSession)
-    appendRuntimeEvent({
-      type: 'active_session',
-      summary: projectName(activeSession.cwd),
-    })
   },
   onRuntimeEvent(data) {
     updateRuntimeEventState(data)
@@ -1440,7 +1428,7 @@ watch(traceWorkbenchCovered, (covered) => {
   if (covered) pauseScroll()
   else resumeScroll()
 }, { flush: 'sync' })
-watch([reviewOpen, researchSourcesOpen, systemPromptEntry, memoryOpen, eventLogOpen, settingsOpen, projectDetailCwd, sessionDetailsOpen], (values) => {
+watch([reviewOpen, researchSourcesOpen, systemPromptEntry, memoryOpen, settingsOpen, projectDetailCwd, sessionDetailsOpen], (values) => {
   if (traceMode.value && values.some(Boolean)) void closeTrace(false)
 })
 
@@ -1662,7 +1650,6 @@ function setSidebarNavigator(navigator) {
   if (!navigator) return
   settingsOpen.value = false
   sessionDetailsOpen.value = false
-  eventLogOpen.value = false
   projectDetailCwd.value = ''
   if (memoryOpen.value) closeMemoryDrawer()
 }
@@ -1844,7 +1831,6 @@ function openProjectDetail(project) {
   settingsOpen.value = false
   sessionDetailsOpen.value = false
   sidebarOpen.value = false
-  eventLogOpen.value = false
   if (memoryOpen.value) closeMemoryDrawer()
 }
 
@@ -2089,7 +2075,6 @@ function openTrace(mode, event) {
   closeResearchCitationPreview()
   if (memoryOpen.value) closeMemoryDrawer()
   closePickerMenus()
-  eventLogOpen.value = false
   sessionDetailsOpen.value = false
   projectDetailCwd.value = ''
   sidebarOpen.value = false
@@ -2194,7 +2179,6 @@ function openSystemPrompt(entry, opener) {
   closeResearchSources()
   closeResearchCitationPreview()
   if (memoryOpen.value) closeMemoryDrawer()
-  eventLogOpen.value = false
   sessionDetailsOpen.value = false
   projectDetailCwd.value = ''
   sidebarOpen.value = false
@@ -2403,30 +2387,6 @@ function navigateHome() {
   sidebarOpen.value = false
 }
 
-function eventType(item) {
-  return item.event?.type || item.type || 'event'
-}
-
-function eventSummary(item) {
-  if (item.summary) return item.summary
-  if (item.type === 'extension_ui') return 'extension UI'
-  const event = item.event || item
-  const type = event.type || item.type
-
-  if (type === 'tool_call') return toolLabel(event.toolName)
-  if (type === 'tool_execution_start') {
-    return `${toolLabel(event.toolName)}${toolTarget(event.args)}`
-  }
-  if (type === 'tool_execution_end') return toolLabel(event.toolName)
-  if (type === 'message_update') return event.message?.role || 'message'
-  if (type === 'message_end') return event.message?.role || 'message'
-  if (type === 'error') return event.error?.message || event.message || 'error'
-  if (type === 'extension_error') {
-    return event.error?.message || event.error || 'extension error'
-  }
-  return item.activeSessionId ? item.activeSessionId.slice(0, 8) : 'runtime'
-}
-
 function liveItemClass(item) {
   return [
     `live-${item.type}-item`,
@@ -2479,7 +2439,6 @@ function openGlobalSettings(category) {
   sidebarOpen.value = false
   settingsOpen.value = true
   sessionDetailsOpen.value = false
-  eventLogOpen.value = false
   memoryOpen.value = false
   projectDetailCwd.value = ''
 }
@@ -2494,7 +2453,6 @@ function toggleSessionDetails() {
   if (memoryDirty.value && !confirmDiscardMemoryChanges()) return
   sessionDetailsOpen.value = !sessionDetailsOpen.value
   settingsOpen.value = false
-  eventLogOpen.value = false
   memoryOpen.value = false
   projectDetailCwd.value = ''
   sidebarNavigator.value = ''
@@ -2751,15 +2709,6 @@ async function deleteBackendConnection(connection) {
     await removeSavedBackendConnection(connection.id)
   } catch {
   }
-}
-
-function toggleEventDrawer() {
-  if (memoryDirty.value && !confirmDiscardMemoryChanges()) return
-  eventLogOpen.value = !eventLogOpen.value
-  settingsOpen.value = false
-  sessionDetailsOpen.value = false
-  memoryOpen.value = false
-  if (eventLogOpen.value) projectDetailCwd.value = ''
 }
 
 function toggleMemoryPanel() {
@@ -4005,7 +3954,6 @@ function anyEscapeTargetOpen(ignoreQueue = false, ignoreEditing = false) {
     || terminalKeysOpen.value
     || (!reviewDesktopAvailable.value && (reviewOpen.value || reviewOpenRequested.value))
     || settingsOpen.value
-    || eventLogOpen.value
     || sessionDetailsOpen.value
     || projectDetailCwd.value
     || memoryOpen.value
@@ -4078,7 +4026,7 @@ function handleEscape(event) {
     event?.stopPropagation?.()
     return
   }
-  const issueCovered = eventLogOpen.value || sessionDetailsOpen.value || projectDetailCwd.value
+  const issueCovered = sessionDetailsOpen.value || projectDetailCwd.value
     || memoryOpen.value || researchSourcesOpen.value || systemPromptEntry.value
     || researchCitationPreview.value || (reviewPaneExpanded.value && window.innerWidth > 1120)
   if (!issueCovered
@@ -4117,7 +4065,6 @@ function handleEscape(event) {
     void interruptAgent()
   }
   settingsOpen.value = false
-  eventLogOpen.value = false
   sidebarNavigator.value = ''
   sessionDetailsOpen.value = false
   projectDetailCwd.value = ''
@@ -4204,7 +4151,6 @@ function closePickerMenus() {
       'session-handoff': sessionHandoff,
       'terminal-open': terminalOpen,
       'terminal-resizing': terminalResizing,
-      'event-log-open': eventLogOpen,
       'memory-open': memoryOpen,
       'review-open': reviewDesktopAvailable && reviewAvailable && reviewOpen && !!selectedSession,
       'review-expanded': reviewDesktopAvailable && reviewAvailable && reviewOpen && reviewExpanded
@@ -4457,34 +4403,19 @@ function closePickerMenus() {
               {{ memoryActiveCount }}
             </span>
           </button>
-          <template v-if="!isEmptySelectedSession">
-            <button
-              class="topbar-icon-button"
-              type="button"
-              title="Events"
-              aria-label="Events"
-              @click="toggleEventDrawer"
-            >
-              <svg viewBox="0 0 16 16" aria-hidden="true">
-                <path d="M1.5 8h3l1.8-4 3.4 8 1.8-4h3"></path>
-              </svg>
-              <span v-if="runtimeEvents.length" class="topbar-icon-count">
-                {{ runtimeEvents.length }}
-              </span>
-            </button>
-            <a
-              class="topbar-icon-button"
-              title="Export transcript"
-              aria-label="Export transcript"
-              :href="selectedSessionExportUrl"
-            >
-              <svg viewBox="0 0 16 16" aria-hidden="true">
-                <path d="M8 2.5v7"></path>
-                <path d="M5 6.5l3 3 3-3"></path>
-                <path d="M3 11v1.5c0 .8.7 1.5 1.5 1.5h7c.8 0 1.5-.7 1.5-1.5V11"></path>
-              </svg>
-            </a>
-          </template>
+          <a
+            v-if="!isEmptySelectedSession"
+            class="topbar-icon-button"
+            title="Export transcript"
+            aria-label="Export transcript"
+            :href="selectedSessionExportUrl"
+          >
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M8 2.5v7"></path>
+              <path d="M5 6.5l3 3 3-3"></path>
+              <path d="M3 11v1.5c0 .8.7 1.5 1.5 1.5h7c.8 0 1.5-.7 1.5-1.5V11"></path>
+            </svg>
+          </a>
           </div>
         </div>
       </div>
@@ -5705,35 +5636,6 @@ function closePickerMenus() {
             </dl>
             <p class="settings-note">Change the active model and thinking level in the composer.</p>
           </div>
-        </aside>
-      </div>
-    </Transition>
-
-    <Transition name="event-drawer">
-      <div v-if="eventLogOpen" class="event-log-slot">
-        <aside class="event-log-drawer" aria-label="Runtime events">
-          <header class="event-log-drawer-header">
-            <div>
-              <strong>Runtime events</strong>
-              <span>{{ runtimeEvents.length }} total</span>
-            </div>
-            <button type="button" @click="eventLogOpen = false">×</button>
-          </header>
-          <div v-if="eventLog.length === 0" class="event-log-empty">
-            No events yet
-          </div>
-          <details v-for="item in eventLog" :key="item.loggedAt" class="event-log-entry">
-            <summary class="event-log-row">
-              <time>{{ eventTime(item) }}</time>
-              <code>{{ eventType(item) }}</code>
-              <span>{{ eventSummary(item) }}</span>
-            </summary>
-            <div class="event-log-detail">
-              <strong>{{ eventType(item) }}</strong>
-              <p>{{ eventSummary(item) }}</p>
-              <button type="button" @click="copyTranscriptItem(`event-${item.loggedAt}`, `${eventType(item)}\n${eventSummary(item)}`)">{{ copiedEntryId === `event-${item.loggedAt}` ? 'Copied' : 'Copy event' }}</button>
-            </div>
-          </details>
         </aside>
       </div>
     </Transition>

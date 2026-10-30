@@ -71,9 +71,6 @@ async function showTranscriptDetails() {
 }
 
 async function showPanels() {
-  await clickIfVisible('button[aria-label="Events"]')
-  await pause(600)
-  await clickIfVisible('.event-log-drawer-header button')
   await clickIfVisible('button[aria-label="Open terminal"]')
   await pause(1000)
   await clickIfVisible('.terminal-header button')

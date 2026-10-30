@@ -38,7 +38,7 @@ description: Find Leyline's frontend, backend, shared modules, Electron shell, e
 - `src/composables/useSettingsOperation.js`: Owns backend-bound operation polling, answers, and cancellation.
 - `src/composables/useLiveTurnProjection.js`: Owns optimistic and live transcript state.
 - `src/composables/useSubagentPreview.js`: Reads the selected saved or active child with tool arguments, and observes a running child through its own runtime socket.
-- `src/composables/useRuntimeEvents.js`: Adapts runtime WebSocket events to frontend callbacks, trace subscribers, and the event log.
+- `src/composables/useRuntimeEvents.js`: Adapts runtime WebSocket events to frontend callbacks and trace subscribers.
 - `src/composables/useMemoryInspector.js`: Owns Memory Inspector requests and optimistic state.
 - `src/composables/useProjectBrowser.js`: Owns project picker and folder-browser visibility.
 - `src/composables/useToolExpansion.js`: Owns transcript expansion, copy, and fullscreen state.
@@ -87,7 +87,7 @@ These files are outside `src/` because Node.js backend code and browser code imp
 - `src/styles/memory.css`: Defines the Memory Inspector.
 - `src/styles/review.css`: Defines the resizable and expanded Git review pane.
 - `src/styles/research.css`: Defines research progress, reports, source navigation, and sidebar markers. Subagent inspector styles belong to `tools.css`.
-- `src/styles/settings.css`: Defines global Settings, contextual settings drawers, agent controls, provider/MCP workspaces, and Runtime events.
+- `src/styles/settings.css`: Defines global Settings, contextual settings drawers, agent controls, and provider/MCP workspaces.
 - `src/styles/modals.css`: Defines the project browser and confirmation dialogs.
 - `src/styles/terminal.css`: Defines the terminal drawer.
 - `src/styles/responsive.css`: Defines reduced-motion and responsive overrides.

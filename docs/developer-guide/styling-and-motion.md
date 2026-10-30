@@ -27,7 +27,7 @@ Avoid decorative glow, gradients, and extra panels. Existing gradients serve fad
 | `memory.css` | Memory Inspector |
 | `review.css` | Git review rail, file list, diff states, resizing, and expanded layout |
 | `research.css` | Research progress, reports, source rail, citation preview, and sidebar markers |
-| `settings.css` | Global Settings, provider/MCP workspaces, scoped agent controls, contextual drawers, and Runtime events |
+| `settings.css` | Global Settings, provider/MCP workspaces, scoped agent controls, and contextual drawers |
 | `modals.css` | Project browser and confirmation dialogs |
 | `terminal.css` | Terminal drawer |
 | `responsive.css` | Reduced-motion and viewport overrides |

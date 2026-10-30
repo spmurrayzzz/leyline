@@ -1,11 +1,9 @@
-.leyline-app.research-open,
-.leyline-app.research-open.event-log-open {
+.leyline-app.research-open {
   grid-template-columns:
     var(--sidebar-width) minmax(0, 1fr) var(--research-pane-width);
 }
 
-.leyline-app.sidebar-hidden.research-open,
-.leyline-app.sidebar-hidden.research-open.event-log-open {
+.leyline-app.sidebar-hidden.research-open {
   grid-template-columns: 0 minmax(0, 1fr) var(--research-pane-width);
 }
 
@@ -705,13 +703,11 @@ button.research-source-select {
 }
 
 @media (max-width: 1120px) {
-  .leyline-app.research-open,
-  .leyline-app.research-open.event-log-open {
+  .leyline-app.research-open {
     grid-template-columns: var(--sidebar-width) minmax(0, 1fr) 0;
   }
 
-  .leyline-app.sidebar-hidden.research-open,
-  .leyline-app.sidebar-hidden.research-open.event-log-open {
+  .leyline-app.sidebar-hidden.research-open {
     grid-template-columns: 0 minmax(0, 1fr) 0;
   }
 
@@ -728,9 +724,7 @@ button.research-source-select {
 
 @media (max-width: 760px) {
   .leyline-app.research-open,
-  .leyline-app.research-open.event-log-open,
-  .leyline-app.sidebar-hidden.research-open,
-  .leyline-app.sidebar-hidden.research-open.event-log-open {
+  .leyline-app.sidebar-hidden.research-open {
     grid-template-columns: 0 minmax(0, 1fr) 0;
   }
 

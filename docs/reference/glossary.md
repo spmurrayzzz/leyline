@@ -51,8 +51,8 @@ description: Definitions of Leyline terms, including sessions, runtimes, steerin
 - **Research artifact**: A completed Markdown report whose numeric citations match the research source ledger.
 - **Runtime**: The live pi session object that runs prompts, tools, shell
   commands, and model operations.
-- **Runtime events**: The **Events** drawer data from the selected backend's
-  event stream. This temporary page list is separate from durable traces.
+- **Runtime events**: Live updates from the selected backend over WebSocket.
+  They update transcript, queue, activity, and extension UI state.
 - **Sent to agent**: Waiting inputs that pi has already accepted. These inputs
   cannot be edited, reordered, or removed from the queue tray.
 - **Source ledger**: The persisted research list that maps citation numbers to cited, supporting, or excluded sources.

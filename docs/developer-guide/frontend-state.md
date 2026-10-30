@@ -22,7 +22,7 @@
 | `useSettingsOperation.js` | Private operation polling, answers, cancellation, and backend-bound cleanup |
 | `useLiveTurnProjection.js` | Optimistic user entries, live assistant blocks, System rows, tools, shell execution, compaction activity, and live-to-persisted reconciliation |
 | `PromptQueue.vue` | Queue expansion, active edit, action menus, queue mutations, and tray width measurement |
-| `useRuntimeEvents.js` | Runtime WebSocket subscription, connection state, the local event log, and dedicated trace notice subscribers |
+| `useRuntimeEvents.js` | Runtime WebSocket subscription, connection state, and dedicated trace notice subscribers |
 | `src/lib/event-socket.js` | Shared runtime/review WebSocket client, selected-backend URLs, reconnect backoff, timeouts, heartbeat replies, and stale-socket guards |
 | `App.vue` / `TracePanel.vue` | Trace surface mode, small selection and return state, selected-backend client, capture controls, and view cleanup |
 | `useMemoryInspector.js` | Visible Memory data, loading, optimistic mutations, dirty-state guards, and drawer state |
@@ -85,7 +85,7 @@ Closing traces unmounts the surface, aborts requests, and removes subscriptions.
 
 A hidden narrow-layout Explorer preview pauses detail requests. Hidden observation detail does not mount its renderer. Workspace and Explorer make the covered workbench inert and pause scroll following. Capture continues regardless of view lifetime.
 
-Trace notices bypass transcript projection and the Runtime Events log. See [Elune integration](../integrations/elune) for the capture boundary and [Trace routes](../reference/api#trace-routes) for pagination.
+Trace notices bypass transcript projection. See [Elune integration](../integrations/elune) for the capture boundary and [Trace routes](../reference/api#trace-routes) for pagination.
 
 ## Session selection
 
@@ -154,7 +154,7 @@ The tray height limit includes the terminal drawer height. Its list scrolls with
 
 The global Escape handler dismisses queue surfaces before it can interrupt a run. Outside-click handling uses `composedPath()` because an action can remove its clicked node before the window listener runs.
 
-Stop applies its returned snapshot through the revision guard. Expected cancellations do not create composer error banners. Genuine failures and raw runtime events remain available.
+Stop applies its returned snapshot through the revision guard. Expected cancellations do not create composer error banners. Genuine failures still create composer error banners.
 
 ## Persisted and live transcript state
 
@@ -344,7 +344,7 @@ A selected-session change resets scroll state. The terminal height and composer 
 
 ## Drawer coordination
 
-`App.vue` coordinates global Settings, Project settings, Session details, Runtime events, Memory, research sources, and sidebar navigators. Opening global Settings closes contextual drawers and conflicting overlays. Opening a navigator closes conflicting drawers and configuration surfaces. Subagent and vision controls belong to the fixed-scope settings surfaces, not separate drawers.
+`App.vue` coordinates global Settings, Project settings, Session details, Memory, research sources, and sidebar navigators. Opening global Settings closes contextual drawers and conflicting overlays. Opening a navigator closes conflicting drawers and configuration surfaces. Subagent and vision controls belong to the fixed-scope settings surfaces, not separate drawers.
 
 Git review and research sources use the desktop third rail. The prompt inspector overlays the workbench. Opening one closes the others.
 

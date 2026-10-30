@@ -1,11 +1,5 @@
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 import { openEventSocket } from '../lib/event-socket'
-
-const transientRuntimeEventTypes = new Set([
-  'message_update',
-  'tool_execution_update',
-  'bash_execution_update',
-])
 
 export function useRuntimeEvents({
   onActiveSession,
@@ -16,15 +10,9 @@ export function useRuntimeEvents({
   onExtensionError,
   onReconnect,
 } = {}) {
-  const runtimeEvents = ref([])
   const eventStreamError = ref('')
   const eventStreamErrorRevision = ref(0)
   const eventStreamConnected = ref(false)
-  const eventLog = computed(() =>
-    [...runtimeEvents.value]
-      .sort((a, b) => b.loggedAt.localeCompare(a.loggedAt))
-      .slice(0, 20),
-  )
   let eventSocket
   let eventSessionId = ''
   let streamOpened = false
@@ -49,7 +37,6 @@ export function useRuntimeEvents({
         streamOpened = true
         eventStreamConnected.value = true
         eventStreamError.value = ''
-        appendRuntimeEvent({ type: 'connected' })
         if (reconnected) {
           publishTraceNotice({ type: 'reconnect' })
           onReconnect?.()
@@ -60,14 +47,12 @@ export function useRuntimeEvents({
         if (eventStreamError.value !== message) eventStreamErrorRevision.value++
         eventStreamConnected.value = false
         eventStreamError.value = message
-        appendRuntimeEvent({ type: 'disconnected' })
         console.warn('pi event stream disconnected')
       },
       onError(error) {
         const message = `Invalid runtime event: ${error.message}`
         eventStreamError.value = message
         eventStreamErrorRevision.value++
-        appendRuntimeEvent({ type: 'error', message })
       },
     })
   }
@@ -85,17 +70,14 @@ export function useRuntimeEvents({
         publishTraceNotice({ ...data.event, activeSessionId: data.event.sessionId })
         return
       }
-      if (!transientRuntimeEventTypes.has(data.event?.type)) appendRuntimeEvent(data)
       onRuntimeEvent?.(data)
     } else if (type === 'runtime_roster') {
       onRuntimeRoster?.(data)
     } else if (type === 'runtime_removed') {
       onRuntimeRemoved?.(data)
     } else if (type === 'extension_ui') {
-      appendRuntimeEvent({ ...data, type })
       onExtensionUi?.(data)
     } else if (type === 'extension_error') {
-      appendRuntimeEvent({ ...data, type })
       onExtensionError?.(data)
     }
   }
@@ -113,22 +95,12 @@ export function useRuntimeEvents({
     eventStreamConnected.value = false
   }
 
-  function appendRuntimeEvent(event) {
-    runtimeEvents.value = [
-      ...runtimeEvents.value.slice(-99),
-      { ...event, loggedAt: new Date().toISOString() },
-    ]
-  }
-
   return {
-    appendRuntimeEvent,
     closeEventStream,
-    eventLog,
     eventStreamConnected,
     eventStreamError,
     eventStreamErrorRevision,
     openEventStream,
-    runtimeEvents,
     setEventSessionId,
     subscribeTraces,
   }

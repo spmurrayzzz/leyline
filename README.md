@@ -36,7 +36,6 @@ See [Tracing](docs/user-guide/tracing.md) for recorded runs and capture controls
 - [Settings, providers, and MCP](docs/user-guide/settings.md)
 - [Tracing](docs/user-guide/tracing.md)
 - [Elune integration](docs/integrations/elune.md)
-- [Runtime events](docs/user-guide/runtime-events.md)
 - [Terminal](docs/user-guide/terminal.md)
 - [Electron](docs/electron/index.md)
 - [Commands](docs/reference/commands.md)

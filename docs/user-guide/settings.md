@@ -119,7 +119,7 @@ API keys are optional for custom compatible endpoints. Leave the key unset when 
 4. Follow pi's prompts in the Settings panel.
 5. Open the authorization link if the provider requests browser login.
 
-Credentials stay on the selected backend. Saved secrets do not appear in the provider details. Authentication prompts and replies do not enter the conversation transcript or Runtime events.
+Credentials stay on the selected backend. Saved secrets do not appear in the provider details. Authentication prompts and replies do not enter the conversation transcript or shared runtime WebSocket.
 
 **Configured** means saved configuration or credentials are available. It does not confirm account access. Use [Test connection](#test-a-model-connection) to check a model request. Sign-in does not select a model. Use the composer to change the active model.
 

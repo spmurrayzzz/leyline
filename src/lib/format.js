@@ -56,14 +56,6 @@ export function sourceDate(source) {
   })
 }
 
-export function eventTime(item) {
-  return new Intl.DateTimeFormat(undefined, {
-    hour: 'numeric',
-    minute: '2-digit',
-    second: '2-digit',
-  }).format(new Date(item.loggedAt))
-}
-
 export function sessionTime(session) {
   const timestamp = session.modified || session.timestamp
   if (!timestamp) return ''

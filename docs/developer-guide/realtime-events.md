@@ -63,11 +63,9 @@ Background streams omit shell updates and execution payloads. They retain `isBas
 
 Connection callbacks update the visible stream status. The adapter passes event messages to `handleEvent(type, data)`.
 
-The adapter keeps the latest 100 local log items. The Runtime Events drawer displays the newest 20.
+An open subagent inspector uses `useSubagentPreview.js` to read only the selected child with `toolArguments=1`, including saved children. While that child runs, the preview opens a separate child-scoped socket through the same helper. Observation never activates the child or changes the parent's subscription and selection. Closing the inspector releases its child observer without aborting the run.
 
-An open subagent inspector uses `useSubagentPreview.js` to read only the selected child with `toolArguments=1`, including saved children. While that child runs, the preview opens a separate child-scoped socket through the same helper. Observation never activates the child or changes the parent's subscription and selection. Preview events do not add another event-log stream. Closing the inspector releases its child observer without aborting the run.
-
-The adapter logs extension errors. Composer error handling filters expected cancellations without removing their raw event records.
+The adapter forwards extension errors to `onExtensionError`. Composer error handling filters expected cancellations.
 
 ## Connection recovery
 
@@ -85,7 +83,7 @@ The event hub combines `message_update` events within 50 ms and flushes pending 
 
 Trace notices reuse the runtime WebSocket. They do not open another connection or include full trace payloads. `trace_updated` follows a storage commit and carries the trace revision. `trace_config` reports backend capture status and optional controlled errors.
 
-`useRuntimeEvents.js` routes these notices to dedicated subscribers, without adding them to the Runtime Events log or transcript projection. Notices for background sessions remain available to Explorer. Open views fetch only the required summary or detail page and ignore older revisions.
+`useRuntimeEvents.js` routes these notices to dedicated subscribers, without adding them to transcript projection. Notices for background sessions remain available to Explorer. Open views fetch only the required summary or detail page and ignore older revisions.
 
 The event hub coalesces queued notices by trace ID and capture configuration. Reconnect tells subscribers to refresh because the stream has no replay history. Closing traces removes view subscriptions without stopping backend capture. See [Elune integration](../integrations/elune).
 
@@ -177,4 +175,3 @@ Keep terminal bytes on the terminal WebSocket. Terminal ordering and backpressur
 3. Route cross-feature state through `App.vue`.
 4. Keep selected-session filtering in the feature owner.
 5. Decide whether the event needs live projection, persisted refresh, or both.
-6. Keep the Runtime Events drawer log bounded.

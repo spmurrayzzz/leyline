@@ -22,10 +22,9 @@ The right side of the header contains these controls:
 - **Review changes** opens the desktop [Git review pane](./git-review). It appears when the selected backend supports review.
 - **Session details** opens runtime information, session metadata, and session-level agent overrides.
 - **Memory** opens the Memory Inspector. Its count shows active visible memories.
-- **Events** opens the Runtime events drawer. Its count shows retained runtime events.
 - **Export transcript** downloads the session as HTML.
 
-**Events** and **Export transcript** do not appear for an empty session.
+**Export transcript** does not appear for an empty session.
 
 ## Read the transcript
 
@@ -63,7 +62,7 @@ The workbench expands into the available space while the sidebar is hidden.
 
 ## Open workbench drawers
 
-**Memory**, **Events**, **Project settings**, and **Session details** use focused drawers. Opening one closes conflicting drawers. The sidebar gear opens the global **Settings** modal. Subagent and vision controls appear within their applicable settings scope.
+**Memory**, **Project settings**, and **Session details** use focused drawers. Opening one closes conflicting drawers. The sidebar gear opens the global **Settings** modal. Subagent and vision controls appear within their applicable settings scope.
 
 Git review and research sources use the desktop right rail. The prompt inspector and trace inspector overlay the transcript. Opening one of these views closes the others. You can resize Git review or expand it across the workspace.
 

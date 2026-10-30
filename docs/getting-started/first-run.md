@@ -66,8 +66,8 @@ beside the send arrow to queue or steer without keyboard shortcuts. If the
 queue is held, select **Resume** to continue queued work. See
 [Composer](../user-guide/composer) for editing and queue controls.
 
-Select **Session traces** to inspect a captured run. **Events** shows a temporary event list for the page connection, separate from durable traces.
+Select **Session traces** to inspect a captured run.
 
-Use **Session details**, **Memory**, **Events**, and **Export transcript** in
+Use **Session details**, **Memory**, and **Export transcript** in
 the workbench header. Use **Reload runtime** at the bottom of the sidebar when
 pi resources or saved provider/MCP configuration must reload.

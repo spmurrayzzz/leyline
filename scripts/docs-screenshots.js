@@ -1976,16 +1976,6 @@ try {
   })
   await capture({
     browser,
-    file: path.join(docsOutputDir, 'runtime-events.png'),
-    route: '/sessions/demo-session',
-    ready: '.assistant-message',
-    interact: async (page) => {
-      await page.getByRole('button', { name: 'Events' }).click()
-      await page.locator('aside[aria-label="Runtime events"] .event-log-row').first().waitFor()
-    },
-  })
-  await capture({
-    browser,
     file: path.join(docsOutputDir, 'terminal.png'),
     route: '/sessions/demo-session',
     ready: '.assistant-message',
@@ -2125,7 +2115,13 @@ try {
     viewport: { width: 1503, height: 818 },
     scenario: 'ultrafast',
     sidebarChildren: true,
-    interact: (page) => openSidebarChildren(page, 2),
+    interact: async (page) => {
+      await openSidebarChildren(page, 2)
+      await disableMotion(page)
+      await page.locator('.workbench').hover({ position: { x: 10, y: 10 } })
+      await page.mouse.wheel(0, -1000)
+      await page.waitForFunction(() => document.querySelector('.workbench')?.scrollTop === 0)
+    },
     macWindow: true,
   })
   await capture({
@@ -2990,7 +2986,6 @@ async function capture({
     runtimeSessions: runtimeFixtures.runtimeSessions,
     runtimeEvents: runtimeFixtures.runtimeEvents,
     terminal,
-    emitRuntimeEvents: !['home', 'subagent-live', 'title-generating'].includes(scenario),
     dictation: ['dictation', 'dictation-settings'].includes(scenario) ? docsDictation : null,
     dictationClient: ['dictation', 'dictation-settings'].includes(scenario) ? docsDictationClient : null,
     dictationMeters: scenario === 'dictation' ? docsDictationMeters : null,
@@ -3539,7 +3534,6 @@ function initBrowser({
   runtimeSessions,
   runtimeEvents,
   terminal,
-  emitRuntimeEvents,
   dictation,
   dictationClient,
   dictationMeters,
@@ -3682,18 +3676,7 @@ function initBrowser({
           this.emit({ type: 'active_session', data: activeRuntime })
         }
         this.emit({ type: 'runtime_roster', data: { sessionIds: runtimeSessions.map((session) => session.id) } })
-        const events = [
-          { activeSessionId: runtime.id, event: { type: 'session_start' } },
-          { activeSessionId: runtime.id, event: { type: 'tool_execution_start', toolName: 'read' } },
-          { activeSessionId: runtime.id, event: { type: 'tool_execution_end', toolName: 'read' } },
-          ...(!runtime.state.isStreaming
-            ? [
-                { activeSessionId: runtime.id, event: { type: 'agent_end' } },
-                { activeSessionId: runtime.id, event: { type: 'agent_settled' } },
-              ]
-            : []),
-        ]
-        for (const data of [...(emitRuntimeEvents ? events : []), ...runtimeEvents]) {
+        for (const data of runtimeEvents) {
           if (['message_update', 'tool_execution_update'].includes(data.event?.type)
             && data.activeSessionId !== target.searchParams.get('sessionId')) continue
           this.emit({ type: 'runtime_event', data })

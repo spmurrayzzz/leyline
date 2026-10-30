@@ -179,7 +179,7 @@ DOCS_SCREENSHOT_FILTER=pinned-sessions.png,pinned-only.png,mobile-sidebar.png np
 
 The pinned-only capture uses the real filter button. It checks the active state, search label, visible count, and pin markers in the right metadata group before capture. The selected unpinned conversation stays open. No pin or session mutation reaches the backend.
 
-Changes to sidebar controls or row alignment also affect desktop screenshots throughout the guides and README. Refresh those images at their existing dimensions. Update the workspace share card from the refreshed workbench image and use a new filename to avoid stale previews.
+Changes to the desktop header, sidebar controls, or row alignment affect screenshots throughout the guides and README. Refresh those images at their existing dimensions. Update the workspace share card from the refreshed workbench image and use a new filename to avoid stale previews.
 
 For sidebar child sessions:
 
@@ -255,7 +255,7 @@ Use these fixed settings and fixture requirements for refreshed documentation im
 - Subagent batch captures: global default 4, desktop/mobile session override 2, the effective source, and **Use global default (4)**
 - Sidebar child captures: an inset guide with hollow nodes, a fixed chevron gutter on every parent row, and one completed child beside two running children
 - Deep research captures: three completed threads, six ledger sources, four citations, one excluded source, and a mobile citation preview
-- Other fixtures: Home, workbench, pinned sessions, project navigation and details, backend settings, composer controls and shell mode, transcript actions, fullscreen previews, memory, subagents, vision delegation, runtime events, terminal, export, and mobile navigation
+- Other fixtures: Home, workbench, pinned sessions, project navigation and details, backend settings, composer controls and shell mode, transcript actions, fullscreen previews, memory, subagents, vision delegation, terminal, export, and mobile navigation
 
 Home shows the `standard` chip. Workbench and composer-control captures show `ultrafast`; the mobile-session capture shows its filled bolt. The new speed-menu captures show Fast selected. All use `openai-codex/gpt-6.1-sol`. Both pinned-session captures use two older sanitized sessions in the current project. Other captures return no pinned IDs. The workbench and export include initial and later System dividers. `system-message.png` shows the initial declaration and a later event open in the prompt inspector. The capture waits for real added and removed lines in the diff renderer. Unchanged instructions stay collapsed. That image crops to the dividers and inspector. The export capture checks the instruction-file diff and exact raw event text with the external preview module blocked, then closes the inspector before capture.
 

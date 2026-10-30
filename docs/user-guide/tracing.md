@@ -112,6 +112,4 @@ Deleting a session or trashing a project does not delete its traces. **Reset to 
 
 Leyline has no automatic retention limit or expiry. It has no trace deletion or export control, and no trace deletion or export API. [HTML transcript export](./export) does not include Elune traces. Turning capture off prevents future capture only.
 
-The **Events** drawer holds recent events for the current page connection. Reloading clears that list. Traces are separate durable records. See [Runtime events](./runtime-events#open-runtime-events).
-
 For storage, capture internals, and backend routes, see [Elune integration](../integrations/elune).

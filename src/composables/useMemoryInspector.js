@@ -13,7 +13,6 @@ export function useMemoryInspector({
   sessionLoading,
   liveTurnActive,
   settingsOpen,
-  eventLogOpen,
 }) {
   const memoryOpen = ref(false)
   const memoryDirty = ref(false)
@@ -70,7 +69,6 @@ export function useMemoryInspector({
     memoryOpen.value = !memoryOpen.value
     if (memoryOpen.value) {
       settingsOpen.value = false
-      eventLogOpen.value = false
       void loadVisibleMemory()
     }
   }

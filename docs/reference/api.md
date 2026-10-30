@@ -2862,7 +2862,7 @@ trace_config: {
 }
 ```
 
-Trace notices reuse this stream without full trace payloads. `trace_updated` follows a storage commit. Trace views refresh paged HTTP data after notices or reconnect. These notices do not enter the browser Runtime Events log or transcript projection.
+Trace notices reuse this stream without full trace payloads. `trace_updated` follows a storage commit. Trace views refresh paged HTTP data after notices or reconnect. These notices do not enter transcript projection.
 
 `runtime_event.event` contains a pi SDK event or a Leyline shell lifecycle event. Its nested fields depend on the event type. The connection stays open until the client or server closes it.
 

@@ -269,13 +269,11 @@
 }
 
 @media (min-width: 761px) and (max-width: 1120px) {
-  .leyline-app.review-open,
-  .leyline-app.review-open.event-log-open {
+  .leyline-app.review-open {
     grid-template-columns: var(--sidebar-width) minmax(0, 1fr) 0;
   }
 
-  .leyline-app.sidebar-hidden.review-open,
-  .leyline-app.sidebar-hidden.review-open.event-log-open {
+  .leyline-app.sidebar-hidden.review-open {
     grid-template-columns: 0 minmax(0, 1fr) 0;
   }
 
@@ -309,12 +307,8 @@
 
   .leyline-app,
   .leyline-app.sidebar-hidden,
-  .leyline-app.event-log-open,
-  .leyline-app.sidebar-hidden.event-log-open,
   .leyline-app.review-open,
-  .leyline-app.review-open.event-log-open,
-  .leyline-app.sidebar-hidden.review-open,
-  .leyline-app.sidebar-hidden.review-open.event-log-open {
+  .leyline-app.sidebar-hidden.review-open {
     grid-template-columns: 1fr;
     grid-template-rows: 50px minmax(0, 1fr);
     overflow: hidden;
@@ -538,23 +532,16 @@
 
   .memory-drawer-slot,
   .project-detail-drawer-slot,
-  .settings-drawer-slot,
-  .event-log-slot {
+  .settings-drawer-slot {
     width: min(420px, 100vw);
   }
 
   .memory-drawer,
   .project-detail-drawer,
-  .settings-drawer,
-  .event-log-drawer {
+  .settings-drawer {
     width: min(420px, 100vw);
     min-width: 0;
     box-shadow: -18px 0 50px rgb(0 0 0 / 38%);
-  }
-
-  .event-log-row {
-    grid-template-columns: 58px 100px 1fr;
-    gap: 6px;
   }
 
   .workbench {
@@ -1086,29 +1073,6 @@
   gap: 6px;
 }
 
-.event-log-row {
-  cursor: pointer;
-  list-style: none;
-}
-
-.event-log-row::-webkit-details-marker {
-  display: none;
-}
-
-.event-log-detail {
-  padding: 8px 0 14px;
-  overflow-wrap: anywhere;
-  white-space: pre-wrap;
-  font-size: 12px;
-}
-
-.event-log-detail button {
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--panel-soft);
-  padding: 7px 10px;
-}
-
 .terminal-header {
   grid-template-columns: auto minmax(0, 1fr) auto auto auto;
 }
@@ -1147,7 +1111,6 @@
 .memory-drawer-slot,
 .settings-drawer-slot,
 .project-detail-drawer-slot,
-.event-log-slot,
 .confirm-backdrop,
 .project-browser-backdrop,
 .sidebar-navigator-backdrop,
@@ -1276,8 +1239,7 @@
   .composer-send-menu-toggle,
   .confirm-actions button,
   .activity-result-actions button,
-  .terminal-header button,
-  .event-log-detail button {
+  .terminal-header button {
     min-width: 44px;
     min-height: 44px;
   }
