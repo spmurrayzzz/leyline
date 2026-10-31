@@ -36,6 +36,7 @@ This command intercepts Leyline API calls and supplies sanitized fixtures. Mock 
 
 - Backend connections, live network-access state, switch and port changes, backend information and capabilities, file editor settings, the thought display setting, and pinned session IDs
 - Provider/model and MCP inventories with the `piSettings` capability; saved secret values are absent
+- Certificate trust settings with two synthetic PEM files and the operating-system store enabled
 - Catalog search results for three Qwen3.8-27B provider variants, with model details, thinking maps, and compatibility metadata
 - Projects, folder browsing, session lists, detail, activation, and runtime state
 - Git status and selected-file diffs
@@ -105,10 +106,10 @@ DOCS_SCREENSHOT_FILTER=tool-activity.png,vision-tool-call.png,preview-fullscreen
 For the settings overview and connection-test captures:
 
 ```bash
-DOCS_SCREENSHOT_FILTER=backend-connections.png,models-providers.png,provider-models.png,provider-connection-test.png,model-connection-test.png,mcp-servers.png,subagents.png,vision-agent.png,project-details.png,session-details.png,settings-mobile.png npm run docs:screenshots
+DOCS_SCREENSHOT_FILTER=backend-connections.png,network-access.png,certificates.png,certificates-mobile.png,models-providers.png,provider-models.png,model-catalog.png,model-editor.png,model-thinking.png,provider-connection-test.png,model-connection-test.png,mcp-servers.png,subagents.png,vision-agent.png,session-title-settings.png,dictation-settings.png,project-details.png,session-details.png,settings-mobile.png npm run docs:screenshots
 ```
 
-These images show Connections with network access off, provider Connection and Models tabs, draft connection-test feedback, MCP configuration, Agent defaults, project/session drawers, and mobile provider selection. Provider fixtures include a keyless local endpoint. The model editor capture shows its sections and fixed Save/Test controls.
+These images cover Settings pages, connection checks, and project/session drawers. The Certificates captures show the same two PEM files on desktop and mobile. Provider fixtures include a keyless local endpoint. Refresh the full set when the Settings category list changes.
 
 For subagent batch configuration:
 
@@ -284,6 +285,23 @@ DOCS_SCREENSHOT_FILTER=composer-issue.png,composer-issue-mobile.png,composer-sen
 Desktop captures use a 1440 by 900 CSS-pixel viewport and crop to the composer and open details. Mobile uses 390 by 844 CSS pixels. All captures use device scale factor 2 and the `local/glm-5.3-flash` fixture.
 
 The helper sends a synthetic extension error through the mock runtime WebSocket. The image-warning fixture has no vision model and uses the real attachment chooser. Checks confirm that dismissal retains the draft, attachment, and disabled Send state. No provider request or configuration change reaches a backend.
+
+## Certificate captures
+
+Refresh the desktop and mobile Certificates images with:
+
+```bash
+DOCS_SCREENSHOT_FILTER=certificates.png,certificates-mobile.png npm run docs:screenshots
+```
+
+| Asset in `docs/assets/screenshots/` | Captured state |
+| --- | --- |
+| `certificates.png` | Sources beside two saved PEM files, with the system store enabled and the add button in the panel header. |
+| `certificates-mobile.png` | The same file list above Sources, with Category set to Certificates. |
+
+The helper checks the file names, per-file counts, trusted total, and enabled controls before capture. `GET /api/pi/settings/tls` returns fixture data. The capture does not read PEM files, inspect the host's certificate stores, or save TLS settings. Counts are illustrative.
+
+Desktop uses 1440 by 900 CSS pixels. Mobile uses 390 by 844. Both use device scale factor 2 and retain `local/glm-5.3-flash` in the composer. See [Trust certificate authorities](../user-guide/settings#trust-certificate-authorities) for the user procedure.
 
 ## Automatic-title captures
 

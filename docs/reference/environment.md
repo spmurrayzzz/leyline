@@ -14,7 +14,7 @@ variables come from the user's pi setup.
 | `LEYLINE_SERVER_ALLOWED_ORIGINS` | Comma-separated frontend origins that can use the backend. Same-origin and loopback clients work without this variable. `*` allows all origins for standard API CORS checks. Dictation requires exact origins. |
 | `PI_CODING_AGENT_SESSION_DIR` | Session directory for discovery and new sessions. Leyline expands `~` and searches subdirectories for JSONL files. |
 | `PI_CODING_AGENT_DIR` | Pi agent directory resolved by the SDK. Global provider/model/MCP configuration and native credentials use this directory. The default is `~/.pi/agent`. |
-| `LEYLINE_MEMORY_DIR` | Backend data directory. App metadata and dictation settings use `memory.sqlite`. Dictation models use `dictation/models/`. Embedded trace records use `elune/elune.db`. Vision delegation uses `attachments/<session-id>/`. |
+| `LEYLINE_MEMORY_DIR` | Backend data directory. App metadata, certificate trust, and dictation settings use `memory.sqlite`. Dictation models use `dictation/models/`. Embedded trace records use `elune/elune.db`. Vision delegation uses `attachments/<session-id>/`. |
 | `SHELL` | Login shell used by Electron environment loading and the terminal backend. Electron falls back to the account shell; the terminal has additional shell fallbacks. |
 
 Without `PI_CODING_AGENT_SESSION_DIR`, Leyline uses the session directory from
@@ -31,9 +31,9 @@ Use an absolute path for `LEYLINE_MEMORY_DIR`. Without this variable, Leyline us
 
 The database can contain the `backend_connections`, `leyline_settings`, `pinned_sessions`, `memories`, `rollout_feedback`, `subagent_overrides`, `subagent_batch_overrides`, and `vision_overrides` tables.
 
-The `leyline_settings` table contains the default backend ID, display preferences, `server.network_access`, `server.network_access_port`, file-editor settings, `subagents.batch_size`, `session_titles.enabled`, `session_titles.model`, `session_titles.thinking`, `runtime.idle_timeout_minutes`, and `tracing.enabled`. The `pinned_sessions` table contains sidebar pin IDs scoped by backend connection.
+The `leyline_settings` table contains the default backend ID, display preferences, `server.network_access`, `server.network_access_port`, and file-editor settings. It also contains `subagents.batch_size`, `session_titles.enabled`, `session_titles.model`, `session_titles.thinking`, `runtime.idle_timeout_minutes`, `tls.extra_ca_files`, `tls.use_system_ca`, and `tracing.enabled`. The `pinned_sessions` table contains sidebar pin IDs scoped by backend connection.
 
-Display, network access, saved connections, and pinned sessions belong to the native app backend. Files, memory, feedback, agent overrides, automatic-title settings, and runtime cleanup settings belong to the selected backend. Each backend uses its own environment and storage directory. Agent defaults, Project settings, and Session details select global, project, and session override scopes within that backend.
+Display, network access, saved connections, and pinned sessions belong to the native app backend. Files, memory, feedback, agent overrides, automatic-title settings, runtime cleanup settings, and certificate trust belong to the selected backend. Each backend uses its own environment and storage directory. Agent defaults, Project settings, and Session details select global, project, and session override scopes within that backend.
 
 Automatic titles default to off, with an empty model and thinking value. An empty thinking value selects the title model's lowest supported level. Runtime cleanup defaults to 5 minutes. Integers from 0 through 1440 are valid, and 0 disables cleanup. These settings are backend-wide, with no project or session overrides. They use Leyline SQLite, not pi configuration files, and require no environment variables. See [Session-title settings](./api#session-title-settings) and [Runtime settings](./api#runtime-settings).
 
@@ -62,7 +62,37 @@ Explicit origin host and port configuration remains authoritative. If that confi
 
 Changing `LEYLINE_MEMORY_DIR` selects a different connection registry, default connection, set of UI settings, network-access settings, and set of pinned sessions.
 
-It also selects different memory, rollout, subagent, vision, automatic-title, runtime cleanup, and dictation settings, plus capture metadata, attachment and dictation model directories, and the embedded trace database.
+It also selects different memory, rollout, subagent, vision, automatic-title, runtime cleanup, certificate trust, and dictation settings. Capture metadata, attachment and dictation model directories, and the embedded trace database also use that directory.
+
+## TLS certificate trust
+
+Settings → Certificates configures TLS trust on the selected backend. The trust store combines Node's bundled roots, startup environment certificates, optional operating-system roots, and saved custom PEM files. Leyline always keeps the bundled roots.
+
+The setting applies to new backend Node TLS connections, including provider requests and provider/MCP management checks. Existing connections can remain open. It does not change Chromium networking, inbound server HTTPS, or the separate dictation process.
+
+Set Node CA variables before the backend process starts. Restart Vite or Electron after startup CA variables or flags change. Saving Certificates settings applies without a restart.
+
+| Variable | Purpose |
+| --- | --- |
+| `NODE_EXTRA_CA_CERTS` | PEM file that Node reads at process startup. Leyline adds these certificates to the trust store. The Certificates pane shows this source read-only. |
+| `NODE_USE_SYSTEM_CA` | `1` enables operating-system roots when `tls.use_system_ca` is unset. Leyline also accepts `true` without case sensitivity. |
+| `NODE_OPTIONS` | Use `--use-system-ca` to include operating-system roots when `tls.use_system_ca` is unset. |
+
+The same fallback applies to a direct Node `--use-system-ca` startup flag. A saved system-store preference takes precedence over these startup options. It does not remove certificates from `NODE_EXTRA_CA_CERTS`.
+
+The `leyline_settings` table in the selected backend's `memory.sqlite` stores these values:
+
+| Key | Value |
+| --- | --- |
+| `tls.extra_ca_files` | JSON array of absolute PEM paths on that backend. The default is an empty list. |
+| `tls.use_system_ca` | `"true"` or `"false"`. An unset value follows the startup system-CA options above. |
+| `tls.extra_ca_file` | Legacy single-file fallback when the list has no paths. Save clears this value. |
+
+Custom paths accept absolute paths or `~/` paths. The backend expands `~` to its own home directory. Save accepts at most 32 files, each at most 1 MiB. There are no project or session overrides.
+
+SQLite stores paths and the system-store preference. The PEM files stay on that backend. Provider and MCP configuration and credentials stay in pi-owned files.
+
+See [Certificate settings](./api#certificate-settings) for the GET/PUT contract and PEM validation rules.
 
 ## Embedded trace storage
 

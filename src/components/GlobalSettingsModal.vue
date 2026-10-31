@@ -18,6 +18,7 @@ const categories = [
   { id: 'connections', label: 'Connections', description: 'Each window uses its own backend connection.' },
   { id: 'dictation', label: 'Dictation', description: 'Choose how speech becomes draft text.' },
   { id: 'files', label: 'Files', description: 'Set the editor for files opened on this backend.' },
+  { id: 'trust', label: 'Certificates', description: 'Trust extra certificate authorities for this backend.' },
   { id: 'agents', label: 'Agent defaults', description: 'Used when a project or session has no override.' },
   { id: 'runtime', label: 'Runtime', description: 'Control cleanup of idle sessions on this backend.' },
   { id: 'providers', label: 'Models & providers', description: '' },
@@ -26,7 +27,7 @@ const categories = [
 const availableCategories = computed(() => categories.filter((item) => {
   if (item.id === 'dictation') return props.dictationAvailable
   if (item.id === 'files') return props.fileLinksAvailable
-  if (['runtime', 'providers', 'mcp'].includes(item.id)) return props.piSettingsAvailable
+  if (['runtime', 'providers', 'mcp', 'trust'].includes(item.id)) return props.piSettingsAvailable
   return true
 }))
 const selected = computed(() => availableCategories.value.find((item) => item.id === props.category) || categories[0])
@@ -189,6 +190,9 @@ function handleKeydown(event) {
                   <template v-else-if="item.id === 'mcp'">
                     <rect x="8" y="3" width="8" height="6" rx="1" /><rect x="2" y="16" width="7" height="5" rx="1" /><rect x="15" y="16" width="7" height="5" rx="1" /><path d="M12 9v4M5 16v-3h14v3" />
                   </template>
+                  <template v-else-if="item.id === 'trust'">
+                    <path d="M12 3 20 6v6c0 5-3.5 7.5-8 9-4.5-1.5-8-4-8-9V6z" /><path d="m9 12 2 2 4-4" />
+                  </template>
                   <template v-else>
                     <rect x="4" y="7" width="16" height="13" rx="3" /><path d="M12 7V3M9 12h.1M15 12h.1M9 16h6M1 11v5M23 11v5" />
                   </template>
@@ -199,7 +203,7 @@ function handleKeydown(event) {
             <p class="global-settings-nav-note">Backend defaults apply<br />to all its projects.</p>
           </nav>
 
-          <div class="global-settings-content">
+          <div class="global-settings-content" :class="{ 'cert-settings-page': selected.id === 'trust' }">
             <div class="global-settings-scope">
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <template v-if="backendScope">

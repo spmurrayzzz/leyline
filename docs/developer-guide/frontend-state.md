@@ -202,7 +202,7 @@ Dirty Memory state can block session changes and drawer changes. Memory Changes 
 
 `App.vue` owns three distinct surfaces. The gear and native Settings command open `GlobalSettingsModal.vue`. Project actions open Project settings. The session header opens Session details, which contains read-only runtime metadata and session overrides.
 
-The global modal includes Display, Connections, Files, Agent defaults, Runtime, Models & providers, and MCP servers categories. Display and Connections use the native app backend. Files, Agent defaults, Runtime, Models & providers, and MCP servers use the selected backend. Files requires `fileLinks`. Runtime, Models & providers, and MCP servers require `piSettings`.
+The global modal includes Display, Connections, Dictation, Files, Certificates, Agent defaults, Runtime, Models & providers, and MCP servers. Display and Connections use the native app backend. Files, Certificates, Agent defaults, Runtime, Models & providers, and MCP servers use the selected backend. Files requires `fileLinks`. Runtime, Certificates, Models & providers, and MCP servers require `piSettings`.
 
 `GlobalSettingsModal.vue` groups categories by owner, fixes the scope label, and uses a selector on narrow layouts. It makes the app root inert, contains keyboard focus, handles Escape, and restores focus on close. Initial focus goes to the dialog container without a visible category highlight.
 
@@ -231,6 +231,12 @@ Batch size appears under **Subagents** only in Agent defaults and Session detail
 These overrides use the existing subagent and vision APIs and Leyline SQLite. They are separate from pi `models.json` overrides. See [Settings surfaces and ownership](./architecture#settings-surfaces-and-ownership).
 
 `SessionTitleSettings.vue` mounts only in global Agent defaults. It uses `src/lib/pi-api.js` for the selected backend's title settings and `SettingsSelect.vue` for model and thinking choices. Titles default to off, with no model selected. Enabling requires an explicit title model. Thinking defaults to that model's lowest supported level. Saving does not change the conversation model or thinking. There are no project/session title overrides. See [Session-title settings](../reference/api#session-title-settings).
+
+### Certificate settings
+
+`TlsTrustSettings.vue` keeps a draft file list, system-store preference, and saved baseline for the selected backend. It loads and saves through `src/lib/pi-api.js`. `App.vue` keys the component by connection ID and URL so another backend gets a new draft.
+
+A typed path joins the file list only after **Add file**. Save stays disabled until the path is added or cancelled. Navigation and window-close guards also include typed paths. A successful save replaces the baseline with the backend response. See [Certificate settings](../reference/api#certificate-settings) for the API contract.
 
 ### Runtime cleanup
 

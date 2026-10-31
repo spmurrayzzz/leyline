@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { getCACertificates } from 'node:tls'
 import { Worker } from 'node:worker_threads'
 import { killMcpProcess } from './mcp-settings-transports.js'
 import { isSettingsObject, readPiConfig, settingsError, updatePiConfig } from './pi-config.js'
@@ -258,7 +259,7 @@ async function runAction(entry, action, op) {
   try {
     op.signal.throwIfAborted()
     worker = new Worker(new URL('./mcp-settings-worker.js', import.meta.url), {
-      workerData: { entry, action, temporary }, stdout: true, stderr: true,
+      workerData: { entry, action, temporary, caCertificates: getCACertificates('default') }, stdout: true, stderr: true,
       execArgv: [],
     })
     worker.stdout.resume()

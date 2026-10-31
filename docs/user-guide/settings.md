@@ -14,12 +14,13 @@ The modal has these categories:
 | **Connections** | Network access for the native backend, saved connections, and the default connection. Each window selects its own active backend. |
 | **Dictation** | Dictation method and client preferences. Local speech model settings belong to the speech host. |
 | **Files** | File actions on the selected backend. |
+| **Certificates** | Certificate authorities for new HTTPS connections from the selected backend. |
 | **Agent defaults** | Session titles and global subagent and vision defaults on the selected backend. |
 | **Runtime** | Idle runtime cleanup on the selected backend. |
 | **Models & providers** | Pi provider credentials, custom providers, model definitions, and catalog overrides on the selected backend. |
 | **MCP servers** | Pi's global MCP configuration on the selected backend. |
 
-**Files**, **Runtime**, **Models & providers**, and **MCP servers** appear only when the selected backend supports them. On narrow screens, use **Category** to select a page.
+**Files**, **Certificates**, **Runtime**, **Models & providers**, and **MCP servers** appear only when the selected backend supports them. On narrow screens, use **Category** to select a page.
 
 Dictation is available in the browser and Electron. Browser dictation stays the default in normal web browsers. **Local models** is also available in normal web browsers and Electron. See [Dictation](./dictation) for setup and processing details.
 
@@ -29,7 +30,7 @@ For local models, select and download a model explicitly. Parakeet supports Engl
 
 Trace capture has no category in this modal. Open **Session traces** or the sidebar **Trace explorer** button, then expand **Capture new runs** in the footer. See [Tracing](./tracing#control-capture).
 
-Global pi configuration stays in pi's files. Leyline stores display preferences, connections, agent defaults and overrides, and runtime cleanup settings in its own `memory.sqlite` database. See [Configuration storage](../reference/environment#pi-configuration-storage).
+Global pi configuration stays in pi's files. Leyline stores display preferences, connections, certificate settings, agent defaults and overrides, and runtime cleanup settings in its own `memory.sqlite` database. See [Configuration storage](../reference/environment#pi-configuration-storage).
 
 ## Manage backend connections
 
@@ -100,6 +101,33 @@ Use trusted networks only. The API has no authentication. Anyone who can reach t
 If startup configuration already exposes the origin, the toggle does not close that separate access path. Settings shows a notice in this case.
 
 Opening the sharing URL serves both the app and API from one origin. No extra allowed-origin setting is necessary. A UI on a different non-loopback origin still needs `LEYLINE_SERVER_ALLOWED_ORIGINS`. See [Environment variables](../reference/environment).
+
+## Trust certificate authorities
+
+![Certificates settings with trusted sources and two custom PEM files](../assets/screenshots/certificates.png)
+
+Use **Certificates** when a model provider or HTTPS MCP server uses a private certificate authority. The certificate files must be on the selected backend, even when you open Leyline on another device.
+
+To add certificate files:
+
+1. Open **Settings → Certificates**.
+2. Select **Add certificate**.
+3. In **PEM file path**, enter an absolute path to a PEM file on that backend.
+4. Select **Add file**.
+5. Repeat for each file you need.
+6. Select **Save**.
+
+Leyline accepts up to 32 files, each no larger than 1 MiB. Each file must contain complete, valid PEM certificates. Save stays disabled while a typed path still needs **Add file** or **Cancel**.
+
+**Sources** lists Node's bundled roots, the optional operating-system store, custom files, and certificates from `NODE_EXTRA_CA_CERTS`. Bundled roots stay trusted. The total removes duplicate PEM entries across sources.
+
+Turn on **Operating system** to include the backend's system certificate store. Its initial value follows the backend's startup options. See [TLS certificate trust](../reference/environment#tls-certificate-trust) for the supported options.
+
+To remove a file, select its remove button, then select **Save**. The same authority can still come from another source. **Discard** restores the saved file list and switch value.
+
+Leyline saves these settings in the selected backend's `memory.sqlite` and restores them at startup. No environment variable is required, including in the packaged Electron app. A failed save leaves the previous trust configuration active.
+
+Changes apply to new backend Node TLS connections, including provider requests and MCP connection checks. Existing connections stay open. These settings do not change browser or Chromium trust, configure HTTPS for Leyline, or apply to the separate dictation process.
 
 ## Manage models and providers
 

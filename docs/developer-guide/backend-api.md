@@ -32,12 +32,13 @@ Network sharing adds a TCP relay before the origin, without another HTTP router.
 | --- | --- |
 | `server/backend-connections.js` | Named connections, the default connection, app settings, live network-access routes, and pinned session IDs on the native backend |
 | `server/network-access.js` | Configurable TCP relay, serialized partial updates, live status, self-change response handling, and relay cleanup |
-| `lib/leyline-settings.js` | Shared setting keys and defaults, including subagent batch size, automatic titles, and idle cleanup |
+| `lib/leyline-settings.js` | Shared setting keys and defaults, including subagent batch size, automatic titles, idle cleanup, and certificate trust |
 | `lib/research-state.js` | Branch-local research state folding and source normalization |
 | `lib/research-citations.js` | Report citation checks against canonical ledger sources |
 | `server/pi-api/index.js` | Shared runtime instance, Vite integration, and WebSocket setup |
 | `server/pi-api/router.js` | HTTP method and path dispatch |
-| `server/pi-api/pi-settings-routes.js` | Runtime cleanup, session-title, provider, model, MCP, and private operation routes |
+| `server/pi-api/pi-settings-routes.js` | Runtime cleanup, session-title, certificate, provider, model, MCP, and private operation routes |
+| `server/pi-api/tls-trust.js` | CA file validation, trust-store construction, startup application, and backend certificate settings |
 | `server/pi-api/pi-config.js` | Pi configuration parsing, revisions, file locks, and atomic edits |
 | `server/pi-api/provider-settings.js` | Redacted provider inventory, catalog lookup, model/provider edits, native authentication, and connection-test dispatch |
 | `server/pi-api/provider-settings-runtime.js` | Cwd-bound settings runtime leases, bounded inventory checks, and resource cleanup |
@@ -84,7 +85,7 @@ The router has these main route groups:
 - selected-backend trace summaries, paged detail, bookmarks, and capture configuration
 - subagent configuration and subagent execution
 - vision configuration, resolution, and child execution
-- backend-wide runtime cleanup and automatic-title settings, global pi provider/model/MCP configuration, and private authentication operations
+- backend-wide runtime cleanup, automatic-title, and certificate settings, global pi provider/model/MCP configuration, and private authentication operations
 - HTTP rejection of event requests without a WebSocket upgrade
 
 See the [API reference](../reference/api) for route contracts. Compare that page with `server/pi-api/router.js` when route behavior changes.
@@ -168,13 +169,25 @@ Leyline does not load Codemode and always excludes `codemode` from the active to
 
 ## Pi Settings
 
-`capabilities.piSettings` enables Runtime, Models & providers, and MCP servers. These routes run on the selected backend. Display preferences and connection records remain on the native app backend.
+`capabilities.piSettings` enables Runtime, Certificates, Models & providers, and MCP servers. These routes run on the selected backend. Display preferences and connection records remain on the native app backend.
 
-Pi owns the global configuration files resolved through `getAgentDir()`. Leyline edits `models.json` and `mcp.json`, while native SDK authentication owns credentials. Subagent and vision overrides, automatic-title settings, and runtime cleanup settings remain in Leyline SQLite. A provider target selects a cwd for extension discovery, not a project configuration file.
+Pi owns the global configuration files resolved through `getAgentDir()`. Leyline edits `models.json` and `mcp.json`, while native SDK authentication owns credentials. Subagent and vision overrides, automatic-title settings, runtime cleanup settings, and certificate trust remain in Leyline SQLite. A provider target selects a cwd for extension discovery, not a project configuration file.
 
 `pi-config.js` preserves unknown fields, supported comments, formatting, and symlink targets. Writes require the whole-file revision, acquire a lock, and replace the file atomically after another revision check. Invalid files block saves. Provider/model inventories omit saved secrets. MCP inventories omit arguments and header/environment values and redact sensitive URL parts.
 
 See [Pi Settings routes](../reference/api#pi-settings-routes) for exact fields, methods, revisions, operation shapes, and errors. This API is deliberately smaller than pi's configuration schema. General preferences, model-picker visibility, project MCP editing, and Codemode configuration are outside this surface.
+
+### Backend TLS trust
+
+`tls-trust.js` owns `GET` and `PUT /api/pi/settings/tls`. Its `tls.*` keys use `leyline_settings` in the selected backend's `memory.sqlite`. They have no project or session overrides. See [Certificate settings](../reference/api#certificate-settings) for fields, limits, validation, and errors.
+
+Both startup paths call `applyTlsTrustAtStartup()` before accepting requests. Vite calls it in `piApi().configureServer()` in `server/pi-api/index.js`. The standalone/Electron server calls it in `startLeylineServer()` in `server/leyline-server.js`. The helper reads saved settings and applies the merged trust store. Startup logs report certificate totals and any saved-file errors.
+
+Store rebuilds start from the immutable `rootCertificates` list. They add `getCACertificates('extra')` captured at module load, optional `getCACertificates('system')` roots, and validated custom PEM blocks. The store deduplicates normalized PEM text. It does not use mutable `getCACertificates('default')` as the bundled baseline. This prevents removed custom authorities from returning during later rebuilds.
+
+GET builds a settings view without applying trust. Its `appliedCount` describes that built store. PUT validates the candidate store and snapshots the actual active CA list through `getCACertificates('default')`. It applies the candidate before the SQLite write. A database write failure restores that exact snapshot.
+
+Changes apply to new backend Node TLS connections, including provider requests and provider/MCP management checks. Existing connections can remain open. Chromium networking, inbound server HTTPS, and the separate dictation process use other configuration. See [TLS certificate trust](../reference/environment#tls-certificate-trust) for startup CA variables and flags.
 
 ### Model metadata and catalog lookup
 
@@ -240,6 +253,8 @@ Settings prompts do not use `extension-ui.js`, the shared runtime WebSocket, or 
 ### Native MCP management
 
 MCP listing reads global configuration without connecting or resolving secrets. Check and login use a disposable worker with an in-memory session and only `createMcpExtension()`. The worker invokes the native `/mcp` command through a private UI context. It reports temporary connections, not conversation connection status. Logout neither connects nor resolves configuration secrets.
+
+Node's default CA configuration is thread-local. For each management worker, `mcp-settings.js` passes the parent's actual `getCACertificates('default')` snapshot in `workerData.caCertificates`. `mcp-settings-worker.js` applies that array through `setDefaultCACertificates()` before connection setup. Workers do not rebuild trust from saved paths. The snapshot preserves the parent's active trust and startup choices.
 
 The worker owns native `StdioTransport` and `StreamableHttpTransport` adapters. It tracks adapters before connection setup, command processes, prompts, and child processes. Cancellation reaches initialization as well as established connections. Deadlines bound native OAuth work and secret commands. Normal HTTP cleanup keeps a bounded signal available for session DELETE requests.
 
@@ -399,10 +414,9 @@ Reset to here is the explicit exception. It replaces the manager entries with th
 
 ## Application metadata
 
-`backend-connections.js`, `memories.js`, `rollout-feedback.js`, `subagents.js`,
-and `vision.js` share `~/.local/share/leyline/memory.sqlite`.
+Leyline metadata uses `memory.sqlite` under each backend's `LEYLINE_MEMORY_DIR`, or `~/.local/share/leyline/`.
 
-Backend connection definitions, the default connection, and display preferences belong to the native app backend. A window stores its active connection ID in `sessionStorage`. File editor settings, memory, feedback, agent overrides, automatic-title settings, and runtime cleanup settings belong to the selected backend.
+Backend connection definitions, the default connection, and display preferences belong to the native app backend. A window stores its active connection ID in `sessionStorage`. File editor settings, memory, feedback, agent overrides, automatic-title settings, runtime cleanup settings, and certificate trust belong to the selected backend.
 
 Trace capture configuration also belongs to the selected backend. Its `tracing.enabled` key uses `leyline_settings`, while trace records use a separate `elune/elune.db`. See [Elune integration](../integrations/elune#storage-and-configuration).
 
@@ -440,13 +454,13 @@ The browser does not reconstruct research state from transcript text. It uses th
 
 `src/lib/backend.js` supplies the active backend base URL for runtime HTTP,
 runtime and Git review WebSockets, terminal WebSocket, and export requests. `src/lib/pi-api.js` owns runtime fetch
-calls and request field names. `src/lib/pi-settings-api.js` owns selected-backend Settings requests and private operation transport.
+calls and request field names. `TlsTrustSettings.vue` uses `src/lib/pi-api.js` for certificate settings. `src/lib/pi-settings-api.js` owns provider, model, MCP, and private operation requests.
 
 `src/lib/leyline-api.js` manages the native connection registry and app settings. It also checks `GET /api/pi/info` before a switch.
 
 `src/lib/trace-client.js` binds trace requests to the selected backend and subscribes to notices through the existing runtime WebSocket adapter. It aborts owned requests and removes subscriptions when the view closes. Trace capture settings use `/api/pi/traces/config`, not the native app settings routes.
 
-The backend information response gates trace views with `tracing`. It gates the research control with `research`. It gates Git review with `review` and automatic watching with `reviewWatch`. Models & providers and MCP servers require `piSettings`.
+The backend information response gates trace views with `tracing`. It gates the research control with `research`. It gates Git review with `review` and automatic watching with `reviewWatch`. Runtime, Certificates, Models & providers, and MCP servers require `piSettings`.
 
 `ReviewPane.vue` loads review data through `src/lib/pi-api.js` and opens the review WebSocket through `openEventSocket()` in `src/lib/event-socket.js`.
 

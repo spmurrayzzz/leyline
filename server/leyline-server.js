@@ -11,11 +11,13 @@ import {
   piApiHandler,
   shutdownPiRuntime,
 } from './pi-api/index.js'
+import { applyTlsTrustAtStartup } from './pi-api/tls-trust.js'
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const defaultDist = join(root, 'dist')
 
 export async function startLeylineServer(options = {}) {
+  applyTlsTrustAtStartup()
   const distDir = resolve(options.distDir || defaultDist)
   const host = options.host || process.env.LEYLINE_SERVER_HOST || '127.0.0.1'
   const port = serverPort(options.port, process.env.LEYLINE_SERVER_PORT)

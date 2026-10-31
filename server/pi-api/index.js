@@ -2,6 +2,7 @@ import { backendConnectionsHandler, readNetworkAccessSettings } from '../backend
 import { configureNetworkAccess, localServerUrl } from '../network-access.js'
 import { configureDictationWebSocketServer } from '../dictation-sockets.js'
 import { createPiRuntimeApi } from './runtime.js'
+import { applyTlsTrustAtStartup } from './tls-trust.js'
 import { createPiApiHandler } from './router.js'
 import { configureEventWebSocketServer } from './event-sockets.js'
 import {
@@ -18,6 +19,7 @@ export function piApi() {
     name: 'pi-api',
     closeBundle: () => Promise.all([closeDictation?.(), closeNetworkAccess?.(), shutdownPiRuntime()]),
     configureServer(server) {
+      applyTlsTrustAtStartup()
       configurePiWebSocketServer(server.httpServer)
       const protocol = server.config.server.https ? 'https' : 'http'
       closeDictation = configureDictationWebSocketServer(server.httpServer, { protocol })

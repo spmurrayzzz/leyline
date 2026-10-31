@@ -60,6 +60,8 @@ See [Tracing](docs/user-guide/tracing.md) for recorded runs and capture controls
 - Connect each window to the native backend or a saved backend
   connection. Configure provider sign-in, custom endpoints, model
   overrides, and MCP servers in [Model settings](docs/user-guide/settings.md#find-a-configuration-in-the-catalog).
+  Add [certificate authorities](docs/user-guide/settings.md#trust-certificate-authorities)
+  for private HTTPS endpoints on the selected backend.
 - Embedded Elune tracing records new runs by default. Examine one
   session or traces across projects on the selected backend. Traces can
   contain private prompts and tool results. See

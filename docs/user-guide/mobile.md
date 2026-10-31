@@ -47,6 +47,14 @@ Settings fills the mobile viewport. **Models & providers** and **MCP servers** u
 
 Use **Close Leyline settings** to return to the workspace. See [Settings](./settings) for scope, authentication, and reload behavior.
 
+### Manage certificates
+
+![Mobile Certificates settings with two custom PEM files above the trusted sources](../assets/screenshots/certificates-mobile.png)
+
+Select **Certificates** in **Category**. **Custom files** appears above **Sources**. Select **Add certificate** to enter a PEM path on the selected backend, then select **Add file**. Repeat for each file, then select **Save**.
+
+See [Trust certificate authorities](./settings#trust-certificate-authorities) for file limits and which connections use these settings.
+
 ### Set automatic session titles
 
 Select **Agent defaults** in **Category**, then find **Session titles**. Choose a **Title model** and set **Thinking mode** if needed. Turn on **Automatic titles**.

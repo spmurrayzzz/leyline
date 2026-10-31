@@ -19,6 +19,8 @@ Linux distributions configure.
 Browser development uses a different rule. The Vite process inherits the
 environment of the terminal that starts `npm run dev`.
 
+Use [Settings → Certificates](../reference/environment#tls-certificate-trust) for private CA trust on the selected backend. You do not need to set a CA environment variable.
+
 If Electron cannot load the shell environment, it continues to start. Provider
 or tool operations can then fail because a variable is absent. See
 [Troubleshooting](../reference/troubleshooting#electron-does-not-have-shell-environment-variables).

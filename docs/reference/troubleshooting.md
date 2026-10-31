@@ -211,6 +211,29 @@ environment variable. A bare `NAME` is a literal value.
 After sign-in or configuration changes, reload the affected idle session.
 A failed connection test does not hide a model or prevent saving.
 
+## A provider or MCP connection fails with a certificate error
+
+For a private certificate authority, configure trust on the backend that makes the connection.
+
+1. Confirm that Settings uses the intended backend.
+2. Open **Settings → Certificates**.
+3. Select **Add certificate**.
+4. Enter an absolute or `~/` PEM path on that backend.
+5. Select **Add file**.
+6. Select **Save**.
+
+If that computer's certificate store contains the required CA, turn on **Operating system** instead of adding a custom file. Select **Save** after the change.
+
+Each file must be readable on that backend and contain at least one complete PEM certificate. Every certificate must parse with Node's `X509Certificate`. An unmatched certificate BEGIN or END marker rejects the file. The list accepts at most 32 files, each at most 1 MiB.
+
+Read the error beside any invalid file. Correct its path or contents. Keep certificate verification enabled.
+
+Save affects new backend Node TLS connections, including provider tests and MCP management checks. Existing connections can remain open. Wait for active work to finish before using Reload runtime to recreate an affected session's connections.
+
+If the error remains, check the endpoint hostname, certificate validity, and server certificate chain. The Certificates pane does not change browser trust for a saved backend's HTTPS URL. Configure browser or operating-system trust for that connection. The pane also does not configure inbound server HTTPS or the separate dictation process.
+
+See [TLS certificate trust](./environment#tls-certificate-trust) for startup CA sources and [Certificate settings](./api#certificate-settings) for validation and errors.
+
 ## A provider connection test is unavailable
 
 The installed pi SDK cannot enforce the test's output limit for Codex,
@@ -260,9 +283,7 @@ wait for the current authentication operation.
 
 ## Settings categories are missing
 
-**Models & providers** and **MCP servers** require the selected backend's
-`piSettings` capability. Update and restart that backend if it predates these
-routes. Rebuild and restart a packaged Electron app after backend changes.
+Runtime, Certificates, Models & providers, and MCP servers require the selected backend's `piSettings` capability. Update and restart that backend if it predates these routes. Rebuild and restart a packaged Electron app after backend changes.
 **Files** separately requires `fileLinks` support.
 
 ## A settings save reports an external change

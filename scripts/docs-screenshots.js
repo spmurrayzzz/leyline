@@ -244,6 +244,21 @@ const fileSettings = {
   terminalEditor: false,
   revealLabel: 'Reveal in Finder',
 }
+const tlsTrustSettings = {
+  extraCaFiles: [
+    { path: '/workspace/certificates/team-root.pem', name: 'team-root.pem', certificateCount: 2, error: '' },
+    { path: '/workspace/certificates/service-root.pem', name: 'service-root.pem', certificateCount: 1, error: '' },
+  ],
+  useSystemCa: true,
+  envCaFile: '',
+  envCaCount: 0,
+  systemAvailable: true,
+  bundledCount: 150,
+  systemCount: 160,
+  customCount: 3,
+  appliedCount: 163,
+  error: '',
+}
 const stagedReviewPatch = `diff --git a/scripts/release.js b/scripts/release.js
 index 03b7821..f21bb35 100644
 --- a/scripts/release.js
@@ -1178,6 +1193,8 @@ const allowedNames = new Set([
   'dictation.png',
   'dictation-settings.png',
   'dictation-mobile.png',
+  'certificates.png',
+  'certificates-mobile.png',
   'session-title-settings.png',
   'session-title-settings-mobile.png',
   'session-title-generating.png',
@@ -1511,6 +1528,23 @@ try {
     scenario: 'network',
     viewport: { width: 390, height: 844 },
     interact: (page) => openBackendConnections(page, true),
+  })
+  await capture({
+    browser,
+    file: path.join(docsOutputDir, 'certificates.png'),
+    route: '/sessions/demo-session',
+    ready: '.assistant-message',
+    scenario: 'certificates',
+    interact: openCertificates,
+  })
+  await capture({
+    browser,
+    file: path.join(docsOutputDir, 'certificates-mobile.png'),
+    route: '/sessions/demo-session',
+    ready: '.composer .mobile-model-control',
+    scenario: 'certificates',
+    viewport: { width: 390, height: 844 },
+    interact: openCertificates,
   })
   await capture({
     browser,
@@ -2903,6 +2937,35 @@ async function openBackendConnections(page, enabled = false) {
   await network.getByRole('button', { name: 'Copy http://198.51.100.10:52342', exact: true }).waitFor()
 }
 
+async function openCertificates(page) {
+  const sidebar = page.getByRole('button', { name: 'Open sessions', exact: true })
+  if (await sidebar.isVisible()) await sidebar.click()
+  await page.getByRole('button', { name: 'Open settings', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Leyline settings' })
+  await dialog.waitFor()
+  const category = dialog.getByRole('combobox', { name: 'Settings category', exact: true })
+  if (await category.isVisible()) await category.selectOption('trust')
+  else await dialog.getByRole('button', { name: 'Certificates', exact: true }).click()
+  const settings = dialog.locator('.cert-settings[aria-busy="false"]')
+  await settings.waitFor()
+  if (await settings.locator('.cert-row').count() !== tlsTrustSettings.extraCaFiles.length) {
+    throw new Error('Certificate fixture must show both saved files')
+  }
+  for (const file of tlsTrustSettings.extraCaFiles) {
+    const row = settings.locator('.cert-row').filter({ hasText: file.path })
+    await row.getByText(file.name, { exact: true }).waitFor()
+    const count = `${file.certificateCount} ${file.certificateCount === 1 ? 'cert' : 'certs'}`
+    if (await row.locator('.cert-badge').innerText() !== count) throw new Error('Unexpected certificate count')
+  }
+  await settings.getByText(`${tlsTrustSettings.appliedCount} authorities trusted`, { exact: true }).waitFor()
+  if (await settings.getByRole('switch').getAttribute('aria-checked') !== 'true'
+    || await settings.getByRole('switch').isDisabled()
+    || await settings.getByRole('button', { name: 'Add certificate', exact: true }).isDisabled()
+    || await settings.locator('.settings-error, .cert-file-error, .cert-badge.pending').count()) {
+    throw new Error('Certificate fixture did not reach the saved, enabled state')
+  }
+}
+
 async function openModelCatalog(page) {
   const sidebarButton = page.getByRole('button', { name: 'Open sessions', exact: true })
   if (await sidebarButton.isVisible()) await sidebarButton.click()
@@ -3059,6 +3122,7 @@ async function capture({
           : [],
       })
     }
+    if (key === 'GET /api/pi/settings/tls') return json(tlsTrustSettings)
     if (key === 'GET /api/pi/settings/session-titles') return json(titleSettings)
     if (key === 'PUT /api/pi/settings/session-titles' && scenario === 'title-settings') {
       const body = req.postDataJSON()

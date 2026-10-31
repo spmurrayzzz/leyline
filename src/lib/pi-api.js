@@ -68,6 +68,17 @@ export function saveRuntimeSettings({ idleTimeoutMinutes }) {
   })
 }
 
+export function fetchTlsTrustSettings() {
+  return apiRequest('/api/pi/settings/tls', 'Failed to load certificate settings')
+}
+
+export function saveTlsTrustSettings({ extraCaFiles, useSystemCa }) {
+  return apiRequest('/api/pi/settings/tls', 'Failed to save certificate settings', {
+    method: 'PUT',
+    body: { extraCaFiles, useSystemCa },
+  })
+}
+
 export function fetchSessionTitleSettings() {
   return apiRequest('/api/pi/settings/session-titles', 'Failed to load session title settings')
 }

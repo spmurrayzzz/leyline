@@ -72,7 +72,7 @@ Home preview runtimes disable capture. Provider Settings runtimes and private pr
 
 ## Settings integration
 
-The selected backend advertises `piSettings` for Runtime, Models & providers, and MCP servers. Pi's global files remain authoritative for provider/model/MCP configuration. `getAgentDir()` selects their directory. Leyline's runtime and title settings and global/project/session subagent and vision overrides remain separate SQLite records.
+The selected backend advertises `piSettings` for Runtime, Certificates, Models & providers, and MCP servers. Pi's global files remain authoritative for provider/model/MCP configuration. `getAgentDir()` selects their directory. Leyline stores runtime, title, and certificate settings in SQLite, along with subagent and vision overrides.
 
 Provider Settings uses leased, cwd-bound runtimes with an in-memory session and a resource loader. It loads provider extensions through SDK resources rather than copying their registrations from a conversation. Each extension set has a session owner and shutdown path, including failed and cold reloads.
 
@@ -100,7 +100,7 @@ Override edits that remove no saved entries can use the effective model. Pi 0.99
 
 Probes request 16 output tokens, set `maxRetries: 0`, and use a 30-second deadline after settings runtime acquisition. Tests refuse Codex, direct OpenAI Responses subscription authentication, `openai-responses` with `supportsMaxOutputTokens: false`, and Bedrock. These paths cannot enforce the output limit or disable retries. See [Provider connection tests](../developer-guide/backend-api#provider-connection-tests) for ownership and result handling.
 
-MCP inventory reads only global `mcp.json`. Checks and OAuth use a disposable worker with native `createMcpExtension()` and owned native transports. The worker binds its private UI context and runs the native `/mcp` command. It does not use a conversation runtime or publish authentication prompts through the runtime WebSocket.
+MCP inventory reads only global `mcp.json`. Checks and OAuth use a disposable worker with native `createMcpExtension()` and owned native transports. The worker binds its private UI context and runs the native `/mcp` command. It does not use a conversation runtime or publish authentication prompts through the runtime WebSocket. Each worker applies the parent's active CA snapshot before connecting. See [Backend TLS trust](../developer-guide/backend-api#backend-tls-trust) for trust-store ownership.
 
 The transport adapter resolves the public `@earendil-works/pi-mcp` package from the coding-agent package context. This preserves native error-class identity for OAuth handling. Cancellation reaches connections still initializing, and bounded cleanup owns transport shutdown and child processes. Logout needs no live connection or secret resolution. HTTP aliases share an operation lock by normalized URL, matching native credential identity.
 

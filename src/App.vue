@@ -21,6 +21,7 @@ const FileContextMenu = defineAsyncComponent(() => import('./components/FileCont
 const FileLinkSettings = defineAsyncComponent(() => import('./components/FileLinkSettings.vue'))
 const NetworkAccessSettings = defineAsyncComponent(() => import('./components/NetworkAccessSettings.vue'))
 const RuntimeSettings = defineAsyncComponent(() => import('./components/RuntimeSettings.vue'))
+const TlsTrustSettings = defineAsyncComponent(() => import('./components/TlsTrustSettings.vue'))
 const ProjectBrowser = defineAsyncComponent(() => import('./components/ProjectBrowser.vue'))
 const ProjectDetailDrawer = defineAsyncComponent(() => import('./components/ProjectDetailDrawer.vue'))
 const ReviewPane = defineAsyncComponent(() => import('./components/ReviewPane.vue'))
@@ -5531,6 +5532,13 @@ function closePickerMenus() {
       </template>
       <template #files>
         <FileLinkSettings ref="piSettingsPane" :backend-name="activeBackendConnection.name" />
+      </template>
+      <template #trust>
+        <TlsTrustSettings
+          :key="`${activeBackendConnectionId}:${activeBackendConnection.url}`"
+          ref="piSettingsPane"
+          :backend-name="activeBackendConnection.name"
+        />
       </template>
       <template #runtime>
         <RuntimeSettings

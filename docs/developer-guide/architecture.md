@@ -117,6 +117,7 @@ Settings and trace surfaces use distinct owners and storage:
 | --- | --- |
 | Display and Connections | Native app backend, in Leyline SQLite. Connections includes live network access for that native backend. The active connection remains per window. |
 | Files | Selected backend, with editor values in `leyline_settings`. |
+| Certificates | Selected backend, with CA file paths and the system-store preference in `leyline_settings`. |
 | Agent defaults | Selected backend, with global subagent models, batch size, vision overrides, and automatic-title settings in SQLite. |
 | Runtime | Selected backend, with the backend-wide idle timeout in SQLite. |
 | Models & providers | Selected backend's pi global `models.json` and native provider authentication. |
@@ -127,7 +128,7 @@ Settings and trace surfaces use distinct owners and storage:
 
 Trace capture controls live in the trace footer, not a global Settings category.
 
-Runtime, Models & providers, and MCP servers require the backend capability `piSettings`. Provider targets select a cwd for extension discovery. They do not change global file ownership. The modal does not contain Global/Project/Session scope tabs.
+Runtime, Certificates, Models & providers, and MCP servers require the backend capability `piSettings`. Provider targets select a cwd for extension discovery. They do not change global file ownership. The modal does not contain Global/Project/Session scope tabs.
 
 Provider settings use separate leased SDK runtimes. MCP management uses disposable native workers. Neither path silently refreshes conversation catalogs or reloads active sessions. See [Pi Settings](./backend-api#pi-settings) for lifecycle and authentication routing rules, and [Frontend state](./frontend-state#settings-surfaces) for UI ownership.
 
@@ -218,9 +219,9 @@ The database currently contains these application tables:
 - `subagent_batch_overrides`
 - `vision_overrides`
 
-`backend_connections` stores named backend URLs. `leyline_settings` stores the default connection ID, display preferences, `server.network_access`, `server.network_access_port`, backend file-editor settings, `subagents.batch_size`, `session_titles.enabled`, `session_titles.model`, `session_titles.thinking`, `runtime.idle_timeout_minutes`, and `tracing.enabled`. `pinned_sessions` stores sidebar pin IDs by backend connection.
+`backend_connections` stores named backend URLs. `leyline_settings` stores the default connection ID, display preferences, `server.network_access`, `server.network_access_port`, and backend file-editor settings. It also stores `subagents.batch_size`, `session_titles.enabled`, `session_titles.model`, `session_titles.thinking`, `runtime.idle_timeout_minutes`, `tls.extra_ca_files`, `tls.use_system_ca`, and `tracing.enabled`. `pinned_sessions` stores sidebar pin IDs by backend connection.
 
-The app reads connection records, display preferences, network-access state, and pinned sessions from the native backend. Files, memory, feedback, agent overrides, automatic-title settings, and runtime cleanup settings use the selected backend's database. Native and selected backends can be the same process.
+The app reads connection records, display preferences, network-access state, and pinned sessions from the native backend. Files, memory, feedback, agent overrides, automatic-title settings, runtime cleanup settings, and certificate trust use the selected backend's database. Native and selected backends can be the same process.
 
 `subagent_overrides` and `vision_overrides` supply Agent defaults, Project settings, and Session details. Their global scope means all projects on that backend. It does not mean all saved backend connections. Vision model and thinking fields inherit independently.
 

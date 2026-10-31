@@ -348,7 +348,7 @@ It shows the desktop review control only when `capabilities.review` is `true`. I
 
 Local file actions and the Files settings section require `capabilities.fileLinks: true`.
 
-Runtime, Models & providers, and MCP servers require `capabilities.piSettings: true`. These categories use the selected backend, even inside the global Settings modal.
+Runtime, Certificates, Models & providers, and MCP servers require `capabilities.piSettings: true`. These categories use the selected backend, even inside the global Settings modal.
 
 Trace views require `capabilities.tracing: true`. Capture configuration and records belong to the selected backend, not the native connection registry.
 
@@ -564,7 +564,7 @@ A prune request can contain at most 500 session IDs. The frontend sends larger c
 
 These routes use `/api/pi/settings` on the selected backend. Every response sets `Cache-Control: no-store`. Successful requests return `200` without an `ok` envelope.
 
-Provider, model, and MCP configuration is global to that backend's pi agent directory, resolved through `getAgentDir()`. Provider and model edits change `models.json`. MCP edits change `mcp.json`. Native authentication owns `auth.json` and `mcp-auth.json`. Runtime and session-title settings instead use Leyline SQLite on the selected backend.
+Provider, model, and MCP configuration is global to that backend's pi agent directory, resolved through `getAgentDir()`. Provider and model edits change `models.json`. MCP edits change `mcp.json`. Native authentication owns `auth.json` and `mcp-auth.json`. Runtime, session-title, and certificate settings instead use Leyline SQLite on the selected backend.
 
 The API does not edit project MCP files, general pi preferences, model-picker visibility, or Codemode settings. Edits preserve unrelated fields. Explicit deletion and MCP transport changes can remove stored fields that the editor does not display.
 
@@ -642,9 +642,80 @@ The three values persist as strings under `session_titles.enabled`, `session_tit
 
 Generation runs once for a newly created ordinary conversation, after pi accepts its first user message. It runs beside the conversation request, not after the reply. Blank first-message text, including image-only input, suppresses generation. Existing or resumed sessions, forks, research sessions, and children do not receive a generator. Manual names and explicit clears take precedence. Failures keep the normal label. See [Automatic session titles](../developer-guide/backend-api#automatic-session-titles) for request limits and cancellation.
 
-PUT bodies for runtime and session-title settings must be objects. Null or array bodies return `400` with `Expected a settings request object`. An optional `target` must be an object with only string `sessionId` and/or `cwd` fields. Invalid targets return `400` with `Invalid settings target`. These settings ignore a valid target and remain backend-wide.
+### Certificate settings
 
-Neither setting requires a revision. Unsupported methods return `405`. Malformed JSON or unexpected storage errors return `500` with `{ error }`.
+#### `GET /api/pi/settings/tls`
+
+Response:
+
+```text
+TlsTrustSettings = {
+  extraCaFiles: Array<{
+    path: string,
+    name: string,
+    certificateCount: number,
+    error: string
+  }>,
+  useSystemCa: boolean,
+  envCaFile: string,
+  envCaCount: number,
+  systemAvailable: boolean,
+  bundledCount: number,
+  systemCount: number,
+  customCount: number,
+  appliedCount: number,
+  error: string
+}
+```
+
+GET reads saved settings and inspects custom files without changing active TLS trust. It does not apply the store that it builds.
+
+Each file record contains its path, basename, certificate count, and an error string. An unreadable or invalid file has `certificateCount: 0` and a nonempty `error`. The built store excludes all certificates from that file. The top-level `error` joins file errors. These errors do not change the `200` response status. An empty error string means no file error.
+
+| Field | Meaning |
+| --- | --- |
+| `useSystemCa` | Whether Leyline adds operating-system roots to the built store. An unset preference follows the [startup CA options](./environment#tls-certificate-trust). |
+| `envCaFile` | The backend's `NODE_EXTRA_CA_CERTS` value, or `""` when absent. |
+| `envCaCount` | Certificates that Node loaded from `NODE_EXTRA_CA_CERTS` at process startup. |
+| `systemAvailable` | Whether the runtime can read the operating-system certificate store. |
+| `bundledCount` | Node's bundled root count. |
+| `systemCount` | Operating-system root count, even when `useSystemCa` is false. |
+| `customCount` | Sum of valid custom-file certificate counts, before deduplication. |
+| `appliedCount` | Total after deduplication in the built store. GET does not measure or change the active default store. |
+
+#### `PUT /api/pi/settings/tls`
+
+Request:
+
+```text
+{ extraCaFiles: string[], useSystemCa: boolean }
+```
+
+Response: `TlsTrustSettings`, with the same fields as GET.
+
+Both fields are required. PUT replaces the complete file list and system-store preference. `extraCaFiles: []` removes saved custom files. It does not remove certificates from `NODE_EXTRA_CA_CERTS`.
+
+A missing array or boolean, or an unsupported field, returns `400` with `Provide CA certificate files and the system store preference.`
+
+Custom files have these limits:
+
+- The list accepts at most 32 files.
+- Each path must be nonempty text with at most 4,096 characters after trimming.
+- Paths must be absolute or start with `~/`. The backend expands `~` to its own home directory and saves absolute paths.
+- Duplicate path strings after trimming and home expansion are invalid.
+- Each path must name a readable regular file of at most 1 MiB, or 1,048,576 bytes.
+
+Each file needs at least one complete PEM certificate block. Every block must parse with Node's `X509Certificate`. An unmatched `-----BEGIN CERTIFICATE-----` or `-----END CERTIFICATE-----` marker rejects the file. These validation failures return `400`. An unsupported runtime or a failure to apply trust also returns `400`.
+
+The store combines Node's bundled roots, startup `NODE_EXTRA_CA_CERTS` certificates, optional operating-system roots, and custom certificates. Save validates and applies this store before persistence. A database write failure restores the exact prior active CA list and returns `500`.
+
+Save writes `tls.extra_ca_files` as a JSON array and `tls.use_system_ca` as `"true"` or `"false"` in `leyline_settings`. The database is the selected backend's `memory.sqlite`, at the same location as runtime settings. Reads fall back to legacy `tls.extra_ca_file` when the list has no paths. Save clears that legacy value.
+
+Changes affect new backend Node TLS connections, including provider requests and MCP management checks. Existing connections can remain open. The setting does not affect Chromium networking, inbound server HTTPS, or the separate dictation process.
+
+PUT bodies for runtime, session-title, and certificate settings must be objects. Null or array bodies return `400` with `Expected a settings request object`. An optional `target` must be an object with only string `sessionId` and/or `cwd` fields. Invalid targets return `400` with `Invalid settings target`. These settings ignore a valid target and remain backend-wide.
+
+None of these settings requires a revision. Unsupported methods return `405`. Malformed JSON or unexpected storage errors return `500` with `{ error }`.
 
 ### Targets and revisions
 
@@ -1236,18 +1307,18 @@ HTTP failures use `{ error: string }`. Asynchronous action failures instead use 
 
 | Status | Condition or exact operation error |
 | --- | --- |
-| `400` | Invalid target, fields, values, configuration changes, or action. |
+| `400` | Invalid target, fields, values, CA files, configuration changes, or action. |
 | `400` | Answer is not a string or is too long: `Invalid response`. |
 | `400` | Select answer is unavailable: `Select an available option`. |
 | `404` | Missing provider/model configuration, missing MCP action target, or unknown Settings path. |
 | `404` | Unknown or expired operation: `This settings operation expired. Start it again.` |
-| `405` | Unsupported method on inventory, model, or operation routes: `Method not allowed`. |
+| `405` | Unsupported method on runtime, session-title, certificate, inventory, model, or operation routes: `Method not allowed`. |
 | `409` | Missing/stale file revision, invalid stored configuration, duplicate creation, unavailable MCP edit target, Radius URL change, or conflicting settings target. |
 | `409` | Stale answer: `This prompt is no longer active.` |
 | `409` | Duplicate active operation: `An operation for this provider or server is already in progress.` |
 | `429` | Eight active operations already exist: `Too many settings operations are in progress.` |
 | `503` | Settings runtime cannot load, refresh authentication, or acquire capacity, or the backend is shutting down. |
-| `500` | Malformed JSON or unexpected filesystem, SDK, or worker error outside an operation. |
+| `500` | Malformed JSON or unexpected storage, filesystem, SDK, or worker error outside an operation. |
 
 Action paths accept only POST. Other methods on those paths return `404` with `Not found`.
 

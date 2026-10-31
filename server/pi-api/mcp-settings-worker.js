@@ -1,12 +1,14 @@
 import { parentPort, workerData } from 'node:worker_threads'
 import { join } from 'node:path'
+import { setDefaultCACertificates } from 'node:tls'
 import {
   createAgentSession, createMcpExtension, DefaultResourceLoader,
   ModelRuntime, SessionManager, SettingsManager,
 } from '@earendil-works/pi-coding-agent'
 import { createMcpSettingsTransports } from './mcp-settings-transports.js'
 
-const { entry, action, temporary } = workerData
+const { entry, action, temporary, caCertificates } = workerData
+setDefaultCACertificates(caCertificates)
 const controller = new AbortController()
 const { signal } = controller
 const send = (message) => parentPort.postMessage(message)
