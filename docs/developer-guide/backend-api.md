@@ -205,8 +205,6 @@ API keys are optional for custom compatible providers. Saved models remain selec
 
 The public `ModelRuntime` wrapper resolves native authentication and streams through the selected provider. SDK-required placeholders stay internal: Leyline never persists them or sends them over HTTP. Request cleanup removes placeholders even with duplicate or case-variant headers or an explicit empty caller key. Keyless Google requests use an empty `x-goog-api-key` header.
 
-The direct `@earendil-works/pi-ai` dependency supplies streaming helpers and is pinned to `0.99.1`. `@earendil-works/pi-coding-agent` is pinned separately to `1.2.0`.
-
 ### Provider runtime ownership
 
 `provider-settings-runtime.js` caches separate settings runtimes by resolved cwd. Each request acquires a lease and releases it in `finally`. These runtimes never replace conversation handles.
@@ -221,7 +219,7 @@ Provider mutations, authentication, and conversation construction share a proces
 
 Existing work is not silently aborted or reloaded. A save refreshes only its settings runtime. `GET /state?cwd=...&refresh=1` builds and disposes a fresh Home preview without changing conversation catalogs.
 
-Pi 0.99.1 retains cached Radius gateway URLs after reload. Leyline rejects changes that alter or remove an existing Radius base URL. A different gateway requires a different provider identity. Provider IDs cannot contain `/`, but model IDs can.
+Pi retains cached Radius gateway URLs after reload. Leyline rejects changes that alter or remove an existing Radius base URL. A different gateway requires a different provider identity. Provider IDs cannot contain `/`, but model IDs can.
 
 ### Provider connection tests
 

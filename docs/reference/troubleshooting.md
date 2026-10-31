@@ -300,7 +300,7 @@ See [Pi configuration storage](./environment#pi-configuration-storage).
 
 ## A Radius gateway URL cannot change
 
-Pi 0.99.1 can reuse cached model URLs after the configured Radius gateway
+Pi can reuse cached model URLs after the configured Radius gateway
 changes. Leyline rejects edits that change an existing Radius gateway URL.
 Use a different provider ID for a different gateway. Refreshing or reloading
 does not make this endpoint change safe.

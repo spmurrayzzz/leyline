@@ -27,8 +27,8 @@
     "version:major": "npm version major --no-package-lock --message \"chore: release v%s\""
   },
   "dependencies": {
-    "@earendil-works/pi-ai": "0.99.1",
-    "@earendil-works/pi-coding-agent": "1.2.0",
+    "@earendil-works/pi-ai": "1.4.0",
+    "@earendil-works/pi-coding-agent": "1.4.0",
     "@elune/embedded": "spmurrayzzz/elune",
     "@pierre/diffs": "1.2.0-beta.6",
     "@vitejs/plugin-vue": "6.0.7",

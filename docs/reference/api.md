@@ -936,7 +936,7 @@ Response: `ProviderInventory`.
 
 This removes the entire `models.json` provider entry, including custom models and overrides. It does not remove a built-in or extension registration or delete stored credentials. Use `logout` separately.
 
-For provider `radius`, or an existing entry with `oauth: "radius"`, changes cannot alter or remove its saved base URL. Pi 0.99.1 retains cached Radius gateway URLs after reload. Such changes return `409`. Use a different provider ID for a different gateway through pi configuration. This editor does not create Radius OAuth configuration.
+For provider `radius`, or an existing entry with `oauth: "radius"`, changes cannot alter or remove its saved base URL. Pi retains cached Radius gateway URLs after reload. Such changes return `409`. Use a different provider ID for a different gateway through pi configuration. This editor does not create Radius OAuth configuration.
 
 ### Model definitions and overrides
 

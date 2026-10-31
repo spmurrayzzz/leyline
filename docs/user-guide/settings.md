@@ -175,7 +175,7 @@ Saved references stay hidden. Keep the current reference, replace it, or remove 
 
 **Remove provider configuration** removes the saved configuration, including fields outside this form. It does not remove built-in or extension definitions, or sign out stored credentials.
 
-Pi 0.99.1 can retain cached model URLs after a Radius gateway URL changes. Leyline therefore rejects changes to existing Radius gateway URLs. Configure a different provider ID through pi for a different gateway. This editor does not create Radius OAuth configuration.
+Pi can retain cached model URLs after a Radius gateway URL changes. Leyline therefore rejects changes to existing Radius gateway URLs. Configure a different provider ID through pi for a different gateway. This editor does not create Radius OAuth configuration.
 
 ### Manage model definitions and overrides
 
@@ -280,7 +280,7 @@ A test does not save form values, select a model, reload a live session, or add 
 
 Tests request up to 16 output tokens, disable automatic retries, and allow 30 seconds for the probe after settings runtime setup. A test can incur a charge or load a local model. Success confirms the short request, not every model capability.
 
-This pi version cannot enforce those limits for:
+Leyline cannot enforce those limits for:
 
 - Codex models using `openai-codex-responses`.
 - Direct OpenAI Responses with ChatGPT-subscription authentication.

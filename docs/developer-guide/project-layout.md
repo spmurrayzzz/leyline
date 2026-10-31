@@ -173,5 +173,5 @@ Normal runtimes load all six bundled extensions plus inline Elune capture. Isola
 
 - `vite.config.js`: Configures Vue, VitePress middleware, and the pi API plugin.
 - `index.html`: Provides the frontend HTML entry.
-- `package.json`: Defines runtime dependencies and commands. It pins `@earendil-works/pi-coding-agent` to `1.2.0` and the direct `@earendil-works/pi-ai` dependency to `0.99.1`.
+- `package.json`: Defines runtime dependencies and commands.
 - `.nvmrc`: Pins Node.js `v22.19.0` for local work.
